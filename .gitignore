@@ -30,3 +30,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+
+# Snapshot data (raw captures - do not commit to git)
+data/
