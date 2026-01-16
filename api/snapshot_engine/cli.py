@@ -8,6 +8,7 @@ Usage:
 
 import argparse
 import logging
+import secrets
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,9 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 def generate_crawl_id(source_id: str) -> str:
-    """Generate a crawl ID based on source and current timestamp."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
-    return f"crawl_{timestamp}_{source_id}"
+    """
+    Generate a unique crawl ID based on source, timestamp, and random suffix.
+
+    Format: crawl_YYYYMMDD_HHMMSS_mmm_XXXX_{source_id}
+    - mmm: milliseconds (prevents same-second collisions)
+    - XXXX: 4 random hex chars (extra collision safety)
+    """
+    now = datetime.now(timezone.utc)
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+    millis = f"{now.microsecond // 1000:03d}"
+    rand_suffix = secrets.token_hex(2)  # 4 hex chars
+    return f"crawl_{timestamp}_{millis}_{rand_suffix}_{source_id}"
 
 
 def main() -> int:

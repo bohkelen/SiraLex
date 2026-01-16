@@ -6,6 +6,10 @@ Implements the behavioral requirements from shared/specs/snapshot-engine.md:
 - Idempotency (skip if unchanged)
 - Robots.txt respect (do not fetch if disallowed unless permission_override)
 - Evidence preservation (headers, raw bytes, hashes)
+
+Key terminology:
+- snapshot_id: Event ID (unique per fetch, includes timestamp)
+- content_id / content_sha256: Content address (unique per content)
 """
 
 import json
@@ -14,7 +18,6 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
-from urllib.parse import urljoin, urlparse
 
 import httpx
 import zstandard as zstd
@@ -30,6 +33,7 @@ from .models import (
     compute_snapshot_id,
     now_iso8601,
 )
+from .robots import RobotsChecker
 
 logger = logging.getLogger(__name__)
 
@@ -54,20 +58,12 @@ class CrawlerConfig:
     permission_override: bool = False  # If True, ignore robots.txt disallow
 
 
-@dataclass
-class RobotsResult:
-    """Result of a robots.txt check."""
-
-    observed: bool
-    allowed: bool
-    notes: str
-
-
 class SnapshotIndex:
     """
     Index of existing snapshots for idempotency checks.
 
-    Maps url_canonical -> latest content_sha256 for quick lookup.
+    Maps url_canonical -> latest (snapshot_id, content_hash) for quick lookup.
+    Only keeps the latest per URL (full history is in crawl_results.jsonl).
     """
 
     def __init__(self) -> None:
@@ -93,7 +89,7 @@ class SnapshotIndex:
         return self._index.get(url_canonical)
 
     def add(self, url_canonical: str, snapshot_id: str, content_hash: str) -> None:
-        """Add a new snapshot to the index."""
+        """Add a new snapshot to the index (replaces previous for same URL)."""
         self._index[url_canonical] = (snapshot_id, content_hash)
 
 
@@ -105,7 +101,6 @@ class SnapshotCrawler:
     def __init__(self, config: CrawlerConfig) -> None:
         self.config = config
         self.index = SnapshotIndex()
-        self._robots_cache: dict[str, RobotsResult] = {}
         self._last_request_time: float = 0.0
 
         # Set up output directories
@@ -126,6 +121,9 @@ class SnapshotCrawler:
             timeout=TIMEOUT_SECONDS,
             headers={"User-Agent": USER_AGENT},
         )
+
+        # Robots.txt checker (uses proper urllib.robotparser)
+        self._robots_checker = RobotsChecker(self._client)
 
         # Zstandard compressor
         self._compressor = zstd.ZstdCompressor(level=3)
@@ -150,55 +148,6 @@ class SnapshotCrawler:
             logger.debug(f"Sleeping {sleep_time:.2f}s for politeness")
             time.sleep(sleep_time)
         self._last_request_time = time.time()
-
-    def _get_robots_base_url(self, url: str) -> str:
-        """Get the base URL for robots.txt lookup."""
-        parsed = urlparse(url)
-        return f"{parsed.scheme}://{parsed.netloc}"
-
-    def _check_robots(self, url: str) -> RobotsResult:
-        """
-        Check robots.txt for the given URL.
-
-        Returns RobotsResult with observed=True if we checked, allowed=True if permitted.
-        """
-        base_url = self._get_robots_base_url(url)
-
-        # Check cache
-        if base_url in self._robots_cache:
-            return self._robots_cache[base_url]
-
-        robots_url = urljoin(base_url, "/robots.txt")
-        logger.debug(f"Fetching robots.txt: {robots_url}")
-
-        try:
-            self._respect_delay()
-            response = self._client.get(robots_url)
-
-            if response.status_code == 404:
-                result = RobotsResult(observed=True, allowed=True, notes="no_robots_file")
-            elif response.status_code != 200:
-                result = RobotsResult(
-                    observed=True, allowed=True, notes=f"robots_fetch_error_{response.status_code}"
-                )
-            else:
-                # Simple robots.txt parsing (very basic - just look for Disallow: /)
-                # A production crawler would use a proper robots.txt parser
-                content = response.text.lower()
-                # Check if there's a blanket disallow for our user agent or *
-                if "disallow: /" in content:
-                    # Very conservative: any disallow means we check more carefully
-                    # For now, assume allowed unless explicitly disallowed
-                    result = RobotsResult(observed=True, allowed=True, notes="allowed")
-                else:
-                    result = RobotsResult(observed=True, allowed=True, notes="allowed")
-
-        except httpx.RequestError as e:
-            logger.warning(f"Failed to fetch robots.txt: {e}")
-            result = RobotsResult(observed=False, allowed=True, notes="robots_fetch_failed")
-
-        self._robots_cache[base_url] = result
-        return result
 
     def _fetch_with_retry(self, url: str) -> httpx.Response | None:
         """Fetch a URL with retry and exponential backoff."""
@@ -262,8 +211,10 @@ class SnapshotCrawler:
 
         logger.info(f"Crawling: {url}")
 
-        # Check robots.txt
-        robots = self._check_robots(url)
+        # Check robots.txt using proper parser
+        self._respect_delay()  # Respect delay for robots.txt fetch too
+        robots = self._robots_checker.check(url)
+
         if not robots.allowed and not self.config.permission_override:
             logger.info(f"Blocked by robots.txt: {url}")
             result = CrawlResult(
@@ -302,6 +253,9 @@ class SnapshotCrawler:
 
         # Check for existing snapshot (idempotency)
         existing = self.index.get_existing(url_canonical)
+        previous_snapshot_id = ""
+        previous_content_sha256 = ""
+
         if existing is not None:
             existing_id, existing_hash = existing
             if existing_hash == content_hash:
@@ -317,7 +271,10 @@ class SnapshotCrawler:
                 return result
             else:
                 status = CrawlStatus.CHANGED
-                logger.info(f"Changed: {url}")
+                # Record what it changed from
+                previous_snapshot_id = existing_id
+                previous_content_sha256 = existing_hash
+                logger.info(f"Changed: {url} (was {existing_id})")
         else:
             status = CrawlStatus.NEW
             logger.info(f"New: {url}")
@@ -328,14 +285,14 @@ class SnapshotCrawler:
             for resp in response.history:
                 redirect_chain.append(RedirectHop(status=resp.status_code, url=str(resp.url)))
 
-        # Compute snapshot_id
+        # Compute snapshot_id (event-based, includes timestamp)
         retrieved_at = checked_at
         snapshot_id = compute_snapshot_id(url_canonical, retrieved_at, content_hash)
 
         # Save payload
         payload_path = self._save_payload(snapshot_id, content)
 
-        # Redact headers
+        # Redact headers (value redaction, preserves keys for evidence)
         raw_headers = dict(response.headers)
         redacted_headers = redact_headers(raw_headers)
 
@@ -376,13 +333,15 @@ class SnapshotCrawler:
         self._append_snapshot(snapshot)
         self.index.add(url_canonical, snapshot_id, content_hash)
 
-        # Create result
+        # Create result (with previous_* for CHANGED status)
         result = CrawlResult(
             url_canonical=url_canonical,
             crawl_status=status,
             checked_at=checked_at,
             snapshot_id=snapshot_id,
             content_sha256=content_hash,
+            previous_snapshot_id=previous_snapshot_id,
+            previous_content_sha256=previous_content_sha256,
         )
         self._append_result(result)
 

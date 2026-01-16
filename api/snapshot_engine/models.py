@@ -2,6 +2,10 @@
 Data models for the Snapshot Engine.
 
 These models implement the contracts defined in shared/specs/snapshot-engine.md.
+
+Key terminology:
+- snapshot_id: Event identifier (unique per fetch). Answers "what did we fetch at that time?"
+- content_id / content_sha256: Content address (unique per content). Answers "what bytes is this?"
 """
 
 from dataclasses import dataclass, field
@@ -35,10 +39,15 @@ class SnapshotRecord:
     Snapshot metadata record per shared/specs/snapshot-engine.md.
 
     All required fields from the spec are present.
+
+    Identity fields:
+    - snapshot_id: Per-fetch event identifier (includes timestamp in hash).
+    - content_id: Per-content identifier (first 16 chars of content_sha256).
+    - content_sha256: Full content hash for exact matching.
     """
 
     # Required fields
-    snapshot_id: str
+    snapshot_id: str  # Event ID: unique per fetch (includes timestamp)
     source_id: str
     url_original: str
     url_canonical: str
@@ -46,10 +55,13 @@ class SnapshotRecord:
     retrieved_at: str  # ISO-8601
     http_status: int
     headers: dict[str, str]
-    content_sha256: str
+    content_sha256: str  # Full content hash
     byte_length: int
     payload_path: str
     robots_observed: bool
+
+    # Content identity (convenience, derived from content_sha256)
+    content_id: str = ""  # First 16 chars of content_sha256
 
     # Recommended fields
     robots_policy_notes: str = ""
@@ -60,10 +72,16 @@ class SnapshotRecord:
     fetch_tool_version: str = ""
     redaction_policy_id: str = "header_redact_v1"
 
+    def __post_init__(self) -> None:
+        """Compute derived fields."""
+        if not self.content_id and self.content_sha256:
+            self.content_id = self.content_sha256[:16]
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dict."""
         return {
             "snapshot_id": self.snapshot_id,
+            "content_id": self.content_id,
             "source_id": self.source_id,
             "url_original": self.url_original,
             "url_canonical": self.url_canonical,
@@ -91,26 +109,46 @@ class CrawlResult:
     URL-level crawl result per shared/specs/snapshot-engine.md.
 
     Recorded for every URL checked, regardless of whether a new snapshot was created.
+
+    For status=CHANGED, includes previous_* fields to make the diff explicit.
     """
 
     url_canonical: str
     crawl_status: CrawlStatus
     checked_at: str  # ISO-8601
     snapshot_id: str = ""  # Empty if error/robots_blocked
+    content_id: str = ""  # First 16 chars of content_sha256 (convenience)
     content_sha256: str = ""  # Empty if not fetched
+
+    # For CHANGED status: what did it change from?
+    previous_snapshot_id: str = ""
+    previous_content_sha256: str = ""
+
+    # Error details
     error_details: str = ""  # Only if status is ERROR
+
+    def __post_init__(self) -> None:
+        """Compute derived fields."""
+        if not self.content_id and self.content_sha256:
+            self.content_id = self.content_sha256[:16]
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dict."""
-        result = {
+        result: dict[str, Any] = {
             "url_canonical": self.url_canonical,
             "crawl_status": self.crawl_status.value,
             "checked_at": self.checked_at,
         }
         if self.snapshot_id:
             result["snapshot_id"] = self.snapshot_id
+        if self.content_id:
+            result["content_id"] = self.content_id
         if self.content_sha256:
             result["content_sha256"] = self.content_sha256
+        if self.previous_snapshot_id:
+            result["previous_snapshot_id"] = self.previous_snapshot_id
+        if self.previous_content_sha256:
+            result["previous_content_sha256"] = self.previous_content_sha256
         if self.error_details:
             result["error_details"] = self.error_details
         return result
@@ -120,6 +158,10 @@ def compute_snapshot_id(url_canonical: str, retrieved_at: str, content_sha256: s
     """
     Compute snapshot_id per spec:
     sha256_hex(url_canonical + "\\n" + retrieved_at + "\\n" + content_sha256)[:16]
+
+    NOTE: This is an EVENT identifier, not a content address.
+    Same content fetched at different times yields different snapshot_id.
+    For content identity, use content_sha256 or content_id.
     """
     data = f"{url_canonical}\n{retrieved_at}\n{content_sha256}"
     return sha256(data.encode("utf-8")).hexdigest()[:16]
@@ -128,6 +170,11 @@ def compute_snapshot_id(url_canonical: str, retrieved_at: str, content_sha256: s
 def compute_content_hash(content: bytes) -> str:
     """Compute SHA-256 hash of content bytes, lowercase hex."""
     return sha256(content).hexdigest()
+
+
+def compute_content_id(content_sha256: str) -> str:
+    """Compute content_id from full content hash (first 16 chars)."""
+    return content_sha256[:16]
 
 
 def now_iso8601() -> str:
