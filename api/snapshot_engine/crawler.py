@@ -212,7 +212,8 @@ class SnapshotCrawler:
         logger.info(f"Crawling: {url}")
 
         # Check robots.txt using proper parser
-        self._respect_delay()  # Respect delay for robots.txt fetch too
+        # Note: delay is applied in _fetch_with_retry(), not here.
+        # RobotsChecker caches per host, so robots.txt is fetched once.
         robots = self._robots_checker.check(url)
 
         if not robots.allowed and not self.config.permission_override:
