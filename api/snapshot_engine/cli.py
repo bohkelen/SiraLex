@@ -152,7 +152,7 @@ Examples:
     )
 
     # Run crawler
-    stats = {"new": 0, "changed": 0, "unchanged": 0, "error": 0, "robots_blocked": 0}
+    stats = {"new": 0, "changed": 0, "unchanged": 0, "not_found": 0, "error": 0, "robots_blocked": 0}
 
     with SnapshotCrawler(config) as crawler:
         for result in crawler.crawl_urls(urls):
@@ -164,6 +164,7 @@ Examples:
     logger.info(f"  New:            {stats['new']}")
     logger.info(f"  Changed:        {stats['changed']}")
     logger.info(f"  Unchanged:      {stats['unchanged']}")
+    logger.info(f"  Not found:      {stats['not_found']}")
     logger.info(f"  Errors:         {stats['error']}")
     logger.info(f"  Robots blocked: {stats['robots_blocked']}")
     logger.info(f"Output: {config.output_dir / config.source_id / config.crawl_id}")
