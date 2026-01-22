@@ -238,6 +238,19 @@ class SnapshotCrawler:
             self._append_result(result)
             return result
 
+        # Handle 404 as a first-class outcome (page doesn't exist, not an error)
+        if response.status_code == 404:
+            logger.info(f"Not found (404): {url}")
+            result = CrawlResult(
+                url_canonical=url_canonical,
+                crawl_status=CrawlStatus.NOT_FOUND,
+                checked_at=checked_at,
+                error_details="http_404",
+            )
+            self._append_result(result)
+            return result
+
+        # Other 4xx/5xx are actual errors
         if response.status_code >= 400:
             result = CrawlResult(
                 url_canonical=url_canonical,

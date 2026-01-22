@@ -2,26 +2,35 @@
 # See shared/specs/source-registry.md for field definitions
 
 source_id: src_malipense
-name: "Mali-pense / Malidaba French → Maninka dictionary"
+name: "Mali-pense / Malidaba Maninka dictionary"
 homepage_url: "https://www.mali-pense.net/"
 
-# Licensing (verified from site; redistribution confirmation pending)
-claimed_license: "CC BY-NC-SA 4.0 (Malidaba landing page claim; scope confirmation pending)"
-license_evidence_url: "https://www.mali-pense.net/emk/lexicon/index.htm"
-license_inference_note: |
-  The Malidaba dictionary landing page (license_evidence_url) states:
-    EN: "Malidaba dictionary is available under licence Creative Commons - CC BY-NC-SA 4.0 Deed…"
-    FR: "Le dictionnaire Malidaba est mis à disposition selon les termes de la licence Creative Commons … CC BY-NC-SA 4.0 Deed…"
-  
-  Important: This license claim is on the Malidaba landing page. It does not automatically
-  prove that all sub-areas or older pages (e.g., /emk/index-french/) are under the same license.
-  
-  Status: Explicit CC BY-NC-SA 4.0 claim exists. Confirmation pending for:
-    - Scope: does the license cover /emk/index-french/ pages?
-    - Redistribution: is offline bundling permitted under CC BY-NC-SA 4.0?
-    - Attribution: what attribution text is required?
+# Authors (from site meta tags and indexfr.htm)
+authors:
+  - name: "Valentin Vydrine"
+    role: "primary author"
+    contact: "valentin.vydrin@gmail.com"
+  - name: "Jean-Jacques Méric"
+    role: "co-author / maintainer"
 
-redistribution_policy: "unknown"
+# Licensing (verified from indexfr.htm - 2026-01-22)
+claimed_license: "CC BY-NC-SA 4.0"
+license_evidence_url: "https://www.mali-pense.net/emk/lexicon/indexfr.htm"
+license_inference_note: |
+  Verified 2026-01-22 from indexfr.htm (lexicon landing page):
+  - Page explicitly states CC BY-NC-SA 4.0 license
+  - Both /emk/lexicon/ and /emk/index-french/ are part of the same Malidaba dictionary
+  - Site provides offline download ZIP, implying redistribution is permitted under CC terms
+  
+  Our stance: We will comply with CC BY-NC-SA 4.0 requirements:
+    - Attribution: credit authors and source URL
+    - NonCommercial: no commercial use
+    - ShareAlike: derivative works under same license
+  
+  Pending: Confirm preferred attribution wording with maintainers.
+  Will comply with any takedown request.
+
+redistribution_policy: "permitted_with_attribution"
 
 # Takedown / removal
 takedown_policy_ref: |
@@ -45,14 +54,61 @@ contact_page_url: "https://www.mali-pense.net/Pour-nous-joindre.html"
 contact_status: "not_attempted"
 contact_attempted_at: null
 
-# Crawl targets (verified structure)
-index_url_pattern: "/emk/index-french/{letter}.htm"
-index_url_example: "https://www.mali-pense.net/emk/index-french/h.htm"
+# Crawl targets (verified structure - 2026-01-22)
+# Two-tier structure discovered from inspection:
+#   1. French index pages: navigation/lookup by French headword
+#   2. Lexicon pages: actual Maninka dictionary entries
+
+french_index:
+  url_pattern: "/emk/index-french/{letter}.htm"
+  letters_in_navbar: "a b c d e f g h i j k l m n o p q r s t u v w x y z"
+  letters_captured: "a b c d e f g h i j k l m n o p q r s t u v w y z"  # x.htm 404
+  count_captured: 25
+  purpose: "French→Maninka index (links to lexicon entries)"
+
+lexicon:
+  url_pattern: "/emk/lexicon/{letter}.htm"
+  letters_in_navbar: "a b c d e ɛ f g h i j k l m n ɲ ŋ o ɔ p r s t u w x y z"
+  letters_captured: "a b c d e ɛ f g h i j k l m n ɲ o ɔ p r s t u w x y"  # ŋ.htm, z.htm 404
+  count_captured: 26
+  purpose: "Main dictionary content (Maninka entries with definitions, examples, POS)"
+  navbar_source: "https://www.mali-pense.net/emk/lexicon/indexfr.htm"
+
+# Known missing pages (navbar includes them but they 404)
+# These are documented to prevent noisy "error" reports on future crawls.
+# The navbar is a UI artifact / template, not fully authoritative.
+known_missing_pages:
+  - url: "https://www.mali-pense.net/emk/index-french/x.htm"
+    http_status: 404
+    verified_at: "2026-01-22T04:27:30Z"
+    reason: "No French words starting with X in the dictionary"
+    recheck: false  # Expected permanent 404
+
+  - url: "https://www.mali-pense.net/emk/lexicon/ŋ.htm"
+    http_status: 404
+    verified_at: "2026-01-22T04:28:20Z"
+    reason: "Navbar includes ŋ but page doesn't exist (stale template or no entries)"
+    recheck: true  # May be added later
+
+  - url: "https://www.mali-pense.net/emk/lexicon/z.htm"
+    http_status: 404
+    verified_at: "2026-01-22T04:28:41Z"
+    reason: "Navbar includes z but page doesn't exist (no Maninka words starting with z)"
+    recheck: false  # Expected permanent 404
 
 crawl_notes: |
-  Index pages: /emk/index-french/{letter}.htm (a.htm through z.htm, possibly with gaps)
-  Entry structure: HTML with dictionary entries (structure TBD during prototype crawl)
-  Encoding: likely iso-8859-1 or windows-1252 (verify during crawl)
+  Two-tier structure (verified 2026-01-22):
+  
+  1. French index: /emk/index-french/{a-z}.htm (26 pages)
+     - French headwords linking to Maninka entries in /lexicon/
+     - Useful for French→Maninka lookup
+  
+  2. Lexicon: /emk/lexicon/{letter}.htm (28 pages, including ɛ ɲ ŋ ɔ)
+     - THE MAIN CONTENT: Maninka entries with French/English glosses, examples, POS
+     - Entries are anchors within pages (e.g., m.htm#mɔ̀ɔ)
+     - ~7,283 lexemes / 8,799 entries per indexfr.htm
+  
+  Encoding: UTF-8 (verified from Content-Type headers)
   
   Note: Do NOT use /Lexique-Maninka/ paths — that's a different/older area.
 
@@ -65,8 +121,11 @@ disable_reason: null
 
 # Record identity notes
 record_identity_notes: |
-  Entries are on per-letter index pages (/emk/index-french/a.htm, b.htm, etc.).
-  No stable per-entry URLs observed; use url_canonical + entry_index for identity.
+  Lexicon entries have stable anchor IDs (e.g., #e5403, #mɔ̀ɔ).
+  Use record_locator.kind = "source_record_id" with the anchor name.
+  
+  For entries without anchor IDs, fall back to url_canonical + entry_index.
+  
   Canonicalization: normalize https, lowercase host, no trailing slash.
 
 # Attribution template (pending confirmation of required format)

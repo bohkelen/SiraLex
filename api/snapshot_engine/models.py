@@ -21,7 +21,8 @@ class CrawlStatus(str, Enum):
     NEW = "new"  # No prior snapshot; new snapshot created
     CHANGED = "changed"  # Content hash differs; new snapshot created
     UNCHANGED = "unchanged"  # Content hash matches; no new snapshot
-    ERROR = "error"  # Fetch failed
+    NOT_FOUND = "not_found"  # HTTP 404 - page doesn't exist (valid state, not error)
+    ERROR = "error"  # Fetch failed (network error, 5xx, max retries)
     ROBOTS_BLOCKED = "robots_blocked"  # Skipped due to robots.txt
 
 
