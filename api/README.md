@@ -57,9 +57,65 @@ data/snapshots/
 
 See `shared/specs/snapshot-engine.md` for full specification.
 
-## Planned responsibilities (Phase 1+)
+## IR Parser (Phase 1.2)
 
-- Ingestion pipeline entry points (raw capture → lossless IR → normalized records)
+The IR Parser extracts structured IR (Intermediate Representation) units from raw snapshots. IR preserves all source data in a lossless-enough format for downstream normalization.
+
+### Usage
+
+```bash
+# Parse all lexicon snapshots from a crawl
+nkokan-parse-ir --crawl-dir data/snapshots/src_malipense/crawl_xxx \
+    --output data/ir/malipense_lexicon.jsonl
+
+# With verbose logging
+nkokan-parse-ir --crawl-dir data/snapshots/src_malipense/crawl_xxx \
+    --output data/ir/malipense_lexicon.jsonl -v
+```
+
+### Output structure
+
+```
+data/ir/
+  malipense_lexicon.jsonl   # One IR unit per line (JSONL)
+```
+
+### IR unit shape
+
+```json
+{
+  "ir_id": "a7b3c9d2...",           // Deterministic, collision-safe
+  "ir_kind": "lexicon_entry",       // Document type
+  "source_id": "src_malipense",
+  "parser_version": "malipense_lexicon_v1",
+  "evidence": [{                    // Full entry block coverage
+    "source_id": "src_malipense",
+    "snapshot_id": "20f263ef...",
+    "entry_block": {...},
+    "text_quote": "ábadàn"
+  }],
+  "record_locator": {...},          // Identity hint
+  "fields_raw": {                   // Literal extraction
+    "headword_latin": "ábadàn",
+    "headword_nko_provided": "...",
+    "senses": [...]
+  }
+}
+```
+
+### Key design decisions
+
+- **`ir_id`**: Deterministic hash of `source_id|url_canonical|record_id|parser_version`
+- **No `retrieved_at`**: Join via `snapshot_id` instead
+- **Evidence covers full block**: Not just headword element
+- **Literal extraction**: `ps_raw` preserved verbatim, `pos_hint` only if confident
+- **"Provided" forms**: N'Ko from source stored as `headword_nko_provided`
+
+See `shared/specs/lossless-capture-and-ir.md` for full specification.
+
+## Planned responsibilities (Phase 1.3+)
+
+- Normalization pipeline (IR → normalized lexicon records)
 - Provenance enforcement (entry/sense/example)
 - Transliteration service/module hooks (Latin → N'Ko + uncertainty flags)
 - Moderation queue for anonymous suggestions (audit + rollback)
