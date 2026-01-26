@@ -75,9 +75,6 @@ class EvidencePointer:
     # Hash of the fragment content
     fragment_hash: str | None = None
     fragment_representation_kind: str | None = None
-    
-    # Raw block hash for lossiness detection (parser drift detection)
-    raw_block_hash: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dict, omitting None values."""
@@ -109,8 +106,6 @@ class EvidencePointer:
             result["fragment_hash"] = self.fragment_hash
         if self.fragment_representation_kind:
             result["fragment_representation_kind"] = self.fragment_representation_kind
-        if self.raw_block_hash:
-            result["raw_block_hash"] = self.raw_block_hash
         return result
 
 
@@ -234,12 +229,10 @@ class LexiconEntryFieldsRaw:
     fields_raw schema for ir_kind=lexicon_entry.
     
     Preserves literal extraction - no over-interpretation.
-    
-    Note: anchor_names belongs in record_locator, not here.
-    fields_raw contains only content fields, not identity/locator fields.
     """
     headword_latin: str
     headword_nko_provided: str | None = None  # From source, not generated
+    anchor_names: list[str] = field(default_factory=list)
     
     # POS: store literally, don't over-interpret
     ps_raw: str | None = None  # Exactly as found (e.g., "adv jamais")
@@ -263,6 +256,8 @@ class LexiconEntryFieldsRaw:
         }
         if self.headword_nko_provided:
             result["headword_nko_provided"] = self.headword_nko_provided
+        if self.anchor_names:
+            result["anchor_names"] = self.anchor_names
         if self.ps_raw:
             result["ps_raw"] = self.ps_raw
         if self.pos_hint:
@@ -356,9 +351,6 @@ class IRUnit:
     fields_raw: LexiconEntryFieldsRaw | IndexMappingFieldsRaw | dict[str, Any]
     parse_warnings: list[str] = field(default_factory=list)
     
-    # Warning policy version (thresholds that generated the warnings)
-    warning_policy_id: str | None = None
-    
     # OCR-specific (only for OCR-derived IR)
     ocr_engine: str | None = None
     ocr_version: str | None = None
@@ -382,8 +374,6 @@ class IRUnit:
         
         if self.parse_warnings:
             result["parse_warnings"] = self.parse_warnings
-        if self.warning_policy_id:
-            result["warning_policy_id"] = self.warning_policy_id
         if self.ocr_engine:
             result["ocr_engine"] = self.ocr_engine
         if self.ocr_version:
@@ -404,8 +394,6 @@ class IRUnit:
         anchor_names: list[str] | None = None,
         text_quote: str | None = None,
         parse_warnings: list[str] | None = None,
-        warning_policy_id: str | None = None,
-        raw_block_hash: str | None = None,
     ) -> "IRUnit":
         """
         Factory method to create a lexicon entry IR unit with proper ir_id computation.
@@ -417,7 +405,6 @@ class IRUnit:
             snapshot_id=snapshot_id,
             entry_block=entry_block,
             text_quote=text_quote,
-            raw_block_hash=raw_block_hash,
         )
         
         record_locator = RecordLocator(
@@ -436,7 +423,6 @@ class IRUnit:
             record_locator=record_locator,
             fields_raw=fields_raw,
             parse_warnings=parse_warnings or [],
-            warning_policy_id=warning_policy_id,
         )
 
     @classmethod
