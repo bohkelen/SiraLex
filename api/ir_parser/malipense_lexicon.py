@@ -55,6 +55,34 @@ logger = logging.getLogger(__name__)
 PARSER_VERSION = "malipense_lexicon_v1"
 SOURCE_ID = "src_malipense"
 
+# Warning policy: versioned thresholds for generating warnings
+# Changes to these thresholds change warning behavior across parser runs
+WARNING_POLICY_ID = "malipense_warn_v1"
+WARNING_THRESHOLDS = {
+    "max_senses_before_warning": 30,
+    "max_examples_before_warning": 50,
+    "max_blocks_before_warning": 50,
+}
+
+
+def compute_block_hash(elements: list) -> str:
+    """
+    Compute SHA256 hash of the entry block HTML for lossiness detection.
+    
+    This allows detecting when parser v2 produces different extraction
+    from the same evidence block.
+    """
+    from hashlib import sha256
+    
+    block_html = ""
+    for el in elements:
+        if hasattr(el, "decode"):
+            block_html += str(el)
+        else:
+            block_html += str(el)
+    
+    return sha256(block_html.encode("utf-8")).hexdigest()[:16]
+
 
 @dataclass
 class ParsedEntry:
@@ -72,6 +100,7 @@ class ParsedEntry:
     literal_meaning_raw: str | None
     corpus_count: int | None
     warnings: list[str]
+    raw_block_hash: str | None = None  # SHA256 hash of entry block HTML
 
 
 class MalipenseLexiconParser:
@@ -137,16 +166,19 @@ class MalipenseLexiconParser:
                 entry_elements.append(sibling)
                 sibling = sibling.find_next_sibling()
             
+            # Compute block hash for lossiness detection
+            raw_block_hash = compute_block_hash(entry_elements)
+            
             # Parse the entry
             try:
-                parsed = self._parse_entry(entry_id, entry_elements)
+                parsed = self._parse_entry(entry_id, entry_elements, raw_block_hash)
                 ir_unit = self._to_ir_unit(parsed, next_entry_id)
                 yield ir_unit
             except Exception as e:
                 logger.warning(f"Failed to parse entry {entry_id}: {e}")
                 continue
     
-    def _parse_entry(self, entry_id: str, elements: list[Tag]) -> ParsedEntry:
+    def _parse_entry(self, entry_id: str, elements: list[Tag], raw_block_hash: str) -> ParsedEntry:
         """Parse entry elements into intermediate structure."""
         warnings: list[str] = []
         
@@ -206,11 +238,15 @@ class MalipenseLexiconParser:
                 if (ex.trans_fr or ex.trans_en) and not ex.text_latin:
                     warnings.append(f"sense_{i}_example_{j}_has_translation_but_no_text")
         
-        if len(senses) > 30:
+        # Use versioned thresholds for warnings
+        max_senses = WARNING_THRESHOLDS["max_senses_before_warning"]
+        max_examples = WARNING_THRESHOLDS["max_examples_before_warning"]
+        
+        if len(senses) > max_senses:
             warnings.append(f"unusually_many_senses: {len(senses)}")
         
         total_examples = sum(len(s.examples) for s in senses)
-        if total_examples > 50:
+        if total_examples > max_examples:
             warnings.append(f"unusually_many_examples: {total_examples}")
         
         return ParsedEntry(
@@ -227,11 +263,16 @@ class MalipenseLexiconParser:
             literal_meaning_raw=literal_meaning_raw,
             corpus_count=corpus_count,
             warnings=warnings,
+            raw_block_hash=raw_block_hash,
         )
     
     def _extract_anchor_names(self, header: Tag) -> list[str]:
         """
         Extract anchor names from <a name="..."> elements before the header.
+        
+        IMPORTANT: This extracts ONLY from literal <a name="..."> tags in the HTML.
+        No synthesis or generation. The Mali-pense source provides multiple anchor
+        variants (e.g., "dɔ́bɛ̀n", "dɔbɛn", "dòbèn") for the same entry.
         
         FIXED: Skip whitespace nodes, comments, and other non-anchor elements
         to handle cases where there are gaps between anchors and header.
@@ -442,12 +483,27 @@ class MalipenseLexiconParser:
         if current_sense:
             senses.append(current_sense)
         
-        # Generate warnings for edge cases
-        if block_count > 50:
+        # Generate warnings for edge cases (using versioned thresholds)
+        max_blocks = WARNING_THRESHOLDS["max_blocks_before_warning"]
+        if block_count > max_blocks:
             warnings.append(f"entry_unusually_large: {block_count} blocks (possible boundary bleed)")
         
-        # Check for empty senses
-        empty_senses = [i for i, s in enumerate(senses) if not s.gloss_fr and not s.gloss_en and not s.sub_entries]
+        # Check for empty senses - a sense is non-empty if it has:
+        # - a gloss (Fr/En/Ru)
+        # - examples
+        # - sub-entries (MXRef)
+        # - synonyms
+        def is_sense_non_empty(s: SenseRaw) -> bool:
+            return bool(
+                s.gloss_fr or 
+                s.gloss_en or 
+                s.gloss_ru or
+                s.examples or
+                s.sub_entries or
+                s.synonyms_raw
+            )
+        
+        empty_senses = [i for i, s in enumerate(senses) if not is_sense_non_empty(s)]
         if empty_senses:
             warnings.append(f"empty_senses_at_indices: {empty_senses}")
         
@@ -532,11 +588,10 @@ class MalipenseLexiconParser:
             end_selector=f"span#{next_entry_id}" if next_entry_id else None,
         )
         
-        # Create fields_raw
+        # Create fields_raw (anchor_names goes in record_locator, not here)
         fields_raw = LexiconEntryFieldsRaw(
             headword_latin=parsed.headword_latin,
             headword_nko_provided=parsed.headword_nko,
-            anchor_names=parsed.anchor_names,
             ps_raw=parsed.ps_raw,
             pos_hint=parsed.pos_hint,
             senses=parsed.senses,
@@ -559,6 +614,8 @@ class MalipenseLexiconParser:
             anchor_names=parsed.anchor_names,
             text_quote=parsed.headword_latin,
             parse_warnings=parsed.warnings,
+            warning_policy_id=WARNING_POLICY_ID,
+            raw_block_hash=parsed.raw_block_hash,
         )
 
 
