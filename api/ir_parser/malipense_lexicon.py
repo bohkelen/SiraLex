@@ -55,6 +55,34 @@ logger = logging.getLogger(__name__)
 PARSER_VERSION = "malipense_lexicon_v1"
 SOURCE_ID = "src_malipense"
 
+# Warning policy: versioned thresholds for generating warnings
+# Changes to these thresholds change warning behavior across parser runs
+WARNING_POLICY_ID = "malipense_warn_v1"
+WARNING_THRESHOLDS = {
+    "max_senses_before_warning": 30,
+    "max_examples_before_warning": 50,
+    "max_blocks_before_warning": 50,
+}
+
+
+def compute_block_hash(elements: list) -> str:
+    """
+    Compute SHA256 hash of the entry block HTML for lossiness detection.
+    
+    This allows detecting when parser v2 produces different extraction
+    from the same evidence block.
+    """
+    from hashlib import sha256
+    
+    block_html = ""
+    for el in elements:
+        if hasattr(el, "decode"):
+            block_html += str(el)
+        else:
+            block_html += str(el)
+    
+    return sha256(block_html.encode("utf-8")).hexdigest()[:16]
+
 
 @dataclass
 class ParsedEntry:
@@ -72,6 +100,7 @@ class ParsedEntry:
     literal_meaning_raw: str | None
     corpus_count: int | None
     warnings: list[str]
+    raw_block_hash: str | None = None  # SHA256 hash of entry block HTML
 
 
 class MalipenseLexiconParser:
@@ -137,16 +166,19 @@ class MalipenseLexiconParser:
                 entry_elements.append(sibling)
                 sibling = sibling.find_next_sibling()
             
+            # Compute block hash for lossiness detection
+            raw_block_hash = compute_block_hash(entry_elements)
+            
             # Parse the entry
             try:
-                parsed = self._parse_entry(entry_id, entry_elements)
+                parsed = self._parse_entry(entry_id, entry_elements, raw_block_hash)
                 ir_unit = self._to_ir_unit(parsed, next_entry_id)
                 yield ir_unit
             except Exception as e:
                 logger.warning(f"Failed to parse entry {entry_id}: {e}")
                 continue
     
-    def _parse_entry(self, entry_id: str, elements: list[Tag]) -> ParsedEntry:
+    def _parse_entry(self, entry_id: str, elements: list[Tag], raw_block_hash: str) -> ParsedEntry:
         """Parse entry elements into intermediate structure."""
         warnings: list[str] = []
         
@@ -191,6 +223,32 @@ class MalipenseLexiconParser:
         # Parse sense blocks (p.lxP2)
         senses = self._parse_senses(elements[1:], warnings)
         
+        # Generate warnings for edge cases
+        if not headword_latin:
+            warnings.append("missing_headword")
+        
+        if not senses:
+            warnings.append("no_senses_found")
+        elif all(not s.gloss_fr and not s.gloss_en and not s.gloss_ru for s in senses):
+            warnings.append("no_glosses_in_any_sense")
+        
+        # Check for examples without example text (translation but no source)
+        for i, sense in enumerate(senses):
+            for j, ex in enumerate(sense.examples):
+                if (ex.trans_fr or ex.trans_en) and not ex.text_latin:
+                    warnings.append(f"sense_{i}_example_{j}_has_translation_but_no_text")
+        
+        # Use versioned thresholds for warnings
+        max_senses = WARNING_THRESHOLDS["max_senses_before_warning"]
+        max_examples = WARNING_THRESHOLDS["max_examples_before_warning"]
+        
+        if len(senses) > max_senses:
+            warnings.append(f"unusually_many_senses: {len(senses)}")
+        
+        total_examples = sum(len(s.examples) for s in senses)
+        if total_examples > max_examples:
+            warnings.append(f"unusually_many_examples: {total_examples}")
+        
         return ParsedEntry(
             entry_id=entry_id,
             anchor_names=anchor_names,
@@ -205,15 +263,45 @@ class MalipenseLexiconParser:
             literal_meaning_raw=literal_meaning_raw,
             corpus_count=corpus_count,
             warnings=warnings,
+            raw_block_hash=raw_block_hash,
         )
     
     def _extract_anchor_names(self, header: Tag) -> list[str]:
-        """Extract anchor names from <a name="..."> elements before the header."""
+        """
+        Extract anchor names from <a name="..."> elements before the header.
+        
+        IMPORTANT: This extracts ONLY from literal <a name="..."> tags in the HTML.
+        No synthesis or generation. The Mali-pense source provides multiple anchor
+        variants (e.g., "dɔ́bɛ̀n", "dɔbɛn", "dòbèn") for the same entry.
+        
+        FIXED: Skip whitespace nodes, comments, and other non-anchor elements
+        to handle cases where there are gaps between anchors and header.
+        """
+        from bs4 import NavigableString, Comment
+        
         anchors = []
-        prev = header.find_previous_sibling()
-        while prev and prev.name == "a" and prev.get("name"):
-            anchors.insert(0, prev.get("name"))
-            prev = prev.find_previous_sibling()
+        prev = header.previous_sibling
+        
+        while prev is not None:
+            # Skip whitespace-only text nodes and comments
+            if isinstance(prev, NavigableString):
+                if isinstance(prev, Comment) or not prev.strip():
+                    prev = prev.previous_sibling
+                    continue
+                else:
+                    # Non-whitespace text node - stop
+                    break
+            
+            # Check if it's an anchor tag with name attribute
+            if isinstance(prev, Tag):
+                if prev.name == "a" and prev.get("name"):
+                    anchors.insert(0, prev.get("name"))
+                else:
+                    # Hit a non-anchor tag - stop
+                    break
+            
+            prev = prev.previous_sibling
+        
         return anchors
     
     def _extract_pos_hint(self, ps_raw: str) -> str | None:
@@ -292,9 +380,17 @@ class MalipenseLexiconParser:
         return synonyms
     
     def _parse_senses(self, elements: list[Tag], warnings: list[str]) -> list[SenseRaw]:
-        """Parse sense blocks (p.lxP2 elements)."""
+        """
+        Parse sense blocks (p.lxP2 elements).
+        
+        FIXED:
+        - Skip PS-only blocks (they're part of speech info, not senses)
+        - Better sub-entry handling (→ markers attach to current sense)
+        - Generate warnings for edge cases
+        """
         senses: list[SenseRaw] = []
         current_sense: SenseRaw | None = None
+        block_count = 0
         
         for elem in elements:
             if not isinstance(elem, Tag):
@@ -303,71 +399,113 @@ class MalipenseLexiconParser:
             if elem.name != "p" or "lxP2" not in elem.get("class", []):
                 continue
             
-            # Check if this starts a new sense (has SnsN)
+            block_count += 1
+            
+            # Check if this is a PS-only block (part of speech line with no glosses)
+            ps_span = elem.find("span", class_="PS")
+            has_any_gloss = (
+                elem.find("div", class_="GlFr") or 
+                elem.find("div", class_="GlEn") or 
+                elem.find("div", class_="GlRu")
+            )
+            if ps_span and not elem.find("span", class_="SnsN") and not has_any_gloss:
+                # This is just the PS line with no glosses - skip as sense
+                continue
+            
+            # Check if this is a sub-entry block (→ marker without SnsN number)
             sense_num_span = elem.find("span", class_="SnsN")
+            is_sub_entry_block = False
+            
             if sense_num_span:
-                # Save previous sense
-                if current_sense:
-                    senses.append(current_sense)
-                
-                # Start new sense
                 sense_text = sense_num_span.get_text(strip=True)
-                sense_num = self._parse_sense_number(sense_text)
-                
-                current_sense = SenseRaw(sense_num=sense_num)
+                # Check if it's a → marker (sub-entry) vs numbered sense
+                if sense_text.strip().startswith("→"):
+                    is_sub_entry_block = True
+                else:
+                    # Save previous sense and start new one
+                    if current_sense:
+                        senses.append(current_sense)
+                    
+                    sense_num = self._parse_sense_number(sense_text)
+                    current_sense = SenseRaw(sense_num=sense_num)
             
             if current_sense is None:
-                # First block without SnsN - create sense 0
+                # First block without SnsN - create sense with no number
                 current_sense = SenseRaw(sense_num=None)
             
-            # Extract glosses
+            # Extract glosses (for both senses and sub-entries)
             gloss_fr = elem.find("div", class_="GlFr")
-            if gloss_fr:
-                text = gloss_fr.get_text(strip=True)
-                if text:
-                    current_sense.gloss_fr = text
-            
             gloss_en = elem.find("div", class_="GlEn")
-            if gloss_en:
-                text = gloss_en.get_text(strip=True)
-                if text:
-                    current_sense.gloss_en = text
-            
             gloss_ru = elem.find("div", class_="GlRu")
-            if gloss_ru:
-                text = gloss_ru.get_text(strip=True)
-                if text:
-                    current_sense.gloss_ru = text
             
-            # Extract examples
-            examples = self._parse_examples(elem)
-            current_sense.examples.extend(examples)
-            
-            # Extract synonyms at sense level
-            synonyms = self._extract_synonyms(elem)
-            for s in synonyms:
-                if s not in current_sense.synonyms_raw:
-                    current_sense.synonyms_raw.append(s)
-            
-            # Extract sub-entries (→ markers - MXRef spans)
-            sub_entry = elem.find("span", class_="MXRef")
-            if sub_entry and not elem.find("span", class_="SnsN"):
-                # This is a sub-entry definition
-                sub_text = sub_entry.get_text(strip=True)
+            # Handle sub-entry blocks
+            mxref = elem.find("span", class_="MXRef")
+            if is_sub_entry_block or (mxref and not sense_num_span):
+                # This is a sub-entry/collocation
+                sub_text = mxref.get_text(strip=True) if mxref else ""
                 sub_nko = elem.find("div", class_="GlNko")
-                sub_gloss_fr = gloss_fr.get_text(strip=True) if gloss_fr else None
-                sub_gloss_en = gloss_en.get_text(strip=True) if gloss_en else None
                 
                 current_sense.sub_entries.append({
                     "text": sub_text,
                     "nko": sub_nko.get_text(strip=True) if sub_nko else None,
-                    "gloss_fr": sub_gloss_fr,
-                    "gloss_en": sub_gloss_en,
+                    "gloss_fr": gloss_fr.get_text(strip=True) if gloss_fr else None,
+                    "gloss_en": gloss_en.get_text(strip=True) if gloss_en else None,
+                    "gloss_ru": gloss_ru.get_text(strip=True) if gloss_ru else None,
                 })
+            else:
+                # Regular sense content
+                if gloss_fr:
+                    text = gloss_fr.get_text(strip=True)
+                    if text:
+                        current_sense.gloss_fr = text
+                
+                if gloss_en:
+                    text = gloss_en.get_text(strip=True)
+                    if text:
+                        current_sense.gloss_en = text
+                
+                if gloss_ru:
+                    text = gloss_ru.get_text(strip=True)
+                    if text:
+                        current_sense.gloss_ru = text
+                
+                # Extract examples
+                examples = self._parse_examples(elem)
+                current_sense.examples.extend(examples)
+                
+                # Extract synonyms at sense level
+                synonyms = self._extract_synonyms(elem)
+                for s in synonyms:
+                    if s not in current_sense.synonyms_raw:
+                        current_sense.synonyms_raw.append(s)
         
         # Don't forget the last sense
         if current_sense:
             senses.append(current_sense)
+        
+        # Generate warnings for edge cases (using versioned thresholds)
+        max_blocks = WARNING_THRESHOLDS["max_blocks_before_warning"]
+        if block_count > max_blocks:
+            warnings.append(f"entry_unusually_large: {block_count} blocks (possible boundary bleed)")
+        
+        # Check for empty senses - a sense is non-empty if it has:
+        # - a gloss (Fr/En/Ru)
+        # - examples
+        # - sub-entries (MXRef)
+        # - synonyms
+        def is_sense_non_empty(s: SenseRaw) -> bool:
+            return bool(
+                s.gloss_fr or 
+                s.gloss_en or 
+                s.gloss_ru or
+                s.examples or
+                s.sub_entries or
+                s.synonyms_raw
+            )
+        
+        empty_senses = [i for i, s in enumerate(senses) if not is_sense_non_empty(s)]
+        if empty_senses:
+            warnings.append(f"empty_senses_at_indices: {empty_senses}")
         
         return senses
     
@@ -379,7 +517,12 @@ class MalipenseLexiconParser:
         return None
     
     def _parse_examples(self, elem: Tag) -> list[ExampleRaw]:
-        """Parse example sentences from a sense block."""
+        """
+        Parse example sentences from a sense block.
+        
+        FIXED: Constrain N'Ko and translation search to siblings within the
+        parent p.lxP2 block, not the entire document tree.
+        """
         examples = []
         
         for exe in elem.find_all("span", class_="Exe"):
@@ -395,31 +538,35 @@ class MalipenseLexiconParser:
                 # Remove from text
                 text_latin = re.sub(r"\s*\[[^\]]+\]\s*", " ", text_latin).strip()
             
-            # Find corresponding N'Ko (next GlNko div)
+            # Find corresponding N'Ko and translations by walking siblings
+            # CONSTRAINED to the parent p.lxP2 block only
             text_nko = None
-            nko_div = exe.find_next("div", class_="GlNko")
-            if nko_div:
-                text_nko = nko_div.get_text(strip=True)
-            
-            # Find translations (next GlFr, GlEn, GlRu divs)
             trans_fr = None
             trans_en = None
             trans_ru = None
             
-            # Look for translation divs after the example
+            # Walk siblings after the example span until next Exe or end of block
             next_elem = exe.find_next_sibling()
             while next_elem:
                 if isinstance(next_elem, Tag):
+                    # Stop at next example
                     if next_elem.name == "span" and "Exe" in next_elem.get("class", []):
-                        break  # Hit next example
+                        break
+                    # Stop at next SnsN (sense number)
+                    if next_elem.name == "span" and "SnsN" in next_elem.get("class", []):
+                        break
+                    
                     if next_elem.name == "div":
                         classes = next_elem.get("class", [])
-                        if "GlFr" in classes and not trans_fr:
+                        if "GlNko" in classes and text_nko is None:
+                            text_nko = next_elem.get_text(strip=True)
+                        elif "GlFr" in classes and trans_fr is None:
                             trans_fr = next_elem.get_text(strip=True)
-                        elif "GlEn" in classes and not trans_en:
+                        elif "GlEn" in classes and trans_en is None:
                             trans_en = next_elem.get_text(strip=True)
-                        elif "GlRu" in classes and not trans_ru:
+                        elif "GlRu" in classes and trans_ru is None:
                             trans_ru = next_elem.get_text(strip=True)
+                
                 next_elem = next_elem.find_next_sibling()
             
             examples.append(ExampleRaw(
@@ -441,11 +588,10 @@ class MalipenseLexiconParser:
             end_selector=f"span#{next_entry_id}" if next_entry_id else None,
         )
         
-        # Create fields_raw
+        # Create fields_raw (anchor_names goes in record_locator, not here)
         fields_raw = LexiconEntryFieldsRaw(
             headword_latin=parsed.headword_latin,
             headword_nko_provided=parsed.headword_nko,
-            anchor_names=parsed.anchor_names,
             ps_raw=parsed.ps_raw,
             pos_hint=parsed.pos_hint,
             senses=parsed.senses,
@@ -468,6 +614,8 @@ class MalipenseLexiconParser:
             anchor_names=parsed.anchor_names,
             text_quote=parsed.headword_latin,
             parse_warnings=parsed.warnings,
+            warning_policy_id=WARNING_POLICY_ID,
+            raw_block_hash=parsed.raw_block_hash,
         )
 
 
