@@ -282,7 +282,7 @@ Evidence MUST reference the **complete entry block**, not just the headword elem
     "snapshot_id": "abc123...",
     "entry_block": {
       "start_selector": "span#e15",
-      "end_selector": "span#e16",            // Next entry (exclusive)
+      "end_selector": "span#e16",
       "block_selectors": [                   // OR explicit list
         "p.lxP:has(#e15)",
         "p.lxP2:nth-of-type(1)",
@@ -294,6 +294,21 @@ Evidence MUST reference the **complete entry block**, not just the headword elem
   }]
 }
 ```
+
+#### `entry_block` boundary semantics (normative)
+
+To prevent ambiguity when rehydrating evidence blocks:
+
+- **`start_selector`**: Points to the **first element** of the entry. **INCLUSIVE** - this element is part of the entry.
+- **`end_selector`**: Points to the **first element of the next entry**. **EXCLUSIVE** - this element is NOT part of the current entry.
+
+This means the entry block spans: `[start_selector, end_selector)` (half-open interval).
+
+If `end_selector` is `null`, the entry extends to the end of the page/document.
+
+**Example:** For entry `e15` with `end_selector: "span#e16"`:
+- Entry `e15` includes all content from `span#e15` up to (but NOT including) `span#e16`
+- Entry `e16` begins at `span#e16`
 
 The parser MUST define its entry block boundary rule (e.g., "from `p.lxP` containing `#eN` until next `p.lxP`").
 
