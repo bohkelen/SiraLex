@@ -1,0 +1,27 @@
+# Normalization ruleset manifest — norm_v1
+#
+# Per shared/specs/normalization-versioning.md § Ruleset artifact composition.
+#
+# This manifest describes the norm_v1 ruleset. All referenced data files
+# must be hashed and treated as immutable once published.
+
+ruleset_id: norm_v1
+
+description: >
+  Initial normalization ruleset for Nkokan. Produces Latin-script search keys
+  (casefold, diacritics-insensitive, punctuation-stripped, no-space) from
+  IR headwords and index terms. N'Ko receives NFC normalization only.
+  Preferred form = source's own headword. No cross-entry inference.
+
+changelog:
+  - version: norm_v1
+    date: "2026-02-06"
+    description: "Initial ruleset. Pure Unicode transforms, no auxiliary data."
+
+# Referenced data files (norm_v1 has no auxiliary data — pure code only)
+data_files: []
+
+# Code file reference (for audit — formal hashing deferred to CI)
+code_files:
+  - path: norm_v1.py
+    description: "All norm_v1 key functions and transforms"
