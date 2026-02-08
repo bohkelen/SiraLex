@@ -58,6 +58,23 @@ DoD:
 DoD:
 - Imported data retains traceability to raw snapshots and extracted fragments.
 
+### Phase 1.x Freeze — Dataset immutability milestone
+
+**Tag:** `v1.0-dataset-freeze`
+
+All Phase 1.0–1.3 outputs are treated as **immutable artifacts** from this point forward. Any future corrections or rule changes produce new versions, never in-place edits.
+
+Frozen artifacts:
+
+- `data/ir/malipense_lexicon_v3.jsonl` (8,823 lexicon entries)
+- `data/ir/malipense_index_v1.jsonl` (10,501 index mappings)
+- `data/normalized/malipense_normalized_norm_v1.jsonl` (19,324 normalized records)
+- Parser versions: `malipense_lexicon_v3`, `malipense_index_v1`
+- Normalization ruleset: `norm_v1` (`shared/normalization/norm_v1.py`)
+- Normalization manifest: `shared/normalization/manifest.yaml`
+
+---
+
 ### Phase 1.3 — Transliteration layer (Latin → N’Ko)
 
 - Deterministic transliteration module:
