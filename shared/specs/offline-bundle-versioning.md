@@ -168,6 +168,81 @@ Bundle consumers SHOULD:
 
 This spec does not mandate delta updates. It reserves `update_mode = "DELTA"` fields for future use; **v1 consumers MUST treat `update_mode = "DELTA"` as unsupported**. If deltas are introduced later, they must also be versioned and hash-verified.
 
+## Enriched record schema (`records.jsonl`)
+
+Bundle `records.jsonl` contains **enriched records** — normalized search metadata joined with IR display fields. Each line is one JSON object keyed by `ir_id`.
+
+### Schema
+
+```json
+{
+  "ir_id": "964909ef6912ff64",
+  "ir_kind": "lexicon_entry",
+  "source_id": "src_malipense",
+  "norm_version": "norm_v1",
+  "preferred_form": "-da",
+  "variant_forms": ["-da"],
+  "search_keys": {
+    "casefold": ["-da"],
+    "diacritics_insensitive": ["-da"],
+    "punct_stripped": ["da"],
+    "nospace": ["-da"]
+  },
+  "display": {
+    "headword_latin": "-da",
+    "headword_nko_provided": "ߘߊ",
+    "ps_raw": null,
+    "pos_hint": null,
+    "senses": [
+      {
+        "gloss_fr": "aoriste intransitif",
+        "gloss_en": "intransitive aorist",
+        "gloss_ru": "аорист интранзитивный",
+        "examples": [],
+        "usage_note": null,
+        "synonyms_raw": []
+      }
+    ],
+    "variants_raw": [],
+    "synonyms_raw": [],
+    "etymology_raw": null,
+    "literal_meaning_raw": null
+  }
+}
+```
+
+For `ir_kind = "index_mapping"`, the `display` field contains:
+
+```json
+{
+  "display": {
+    "source_term": "abandonner",
+    "source_lang": "fr",
+    "target_entries": [
+      { "lexicon_url": "/emk/lexicon/b.htm", "anchor": "e504", "display_text": "bàn" }
+    ]
+  }
+}
+```
+
+### `display` field rules (normative)
+
+- `display` contains a **shallow, read-only projection** of IR `fields_raw` sufficient for user-facing rendering.
+- `display` MUST NOT contain inferred, ranked, or normalized content.
+- All values are copied from IR `fields_raw` unchanged.
+- If the IR record for a given `ir_id` is unavailable, the enrichment step MUST emit the record **without** a `display` field and log a warning.
+
+### Enrichment non-goals
+
+The enrichment step MUST NOT:
+
+- Apply language ranking or preference ordering
+- Apply frequency-based pruning of senses or examples
+- Merge or deduplicate across entries
+- Apply UI formatting or presentation logic
+
+It is **data plumbing only**.
+
 ## Compatibility rule (record schema)
 
 Consumers MUST enforce compatibility using **both** schema identity and version:

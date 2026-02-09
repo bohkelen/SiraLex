@@ -22,6 +22,7 @@ nkokan-crawl = "snapshot_engine.cli:main"
 nkokan-parse-ir = "ir_parser.cli:main"
 nkokan-build-index = "search_index.cli:main"
 nkokan-build-bundle = "bundle_builder.cli:main"
+nkokan-enrich = "enrichment.cli:main"
 
 [tool.ruff]
 line-length = 100
@@ -31,7 +32,7 @@ target-version = "py310"
 select = ["E", "F", "I", "W"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["snapshot_engine", "ir_parser", "search_index", "bundle_builder"]
+packages = ["snapshot_engine", "ir_parser", "search_index", "bundle_builder", "enrichment"]
 
 [build-system]
 requires = ["hatchling"]
