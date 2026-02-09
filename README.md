@@ -1,6 +1,7 @@
 # Nkokan
 
 Offline-first dictionary and sentence analysis tooling for the Manding language family — starting with **Maninka (Guinea)** — with **Latin + N’Ko** treated as first-class scripts throughout.
+100% built with AI. Why not!
 
 ## What it aims to do (Phase 1)
 
