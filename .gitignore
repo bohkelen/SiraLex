@@ -24,11 +24,16 @@ __pycache__/
 venv/
 
 # Node
+.nvm/
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Web build outputs
+web/dist/
+web/.vite/
 
 
 # Snapshot data (raw captures - do not commit to git)
