@@ -232,7 +232,7 @@ DoD:
 |----------|-------|------|--------|
 | 1 | Phase 1.4.2 — Build and verify the first real bundle | Immediate | ✅ Complete |
 | 2 | Phase 2.0.0 — Enrich bundle with display data | Backend prerequisite | ✅ Complete |
-| 3 | Phase 2.0.1 — Web project scaffolding (Vite + TS) | Primary focus | Pending |
+| 3 | Phase 2.0.1 — Web project scaffolding (Vite + TS) | Primary focus | ✅ Complete |
 | 4 | Phase 2.0.2 — JS normalization mirror (`norm_v1` port) | Primary focus | Pending |
 | 5 | Phase 2.0.3 — Bundle loading + client-side search | Primary focus | Pending |
 | 6 | Phase 2.0.4 — Results display + entry view | Primary focus | Pending |
@@ -240,7 +240,16 @@ DoD:
 | 8 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
 | 9 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
 
-Phase 2.0 (Branch A) is the primary track. Phase 2.0.0 (bundle enrichment) is complete — the data layer is ready for frontend consumption. Phase 1.5 backend work (Branch B) can proceed in parallel as light, spec-level work. Branch C is explicitly deferred until real usage data exists.
+Phase 2.0 (Branch A) is the primary track. Phase 2.0.0 (bundle enrichment) and Phase 2.0.1 (web scaffolding) are complete — the data layer and build tooling are ready for frontend consumption. Phase 1.5 backend work (Branch B) can proceed in parallel as light, spec-level work. Branch C is explicitly deferred until real usage data exists.
+
+### Phase 2 memory constraint (lock-in before IndexedDB)
+
+Observed via browser probe on the ~20 MB enriched bundle: **JSON.parse creates large transient heap spikes** even when not retaining parsed objects. To stay safe on mid-range Android, Phase 2.0.3 MUST follow these constraints:
+
+- `records.jsonl` MUST NOT be fully materialized in memory as parsed objects.
+- Import MUST be streaming: read → parse line-by-line → write to IndexedDB → discard.
+- `search_index.jsonl` SHOULD NOT become a giant in-memory Map by default (87k entries can balloon).
+- Prefer storing the search index in IndexedDB too (or a compact on-disk structure) and only reading what’s needed per query.
 
 ---
 
