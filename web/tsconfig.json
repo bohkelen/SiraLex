@@ -11,6 +11,8 @@
     "noEmit": true,
     "jsx": "preserve",
     "strict": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
     "types": ["vite/client"]
   },
   "include": ["src", "vite.config.ts"]
