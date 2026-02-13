@@ -53,3 +53,14 @@ This phase is scaffolding only:
 
 Those land in Phase 2.0.2+ per `docs/ROADMAP.md`.
 
+## Performance constraint (important)
+
+The enriched bundle is ~20 MB. A browser probe confirmed that parsing JSONL with `JSON.parse` can create large transient heap spikes even when you do **not** retain parsed objects.
+
+Implication (lock-in before IndexedDB work):
+
+- `records.jsonl` must **not** be fully materialized in memory as parsed objects.
+- Import must be streaming: read → parse line-by-line → write to IndexedDB → discard.
+- `search_index.jsonl` should **not** become a giant in-memory Map by default (87k entries can balloon).
+- Prefer storing the index in IndexedDB too (or another compact structure) and only reading what’s needed per query.
+
