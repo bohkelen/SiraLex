@@ -155,6 +155,18 @@ IR sits between raw capture and normalized lexicon records.
 - Keep enough structure that normalization can be deterministic and versioned later.
 - Keep provenance hooks: every IR unit points back to snapshot(s) and fragment(s).
 
+### Unicode normalization policy (layering clarification)
+
+IR is a **structural projection**, not a display/normalization layer.
+
+- IR `fields_raw` strings SHOULD preserve what was extracted from the source as faithfully as possible.
+- IR MUST NOT enforce Unicode normalization forms (e.g., NFC) on Latin display strings as a global invariant.
+- Any Unicode normalization policy (e.g., “normalize to NFC before computing keys” or “normalize to NFC for display”) belongs to the **Normalization** layer (`shared/specs/normalization-versioning.md`) and must be deterministic and versioned (`norm_vN`).
+
+Rationale: this preserves the clean layering:
+
+Snapshot (raw bytes) → IR (structural projection) → Corrections (optional) → Normalization (NFC + key generation) → Index/Bundle → Frontend
+
 ### IR kinds (document type discrimination)
 
 Different source document types produce different IR shapes. To prevent schema confusion and enable type-specific validation:
