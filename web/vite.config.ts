@@ -1,8 +1,20 @@
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig({
+  base: "./",
   plugins: [
+    ...(process.env.REPORT
+      ? [
+          visualizer({
+            filename: "dist/stats.html",
+            gzipSize: true,
+            brotliSize: true,
+            template: "treemap",
+          }),
+        ]
+      : []),
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
