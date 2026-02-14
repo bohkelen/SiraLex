@@ -37,7 +37,7 @@ from normalization.norm_v1 import (
     KEY_FUNCTIONS,
 )
 
-from api.normalizer.normalize import (
+from normalizer.normalize import (
     normalize_lexicon_entry,
     normalize_index_mapping,
     normalize_ir_unit,
