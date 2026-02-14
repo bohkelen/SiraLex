@@ -1,9 +1,6 @@
 {
-  "ruleset_id": "norm_v1",
   "cases": [
     {
-      "input": "dɔ́bɛ̀n",
-      "input_nfc": "dɔ́bɛ̀n",
       "expected": {
         "casefold": [
           "dɔ́bɛ̀n"
@@ -11,18 +8,17 @@
         "diacritics_insensitive": [
           "dɔbɛn"
         ],
-        "punct_stripped": [
+        "nospace": [
           "dɔbɛn"
         ],
-        "nospace": [
+        "punct_stripped": [
           "dɔbɛn"
         ]
       },
+      "input": "dɔ́bɛ̀n",
+      "input_nfc": "dɔ́bɛ̀n",
       "normalized_record_projection": {
         "preferred_form": "dɔ́bɛ̀n",
-        "variant_forms": [
-          "dɔ́bɛ̀n"
-        ],
         "search_keys": {
           "casefold": [
             "dɔ́bɛ̀n"
@@ -30,18 +26,19 @@
           "diacritics_insensitive": [
             "dɔbɛn"
           ],
-          "punct_stripped": [
-            "dɔbɛn"
-          ],
           "nospace": [
             "dɔbɛn"
+          ],
+          "punct_stripped": [
+            "dɔbɛn"
           ]
-        }
+        },
+        "variant_forms": [
+          "dɔ́bɛ̀n"
+        ]
       }
     },
     {
-      "input": "dá",
-      "input_nfc": "dá",
       "expected": {
         "casefold": [
           "dá"
@@ -49,18 +46,17 @@
         "diacritics_insensitive": [
           "da"
         ],
-        "punct_stripped": [
+        "nospace": [
           "da"
         ],
-        "nospace": [
+        "punct_stripped": [
           "da"
         ]
       },
+      "input": "dá",
+      "input_nfc": "dá",
       "normalized_record_projection": {
         "preferred_form": "dá",
-        "variant_forms": [
-          "dá"
-        ],
         "search_keys": {
           "casefold": [
             "dá"
@@ -68,18 +64,19 @@
           "diacritics_insensitive": [
             "da"
           ],
-          "punct_stripped": [
-            "da"
-          ],
           "nospace": [
             "da"
+          ],
+          "punct_stripped": [
+            "da"
           ]
-        }
+        },
+        "variant_forms": [
+          "dá"
+        ]
       }
     },
     {
-      "input": "  a\tb\nc  ",
-      "input_nfc": "  a\tb\nc  ",
       "expected": {
         "casefold": [
           "a b c"
@@ -87,18 +84,17 @@
         "diacritics_insensitive": [
           "a b c"
         ],
-        "punct_stripped": [
-          "a b c"
-        ],
         "nospace": [
           "abc"
+        ],
+        "punct_stripped": [
+          "a b c"
         ]
       },
+      "input": "  a\tb\nc  ",
+      "input_nfc": "  a\tb\nc  ",
       "normalized_record_projection": {
         "preferred_form": "  a\tb\nc  ",
-        "variant_forms": [
-          "  a\tb\nc  "
-        ],
         "search_keys": {
           "casefold": [
             "a b c"
@@ -106,18 +102,19 @@
           "diacritics_insensitive": [
             "a b c"
           ],
-          "punct_stripped": [
-            "a b c"
-          ],
           "nospace": [
             "abc"
+          ],
+          "punct_stripped": [
+            "a b c"
           ]
-        }
+        },
+        "variant_forms": [
+          "  a\tb\nc  "
+        ]
       }
     },
     {
-      "input": "dín`",
-      "input_nfc": "dín`",
       "expected": {
         "casefold": [
           "dín`"
@@ -125,18 +122,17 @@
         "diacritics_insensitive": [
           "din`"
         ],
-        "punct_stripped": [
+        "nospace": [
           "din`"
         ],
-        "nospace": [
+        "punct_stripped": [
           "din`"
         ]
       },
+      "input": "dín`",
+      "input_nfc": "dín`",
       "normalized_record_projection": {
         "preferred_form": "dín`",
-        "variant_forms": [
-          "dín`"
-        ],
         "search_keys": {
           "casefold": [
             "dín`"
@@ -144,75 +140,75 @@
           "diacritics_insensitive": [
             "din`"
           ],
-          "punct_stripped": [
-            "din`"
-          ],
           "nospace": [
             "din`"
+          ],
+          "punct_stripped": [
+            "din`"
           ]
-        }
+        },
+        "variant_forms": [
+          "dín`"
+        ]
       }
     },
     {
-      "input": "-da",
-      "input_nfc": "-da",
       "expected": {
         "casefold": [
           "-da"
         ],
         "diacritics_insensitive": [
+          "-da"
+        ],
+        "nospace": [
           "-da"
         ],
         "punct_stripped": [
           "da"
-        ],
-        "nospace": [
-          "-da"
         ]
       },
+      "input": "-da",
+      "input_nfc": "-da",
       "normalized_record_projection": {
         "preferred_form": "-da",
-        "variant_forms": [
-          "-da"
-        ],
         "search_keys": {
           "casefold": [
             "-da"
           ],
           "diacritics_insensitive": [
+            "-da"
+          ],
+          "nospace": [
             "-da"
           ],
           "punct_stripped": [
             "da"
-          ],
-          "nospace": [
-            "-da"
           ]
-        }
+        },
+        "variant_forms": [
+          "-da"
+        ]
       }
     },
     {
+      "expected": {
+        "casefold": [
+          "n'ko"
+        ],
+        "diacritics_insensitive": [
+          "n'ko"
+        ],
+        "nospace": [
+          "n'ko"
+        ],
+        "punct_stripped": [
+          "nko"
+        ]
+      },
       "input": "n'ko",
       "input_nfc": "n'ko",
-      "expected": {
-        "casefold": [
-          "n'ko"
-        ],
-        "diacritics_insensitive": [
-          "n'ko"
-        ],
-        "punct_stripped": [
-          "nko"
-        ],
-        "nospace": [
-          "n'ko"
-        ]
-      },
       "normalized_record_projection": {
         "preferred_form": "n'ko",
-        "variant_forms": [
-          "n'ko"
-        ],
         "search_keys": {
           "casefold": [
             "n'ko"
@@ -220,37 +216,37 @@
           "diacritics_insensitive": [
             "n'ko"
           ],
-          "punct_stripped": [
-            "nko"
-          ],
           "nospace": [
             "n'ko"
+          ],
+          "punct_stripped": [
+            "nko"
           ]
-        }
+        },
+        "variant_forms": [
+          "n'ko"
+        ]
       }
     },
     {
-      "input": "n’ko",
-      "input_nfc": "n’ko",
       "expected": {
         "casefold": [
           "n’ko"
         ],
         "diacritics_insensitive": [
+          "n’ko"
+        ],
+        "nospace": [
           "n’ko"
         ],
         "punct_stripped": [
           "nko"
-        ],
-        "nospace": [
-          "n’ko"
         ]
       },
+      "input": "n’ko",
+      "input_nfc": "n’ko",
       "normalized_record_projection": {
         "preferred_form": "n’ko",
-        "variant_forms": [
-          "n’ko"
-        ],
         "search_keys": {
           "casefold": [
             "n’ko"
@@ -258,18 +254,19 @@
           "diacritics_insensitive": [
             "n’ko"
           ],
-          "punct_stripped": [
-            "nko"
-          ],
           "nospace": [
             "n’ko"
+          ],
+          "punct_stripped": [
+            "nko"
           ]
-        }
+        },
+        "variant_forms": [
+          "n’ko"
+        ]
       }
     },
     {
-      "input": "ߞߊ߬ߣߌ߲ߞߊߞߊ߲",
-      "input_nfc": "ߞߊ߬ߣߌ߲ߞߊߞߊ߲",
       "expected": {
         "casefold": [
           "ߞߊ߬ߣߌ߲ߞߊߞߊ߲"
@@ -277,18 +274,17 @@
         "diacritics_insensitive": [
           "ߞߊߣߌߞߊߞߊ"
         ],
-        "punct_stripped": [
+        "nospace": [
           "ߞߊߣߌߞߊߞߊ"
         ],
-        "nospace": [
+        "punct_stripped": [
           "ߞߊߣߌߞߊߞߊ"
         ]
       },
+      "input": "ߞߊ߬ߣߌ߲ߞߊߞߊ߲",
+      "input_nfc": "ߞߊ߬ߣߌ߲ߞߊߞߊ߲",
       "normalized_record_projection": {
         "preferred_form": "ߞߊ߬ߣߌ߲ߞߊߞߊ߲",
-        "variant_forms": [
-          "ߞߊ߬ߣߌ߲ߞߊߞߊ߲"
-        ],
         "search_keys": {
           "casefold": [
             "ߞߊ߬ߣߌ߲ߞߊߞߊ߲"
@@ -296,18 +292,19 @@
           "diacritics_insensitive": [
             "ߞߊߣߌߞߊߞߊ"
           ],
-          "punct_stripped": [
-            "ߞߊߣߌߞߊߞߊ"
-          ],
           "nospace": [
             "ߞߊߣߌߞߊߞߊ"
+          ],
+          "punct_stripped": [
+            "ߞߊߣߌߞߊߞߊ"
           ]
-        }
+        },
+        "variant_forms": [
+          "ߞߊ߬ߣߌ߲ߞߊߞߊ߲"
+        ]
       }
     },
     {
-      "input": "Straße",
-      "input_nfc": "Straße",
       "expected": {
         "casefold": [
           "strasse"
@@ -315,18 +312,17 @@
         "diacritics_insensitive": [
           "strasse"
         ],
-        "punct_stripped": [
+        "nospace": [
           "strasse"
         ],
-        "nospace": [
+        "punct_stripped": [
           "strasse"
         ]
       },
+      "input": "Straße",
+      "input_nfc": "Straße",
       "normalized_record_projection": {
         "preferred_form": "Straße",
-        "variant_forms": [
-          "Straße"
-        ],
         "search_keys": {
           "casefold": [
             "strasse"
@@ -334,14 +330,18 @@
           "diacritics_insensitive": [
             "strasse"
           ],
-          "punct_stripped": [
-            "strasse"
-          ],
           "nospace": [
             "strasse"
+          ],
+          "punct_stripped": [
+            "strasse"
           ]
-        }
+        },
+        "variant_forms": [
+          "Straße"
+        ]
       }
     }
-  ]
+  ],
+  "ruleset_id": "norm_v1"
 }

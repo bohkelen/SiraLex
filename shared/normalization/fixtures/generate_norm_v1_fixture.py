@@ -65,7 +65,13 @@ def main() -> None:
         "cases": [make_case(s) for s in FIXTURE_INPUTS],
     }
 
-    out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # Deterministic JSON serialization to avoid noisy diffs across regenerations.
+    # - sort_keys=True: stable dict key ordering
+    # - cases list order is FIXTURE_INPUTS order (explicit and stable)
+    out_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(f"Wrote {out_path} ({len(payload['cases'])} cases) for {RULESET_ID}")
 
 

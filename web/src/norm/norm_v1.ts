@@ -12,9 +12,13 @@
  *
  * Notes:
  * - Python uses full Unicode casefold (str.casefold()).
- *   JS has no built-in casefold; we use NFKC + toLowerCase and apply the
- *   highest-impact casefold difference for Latin text (ß -> ss) so the
- *   shared fixture catches drift.
+ *   JS has no built-in casefold. For this project’s supported scripts
+ *   (Latin + N’Ko), we intentionally accept a best-effort approximation:
+ *   NFKC + toLowerCase + ß→ss. The shared cross-language fixture includes
+ *   cases (e.g. "Straße") to detect drift.
+ *
+ *   If we ever expand supported scripts (or require full Unicode casefold
+ *   parity), this MUST be revisited and versioned (norm_v2+).
  */
 
 export type SearchKeys = Record<

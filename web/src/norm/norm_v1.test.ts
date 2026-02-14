@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-import { computeSearchKeys, RULESET_ID } from "./norm_v1";
+import { computeSearchKeys, normalizeNfc, RULESET_ID } from "./norm_v1";
 
 type Fixture = {
   ruleset_id: string;
@@ -37,12 +37,16 @@ describe("norm_v1 JS mirror parity", () => {
     expect(fixture.ruleset_id).toBe(RULESET_ID);
 
     for (const c of fixture.cases) {
-      const got = computeSearchKeys([c.input_nfc]);
+      // Explicit NFC normalization in JS (avoid platform-dependent implicit normalization)
+      const nfc = normalizeNfc(c.input);
+      expect(nfc).toBe(c.input_nfc);
+
+      const got = computeSearchKeys([nfc]);
       expect(got).toEqual(c.expected);
 
       // Projection behavior: preferred + variants + keys
-      expect(c.normalized_record_projection.preferred_form).toBe(c.input_nfc);
-      expect(c.normalized_record_projection.variant_forms).toEqual([c.input_nfc]);
+      expect(c.normalized_record_projection.preferred_form).toBe(nfc);
+      expect(c.normalized_record_projection.variant_forms).toEqual([nfc]);
       expect(c.normalized_record_projection.search_keys).toEqual(c.expected);
     }
   });
