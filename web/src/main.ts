@@ -2,6 +2,19 @@ import "./style.css";
 import { registerSW } from "virtual:pwa-register";
 
 import { probeJsonlFile } from "./bundle_probe";
+import {
+  parseAndValidateManifestJson,
+  validateSelectedFilesAgainstManifest,
+  type BundleManifestV1,
+} from "./bundle_manifest";
+import {
+  deleteNkokanDb,
+  getActiveBundleMeta,
+  openNkokanDb,
+  setActiveBundleMeta,
+} from "./idb/nkokan_db";
+import { importRecordsJsonl } from "./import/import_records";
+import { importSearchIndexJsonl } from "./import/import_search_index";
 
 registerSW({ immediate: true });
 
@@ -15,11 +28,34 @@ app.innerHTML = `
     <div class="card">
       <h1 class="title">Nkokan (Phase 2 harness)</h1>
       <p class="subtitle">
-        Web/PWA scaffolding is in place. Next: bundle loading, JS normalization parity, and minimal offline lookup UI.
+        Web/PWA scaffolding is in place. Next: bundle loading and minimal offline lookup UI.
       </p>
       <p class="subtitle" style="margin-top: 12px">
         See <code>docs/ROADMAP.md</code> for the Phase 2.0 ordering.
       </p>
+    </div>
+
+    <div class="card" style="margin-top: 16px">
+      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Bundle manifest gating (Phase 2.0.3)</h2>
+      <p class="subtitle">
+        Select <code>bundle.manifest.json</code> and validate it before any import. This enforces ruleset/schema compatibility and REPLACE_ALL semantics.
+      </p>
+
+      <div class="row" style="margin-top: 12px">
+        <div class="field">
+          <div class="label">bundle.manifest.json</div>
+          <input id="manifestFile" type="file" accept=".json,application/json" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top: 12px">
+        <button id="validateManifest" class="btn" disabled>Validate manifest + selected files</button>
+        <button id="importBundle" class="btn" disabled>Import bundle (records + search index)</button>
+        <button id="clearDb" class="btn">Delete entire local IndexedDB database</button>
+      </div>
+
+      <div id="manifestOut" class="mono" style="margin-top: 12px"></div>
+      <div id="dbOut" class="mono" style="margin-top: 12px"></div>
     </div>
 
     <div class="card" style="margin-top: 16px">
@@ -58,10 +94,16 @@ function mustGetEl<T extends Element>(selector: string): T {
 
 const recordsFile = mustGetEl<HTMLInputElement>("#recordsFile");
 const indexFile = mustGetEl<HTMLInputElement>("#indexFile");
+const manifestFile = mustGetEl<HTMLInputElement>("#manifestFile");
+const validateManifestBtn = mustGetEl<HTMLButtonElement>("#validateManifest");
+const importBundleBtn = mustGetEl<HTMLButtonElement>("#importBundle");
+const clearDbBtn = mustGetEl<HTMLButtonElement>("#clearDb");
 const probeRecordsBtn = mustGetEl<HTMLButtonElement>("#probeRecords");
 const probeIndexBtn = mustGetEl<HTMLButtonElement>("#probeIndex");
 const probeAllBtn = mustGetEl<HTMLButtonElement>("#probeAll");
 const probeOut = mustGetEl<HTMLDivElement>("#probeOut");
+const manifestOut = mustGetEl<HTMLDivElement>("#manifestOut");
+const dbOut = mustGetEl<HTMLDivElement>("#dbOut");
 
 function fmtBytes(n: number | undefined): string {
   if (n === undefined) return "n/a";
@@ -82,14 +124,248 @@ function fmtMs(ms: number): string {
 function updateButtons() {
   const hasRecords = (recordsFile.files?.length ?? 0) > 0;
   const hasIndex = (indexFile.files?.length ?? 0) > 0;
+  const hasManifest = (manifestFile.files?.length ?? 0) > 0;
   probeRecordsBtn.disabled = !hasRecords;
   probeIndexBtn.disabled = !hasIndex;
   probeAllBtn.disabled = !(hasRecords && hasIndex);
+  validateManifestBtn.disabled = !(hasManifest && hasRecords && hasIndex);
+  importBundleBtn.disabled = !lastValidatedManifest;
 }
 
-recordsFile.addEventListener("change", updateButtons);
-indexFile.addEventListener("change", updateButtons);
+function invalidateManifestValidation() {
+  lastValidatedManifest = undefined;
+  manifestOut.textContent = "";
+}
+
+recordsFile.addEventListener("change", () => {
+  invalidateManifestValidation();
+  updateButtons();
+});
+indexFile.addEventListener("change", () => {
+  invalidateManifestValidation();
+  updateButtons();
+});
+manifestFile.addEventListener("change", () => {
+  invalidateManifestValidation();
+  updateButtons();
+});
 updateButtons();
+
+async function refreshDbStatus() {
+  try {
+    const db = await openNkokanDb();
+    const active = await getActiveBundleMeta(db);
+    dbOut.textContent =
+      active
+        ? `IndexedDB: present\nActive bundle: ${active.bundle_id}\nNormalization: ${active.normalization_ruleset}\nSchema: ${active.record_schema_id}@${active.record_schema_version}\nImported: ${active.imported_at_iso}\nRecords: ${active.records_count ?? "n/a"} | Index entries: ${active.index_entries_count ?? "n/a"}\n`
+        : "IndexedDB: present\nActive bundle: none (not imported yet)\n";
+    db.close();
+  } catch (e) {
+    dbOut.textContent = `IndexedDB status error: ${String(e)}\n`;
+  }
+}
+
+let lastValidatedManifest: BundleManifestV1 | undefined;
+let busy = false;
+
+async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
+  if (busy) return;
+  busy = true;
+  manifestOut.textContent += `\n[busy] ${label}\n`;
+  // Disable all interactive buttons while running.
+  const prev = {
+    validate: validateManifestBtn.disabled,
+    importBundle: importBundleBtn.disabled,
+    clearDb: clearDbBtn.disabled,
+    probeRecords: probeRecordsBtn.disabled,
+    probeIndex: probeIndexBtn.disabled,
+    probeAll: probeAllBtn.disabled,
+  };
+  validateManifestBtn.disabled = true;
+  importBundleBtn.disabled = true;
+  clearDbBtn.disabled = true;
+  probeRecordsBtn.disabled = true;
+  probeIndexBtn.disabled = true;
+  probeAllBtn.disabled = true;
+  try {
+    await fn();
+  } finally {
+    busy = false;
+    validateManifestBtn.disabled = prev.validate;
+    importBundleBtn.disabled = prev.importBundle;
+    clearDbBtn.disabled = prev.clearDb;
+    probeRecordsBtn.disabled = prev.probeRecords;
+    probeIndexBtn.disabled = prev.probeIndex;
+    probeAllBtn.disabled = prev.probeAll;
+    updateButtons();
+  }
+}
+
+async function validateManifestAndFiles() {
+  const mf = manifestFile.files?.[0];
+  const rf = recordsFile.files?.[0];
+  const ix = indexFile.files?.[0];
+  if (!mf || !rf || !ix) return;
+
+  manifestOut.textContent = "";
+  lastValidatedManifest = undefined;
+
+  const txt = await mf.text();
+  const parsed = parseAndValidateManifestJson(txt);
+  if (!parsed.ok || !parsed.manifest) {
+    manifestOut.textContent += `Manifest INVALID\n`;
+    for (const err of parsed.errors) manifestOut.textContent += `ERROR: ${err}\n`;
+    for (const w of parsed.warnings) manifestOut.textContent += `WARN: ${w}\n`;
+    return;
+  }
+
+  const mfst = parsed.manifest;
+  const fileCheck = validateSelectedFilesAgainstManifest(mfst, {
+    records: rf,
+    search_index: ix,
+  });
+  if (fileCheck.errors.length > 0) {
+    manifestOut.textContent += `Manifest OK but selected files INVALID\n`;
+    manifestOut.textContent += `bundle_id: ${mfst.bundle_id}\n`;
+    for (const err of fileCheck.errors) manifestOut.textContent += `ERROR: ${err}\n`;
+    for (const w of [...parsed.warnings, ...fileCheck.warnings]) manifestOut.textContent += `WARN: ${w}\n`;
+    return;
+  }
+
+  lastValidatedManifest = mfst;
+  manifestOut.textContent += `Manifest OK\n`;
+  manifestOut.textContent += `bundle_id: ${mfst.bundle_id}\n`;
+  manifestOut.textContent += `normalization: ${mfst.rule_versions.normalization}\n`;
+  manifestOut.textContent += `schema: ${mfst.record_schema_id}@${mfst.record_schema_version}\n`;
+  manifestOut.textContent += `mode: ${mfst.update_mode} / ${mfst.reconciliation_action}\n`;
+  manifestOut.textContent += `payloads: ${mfst.files.map((f) => f.path).join(", ")}\n`;
+  for (const w of [...parsed.warnings, ...fileCheck.warnings]) manifestOut.textContent += `WARN: ${w}\n`;
+  manifestOut.textContent += `\nNote: hash verification (sha256) is deferred in the browser harness for Phase 2.0.3.\n`;
+  manifestOut.textContent += `Manifest schema versions are hard-gated; newer manifest versions require a frontend update.\n`;
+  manifestOut.textContent += `\nNext step: import streaming → IndexedDB\n`;
+  updateButtons();
+}
+
+validateManifestBtn.addEventListener("click", () => {
+  void withSingleWriterLock("validate manifest", validateManifestAndFiles);
+});
+
+importBundleBtn.addEventListener("click", () => {
+  void withSingleWriterLock("import bundle (records + index)", async () => {
+    const mfst = lastValidatedManifest;
+    const rf = recordsFile.files?.[0];
+    const ix = indexFile.files?.[0];
+    if (!mfst || !rf || !ix) return;
+
+    // No-op if already imported (REPLACE_ALL semantics).
+    try {
+      const existingDb = await openNkokanDb();
+      const active = await getActiveBundleMeta(existingDb);
+      existingDb.close();
+      if (active?.bundle_id === mfst.bundle_id) {
+        dbOut.textContent = `Bundle already imported: ${mfst.bundle_id}\n(No-op)\n`;
+        return;
+      }
+    } catch {
+      // ignore and proceed; we'll recreate DB via delete+open
+    }
+
+    // REPLACE_ALL v1 semantics for import: delete entire DB at import start.
+    dbOut.textContent = "Import starting: deleting IndexedDB...\n";
+    try {
+      await deleteNkokanDb();
+    } catch (e) {
+      dbOut.textContent += `Delete failed: ${String(e)}\n`;
+      dbOut.textContent += "Close other tabs using this app, then retry.\n";
+      return;
+    }
+
+    const db = await openNkokanDb();
+    const t0 = performance.now();
+    let recordsCount = 0;
+    let indexCount = 0;
+    try {
+      dbOut.textContent = `Deleted. Importing bundle ${mfst.bundle_id}...\n`;
+
+      const recRes = await importRecordsJsonl(db, rf, {
+        batchSize: 500,
+        onProgress: (p) => {
+          dbOut.textContent =
+            `Importing bundle (NOT active yet)\n` +
+            `bundle_id: ${mfst.bundle_id}\n` +
+            `\n[records.jsonl]\n` +
+            `bytes read: ${p.bytesRead}\n` +
+            `lines seen: ${p.linesSeen}\n` +
+            `records written: ${p.recordsWritten}\n` +
+            `batches committed: ${p.batchesCommitted}\n`;
+        },
+      });
+      recordsCount = recRes.recordsWritten;
+
+      const idxRes = await importSearchIndexJsonl(db, ix, {
+        batchSize: 500,
+        onProgress: (p) => {
+          dbOut.textContent =
+            `Importing bundle (NOT active yet)\n` +
+            `bundle_id: ${mfst.bundle_id}\n` +
+            `\n[records.jsonl] written: ${recordsCount}\n` +
+            `\n[search_index.jsonl]\n` +
+            `bytes read: ${p.bytesRead}\n` +
+            `lines seen: ${p.linesSeen}\n` +
+            `entries written: ${p.entriesWritten}\n` +
+            `batches committed: ${p.batchesCommitted}\n`;
+        },
+      });
+      indexCount = idxRes.entriesWritten;
+
+      // Commit marker: only write active bundle metadata after BOTH imports succeed.
+      await setActiveBundleMeta(db, {
+        bundle_id: mfst.bundle_id,
+        manifest_schema_version: mfst.manifest_schema_version,
+        record_schema_id: mfst.record_schema_id,
+        record_schema_version: mfst.record_schema_version,
+        normalization_ruleset: mfst.rule_versions.normalization,
+        update_mode: mfst.update_mode,
+        reconciliation_action: mfst.reconciliation_action,
+        content_sha256: mfst.content_sha256,
+        imported_at_iso: new Date().toISOString(),
+        records_count: recordsCount,
+        index_entries_count: indexCount,
+      });
+
+      const elapsedMs = performance.now() - t0;
+      dbOut.textContent =
+        `Import COMPLETE\n` +
+        `bundle_id: ${mfst.bundle_id}\n` +
+        `records: ${recordsCount}\n` +
+        `index entries: ${indexCount}\n` +
+        `elapsed: ${elapsedMs.toFixed(0)} ms\n` +
+        `\nNote: hash verification (sha256) is deferred in the browser harness for Phase 2.0.3.\n`;
+    } catch (e) {
+      dbOut.textContent += `\nImport FAILED: ${String(e)}\n`;
+      dbOut.textContent += `Database was cleared at import start (REPLACE_ALL). Please re-import.\n`;
+      dbOut.textContent += `No bundle has been marked active.\n`;
+    } finally {
+      db.close();
+    }
+
+    await refreshDbStatus();
+  });
+});
+
+clearDbBtn.addEventListener("click", () => {
+  void withSingleWriterLock("delete db", async () => {
+    manifestOut.textContent = "";
+    dbOut.textContent = "Deleting IndexedDB...\n";
+    try {
+      await deleteNkokanDb();
+      dbOut.textContent += "Deleted.\n";
+    } catch (e) {
+      dbOut.textContent += `Delete failed: ${String(e)}\n`;
+    }
+    await refreshDbStatus();
+  });
+});
 
 async function runProbe(label: string, file: File) {
   probeOut.textContent += `\n[${label}] ${file.name} (${fmtBytes(file.size)})\n`;
@@ -152,3 +428,4 @@ probeAllBtn.addEventListener("click", () => {
   });
 });
 
+void refreshDbStatus();
