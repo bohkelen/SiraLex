@@ -12,6 +12,7 @@ export type ImportSearchIndexOptions = {
   batchSize?: number; // max writes per transaction
   onProgress?: (p: ImportSearchIndexProgress) => void;
   signal?: AbortSignal;
+  debugDetectDuplicateKeys?: boolean;
 };
 
 function nextAnimationFrame(): Promise<void> {
@@ -36,16 +37,18 @@ export async function importSearchIndexJsonl(
   db: IDBDatabase,
   indexFile: File,
   options: ImportSearchIndexOptions = {},
-): Promise<{ entriesWritten: number; linesSeen: number; batchesCommitted: number }> {
+): Promise<{ entriesWritten: number; linesSeen: number; batchesCommitted: number; duplicateKeysFound: string[] }> {
   const batchSize = options.batchSize ?? 500;
-  const { onProgress, signal } = options;
+  const { onProgress, signal, debugDetectDuplicateKeys } = options;
 
   let bytesRead = 0;
   let linesSeen = 0;
   let entriesWritten = 0;
   let batchesCommitted = 0;
+  const duplicateKeysFound: string[] = [];
 
   const batch: SearchIndexEntry[] = [];
+  const batchKeySet = debugDetectDuplicateKeys ? new Set<string>() : undefined;
 
   const report = () => onProgress?.({ bytesRead, linesSeen, entriesWritten, batchesCommitted });
 
@@ -59,14 +62,13 @@ export async function importSearchIndexJsonl(
     const tx = db.transaction(STORE_SEARCH_INDEX, "readwrite");
     const store = tx.objectStore(STORE_SEARCH_INDEX);
     for (const entry of batch) {
-      // Store the full object (including key_type + key) even though the compound keyPath
-      // could technically omit them. This is valuable for debugging/export.
       store.put(entry);
     }
     await txDone(tx);
     batchesCommitted += 1;
     entriesWritten += batch.length;
     batch.length = 0;
+    batchKeySet?.clear();
     report();
     await nextAnimationFrame();
   }
@@ -108,6 +110,14 @@ export async function importSearchIndexJsonl(
       throw new Error(`search_index.jsonl line ${linesSeen}: ir_ids[] is empty or non-string`);
     }
 
+    if (batchKeySet) {
+      const compoundKey = `${keyType}\0${key}`;
+      if (batchKeySet.has(compoundKey)) {
+        duplicateKeysFound.push(`search_index line ${linesSeen}: duplicate [${keyType}, ${key}] within batch`);
+      }
+      batchKeySet.add(compoundKey);
+    }
+
     batch.push({ key_type: keyType, key, ir_ids: ids });
     if (batch.length >= batchSize) {
       await flushBatch();
@@ -117,6 +127,6 @@ export async function importSearchIndexJsonl(
   await flushBatch();
   report();
 
-  return { entriesWritten, linesSeen, batchesCommitted };
+  return { entriesWritten, linesSeen, batchesCommitted, duplicateKeysFound };
 }
 

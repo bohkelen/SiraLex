@@ -12,6 +12,7 @@ export type ImportRecordsOptions = {
   batchSize?: number; // max writes per transaction
   onProgress?: (p: ImportRecordsProgress) => void;
   signal?: AbortSignal;
+  debugDetectDuplicateKeys?: boolean;
 };
 
 function nextAnimationFrame(): Promise<void> {
@@ -30,16 +31,18 @@ export async function importRecordsJsonl(
   db: IDBDatabase,
   recordsFile: File,
   options: ImportRecordsOptions = {},
-): Promise<{ recordsWritten: number; linesSeen: number; batchesCommitted: number }> {
+): Promise<{ recordsWritten: number; linesSeen: number; batchesCommitted: number; duplicateKeysFound: string[] }> {
   const batchSize = options.batchSize ?? 500;
-  const { onProgress, signal } = options;
+  const { onProgress, signal, debugDetectDuplicateKeys } = options;
 
   let bytesRead = 0;
   let linesSeen = 0;
   let recordsWritten = 0;
   let batchesCommitted = 0;
+  const duplicateKeysFound: string[] = [];
 
   const batch: unknown[] = [];
+  const batchKeySet = debugDetectDuplicateKeys ? new Set<string>() : undefined;
 
   const report = () =>
     onProgress?.({ bytesRead, linesSeen, recordsWritten, batchesCommitted });
@@ -62,6 +65,7 @@ export async function importRecordsJsonl(
     batchesCommitted += 1;
     recordsWritten += batch.length;
     batch.length = 0;
+    batchKeySet?.clear();
     report();
     await nextAnimationFrame();
   }
@@ -86,6 +90,13 @@ export async function importRecordsJsonl(
       throw new Error(`records.jsonl line ${linesSeen}: missing/invalid ir_id`);
     }
 
+    if (batchKeySet) {
+      if (batchKeySet.has(irId)) {
+        duplicateKeysFound.push(`records line ${linesSeen}: duplicate ir_id "${irId}" within batch`);
+      }
+      batchKeySet.add(irId);
+    }
+
     batch.push(obj);
     if (batch.length >= batchSize) {
       await flushBatch();
@@ -95,6 +106,6 @@ export async function importRecordsJsonl(
   await flushBatch();
   report();
 
-  return { recordsWritten, linesSeen, batchesCommitted };
+  return { recordsWritten, linesSeen, batchesCommitted, duplicateKeysFound };
 }
 

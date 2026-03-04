@@ -79,7 +79,7 @@ export type ActiveBundleMeta = {
   normalization_ruleset: string;
   update_mode: string;
   reconciliation_action: string;
-  content_sha256?: string;
+  expected_content_sha256?: string;
   imported_at_iso: string;
   records_count?: number;
   index_entries_count?: number;
@@ -89,6 +89,13 @@ export const META_ACTIVE_BUNDLE_KEY = "active_bundle";
 
 export async function getActiveBundleMeta(db: IDBDatabase): Promise<ActiveBundleMeta | undefined> {
   return await metaGet<ActiveBundleMeta>(db, META_ACTIVE_BUNDLE_KEY);
+}
+
+export async function storeHasData(db: IDBDatabase, storeName: NkokanObjectStoreName): Promise<boolean> {
+  const tx = db.transaction(storeName, "readonly");
+  const store = tx.objectStore(storeName);
+  const count = await reqToPromise(store.count());
+  return count > 0;
 }
 
 export async function setActiveBundleMeta(db: IDBDatabase, meta: ActiveBundleMeta): Promise<void> {

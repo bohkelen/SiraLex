@@ -233,14 +233,80 @@ DoD:
 | 1 | Phase 1.4.2 — Build and verify the first real bundle | Immediate | ✅ Complete |
 | 2 | Phase 2.0.0 — Enrich bundle with display data | Backend prerequisite | ✅ Complete |
 | 3 | Phase 2.0.1 — Web project scaffolding (Vite + TS) | Primary focus | ✅ Complete |
-| 4 | Phase 2.0.2 — JS normalization mirror (`norm_v1` port) | Primary focus | Pending |
-| 5 | Phase 2.0.3 — Bundle loading + client-side search | Primary focus | Pending |
-| 6 | Phase 2.0.4 — Results display + entry view | Primary focus | Pending |
-| 7 | Phase 2.0.5 — Offline PWA finalization | Primary focus | Pending |
+| 4 | Phase 2.0.2 — JS normalization mirror (`norm_v1` port) | Primary focus | ✅ Complete |
+| 5 | Phase 2.0.3 — Bundle ingestion (storage correctness) | Primary focus | ✅ Complete (hardening items tracked for next PR) |
+| 5b | Phase 2.0.3b — Query execution (retrieval correctness) | Primary focus | Pending |
+| 6 | Phase 2.0.4 — Results display + entry view (presentation correctness) | Primary focus | Pending |
+| 7 | Phase 2.0.5 — Offline PWA finalization (first-install → offline proof) | Primary focus | Pending |
 | 8 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
 | 9 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
 
-Phase 2.0 (Branch A) is the primary track. Phase 2.0.0 (bundle enrichment) and Phase 2.0.1 (web scaffolding) are complete — the data layer and build tooling are ready for frontend consumption. Phase 1.5 backend work (Branch B) can proceed in parallel as light, spec-level work. Branch C is explicitly deferred until real usage data exists.
+Phase 2.0 (Branch A) is the primary track. Phases 2.0.0–2.0.3 are complete — the data layer, build tooling, JS normalization mirror, and bundle ingestion pipeline are ready for frontend consumption. Phase 1.5 backend work (Branch B) can proceed in parallel as light, spec-level work. Branch C is explicitly deferred until real usage data exists.
+
+The remaining Phase 2.0 work follows clean layer separation:
+
+- **2.0.3** = storage correctness (import pipeline) ✅
+- **2.0.3b** = retrieval correctness (query execution)
+- **2.0.4** = presentation correctness (results display + entry view)
+- **2.0.5** = offline correctness (PWA first-install → offline proof)
+
+#### Phase 2.0.3 — Hardening items (tracked for next PR)
+
+These items were identified during PR C review. They should be addressed alongside or before Phase 2.0.3b:
+
+1. **Inactive DB banner + one-click reset** — After a failed import, the DB contains partial data but no `active_bundle`. The UI should make this state unambiguous (explicit banner, one-click delete affordance, search disabled until successful import). Tracked as `TODO(hardening-1)` in `web/src/main.ts`.
+
+2. **Optional debug duplicate-key detection** — Import counters (`records_count`, `index_entries_count`) count committed `put()` operations, not unique keys. An opt-in debug flag should track keys within each batch (Set of ≤500) to catch bundle generation regressions cheaply. Cross-batch detection is too expensive for prod. Tracked as `TODO(hardening-2)` in `web/src/import/import_records.ts` and `import_search_index.ts`.
+
+3. **Max line length metric in bundle manifest** — The 4 MiB `MAX_JSONL_LINE_BYTES` cap is generous. The bundle builder should record the actual max line length in `search_index.jsonl` as a non-enforced informational metric in the manifest (future).
+
+#### Phase 2.0.3b — Query execution (retrieval correctness)
+
+Goal: given a user query string, return an ordered list of `ir_id` values from IndexedDB.
+
+**Critical implementation constraint**: the query function MUST call `computeSearchKeys([query])` from `web/src/norm/norm_v1.ts` — the same function used during import parity tests. It must never re-derive normalization logic. If the normalization mirror ever changes, both importer and query behavior stay consistent through this single entry point.
+
+- Exactness ladder: `casefold` → `diacritics_insensitive` → `punct_stripped` → `nospace`
+- For each key type (in order), do `store.get([key_type, normalized_key])` against `search_index`
+- Stop at first non-empty `ir_ids[]` — no merging across levels, no ranking
+- Preserve `ir_ids[]` order as-is (order from the bundle)
+- No prefix search, no suggestions, no fuzzy matching
+
+Performance expectations (87k entries, exact compound key lookup):
+- O(1) per lookup, 1–3 ms on mid-range Android
+- Worst case: 4 lookups (only `nospace` matches) = ~4–12 ms
+- No batching needed
+
+DoD:
+- A user can type a query in the harness and see matching `ir_id` values from IndexedDB.
+- Query uses the same normalization path as the import pipeline.
+
+#### Phase 2.0.4 — Results display + entry view (presentation correctness)
+
+Goal: render search results as human-readable dictionary entries.
+
+- Resolve `ir_id` list → fetch records from `records` store
+- **Record resolution**: use `Promise.all` with multiple `get()` calls in a single read-only transaction, or parallel `get()` calls. Never open a transaction per record.
+- Display summary line per result (headword, POS, first translation)
+- Entry detail view: full senses, translations, variant forms, examples, provenance
+- Language toggle: FR → Maninka vs Maninka → FR
+- Consume the enriched `display` object (from Phase 2.0.0)
+- No styling polish, no animations
+
+DoD:
+- A user can type a query, see a results list, and tap into a full entry view.
+
+#### Phase 2.0.5 — Offline PWA finalization (first-install → offline proof)
+
+Goal: prove the app works fully offline after first load.
+
+- Service worker caches all static assets (already scaffolded in Phase 2.0.1)
+- Bundle download/import flow for first-time users
+- Verify on a real mid-range Android device: cold start, search latency, offline behavior
+- **Do not attempt update orchestration yet** — just prove first-install → offline search works
+
+DoD:
+- A learner can install the PWA, import a bundle, close the browser, reopen offline, and search successfully.
 
 ### Phase 2 memory constraint (lock-in before IndexedDB)
 

@@ -12,9 +12,13 @@ import {
   getActiveBundleMeta,
   openNkokanDb,
   setActiveBundleMeta,
+  storeHasData,
+  STORE_RECORDS,
+  STORE_SEARCH_INDEX,
 } from "./idb/nkokan_db";
 import { importRecordsJsonl } from "./import/import_records";
 import { importSearchIndexJsonl } from "./import/import_search_index";
+import { searchQuery } from "./search/search_query";
 
 registerSW({ immediate: true });
 
@@ -56,6 +60,23 @@ app.innerHTML = `
 
       <div id="manifestOut" class="mono" style="margin-top: 12px"></div>
       <div id="dbOut" class="mono" style="margin-top: 12px"></div>
+    </div>
+
+    <div class="card" style="margin-top: 16px">
+      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Search (Phase 2.0.3b)</h2>
+      <p class="subtitle">
+        Type a query to look up matching <code>ir_id</code> values from IndexedDB.
+        Uses the exactness ladder: casefold → diacritics_insensitive → punct_stripped → nospace.
+      </p>
+
+      <div class="row" style="margin-top: 12px">
+        <div class="field" style="flex: 1">
+          <div class="label">Query</div>
+          <input id="searchInput" type="text" placeholder="Type a word…" disabled autocomplete="off" />
+        </div>
+      </div>
+
+      <div id="searchOut" class="mono" style="margin-top: 12px"></div>
     </div>
 
     <div class="card" style="margin-top: 16px">
@@ -104,6 +125,8 @@ const probeAllBtn = mustGetEl<HTMLButtonElement>("#probeAll");
 const probeOut = mustGetEl<HTMLDivElement>("#probeOut");
 const manifestOut = mustGetEl<HTMLDivElement>("#manifestOut");
 const dbOut = mustGetEl<HTMLDivElement>("#dbOut");
+const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
+const searchOut = mustGetEl<HTMLDivElement>("#searchOut");
 
 function fmtBytes(n: number | undefined): string {
   if (n === undefined) return "n/a";
@@ -155,15 +178,39 @@ async function refreshDbStatus() {
   try {
     const db = await openNkokanDb();
     const active = await getActiveBundleMeta(db);
-    dbOut.textContent =
-      active
-        ? `IndexedDB: present\nActive bundle: ${active.bundle_id}\nNormalization: ${active.normalization_ruleset}\nSchema: ${active.record_schema_id}@${active.record_schema_version}\nImported: ${active.imported_at_iso}\nRecords: ${active.records_count ?? "n/a"} | Index entries: ${active.index_entries_count ?? "n/a"}\n`
-        : "IndexedDB: present\nActive bundle: none (not imported yet)\n";
+    if (active) {
+      hasActiveBundle = true;
+      dbOut.textContent =
+        `IndexedDB: present\nActive bundle: ${active.bundle_id}\n` +
+        `Normalization: ${active.normalization_ruleset}\n` +
+        `Schema: ${active.record_schema_id}@${active.record_schema_version}\n` +
+        `Imported: ${active.imported_at_iso}\n` +
+        `Records: ${active.records_count ?? "n/a"} | Index entries: ${active.index_entries_count ?? "n/a"}\n`;
+    } else {
+      hasActiveBundle = false;
+      const hasRecordsData = await storeHasData(db, STORE_RECORDS);
+      const hasIndexData = await storeHasData(db, STORE_SEARCH_INDEX);
+      if (hasRecordsData || hasIndexData) {
+        dbOut.textContent =
+          `⚠ INACTIVE DATABASE — partial data from a failed or interrupted import.\n` +
+          `No active bundle is committed. Search is disabled.\n` +
+          `Use "Delete entire local IndexedDB database" to reset, then re-import.\n`;
+      } else {
+        dbOut.textContent = "IndexedDB: present\nActive bundle: none (not imported yet)\n";
+      }
+    }
     db.close();
   } catch (e) {
+    hasActiveBundle = false;
     dbOut.textContent = `IndexedDB status error: ${String(e)}\n`;
   }
+  searchInput.disabled = !hasActiveBundle;
+  if (!hasActiveBundle) {
+    searchOut.textContent = "";
+  }
 }
+
+let hasActiveBundle = false;
 
 let lastValidatedManifest: BundleManifestV1 | undefined;
 let busy = false;
@@ -240,7 +287,7 @@ async function validateManifestAndFiles() {
   manifestOut.textContent += `mode: ${mfst.update_mode} / ${mfst.reconciliation_action}\n`;
   manifestOut.textContent += `payloads: ${mfst.files.map((f) => f.path).join(", ")}\n`;
   for (const w of [...parsed.warnings, ...fileCheck.warnings]) manifestOut.textContent += `WARN: ${w}\n`;
-  manifestOut.textContent += `\nNote: hash verification (sha256) is deferred in the browser harness for Phase 2.0.3.\n`;
+  manifestOut.textContent += `\nNote: content_sha256 is stored from manifest but NOT verified client-side (hash verification deferred).\n`;
   manifestOut.textContent += `Manifest schema versions are hard-gated; newer manifest versions require a frontend update.\n`;
   manifestOut.textContent += `\nNext step: import streaming → IndexedDB\n`;
   updateButtons();
@@ -277,6 +324,8 @@ importBundleBtn.addEventListener("click", () => {
     } catch (e) {
       dbOut.textContent += `Delete failed: ${String(e)}\n`;
       dbOut.textContent += "Close other tabs using this app, then retry.\n";
+      lastValidatedManifest = undefined;
+      await refreshDbStatus();
       return;
     }
 
@@ -327,7 +376,7 @@ importBundleBtn.addEventListener("click", () => {
         normalization_ruleset: mfst.rule_versions.normalization,
         update_mode: mfst.update_mode,
         reconciliation_action: mfst.reconciliation_action,
-        content_sha256: mfst.content_sha256,
+        expected_content_sha256: mfst.content_sha256,
         imported_at_iso: new Date().toISOString(),
         records_count: recordsCount,
         index_entries_count: indexCount,
@@ -340,11 +389,12 @@ importBundleBtn.addEventListener("click", () => {
         `records: ${recordsCount}\n` +
         `index entries: ${indexCount}\n` +
         `elapsed: ${elapsedMs.toFixed(0)} ms\n` +
-        `\nNote: hash verification (sha256) is deferred in the browser harness for Phase 2.0.3.\n`;
+        `\nNote: expected_content_sha256 stored from manifest; NOT verified client-side.\n`;
     } catch (e) {
       dbOut.textContent += `\nImport FAILED: ${String(e)}\n`;
-      dbOut.textContent += `Database was cleared at import start (REPLACE_ALL). Please re-import.\n`;
+      dbOut.textContent += `Database was cleared at import start (REPLACE_ALL). Please re-validate and re-import.\n`;
       dbOut.textContent += `No bundle has been marked active.\n`;
+      lastValidatedManifest = undefined;
     } finally {
       db.close();
     }
@@ -427,5 +477,59 @@ probeAllBtn.addEventListener("click", () => {
     await runProbe("search_index", fi);
   });
 });
+
+let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+let searchSeq = 0;
+
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchDebounceTimer);
+  const query = searchInput.value;
+  if (query.trim() === "") {
+    searchSeq += 1;
+    searchOut.textContent = "";
+    return;
+  }
+  searchDebounceTimer = setTimeout(() => {
+    void runSearch(query);
+  }, 150);
+});
+
+async function runSearch(query: string) {
+  if (!hasActiveBundle) {
+    searchOut.textContent = "Search disabled: no active bundle.";
+    return;
+  }
+  const seq = ++searchSeq;
+  const t0 = performance.now();
+  let db: IDBDatabase | undefined;
+  try {
+    db = await openNkokanDb();
+    const result = await searchQuery(db, query);
+    if (seq !== searchSeq) return;
+    const elapsedMs = performance.now() - t0;
+
+    if (result.ir_ids.length === 0) {
+      searchOut.textContent =
+        `Query: "${query}"\n` +
+        `No matches (all 4 levels checked).\n` +
+        `Elapsed: ${elapsedMs.toFixed(1)} ms\n`;
+    } else {
+      searchOut.textContent =
+        `Query: "${query}"\n` +
+        `Matched at level: ${result.matched_key_type}\n` +
+        `Normalized key: "${result.matched_key}"\n` +
+        `Results: ${result.ir_ids.length} ir_id(s)\n` +
+        `Elapsed: ${elapsedMs.toFixed(1)} ms\n` +
+        `\n` +
+        result.ir_ids.join("\n") +
+        "\n";
+    }
+  } catch (e) {
+    if (seq !== searchSeq) return;
+    searchOut.textContent = `Search error: ${String(e)}\n`;
+  } finally {
+    db?.close();
+  }
+}
 
 void refreshDbStatus();
