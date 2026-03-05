@@ -19,6 +19,10 @@ import {
 import { importRecordsJsonl } from "./import/import_records";
 import { importSearchIndexJsonl } from "./import/import_search_index";
 import { searchQuery } from "./search/search_query";
+import { resolveRecords } from "./search/resolve_records";
+import { renderResultsList } from "./render/render_results";
+import { renderEntryDetail } from "./render/render_entry";
+import type { EnrichedRecord } from "./types/records";
 
 registerSW({ immediate: true });
 
@@ -63,20 +67,21 @@ app.innerHTML = `
     </div>
 
     <div class="card" style="margin-top: 16px">
-      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Search (Phase 2.0.3b)</h2>
+      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Search + Results (Phase 2.0.4)</h2>
       <p class="subtitle">
-        Type a query to look up matching <code>ir_id</code> values from IndexedDB.
-        Uses the exactness ladder: casefold → diacritics_insensitive → punct_stripped → nospace.
+        Type a query to search the dictionary. Uses the exactness ladder: casefold → diacritics_insensitive → punct_stripped → nospace.
       </p>
 
-      <div class="row" style="margin-top: 12px">
+      <div class="row" style="margin-top: 12px; align-items: center">
         <div class="field" style="flex: 1">
-          <div class="label">Query</div>
-          <input id="searchInput" type="text" placeholder="Type a word…" disabled autocomplete="off" />
+          <div class="label" id="searchLabel">Query (FR → Maninka)</div>
+          <input id="searchInput" type="text" placeholder="Type a French word…" disabled autocomplete="off" />
         </div>
+        <button id="langToggle" class="btn" disabled>FR → Maninka</button>
       </div>
 
-      <div id="searchOut" class="mono" style="margin-top: 12px"></div>
+      <div id="searchMeta" class="mono" style="margin-top: 12px"></div>
+      <div id="searchResults" style="margin-top: 12px"></div>
     </div>
 
     <div class="card" style="margin-top: 16px">
@@ -126,7 +131,10 @@ const probeOut = mustGetEl<HTMLDivElement>("#probeOut");
 const manifestOut = mustGetEl<HTMLDivElement>("#manifestOut");
 const dbOut = mustGetEl<HTMLDivElement>("#dbOut");
 const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
-const searchOut = mustGetEl<HTMLDivElement>("#searchOut");
+const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
+const searchMeta = mustGetEl<HTMLDivElement>("#searchMeta");
+const searchResults = mustGetEl<HTMLDivElement>("#searchResults");
+const langToggle = mustGetEl<HTMLButtonElement>("#langToggle");
 
 function fmtBytes(n: number | undefined): string {
   if (n === undefined) return "n/a";
@@ -205,8 +213,10 @@ async function refreshDbStatus() {
     dbOut.textContent = `IndexedDB status error: ${String(e)}\n`;
   }
   searchInput.disabled = !hasActiveBundle;
+  langToggle.disabled = !hasActiveBundle;
   if (!hasActiveBundle) {
-    searchOut.textContent = "";
+    searchMeta.textContent = "";
+    searchResults.innerHTML = "";
   }
 }
 
@@ -478,15 +488,42 @@ probeAllBtn.addEventListener("click", () => {
   });
 });
 
+// --- Language toggle ---
+
+type SearchDirection = "fr_to_mnk" | "mnk_to_fr";
+let searchDirection: SearchDirection = "fr_to_mnk";
+
+function updateLangToggle() {
+  if (searchDirection === "fr_to_mnk") {
+    langToggle.textContent = "FR → Maninka";
+    searchLabel.textContent = "Query (FR → Maninka)";
+    searchInput.placeholder = "Type a French word…";
+  } else {
+    langToggle.textContent = "Maninka → FR";
+    searchLabel.textContent = "Query (Maninka → FR)";
+    searchInput.placeholder = "Type a Maninka word…";
+  }
+}
+
+langToggle.addEventListener("click", () => {
+  searchDirection = searchDirection === "fr_to_mnk" ? "mnk_to_fr" : "fr_to_mnk";
+  updateLangToggle();
+});
+
+// --- Search + results ---
+
 let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 let searchSeq = 0;
+let lastSearchRecords: EnrichedRecord[] = [];
 
 searchInput.addEventListener("input", () => {
   clearTimeout(searchDebounceTimer);
   const query = searchInput.value;
   if (query.trim() === "") {
     searchSeq += 1;
-    searchOut.textContent = "";
+    searchMeta.textContent = "";
+    searchResults.innerHTML = "";
+    lastSearchRecords = [];
     return;
   }
   searchDebounceTimer = setTimeout(() => {
@@ -494,9 +531,34 @@ searchInput.addEventListener("input", () => {
   }, 150);
 });
 
+function showResultsList() {
+  searchResults.innerHTML = "";
+  if (lastSearchRecords.length === 0) return;
+
+  const list = renderResultsList(lastSearchRecords, (record) => {
+    showEntryDetail(record);
+  });
+  if (list) searchResults.appendChild(list);
+}
+
+function triggerSearch(query: string) {
+  searchInput.value = query;
+  searchSeq += 1;
+  void runSearch(query);
+}
+
+function showEntryDetail(record: EnrichedRecord) {
+  searchResults.innerHTML = "";
+  const detail = renderEntryDetail(record, {
+    onBack: () => showResultsList(),
+    onSearch: (query) => triggerSearch(query),
+  });
+  searchResults.appendChild(detail);
+}
+
 async function runSearch(query: string) {
   if (!hasActiveBundle) {
-    searchOut.textContent = "Search disabled: no active bundle.";
+    searchMeta.textContent = "Search disabled: no active bundle.";
     return;
   }
   const seq = ++searchSeq;
@@ -506,27 +568,31 @@ async function runSearch(query: string) {
     db = await openNkokanDb();
     const result = await searchQuery(db, query);
     if (seq !== searchSeq) return;
-    const elapsedMs = performance.now() - t0;
 
     if (result.ir_ids.length === 0) {
-      searchOut.textContent =
-        `Query: "${query}"\n` +
-        `No matches (all 4 levels checked).\n` +
-        `Elapsed: ${elapsedMs.toFixed(1)} ms\n`;
-    } else {
-      searchOut.textContent =
-        `Query: "${query}"\n` +
-        `Matched at level: ${result.matched_key_type}\n` +
-        `Normalized key: "${result.matched_key}"\n` +
-        `Results: ${result.ir_ids.length} ir_id(s)\n` +
-        `Elapsed: ${elapsedMs.toFixed(1)} ms\n` +
-        `\n` +
-        result.ir_ids.join("\n") +
-        "\n";
+      const elapsedMs = performance.now() - t0;
+      searchMeta.textContent =
+        `Query: "${query}" — No matches (all 4 levels checked). ${elapsedMs.toFixed(1)} ms`;
+      searchResults.innerHTML = "";
+      lastSearchRecords = [];
+      return;
     }
+
+    const records = await resolveRecords(db, result.ir_ids);
+    if (seq !== searchSeq) return;
+    const elapsedMs = performance.now() - t0;
+
+    searchMeta.textContent =
+      `Query: "${query}" — ${records.length} result(s) at level: ${result.matched_key_type} ` +
+      `[key: "${result.matched_key}"] ${elapsedMs.toFixed(1)} ms`;
+
+    lastSearchRecords = records;
+    showResultsList();
   } catch (e) {
     if (seq !== searchSeq) return;
-    searchOut.textContent = `Search error: ${String(e)}\n`;
+    searchMeta.textContent = `Search error: ${String(e)}`;
+    searchResults.innerHTML = "";
+    lastSearchRecords = [];
   } finally {
     db?.close();
   }

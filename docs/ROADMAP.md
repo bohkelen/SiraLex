@@ -234,20 +234,20 @@ DoD:
 | 2 | Phase 2.0.0 — Enrich bundle with display data | Backend prerequisite | ✅ Complete |
 | 3 | Phase 2.0.1 — Web project scaffolding (Vite + TS) | Primary focus | ✅ Complete |
 | 4 | Phase 2.0.2 — JS normalization mirror (`norm_v1` port) | Primary focus | ✅ Complete |
-| 5 | Phase 2.0.3 — Bundle ingestion (storage correctness) | Primary focus | ✅ Complete (hardening items tracked for next PR) |
-| 5b | Phase 2.0.3b — Query execution (retrieval correctness) | Primary focus | Pending |
-| 6 | Phase 2.0.4 — Results display + entry view (presentation correctness) | Primary focus | Pending |
+| 5 | Phase 2.0.3 — Bundle ingestion (storage correctness) | Primary focus | ✅ Complete |
+| 5b | Phase 2.0.3b — Query execution (retrieval correctness) | Primary focus | ✅ Complete |
+| 6 | Phase 2.0.4 — Results display + entry view (presentation correctness) | Primary focus | ✅ Complete |
 | 7 | Phase 2.0.5 — Offline PWA finalization (first-install → offline proof) | Primary focus | Pending |
 | 8 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
 | 9 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
 
-Phase 2.0 (Branch A) is the primary track. Phases 2.0.0–2.0.3 are complete — the data layer, build tooling, JS normalization mirror, and bundle ingestion pipeline are ready for frontend consumption. Phase 1.5 backend work (Branch B) can proceed in parallel as light, spec-level work. Branch C is explicitly deferred until real usage data exists.
+Phase 2.0 (Branch A) is the primary track. Phases 2.0.0–2.0.4 are complete — the data layer, build tooling, JS normalization mirror, bundle ingestion, search query execution, and results display are all functional. Phase 1.5 backend work (Branch B) can proceed in parallel as light, spec-level work. Branch C is explicitly deferred until real usage data exists.
 
 The remaining Phase 2.0 work follows clean layer separation:
 
 - **2.0.3** = storage correctness (import pipeline) ✅
-- **2.0.3b** = retrieval correctness (query execution)
-- **2.0.4** = presentation correctness (results display + entry view)
+- **2.0.3b** = retrieval correctness (query execution) ✅
+- **2.0.4** = presentation correctness (results display + entry view) ✅
 - **2.0.5** = offline correctness (PWA first-install → offline proof)
 
 #### Phase 2.0.3 — Hardening items (tracked for next PR)
