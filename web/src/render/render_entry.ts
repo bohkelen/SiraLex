@@ -137,7 +137,11 @@ function renderLexiconEntry(record: EnrichedRecord, d: LexiconDisplayFields): HT
   return wrap;
 }
 
-function renderIndexMapping(record: EnrichedRecord, d: IndexMappingDisplayFields): HTMLElement {
+function renderIndexMapping(
+  record: EnrichedRecord,
+  d: IndexMappingDisplayFields,
+  onSearch?: (query: string) => void,
+): HTMLElement {
   const wrap = el("div", "entry-detail entry-index");
 
   const header = el("div", "entry-header");
@@ -149,10 +153,20 @@ function renderIndexMapping(record: EnrichedRecord, d: IndexMappingDisplayFields
     const targets = el("div", "entry-targets");
     targets.appendChild(el("div", "targets-label", "Maninka entries:"));
     for (const t of d.target_entries) {
-      const item = el("div", "target-item");
-      item.appendChild(el("span", "target-text", t.display_text));
-      item.appendChild(el("span", "target-ref", ` (${t.anchor})`));
-      targets.appendChild(item);
+      if (onSearch) {
+        const btn = document.createElement("button");
+        btn.className = "target-item target-link";
+        btn.type = "button";
+        btn.appendChild(el("span", "target-text", t.display_text));
+        btn.appendChild(el("span", "target-ref", ` (${t.anchor})`));
+        btn.addEventListener("click", () => onSearch(t.display_text));
+        targets.appendChild(btn);
+      } else {
+        const item = el("div", "target-item");
+        item.appendChild(el("span", "target-text", t.display_text));
+        item.appendChild(el("span", "target-ref", ` (${t.anchor})`));
+        targets.appendChild(item);
+      }
     }
     wrap.appendChild(targets);
   }
@@ -166,13 +180,19 @@ function renderIndexMapping(record: EnrichedRecord, d: IndexMappingDisplayFields
   return wrap;
 }
 
+export type EntryDetailCallbacks = {
+  onBack: () => void;
+  onSearch?: (query: string) => void;
+};
+
 /**
  * Render a full entry detail view for a single enriched record.
  * Includes a "Back to results" callback button.
+ * If onSearch is provided, target entries in index mappings become clickable.
  */
 export function renderEntryDetail(
   record: EnrichedRecord,
-  onBack: () => void,
+  callbacks: EntryDetailCallbacks,
 ): HTMLElement {
   const container = el("div", "entry-container");
 
@@ -180,13 +200,13 @@ export function renderEntryDetail(
   backBtn.className = "btn entry-back";
   backBtn.type = "button";
   backBtn.textContent = "\u2190 Back to results";
-  backBtn.addEventListener("click", onBack);
+  backBtn.addEventListener("click", callbacks.onBack);
   container.appendChild(backBtn);
 
   if (isLexiconDisplay(record)) {
     container.appendChild(renderLexiconEntry(record, record.display));
   } else if (isIndexMappingDisplay(record)) {
-    container.appendChild(renderIndexMapping(record, record.display));
+    container.appendChild(renderIndexMapping(record, record.display, callbacks.onSearch));
   } else {
     container.appendChild(el("div", "entry-error", `No display data for ir_id: ${record.ir_id}`));
   }

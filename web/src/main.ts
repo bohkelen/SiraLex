@@ -541,10 +541,17 @@ function showResultsList() {
   if (list) searchResults.appendChild(list);
 }
 
+function triggerSearch(query: string) {
+  searchInput.value = query;
+  searchSeq += 1;
+  void runSearch(query);
+}
+
 function showEntryDetail(record: EnrichedRecord) {
   searchResults.innerHTML = "";
-  const detail = renderEntryDetail(record, () => {
-    showResultsList();
+  const detail = renderEntryDetail(record, {
+    onBack: () => showResultsList(),
+    onSearch: (query) => triggerSearch(query),
   });
   searchResults.appendChild(detail);
 }

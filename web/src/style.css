@@ -314,6 +314,29 @@ a {
   padding-left: 8px;
 }
 
+button.target-link {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  padding: 4px 8px;
+}
+
+button.target-link:hover {
+  background: color-mix(in oklab, var(--panel) 70%, white 10%);
+  border-color: color-mix(in oklab, var(--panel) 60%, white 20%);
+}
+
+button.target-link .target-text {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .target-text {
   font-weight: 600;
 }
