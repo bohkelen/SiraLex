@@ -112,3 +112,234 @@ a {
   color: var(--accent);
 }
 
+/* --- Results list (Phase 2.0.4) --- */
+
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.result-item {
+  appearance: none;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.result-item:hover {
+  background: color-mix(in oklab, var(--panel) 70%, white 10%);
+  border-color: color-mix(in oklab, var(--panel) 60%, white 20%);
+}
+
+.result-headword {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.result-pos {
+  color: var(--accent);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.result-kind {
+  font-size: 10px;
+  color: var(--muted);
+  border: 1px solid color-mix(in oklab, var(--muted) 40%, transparent 60%);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.result-translation {
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Entry detail (Phase 2.0.4) --- */
+
+.entry-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entry-back {
+  align-self: flex-start;
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.entry-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.entry-headword {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.entry-nko {
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.entry-pos {
+  font-size: 13px;
+  color: var(--accent);
+  font-style: italic;
+}
+
+.entry-variants,
+.entry-synonyms,
+.entry-etymology,
+.entry-literal {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.entry-senses {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.entry-sense {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 8px;
+  border-left: 2px solid color-mix(in oklab, var(--accent) 40%, transparent 60%);
+}
+
+.sense-header {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.sense-num {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.sense-gloss {
+  font-size: 14px;
+}
+
+.sense-usage,
+.sense-synonyms {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sense-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 12px;
+}
+
+.entry-example {
+  font-size: 13px;
+}
+
+.example-text {
+  font-style: italic;
+}
+
+.example-nko {
+  color: var(--muted);
+}
+
+.example-trans {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.example-attr {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sense-subentries {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 12px;
+}
+
+.entry-subentry {
+  font-size: 13px;
+}
+
+.subentry-gloss {
+  color: var(--muted);
+}
+
+.entry-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.targets-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.target-item {
+  font-size: 14px;
+  padding-left: 8px;
+}
+
+.target-text {
+  font-weight: 600;
+}
+
+.target-ref {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.entry-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in oklab, var(--panel) 70%, white 15%);
+}
+
+.meta-item {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.entry-error {
+  color: #f87171;
+  font-size: 13px;
+}
+
