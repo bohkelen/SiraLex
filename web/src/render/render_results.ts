@@ -14,15 +14,29 @@ import { isLexiconDisplay, isIndexMappingDisplay } from "../types/records";
 
 type Summary = { headword: string; pos: string; translation: string; kind: string };
 
+const NO_TRANSLATION = "(no translation available)";
+
 function summarizeLexicon(d: LexiconDisplayFields): Summary {
   const pos = d.pos_hint ?? d.ps_raw ?? "";
-  const firstGloss = d.senses?.[0]?.gloss_fr ?? d.senses?.[0]?.gloss_en ?? "";
-  return { headword: d.headword_latin, pos, translation: firstGloss, kind: "lexicon" };
+  const firstSense = d.senses?.[0];
+  const firstGloss =
+    firstSense?.gloss_fr ?? firstSense?.gloss_en ?? firstSense?.gloss_ru ?? "";
+  return {
+    headword: d.headword_latin,
+    pos,
+    translation: firstGloss || NO_TRANSLATION,
+    kind: "lexicon",
+  };
 }
 
 function summarizeIndexMapping(d: IndexMappingDisplayFields): Summary {
   const targetText = d.target_entries?.map((t) => t.display_text).join(", ") ?? "";
-  return { headword: d.source_term, pos: d.source_lang, translation: targetText, kind: "index" };
+  return {
+    headword: d.source_term,
+    pos: d.source_lang,
+    translation: targetText || NO_TRANSLATION,
+    kind: "index",
+  };
 }
 
 export type OnSelectRecord = (record: EnrichedRecord) => void;
