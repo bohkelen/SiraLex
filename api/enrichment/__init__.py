@@ -1,5 +1,5 @@
 """
-Record enrichment for Nkokan offline bundles.
+Record enrichment for SiraLex offline bundles.
 
 Joins normalized records (search metadata) with IR records (display fields)
 to produce self-contained enriched records suitable for offline dictionary use.

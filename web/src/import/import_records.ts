@@ -1,4 +1,4 @@
-import { STORE_RECORDS } from "../idb/nkokan_db";
+import { STORE_RECORDS } from "../idb/siralex_db";
 import { streamJsonlLines, type JsonlStreamProgress } from "./jsonl_stream";
 
 export type ImportRecordsProgress = {

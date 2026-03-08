@@ -1,6 +1,6 @@
 # Sources, attribution, and provenance
 
-Nkokan modernizes and makes usable (including offline) a set of existing scholarly and lexicographic resources with **attribution-first** intent.
+SiraLex modernizes and makes usable (including offline) a set of existing scholarly and lexicographic resources with **attribution-first** intent.
 
 ## Principles
 

@@ -18,9 +18,9 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
-        name: "Nkokan",
-        short_name: "Nkokan",
-        description: "Offline-first Maninka dictionary",
+        name: "SiraLex",
+        short_name: "SiraLex",
+        description: "Offline-first dictionary",
         start_url: ".",
         scope: ".",
         display: "standalone",

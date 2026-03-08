@@ -402,7 +402,7 @@ def validate_entry(ir_unit: dict[str, Any], expected: dict[str, Any]) -> list[st
 # ---------------------------------------------------------------------------
 
 IR_DATA_CANDIDATES = [
-    Path("/home/potentplot/projects/perso_projects/nkokan/data/ir/malipense_lexicon_v3.jsonl"),
+    Path("/home/potentplot/projects/perso_projects/SiraLex/data/ir/malipense_lexicon_v3.jsonl"),
     Path("data/ir/malipense_lexicon_v3.jsonl"),
     Path("../../../data/ir/malipense_lexicon_v3.jsonl"),
 ]

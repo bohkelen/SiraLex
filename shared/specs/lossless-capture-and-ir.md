@@ -1,6 +1,6 @@
 # Lossless capture & IR specification (v1.1)
 
-This spec defines how Nkokan captures third-party sources in a **lossless enough** way to support:
+This spec defines how SiraLex captures third-party sources in a **lossless enough** way to support:
 
 - iterative parsing without re-scraping
 - fine-grained provenance (entry/sense/example)

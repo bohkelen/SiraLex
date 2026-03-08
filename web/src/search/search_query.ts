@@ -13,7 +13,7 @@
  * levels, no client-side re-ranking.
  */
 
-import { STORE_SEARCH_INDEX } from "../idb/nkokan_db";
+import { STORE_SEARCH_INDEX } from "../idb/siralex_db";
 import { computeSearchKeys, type SearchKeys } from "../norm/norm_v1";
 
 const KEY_TYPE_ORDER: (keyof SearchKeys)[] = [

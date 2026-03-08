@@ -8,7 +8,7 @@
 ruleset_id: norm_v1
 
 description: >
-  Initial normalization ruleset for Nkokan. Produces Latin-script search keys
+  Initial normalization ruleset for SiraLex. Produces Latin-script search keys
   (casefold, diacritics-insensitive, punctuation-stripped, no-space) from
   IR headwords and index terms. N'Ko receives NFC normalization only.
   Preferred form = source's own headword. No cross-entry inference.

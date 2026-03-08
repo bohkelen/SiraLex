@@ -1,6 +1,6 @@
 # Normalization rules versioning strategy (v1)
 
-This document defines how Nkokan performs **normalization** while preserving:
+This document defines how SiraLex performs **normalization** while preserving:
 
 - Maninka-first linguistic humility (no invented language)
 - provenance + traceability

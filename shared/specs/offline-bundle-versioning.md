@@ -1,6 +1,6 @@
 # Offline data bundle versioning plan (v1)
 
-This spec defines how Nkokan packages and versions **offline lexicon bundles** (seed + full) so the app can:
+This spec defines how SiraLex packages and versions **offline lexicon bundles** (seed + full) so the app can:
 
 - work offline-first on constrained devices
 - update deterministically over time

@@ -1,6 +1,6 @@
 # Source Registry entries
 
-This directory contains **source registry entries** (YAML files) for each data source Nkokan ingests.
+This directory contains **source registry entries** (YAML files) for each data source SiraLex ingests.
 
 See `shared/specs/source-registry.md` for field definitions and requirements.
 

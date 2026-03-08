@@ -2,8 +2,8 @@
 CLI for the Snapshot Engine.
 
 Usage:
-    nkokan-crawl --source src_malipense --urls https://www.mali-pense.net/emk/index-french/a.htm
-    nkokan-crawl --source src_malipense --url-file urls.txt
+    siralex-crawl --source src_malipense --urls https://www.mali-pense.net/emk/index-french/a.htm
+    siralex-crawl --source src_malipense --url-file urls.txt
 """
 
 import argparse
@@ -36,21 +36,21 @@ def generate_crawl_id(source_id: str) -> str:
 def main() -> int:
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
-        description="Nkokan Snapshot Engine - crawl and capture web pages",
+        description="SiraLex Snapshot Engine - crawl and capture web pages",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Crawl a single URL
-  nkokan-crawl --source src_malipense --urls https://www.mali-pense.net/emk/index-french/a.htm
+  siralex-crawl --source src_malipense --urls https://www.mali-pense.net/emk/index-french/a.htm
 
   # Crawl multiple URLs
-  nkokan-crawl --source src_malipense --urls URL1 URL2 URL3
+  siralex-crawl --source src_malipense --urls URL1 URL2 URL3
 
   # Crawl URLs from a file (one per line)
-  nkokan-crawl --source src_malipense --url-file urls.txt
+  siralex-crawl --source src_malipense --url-file urls.txt
 
   # Specify output directory
-  nkokan-crawl --source src_malipense --urls URL --output ./data/snapshots
+  siralex-crawl --source src_malipense --urls URL --output ./data/snapshots
         """,
     )
 

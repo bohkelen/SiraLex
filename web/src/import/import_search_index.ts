@@ -1,4 +1,4 @@
-import { STORE_SEARCH_INDEX } from "../idb/nkokan_db";
+import { STORE_SEARCH_INDEX } from "../idb/siralex_db";
 import { streamJsonlLines, type JsonlStreamProgress } from "./jsonl_stream";
 
 export type ImportSearchIndexProgress = {
