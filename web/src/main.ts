@@ -34,40 +34,29 @@ if (!app) {
 app.innerHTML = `
   <div class="container">
     <div class="card">
-      <h1 class="title">Nkokan (Phase 2 harness)</h1>
-      <p class="subtitle">
-        Web/PWA scaffolding is in place. Next: bundle loading and minimal offline lookup UI.
-      </p>
-      <p class="subtitle" style="margin-top: 12px">
-        See <code>docs/ROADMAP.md</code> for the Phase 2.0 ordering.
-      </p>
+      <h1 class="title">Nkokan</h1>
+      <p class="subtitle">Offline-first Maninka dictionary</p>
     </div>
 
     <div class="card" style="margin-top: 16px">
-      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Bundle manifest gating (Phase 2.0.3)</h2>
-      <p class="subtitle">
-        Select <code>bundle.manifest.json</code> and validate it before any import. This enforces ruleset/schema compatibility and REPLACE_ALL semantics.
-      </p>
-
-      <div class="row" style="margin-top: 12px">
-        <div class="field">
-          <div class="label">bundle.manifest.json</div>
-          <input id="manifestFile" type="file" accept=".json,application/json" />
-        </div>
+      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Dictionary</h2>
+      <div id="dictStatus" class="mono"></div>
+      <div id="firstRun" style="display: none; margin-top: 12px">
+        <p style="color: var(--muted); font-size: 14px; margin: 0 0 12px 0">
+          No dictionary installed.<br>
+          Download a dictionary bundle and import it.
+        </p>
+        <button id="quickImport" class="btn">Import bundle files</button>
+        <input id="quickImportFiles" type="file" multiple accept=".json,.jsonl" style="display: none" />
       </div>
-
+      <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
       <div class="row" style="margin-top: 12px">
-        <button id="validateManifest" class="btn" disabled>Validate manifest + selected files</button>
-        <button id="importBundle" class="btn" disabled>Import bundle (records + search index)</button>
-        <button id="clearDb" class="btn">Delete entire local IndexedDB database</button>
+        <button id="clearDb" class="btn">Delete database</button>
       </div>
-
-      <div id="manifestOut" class="mono" style="margin-top: 12px"></div>
-      <div id="dbOut" class="mono" style="margin-top: 12px"></div>
     </div>
 
     <div class="card" style="margin-top: 16px">
-      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Search + Results (Phase 2.0.4)</h2>
+      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Search</h2>
       <p class="subtitle">
         Type a query to search the dictionary. Uses the exactness ladder: casefold → diacritics_insensitive → punct_stripped → nospace.
       </p>
@@ -84,31 +73,57 @@ app.innerHTML = `
       <div id="searchResults" style="margin-top: 12px"></div>
     </div>
 
-    <div class="card" style="margin-top: 16px">
-      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Bundle size & memory sanity probe</h2>
-      <p class="subtitle">
-        Select the bundle JSONL files from disk and run a parse probe. This intentionally does not use IndexedDB yet.
-      </p>
+    <details style="margin-top: 16px">
+      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">Developer tools</summary>
 
-      <div class="row" style="margin-top: 12px">
-        <div class="field">
-          <div class="label">records.jsonl (enriched)</div>
-          <input id="recordsFile" type="file" accept=".jsonl,.txt,application/json" />
+      <div class="card" style="margin-top: 8px">
+        <h3 class="title" style="font-size: 14px; margin-bottom: 8px">Bundle manifest gating</h3>
+        <p class="subtitle">
+          Select <code>bundle.manifest.json</code> and validate it before any import.
+        </p>
+
+        <div class="row" style="margin-top: 12px">
+          <div class="field">
+            <div class="label">bundle.manifest.json</div>
+            <input id="manifestFile" type="file" accept=".json,application/json" />
+          </div>
         </div>
-        <div class="field">
-          <div class="label">search_index.jsonl</div>
-          <input id="indexFile" type="file" accept=".jsonl,.txt,application/json" />
+
+        <div class="row" style="margin-top: 12px">
+          <div class="field">
+            <div class="label">records.jsonl (enriched)</div>
+            <input id="recordsFile" type="file" accept=".jsonl,.txt,application/json" />
+          </div>
+          <div class="field">
+            <div class="label">search_index.jsonl</div>
+            <input id="indexFile" type="file" accept=".jsonl,.txt,application/json" />
+          </div>
         </div>
+
+        <div class="row" style="margin-top: 12px">
+          <button id="validateManifest" class="btn" disabled>Validate manifest + selected files</button>
+          <button id="importBundle" class="btn" disabled>Import bundle</button>
+        </div>
+
+        <div id="manifestOut" class="mono" style="margin-top: 12px"></div>
+        <div id="dbOut" class="mono" style="margin-top: 12px"></div>
       </div>
 
-      <div class="row" style="margin-top: 12px">
-        <button id="probeRecords" class="btn" disabled>Probe records</button>
-        <button id="probeIndex" class="btn" disabled>Probe index</button>
-        <button id="probeAll" class="btn" disabled>Probe both</button>
-      </div>
+      <div class="card" style="margin-top: 8px">
+        <h3 class="title" style="font-size: 14px; margin-bottom: 8px">Bundle size &amp; memory probe</h3>
+        <p class="subtitle">
+          Select the bundle JSONL files from disk and run a parse probe.
+        </p>
 
-      <div id="probeOut" class="mono" style="margin-top: 12px"></div>
-    </div>
+        <div class="row" style="margin-top: 12px">
+          <button id="probeRecords" class="btn" disabled>Probe records</button>
+          <button id="probeIndex" class="btn" disabled>Probe index</button>
+          <button id="probeAll" class="btn" disabled>Probe both</button>
+        </div>
+
+        <div id="probeOut" class="mono" style="margin-top: 12px"></div>
+      </div>
+    </details>
   </div>
 `;
 
@@ -118,23 +133,34 @@ function mustGetEl<T extends Element>(selector: string): T {
   return el as T;
 }
 
+// Primary UI elements
+const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
+const firstRun = mustGetEl<HTMLDivElement>("#firstRun");
+const quickImportBtn = mustGetEl<HTMLButtonElement>("#quickImport");
+const quickImportFiles = mustGetEl<HTMLInputElement>("#quickImportFiles");
+const importProgress = mustGetEl<HTMLDivElement>("#importProgress");
+const clearDbBtn = mustGetEl<HTMLButtonElement>("#clearDb");
+const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
+const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
+const searchMeta = mustGetEl<HTMLDivElement>("#searchMeta");
+const searchResults = mustGetEl<HTMLDivElement>("#searchResults");
+const langToggle = mustGetEl<HTMLButtonElement>("#langToggle");
+
+// Developer tools elements
 const recordsFile = mustGetEl<HTMLInputElement>("#recordsFile");
 const indexFile = mustGetEl<HTMLInputElement>("#indexFile");
 const manifestFile = mustGetEl<HTMLInputElement>("#manifestFile");
 const validateManifestBtn = mustGetEl<HTMLButtonElement>("#validateManifest");
 const importBundleBtn = mustGetEl<HTMLButtonElement>("#importBundle");
-const clearDbBtn = mustGetEl<HTMLButtonElement>("#clearDb");
 const probeRecordsBtn = mustGetEl<HTMLButtonElement>("#probeRecords");
 const probeIndexBtn = mustGetEl<HTMLButtonElement>("#probeIndex");
 const probeAllBtn = mustGetEl<HTMLButtonElement>("#probeAll");
 const probeOut = mustGetEl<HTMLDivElement>("#probeOut");
 const manifestOut = mustGetEl<HTMLDivElement>("#manifestOut");
 const dbOut = mustGetEl<HTMLDivElement>("#dbOut");
-const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
-const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
-const searchMeta = mustGetEl<HTMLDivElement>("#searchMeta");
-const searchResults = mustGetEl<HTMLDivElement>("#searchResults");
-const langToggle = mustGetEl<HTMLButtonElement>("#langToggle");
+
+let lastValidatedManifest: BundleManifestV1 | undefined;
+let busy = false;
 
 function fmtBytes(n: number | undefined): string {
   if (n === undefined) return "n/a";
@@ -182,35 +208,52 @@ manifestFile.addEventListener("change", () => {
 });
 updateButtons();
 
+// --- Dictionary status ---
+
+let hasActiveBundle = false;
+
 async function refreshDbStatus() {
   try {
     const db = await openNkokanDb();
     const active = await getActiveBundleMeta(db);
     if (active) {
       hasActiveBundle = true;
-      dbOut.textContent =
-        `IndexedDB: present\nActive bundle: ${active.bundle_id}\n` +
+      firstRun.style.display = "none";
+      const statusText =
+        `Active: ${active.bundle_id}\n` +
         `Normalization: ${active.normalization_ruleset}\n` +
         `Schema: ${active.record_schema_id}@${active.record_schema_version}\n` +
         `Imported: ${active.imported_at_iso}\n` +
         `Records: ${active.records_count ?? "n/a"} | Index entries: ${active.index_entries_count ?? "n/a"}\n`;
+      dictStatus.textContent = statusText;
+      dbOut.textContent = statusText;
     } else {
       hasActiveBundle = false;
       const hasRecordsData = await storeHasData(db, STORE_RECORDS);
       const hasIndexData = await storeHasData(db, STORE_SEARCH_INDEX);
       if (hasRecordsData || hasIndexData) {
-        dbOut.textContent =
-          `⚠ INACTIVE DATABASE — partial data from a failed or interrupted import.\n` +
-          `No active bundle is committed. Search is disabled.\n` +
-          `Use "Delete entire local IndexedDB database" to reset, then re-import.\n`;
+        firstRun.style.display = "none";
+        importProgress.style.display = "none";
+        const warnText =
+          `Warning: partial data from a failed or interrupted import.\n` +
+          `No active bundle. Search is disabled.\n` +
+          `Delete the database and re-import.\n`;
+        dictStatus.textContent = warnText;
+        dbOut.textContent = warnText;
       } else {
-        dbOut.textContent = "IndexedDB: present\nActive bundle: none (not imported yet)\n";
+        firstRun.style.display = "";
+        importProgress.style.display = "none";
+        dictStatus.textContent = "";
+        dbOut.textContent = "No active bundle.\n";
       }
     }
     db.close();
   } catch (e) {
     hasActiveBundle = false;
-    dbOut.textContent = `IndexedDB status error: ${String(e)}\n`;
+    firstRun.style.display = "none";
+    importProgress.style.display = "none";
+    dictStatus.textContent = `Database error: ${String(e)}\n`;
+    dbOut.textContent = dictStatus.textContent;
   }
   searchInput.disabled = !hasActiveBundle;
   langToggle.disabled = !hasActiveBundle;
@@ -220,16 +263,11 @@ async function refreshDbStatus() {
   }
 }
 
-let hasActiveBundle = false;
-
-let lastValidatedManifest: BundleManifestV1 | undefined;
-let busy = false;
+// --- Writer lock (prevents concurrent import/delete operations) ---
 
 async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
   if (busy) return;
   busy = true;
-  manifestOut.textContent += `\n[busy] ${label}\n`;
-  // Disable all interactive buttons while running.
   const prev = {
     validate: validateManifestBtn.disabled,
     importBundle: importBundleBtn.disabled,
@@ -237,6 +275,7 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
     probeRecords: probeRecordsBtn.disabled,
     probeIndex: probeIndexBtn.disabled,
     probeAll: probeAllBtn.disabled,
+    quickImport: quickImportBtn.disabled,
   };
   validateManifestBtn.disabled = true;
   importBundleBtn.disabled = true;
@@ -244,6 +283,7 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
   probeRecordsBtn.disabled = true;
   probeIndexBtn.disabled = true;
   probeAllBtn.disabled = true;
+  quickImportBtn.disabled = true;
   try {
     await fn();
   } finally {
@@ -254,9 +294,151 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
     probeRecordsBtn.disabled = prev.probeRecords;
     probeIndexBtn.disabled = prev.probeIndex;
     probeAllBtn.disabled = prev.probeAll;
+    quickImportBtn.disabled = prev.quickImport;
     updateButtons();
   }
 }
+
+// --- Quick import (single-action file picker) ---
+
+quickImportBtn.addEventListener("click", () => {
+  quickImportFiles.value = "";
+  quickImportFiles.click();
+});
+
+quickImportFiles.addEventListener("change", () => {
+  const files = quickImportFiles.files;
+  if (!files || files.length === 0) return;
+  void withSingleWriterLock("import bundle", () => quickImportBundle(files));
+});
+
+async function quickImportBundle(fileList: FileList) {
+  let manifestFileObj: File | undefined;
+  let recordsFileObj: File | undefined;
+  let searchIndexFileObj: File | undefined;
+
+  for (const file of Array.from(fileList)) {
+    if (file.name === "bundle.manifest.json") manifestFileObj = file;
+    else if (file.name === "records.jsonl") recordsFileObj = file;
+    else if (file.name === "search_index.jsonl") searchIndexFileObj = file;
+  }
+
+  const missing: string[] = [];
+  if (!manifestFileObj) missing.push("bundle.manifest.json");
+  if (!recordsFileObj) missing.push("records.jsonl");
+  if (!searchIndexFileObj) missing.push("search_index.jsonl");
+
+  if (missing.length > 0) {
+    importProgress.style.display = "";
+    importProgress.textContent =
+      `Missing required files: ${missing.join(", ")}\n\n` +
+      `Select all 3 bundle files:\n  bundle.manifest.json\n  records.jsonl\n  search_index.jsonl`;
+    return;
+  }
+
+  importProgress.style.display = "";
+  importProgress.textContent = "Validating manifest...\n";
+
+  const txt = await manifestFileObj!.text();
+  const parsed = parseAndValidateManifestJson(txt);
+  if (!parsed.ok || !parsed.manifest) {
+    importProgress.textContent = "Manifest validation failed:\n";
+    for (const err of parsed.errors) importProgress.textContent += `  ${err}\n`;
+    return;
+  }
+
+  const mfst = parsed.manifest;
+
+  const fileCheck = validateSelectedFilesAgainstManifest(mfst, {
+    records: recordsFileObj!,
+    search_index: searchIndexFileObj!,
+  });
+  if (fileCheck.errors.length > 0) {
+    importProgress.textContent = `File validation failed for ${mfst.bundle_id}:\n`;
+    for (const err of fileCheck.errors) importProgress.textContent += `  ${err}\n`;
+    return;
+  }
+
+  try {
+    const existingDb = await openNkokanDb();
+    const active = await getActiveBundleMeta(existingDb);
+    existingDb.close();
+    if (active?.bundle_id === mfst.bundle_id) {
+      importProgress.textContent = `Bundle already imported: ${mfst.bundle_id}\n`;
+      await refreshDbStatus();
+      return;
+    }
+  } catch {
+    // DB may not exist yet; proceed with import
+  }
+
+  firstRun.style.display = "none";
+  importProgress.textContent = `Importing ${mfst.bundle_id}...\n`;
+
+  try {
+    await deleteNkokanDb();
+  } catch (e) {
+    importProgress.textContent += `Delete failed: ${String(e)}\nClose other tabs using this app, then retry.\n`;
+    await refreshDbStatus();
+    return;
+  }
+
+  const db = await openNkokanDb();
+  const t0 = performance.now();
+  let recordsCount = 0;
+  let indexCount = 0;
+  try {
+    const recRes = await importRecordsJsonl(db, recordsFileObj!, {
+      batchSize: 500,
+      onProgress: (p) => {
+        importProgress.textContent =
+          `Importing ${mfst.bundle_id}\n\n` +
+          `records.jsonl: ${p.recordsWritten} records (${p.batchesCommitted} batches)\n`;
+      },
+    });
+    recordsCount = recRes.recordsWritten;
+
+    const idxRes = await importSearchIndexJsonl(db, searchIndexFileObj!, {
+      batchSize: 500,
+      onProgress: (p) => {
+        importProgress.textContent =
+          `Importing ${mfst.bundle_id}\n\n` +
+          `records.jsonl: ${recordsCount} records — done\n` +
+          `search_index.jsonl: ${p.entriesWritten} entries (${p.batchesCommitted} batches)\n`;
+      },
+    });
+    indexCount = idxRes.entriesWritten;
+
+    await setActiveBundleMeta(db, {
+      bundle_id: mfst.bundle_id,
+      manifest_schema_version: mfst.manifest_schema_version,
+      record_schema_id: mfst.record_schema_id,
+      record_schema_version: mfst.record_schema_version,
+      normalization_ruleset: mfst.rule_versions.normalization,
+      update_mode: mfst.update_mode,
+      reconciliation_action: mfst.reconciliation_action,
+      expected_content_sha256: mfst.content_sha256,
+      imported_at_iso: new Date().toISOString(),
+      records_count: recordsCount,
+      index_entries_count: indexCount,
+    });
+
+    const elapsed = performance.now() - t0;
+    importProgress.textContent =
+      `Import complete: ${mfst.bundle_id}\n` +
+      `${recordsCount} records, ${indexCount} index entries\n` +
+      `${elapsed.toFixed(0)} ms\n`;
+  } catch (e) {
+    importProgress.textContent += `\nImport failed: ${String(e)}\n`;
+    importProgress.textContent += `Database cleared. Re-import required.\n`;
+  } finally {
+    db.close();
+  }
+
+  await refreshDbStatus();
+}
+
+// --- Developer tools: manifest validation ---
 
 async function validateManifestAndFiles() {
   const mf = manifestFile.files?.[0];
@@ -307,6 +489,8 @@ validateManifestBtn.addEventListener("click", () => {
   void withSingleWriterLock("validate manifest", validateManifestAndFiles);
 });
 
+// --- Developer tools: harness import ---
+
 importBundleBtn.addEventListener("click", () => {
   void withSingleWriterLock("import bundle (records + index)", async () => {
     const mfst = lastValidatedManifest;
@@ -314,7 +498,6 @@ importBundleBtn.addEventListener("click", () => {
     const ix = indexFile.files?.[0];
     if (!mfst || !rf || !ix) return;
 
-    // No-op if already imported (REPLACE_ALL semantics).
     try {
       const existingDb = await openNkokanDb();
       const active = await getActiveBundleMeta(existingDb);
@@ -327,7 +510,6 @@ importBundleBtn.addEventListener("click", () => {
       // ignore and proceed; we'll recreate DB via delete+open
     }
 
-    // REPLACE_ALL v1 semantics for import: delete entire DB at import start.
     dbOut.textContent = "Import starting: deleting IndexedDB...\n";
     try {
       await deleteNkokanDb();
@@ -377,7 +559,6 @@ importBundleBtn.addEventListener("click", () => {
       });
       indexCount = idxRes.entriesWritten;
 
-      // Commit marker: only write active bundle metadata after BOTH imports succeed.
       await setActiveBundleMeta(db, {
         bundle_id: mfst.bundle_id,
         manifest_schema_version: mfst.manifest_schema_version,
@@ -413,19 +594,25 @@ importBundleBtn.addEventListener("click", () => {
   });
 });
 
+// --- Delete database ---
+
 clearDbBtn.addEventListener("click", () => {
   void withSingleWriterLock("delete db", async () => {
     manifestOut.textContent = "";
-    dbOut.textContent = "Deleting IndexedDB...\n";
+    lastValidatedManifest = undefined;
+    importProgress.style.display = "";
+    importProgress.textContent = "Deleting database...\n";
     try {
       await deleteNkokanDb();
-      dbOut.textContent += "Deleted.\n";
+      importProgress.textContent = "Database deleted.\n";
     } catch (e) {
-      dbOut.textContent += `Delete failed: ${String(e)}\n`;
+      importProgress.textContent += `Delete failed: ${String(e)}\n`;
     }
     await refreshDbStatus();
   });
 });
+
+// --- Developer tools: probe ---
 
 async function runProbe(label: string, file: File) {
   probeOut.textContent += `\n[${label}] ${file.name} (${fmtBytes(file.size)})\n`;

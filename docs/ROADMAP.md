@@ -298,15 +298,29 @@ DoD:
 
 #### Phase 2.0.5 — Offline PWA finalization (first-install → offline proof)
 
-Goal: prove the app works fully offline after first load.
+Goal: prove the app works fully offline after manual bundle import.
 
-- Service worker caches all static assets (already scaffolded in Phase 2.0.1)
-- Bundle download/import flow for first-time users
-- Verify on a real mid-range Android device: cold start, search latency, offline behavior
-- **Do not attempt update orchestration yet** — just prove first-install → offline search works
+The PWA shell (application code) and the dictionary bundle (dataset artifact) are separate layers that evolve independently. The app must not assume a canonical bundle host — different communities may host different bundles. Bundle acquisition via remote fetch, bundle catalogs, and delta updates belong in Phase 3.
+
+Scope:
+
+1. **Clear first-run state** — When no bundle is installed, show explicit guidance ("No dictionary installed. Download a dictionary bundle and import it.") with a single "Import bundle files" action that opens a multi-file picker. The user selects all 3 bundle files (`bundle.manifest.json`, `records.jsonl`, `search_index.jsonl`); the app auto-identifies, validates, and imports them.
+
+2. **Verify service worker caching** — `vite-plugin-pwa` with default Workbox `generateSW` precaches all Vite build output. Verify `vite build` produces `sw.js` + `manifest.webmanifest` in `dist/`. Confirm in browser DevTools: Application → Service Workers (registered), Application → Cache Storage (static assets present). Do not modify Workbox config unless something is broken.
+
+3. **Device testing** — On Chrome Android (mid-range device): visit site → install PWA → import bundle via file picker → kill browser → reopen → search offline. This proves IndexedDB persistence + service worker caching + offline shell + offline data.
+
+Out of scope:
+
+- No `fetch()`-based bundle download
+- No bundle hosting decisions
+- No CORS, range requests, or streaming download from network
+- No bundle catalog or remote URL import
+- No Workbox runtime caching rules
+- No update orchestration
 
 DoD:
-- A learner can install the PWA, import a bundle, close the browser, reopen offline, and search successfully.
+- A learner can install the PWA, import a bundle via file picker, close the browser, reopen offline, and search successfully.
 
 ### Phase 2 memory constraint (lock-in before IndexedDB)
 
