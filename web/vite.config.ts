@@ -20,7 +20,7 @@ export default defineConfig({
       manifest: {
         name: "Nkokan",
         short_name: "Nkokan",
-        description: "Offline-first Maninka dictionary (Phase 2 harness)",
+        description: "Offline-first Maninka dictionary",
         start_url: ".",
         scope: ".",
         display: "standalone",
