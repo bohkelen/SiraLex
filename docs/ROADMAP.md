@@ -97,7 +97,7 @@ Goal: produce a verified, distributable offline bundle from frozen data.
 - Single JSONL file: `data/search_index/norm_v1_search_index.jsonl`
 - Covers all 4 key types from `norm_v1`: `casefold`, `diacritics_insensitive`, `punct_stripped`, `nospace`
 - No ranking, scoring, or UX decisions — just string → IR ID resolution
-- Implementation: `api/search_index/` module, CLI `nkokan-build-index`
+- Implementation: `api/search_index/` module, CLI `siralex-build-index`
 
 DoD:
 - 87,153 index entries from 19,324 records. Deterministic, byte-identical output.
@@ -107,7 +107,7 @@ DoD:
 - Assemble normalized records + search index into a versioned bundle directory
 - Bundle manifest (`bundle.manifest.json`) with per-file SHA-256 checksums and `content_sha256`
 - Support for `full` and `seed` bundle types
-- Implementation: `api/bundle_builder/` module, CLI `nkokan-build-bundle`
+- Implementation: `api/bundle_builder/` module, CLI `siralex-build-bundle`
 - Spec: `shared/specs/offline-bundle-versioning.md`
 
 DoD:
@@ -116,7 +116,7 @@ DoD:
 #### Phase 1.4.2 — First real bundle build ✅
 
 - Validation run: execute the full pipeline on frozen data
-- Run `nkokan-build-index` → `nkokan-build-bundle` on real frozen normalized JSONL
+- Run `siralex-build-index` → `siralex-build-bundle` on real frozen normalized JSONL
 - Verify determinism (byte-identical across reruns) and bundle integrity
 - Publish as draft GitHub release with manifest and checksums
 
@@ -134,7 +134,7 @@ Once the first bundle exists, the project can evolve in three orthogonal directi
 
 Bundle `records.jsonl` enriched with display fields from IR `fields_raw`. Each record now contains search metadata + a `display` field for rendering. The `display` field is a shallow, read-only projection — no normalization, inference, or ranking.
 
-- Implementation: `api/enrichment/` module, CLI `nkokan-enrich`
+- Implementation: `api/enrichment/` module, CLI `siralex-enrich`
 - Spec: `shared/specs/offline-bundle-versioning.md` § Enriched record schema
 - Tests: 24 tests covering lookup construction, single-record enrichment, end-to-end processing, determinism, edge cases
 - Result: 19,324/19,324 records enriched (0 missing), bundle `bundle_full_20260209_8b28f152` verified

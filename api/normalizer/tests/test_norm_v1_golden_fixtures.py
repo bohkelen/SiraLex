@@ -371,7 +371,7 @@ class TestNormalizeIndexMapping:
 # ===========================================================================
 
 NORMALIZED_DATA_CANDIDATES = [
-    Path("/home/potentplot/projects/perso_projects/nkokan/data/normalized/malipense_normalized_norm_v1.jsonl"),
+    Path("/home/potentplot/projects/perso_projects/SiraLex/data/normalized/malipense_normalized_norm_v1.jsonl"),
     Path("data/normalized/malipense_normalized_norm_v1.jsonl"),
     Path("../../../data/normalized/malipense_normalized_norm_v1.jsonl"),
 ]

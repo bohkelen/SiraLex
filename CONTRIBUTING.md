@@ -1,6 +1,6 @@
-# Contributing to Nkokan
+# Contributing to SiraLex
 
-Thanks for helping build Nkokan. This project touches sensitive areas (language correctness, community trust, and third‑party sources), so we optimize for **traceability** and **respect for provenance**.
+Thanks for helping build SiraLex. This project touches sensitive areas (language correctness, community trust, and third‑party sources), so we optimize for **traceability** and **respect for provenance**.
 
 ## Ground rules
 

@@ -1,7 +1,7 @@
 [project]
-name = "nkokan-api"
+name = "siralex-api"
 version = "0.1.0"
-description = "Nkokan backend services: snapshot engine, ingestion, and API"
+description = "SiraLex backend services: snapshot engine, ingestion, and API"
 requires-python = ">=3.10"
 dependencies = [
     "httpx>=0.27.0",
@@ -18,11 +18,11 @@ dev = [
 ]
 
 [project.scripts]
-nkokan-crawl = "snapshot_engine.cli:main"
-nkokan-parse-ir = "ir_parser.cli:main"
-nkokan-build-index = "search_index.cli:main"
-nkokan-build-bundle = "bundle_builder.cli:main"
-nkokan-enrich = "enrichment.cli:main"
+siralex-crawl = "snapshot_engine.cli:main"
+siralex-parse-ir = "ir_parser.cli:main"
+siralex-build-index = "search_index.cli:main"
+siralex-build-bundle = "bundle_builder.cli:main"
+siralex-enrich = "enrichment.cli:main"
 
 [tool.ruff]
 line-length = 100

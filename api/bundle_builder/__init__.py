@@ -1,5 +1,5 @@
 """
-Bundle builder for Nkokan.
+Bundle builder for SiraLex.
 
 Assembles offline data bundles from normalized records and search index
 artifacts, per shared/specs/offline-bundle-versioning.md.

@@ -1,6 +1,6 @@
-# Nkokan
+# SiraLex
 
-Offline-first dictionary and sentence analysis tooling for the Manding language family — starting with **Maninka (Guinea)** — with **Latin + N’Ko** treated as first-class scripts throughout.
+Offline-first dictionary and sentence analysis tooling for the Manding language family — starting with **Maninka (Guinea)** — with **Latin + N’Ko** treated as first-class scripts throughout. Domain: **siralx.org**.
 100% built with AI. Why not!
 
 ## What it aims to do (Phase 1)
@@ -37,7 +37,7 @@ See `LICENSE-MIT` and `LICENSE-APACHE`.
 
 ## Project posture (non-commercial, community)
 
-Nkokan is built as **non-commercial language infrastructure** for learners and communities.
+SiraLex is built as **non-commercial language infrastructure** for learners and communities.
 
 - We ask that downstream use **preserves attribution** and respects **source licensing/permissions**.
 - We do **not** intend paywalls, “API resale”, or other extractive commercialization of the lexicon.

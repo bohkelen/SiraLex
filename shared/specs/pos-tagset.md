@@ -1,6 +1,6 @@
 # POS tagset & mapping policy (v1)
 
-This spec defines Nkokan’s **internal part-of-speech (POS) tagset** and how we map source-specific labels into it.
+This spec defines SiraLex’s **internal part-of-speech (POS) tagset** and how we map source-specific labels into it.
 
 It is **stack-neutral**: it describes required fields and behavior, not storage or implementation.
 

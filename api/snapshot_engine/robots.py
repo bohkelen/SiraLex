@@ -21,7 +21,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # Our User-Agent for robots.txt evaluation
-USER_AGENT = "Nkokan-Snapshot"
+USER_AGENT = "SiraLex-Snapshot"
 
 
 @dataclass

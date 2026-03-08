@@ -1,5 +1,5 @@
 """
-Nkokan Snapshot Engine
+SiraLex Snapshot Engine
 
 Crawler/capture tooling for Phase 1.1 raw data capture.
 See shared/specs/snapshot-engine.md for behavioral requirements.

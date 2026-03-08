@@ -1,6 +1,6 @@
 # `api/`
 
-Backend service package for Nkokan.
+Backend service package for SiraLex.
 
 ## Snapshot Engine (Phase 1.1)
 
@@ -19,19 +19,19 @@ pip install -e .
 
 ```bash
 # Crawl a single URL
-nkokan-crawl --source src_malipense \
+siralex-crawl --source src_malipense \
     --urls https://www.mali-pense.net/emk/index-french/a.htm
 
 # Crawl multiple URLs
-nkokan-crawl --source src_malipense \
+siralex-crawl --source src_malipense \
     --urls URL1 URL2 URL3
 
 # Crawl URLs from a file
-nkokan-crawl --source src_malipense \
+siralex-crawl --source src_malipense \
     --url-file urls.txt
 
 # With verbose logging
-nkokan-crawl --source src_malipense \
+siralex-crawl --source src_malipense \
     --urls URL \
     --verbose
 ```
@@ -65,11 +65,11 @@ The IR Parser extracts structured IR (Intermediate Representation) units from ra
 
 ```bash
 # Parse all lexicon snapshots from a crawl
-nkokan-parse-ir --crawl-dir data/snapshots/src_malipense/crawl_xxx \
+siralex-parse-ir --crawl-dir data/snapshots/src_malipense/crawl_xxx \
     --output data/ir/malipense_lexicon.jsonl
 
 # With verbose logging
-nkokan-parse-ir --crawl-dir data/snapshots/src_malipense/crawl_xxx \
+siralex-parse-ir --crawl-dir data/snapshots/src_malipense/crawl_xxx \
     --output data/ir/malipense_lexicon.jsonl -v
 ```
 

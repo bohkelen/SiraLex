@@ -8,14 +8,14 @@ import {
   type BundleManifestV1,
 } from "./bundle_manifest";
 import {
-  deleteNkokanDb,
+  deleteSiralexDb,
   getActiveBundleMeta,
-  openNkokanDb,
+  openSiralexDb,
   setActiveBundleMeta,
   storeHasData,
   STORE_RECORDS,
   STORE_SEARCH_INDEX,
-} from "./idb/nkokan_db";
+} from "./idb/siralex_db";
 import { importRecordsJsonl } from "./import/import_records";
 import { importSearchIndexJsonl } from "./import/import_search_index";
 import { searchQuery } from "./search/search_query";
@@ -34,8 +34,8 @@ if (!app) {
 app.innerHTML = `
   <div class="container">
     <div class="card">
-      <h1 class="title">Nkokan</h1>
-      <p class="subtitle">Offline-first Maninka dictionary</p>
+      <h1 class="title">SiraLex</h1>
+      <p class="subtitle">Offline-first dictionary</p>
     </div>
 
     <div class="card" style="margin-top: 16px">
@@ -214,7 +214,7 @@ let hasActiveBundle = false;
 
 async function refreshDbStatus() {
   try {
-    const db = await openNkokanDb();
+    const db = await openSiralexDb();
     const active = await getActiveBundleMeta(db);
     if (active) {
       hasActiveBundle = true;
@@ -360,7 +360,7 @@ async function quickImportBundle(fileList: FileList) {
   }
 
   try {
-    const existingDb = await openNkokanDb();
+    const existingDb = await openSiralexDb();
     const active = await getActiveBundleMeta(existingDb);
     existingDb.close();
     if (active?.bundle_id === mfst.bundle_id) {
@@ -376,14 +376,14 @@ async function quickImportBundle(fileList: FileList) {
   importProgress.textContent = `Importing ${mfst.bundle_id}...\n`;
 
   try {
-    await deleteNkokanDb();
+    await deleteSiralexDb();
   } catch (e) {
     importProgress.textContent += `Delete failed: ${String(e)}\nClose other tabs using this app, then retry.\n`;
     await refreshDbStatus();
     return;
   }
 
-  const db = await openNkokanDb();
+  const db = await openSiralexDb();
   const t0 = performance.now();
   let recordsCount = 0;
   let indexCount = 0;
@@ -499,7 +499,7 @@ importBundleBtn.addEventListener("click", () => {
     if (!mfst || !rf || !ix) return;
 
     try {
-      const existingDb = await openNkokanDb();
+      const existingDb = await openSiralexDb();
       const active = await getActiveBundleMeta(existingDb);
       existingDb.close();
       if (active?.bundle_id === mfst.bundle_id) {
@@ -512,7 +512,7 @@ importBundleBtn.addEventListener("click", () => {
 
     dbOut.textContent = "Import starting: deleting IndexedDB...\n";
     try {
-      await deleteNkokanDb();
+      await deleteSiralexDb();
     } catch (e) {
       dbOut.textContent += `Delete failed: ${String(e)}\n`;
       dbOut.textContent += "Close other tabs using this app, then retry.\n";
@@ -521,7 +521,7 @@ importBundleBtn.addEventListener("click", () => {
       return;
     }
 
-    const db = await openNkokanDb();
+    const db = await openSiralexDb();
     const t0 = performance.now();
     let recordsCount = 0;
     let indexCount = 0;
@@ -603,7 +603,7 @@ clearDbBtn.addEventListener("click", () => {
     importProgress.style.display = "";
     importProgress.textContent = "Deleting database...\n";
     try {
-      await deleteNkokanDb();
+      await deleteSiralexDb();
       importProgress.textContent = "Database deleted.\n";
     } catch (e) {
       importProgress.textContent += `Delete failed: ${String(e)}\n`;
@@ -752,7 +752,7 @@ async function runSearch(query: string) {
   const t0 = performance.now();
   let db: IDBDatabase | undefined;
   try {
-    db = await openNkokanDb();
+    db = await openSiralexDb();
     const result = await searchQuery(db, query);
     if (seq !== searchSeq) return;
 

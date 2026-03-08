@@ -37,8 +37,8 @@ from .robots import RobotsChecker
 
 logger = logging.getLogger(__name__)
 
-FETCH_TOOL_VERSION = "nkokan-snapshot/0.1.0"
-USER_AGENT = "Nkokan-Snapshot/0.1.0 (+https://github.com/bohkelen/nkokan)"
+FETCH_TOOL_VERSION = "siralex-snapshot/0.1.0"
+USER_AGENT = "SiraLex-Snapshot/0.1.0 (+https://github.com/bohkelen/siralex)"
 
 # Politeness defaults
 DEFAULT_DELAY_SECONDS = 2.0

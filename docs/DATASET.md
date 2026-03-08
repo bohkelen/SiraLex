@@ -1,6 +1,6 @@
-# Nkokan Dataset v1.0
+# SiraLex Dataset v1.0
 
-This document describes the first frozen dataset release of the Nkokan project.
+This document describes the first frozen dataset release of the SiraLex project.
 
 ## What is in v1.0
 
@@ -31,7 +31,7 @@ Normalization ruleset: `norm_v1` (pure Unicode transforms, no auxiliary data)
 
 If you use this dataset in research or other projects, please cite:
 
-> Nkokan Project. *Nkokan Maninka Lexicon Dataset v1.0*. 2026. Available at: https://github.com/bohkelen/nkokan (tag: `v1.0-dataset-freeze`).
+> SiraLex Project. *SiraLex Maninka Lexicon Dataset v1.0*. 2026. Available at: https://github.com/bohkelen/siralex (tag: `v1.0-dataset-freeze`).
 
 The underlying lexicographic data originates from:
 

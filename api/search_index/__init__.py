@@ -1,5 +1,5 @@
 """
-Search index builder for Nkokan.
+Search index builder for SiraLex.
 
 Reads normalized JSONL and produces a materialized inverted index:
 (key_type, key) → [ir_id, ...].

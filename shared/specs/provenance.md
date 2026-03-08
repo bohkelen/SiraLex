@@ -1,6 +1,6 @@
 # Provenance specification (v1)
 
-This document defines **required provenance** for any imported/derived language data in Nkokan.  
+This document defines **required provenance** for any imported/derived language data in SiraLex.  
 It is **stack-neutral**: it describes *data contracts*, not implementation.
 
 ## Goals

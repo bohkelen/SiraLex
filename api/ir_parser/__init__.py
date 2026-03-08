@@ -1,5 +1,5 @@
 """
-IR Parser module for Nkokan.
+IR Parser module for SiraLex.
 
 Parsers extract IR units from raw snapshots.
 """

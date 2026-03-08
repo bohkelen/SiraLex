@@ -1,5 +1,5 @@
 """
-Normalization module for Nkokan.
+Normalization module for SiraLex.
 
 Contains versioned normalization rulesets that derive search keys
 and variant/preferred metadata from IR units.

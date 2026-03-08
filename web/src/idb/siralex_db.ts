@@ -1,11 +1,11 @@
-export const NKOKAN_DB_NAME = "nkokan_offline";
-export const NKOKAN_DB_VERSION = 1;
+export const SIRALEX_DB_NAME = "siralex_db";
+export const SIRALEX_DB_VERSION = 1;
 
 export const STORE_META = "meta" as const;
 export const STORE_RECORDS = "records" as const;
 export const STORE_SEARCH_INDEX = "search_index" as const;
 
-export type NkokanObjectStoreName =
+export type SiralexObjectStoreName =
   | typeof STORE_META
   | typeof STORE_RECORDS
   | typeof STORE_SEARCH_INDEX;
@@ -17,9 +17,9 @@ function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
-export async function openNkokanDb(): Promise<IDBDatabase> {
+export async function openSiralexDb(): Promise<IDBDatabase> {
   return await new Promise((resolve, reject) => {
-    const req = indexedDB.open(NKOKAN_DB_NAME, NKOKAN_DB_VERSION);
+    const req = indexedDB.open(SIRALEX_DB_NAME, SIRALEX_DB_VERSION);
 
     req.addEventListener("upgradeneeded", () => {
       const db = req.result;
@@ -41,9 +41,9 @@ export async function openNkokanDb(): Promise<IDBDatabase> {
   });
 }
 
-export async function deleteNkokanDb(): Promise<void> {
+export async function deleteSiralexDb(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const req = indexedDB.deleteDatabase(NKOKAN_DB_NAME);
+    const req = indexedDB.deleteDatabase(SIRALEX_DB_NAME);
     req.addEventListener("success", () => resolve());
     req.addEventListener("error", () => reject(req.error));
     req.addEventListener("blocked", () => {
@@ -91,7 +91,7 @@ export async function getActiveBundleMeta(db: IDBDatabase): Promise<ActiveBundle
   return await metaGet<ActiveBundleMeta>(db, META_ACTIVE_BUNDLE_KEY);
 }
 
-export async function storeHasData(db: IDBDatabase, storeName: NkokanObjectStoreName): Promise<boolean> {
+export async function storeHasData(db: IDBDatabase, storeName: SiralexObjectStoreName): Promise<boolean> {
   const tx = db.transaction(storeName, "readonly");
   const store = tx.objectStore(storeName);
   const count = await reqToPromise(store.count());
@@ -109,4 +109,3 @@ export async function setActiveBundleMeta(db: IDBDatabase, meta: ActiveBundleMet
   // over a partially-imported DB being treated as valid.
   await metaSet(db, META_ACTIVE_BUNDLE_KEY, meta);
 }
-

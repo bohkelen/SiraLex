@@ -8,7 +8,7 @@
  * Promise.all — never one transaction per record.
  */
 
-import { STORE_RECORDS } from "../idb/nkokan_db";
+import { STORE_RECORDS } from "../idb/siralex_db";
 import type { EnrichedRecord } from "../types/records";
 
 function idbGet<T>(store: IDBObjectStore, key: IDBValidKey): Promise<T | undefined> {

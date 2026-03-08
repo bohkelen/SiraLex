@@ -263,7 +263,7 @@ def validate_mapping(ir_unit: dict[str, Any], expected: dict[str, Any]) -> list[
 # ---------------------------------------------------------------------------
 
 IR_DATA_CANDIDATES = [
-    Path("/home/potentplot/projects/perso_projects/nkokan/data/ir/malipense_index_v1.jsonl"),
+    Path("/home/potentplot/projects/perso_projects/SiraLex/data/ir/malipense_index_v1.jsonl"),
     Path("data/ir/malipense_index_v1.jsonl"),
     Path("../../../data/ir/malipense_index_v1.jsonl"),
 ]

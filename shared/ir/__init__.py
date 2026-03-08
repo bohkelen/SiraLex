@@ -1,5 +1,5 @@
 """
-IR (Intermediate Representation) models for Nkokan.
+IR (Intermediate Representation) models for SiraLex.
 
 These models implement the contracts defined in shared/specs/lossless-capture-and-ir.md v1.1.
 """

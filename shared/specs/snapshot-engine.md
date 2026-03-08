@@ -1,6 +1,6 @@
 # Snapshot Engine specification (v1)
 
-This document defines **crawler/capture behavior** for the Nkokan Snapshot Engine.
+This document defines **crawler/capture behavior** for the SiraLex Snapshot Engine.
 
 It complements `lossless-capture-and-ir.md` (which defines snapshot **data contracts**) by specifying how the engine **operates**: idempotency, politeness, storage layout, and change detection.
 
@@ -133,7 +133,7 @@ The engine MUST be polite to target servers:
 |-------------|---------|-------|
 | **Single-threaded** | Yes | No parallel requests to the same host |
 | **Request delay** | ≥ 2 seconds | Between consecutive requests to same host |
-| **User-Agent** | Descriptive | Include project name + contact (e.g., `Nkokan-Snapshot/1.0 (+https://github.com/bohkelen/nkokan)`) |
+| **User-Agent** | Descriptive | Include project name + contact (e.g., `SiraLex-Snapshot/1.0 (+https://github.com/bohkelen/siralex)`) |
 | **Retry with backoff** | Yes | On 429/5xx, exponential backoff (max 3 retries) |
 | **Abort on block** | Yes | If server returns persistent 403/429, stop crawl for that source and alert |
 
@@ -285,7 +285,7 @@ Phase 1.1 is complete when:
   "encoding": "iso-8859-1",
   "redirect_chain": [],
   "crawl_id": "crawl_2026-01-15_malipense_v1",
-  "fetch_tool_version": "nkokan-snapshot/0.1.0",
+  "fetch_tool_version": "siralex-snapshot/0.1.0",
   "redaction_policy_id": "header_redact_v1",
   "robots_observed": true,
   "robots_policy_notes": "allowed"
