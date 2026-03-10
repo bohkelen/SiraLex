@@ -9,6 +9,7 @@ export type ImportRecordsProgress = {
 };
 
 export type ImportRecordsOptions = {
+  bundleId: string;
   batchSize?: number; // max writes per transaction
   onProgress?: (p: ImportRecordsProgress) => void;
   signal?: AbortSignal;
@@ -16,7 +17,13 @@ export type ImportRecordsOptions = {
 };
 
 function nextAnimationFrame(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => resolve());
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
 }
 
 function txDone(tx: IDBTransaction): Promise<void> {
@@ -30,10 +37,14 @@ function txDone(tx: IDBTransaction): Promise<void> {
 export async function importRecordsJsonl(
   db: IDBDatabase,
   recordsFile: File,
-  options: ImportRecordsOptions = {},
+  options: ImportRecordsOptions,
 ): Promise<{ recordsWritten: number; linesSeen: number; batchesCommitted: number; duplicateKeysFound: string[] }> {
   const batchSize = options.batchSize ?? 500;
-  const { onProgress, signal, debugDetectDuplicateKeys } = options;
+  const { bundleId, onProgress, signal, debugDetectDuplicateKeys } = options;
+
+  if (typeof bundleId !== "string" || bundleId.trim() === "") {
+    throw new Error("importRecordsJsonl requires a non-empty bundleId");
+  }
 
   let bytesRead = 0;
   let linesSeen = 0;
@@ -91,13 +102,17 @@ export async function importRecordsJsonl(
     }
 
     if (batchKeySet) {
-      if (batchKeySet.has(irId)) {
-        duplicateKeysFound.push(`records line ${linesSeen}: duplicate ir_id "${irId}" within batch`);
+      const scopedKey = `${bundleId}\0${irId}`;
+      if (batchKeySet.has(scopedKey)) {
+        duplicateKeysFound.push(`records line ${linesSeen}: duplicate [${bundleId}, ${irId}] within batch`);
       }
-      batchKeySet.add(irId);
+      batchKeySet.add(scopedKey);
     }
 
-    batch.push(obj);
+    batch.push({
+      ...(obj as Record<string, unknown>),
+      bundle_id: bundleId,
+    });
     if (batch.length >= batchSize) {
       await flushBatch();
     }

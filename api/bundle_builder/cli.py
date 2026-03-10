@@ -27,6 +27,11 @@ def cmd_build(args: argparse.Namespace) -> None:
         search_index_path=args.search_index,
         output_dir=args.output_dir,
         bundle_type=args.bundle_type,
+        source_lang=args.source_lang,
+        target_lang=args.target_lang,
+        source_label=args.source_label,
+        target_label=args.target_label,
+        target_scripts=args.target_script,
     )
 
     print("=" * 50)
@@ -94,6 +99,28 @@ def main():
         choices=["full", "seed"],
         default="full",
         help="Bundle type (default: full)",
+    )
+    build_parser.add_argument(
+        "--source-lang",
+        help="Optional source language code for manifest metadata",
+    )
+    build_parser.add_argument(
+        "--target-lang",
+        help="Optional target language code for manifest metadata",
+    )
+    build_parser.add_argument(
+        "--source-label",
+        help="Optional human-readable source language label",
+    )
+    build_parser.add_argument(
+        "--target-label",
+        help="Optional human-readable target language label",
+    )
+    build_parser.add_argument(
+        "--target-script",
+        action="append",
+        default=[],
+        help="Optional supported target script label (repeatable)",
     )
 
     # Verify subcommand

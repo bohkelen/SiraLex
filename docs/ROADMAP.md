@@ -1,4 +1,4 @@
-# Roadmap (Phase 0 → Phase 2+)
+# Roadmap (Phase 0 → Phase 3)
 
 This roadmap documents the execution path to a usable, offline-first **French/English ↔ Maninka (Guinea)** dictionary and sentence analysis app with **Latin + N'Ko** as first-class scripts.
 
@@ -237,18 +237,23 @@ DoD:
 | 5 | Phase 2.0.3 — Bundle ingestion (storage correctness) | Primary focus | ✅ Complete |
 | 5b | Phase 2.0.3b — Query execution (retrieval correctness) | Primary focus | ✅ Complete |
 | 6 | Phase 2.0.4 — Results display + entry view (presentation correctness) | Primary focus | ✅ Complete |
-| 7 | Phase 2.0.5 — Offline PWA finalization (first-install → offline proof) | Primary focus | Pending |
-| 8 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
-| 9 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
+| 7 | Phase 2.0.5 — Offline PWA finalization (first-install → offline proof) | Primary focus | ✅ Complete |
+| 8 | Phase 3.1 — Manifest language metadata | Next platform step | Pending |
+| 9 | Phase 3.2 — Language-agnostic UI + direction semantics | Next platform step | Pending |
+| 10 | Phase 3.3 — Installed bundle registry | Next platform step | Pending |
+| 11 | Phase 3.4 — Multi-bundle support | Next platform step | Pending |
+| 12 | Phase 3.5 — Bundle selection + distribution | Next platform step | Pending |
+| 13 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
+| 14 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
 
-Phase 2.0 (Branch A) is the primary track. Phases 2.0.0–2.0.4 are complete — the data layer, build tooling, JS normalization mirror, bundle ingestion, search query execution, and results display are all functional. Phase 1.5 backend work (Branch B) can proceed in parallel as light, spec-level work. Branch C is explicitly deferred until real usage data exists.
+Phase 2.0 (Branch A) has now served its purpose: it proved that the offline-first runtime, bundle ingestion, IndexedDB storage, search query execution, rendering, and PWA shell all work end-to-end for the first dictionary bundle. The next primary track is Phase 3: generalize the platform so language metadata, installed bundles, and active dictionary behavior are runtime concerns rather than hardcoded assumptions. Phase 1.5 backend work (Branch B) can still proceed in parallel as light, spec-level work. Branch C remains explicitly deferred until real usage data exists.
 
-The remaining Phase 2.0 work follows clean layer separation:
+The completed Phase 2.0 work followed clean layer separation:
 
 - **2.0.3** = storage correctness (import pipeline) ✅
 - **2.0.3b** = retrieval correctness (query execution) ✅
 - **2.0.4** = presentation correctness (results display + entry view) ✅
-- **2.0.5** = offline correctness (PWA first-install → offline proof)
+- **2.0.5** = offline correctness (PWA first-install → offline proof) ✅
 
 #### Phase 2.0.3 — Hardening items (tracked for next PR)
 
@@ -296,7 +301,7 @@ Goal: render search results as human-readable dictionary entries.
 DoD:
 - A user can type a query, see a results list, and tap into a full entry view.
 
-#### Phase 2.0.5 — Offline PWA finalization (first-install → offline proof)
+#### Phase 2.0.5 — Offline PWA finalization (first-install → offline proof) ✅
 
 Goal: prove the app works fully offline after manual bundle import.
 
@@ -321,6 +326,116 @@ Out of scope:
 
 DoD:
 - A learner can install the PWA, import a bundle via file picker, close the browser, reopen offline, and search successfully.
+
+---
+
+## Phase 3 — Platform generalization + bundle metadata
+
+Goal: evolve SiraLex from a proven offline dictionary for the first language pair into a reusable platform that can host multiple language bundles without embedding language-specific logic in the app.
+
+### What Phase 3 must accomplish
+
+- Move language knowledge out of the app and into bundle metadata
+- Remove Maninka-specific UI assumptions from the frontend runtime
+- Support multiple installed bundles with explicit active-bundle selection
+- Prepare for bundle distribution/download without changing the core importer/search architecture
+
+### Design constraints
+
+- The platform should remain **bundle-driven**: language labels, language codes, and script/display metadata come from bundle manifests, not hardcoded app logic.
+- Existing bundles should continue to import if the new metadata is absent; language metadata should be added as **optional, forward-looking fields** first.
+- The current importer, search key generation, and normalized record/search-index formats are already strong foundations and should be reused rather than replaced.
+- Do not treat large-scale search optimization as a Phase 3 blocker. Keep the architecture open for future indexing improvements, but do not over-engineer before real bundle scale requires it.
+
+### Phase 3.1 — Manifest language metadata
+
+Extend `bundle.manifest.json` so the UI can describe the installed dictionary accurately.
+
+Recommended metadata:
+
+- `languages.source_lang`
+- `languages.target_lang`
+- `language_labels.source`
+- `language_labels.target`
+- optional script/display hints for the target language
+
+Implementation impact:
+
+- Update the runtime manifest type in the web app
+- Update the bundle builder to emit metadata when available
+- Preserve compatibility with older bundles by allowing these fields to be missing
+
+DoD:
+- A bundle can declare its language pair and display labels in the manifest.
+- The app can parse that metadata safely, with sensible fallback behavior when absent.
+
+### Phase 3.2 — Language-agnostic UI and direction semantics
+
+Replace language-specific frontend assumptions such as `FR → Maninka`, `Maninka → FR`, and enum values like `fr_to_mnk`.
+
+Required direction semantics:
+
+- `source_to_target`
+- `target_to_source`
+
+UI labels should be generated from manifest metadata instead of hardcoded strings.
+
+DoD:
+- Search labels, toggle text, placeholders, and entry-render labels are derived from the active bundle metadata.
+- Frontend runtime code no longer embeds a specific target language in its direction model.
+
+### Phase 3.3 — Installed bundle registry
+
+Phase 2 proved the runtime for one imported bundle. Phase 3 should make bundle installation explicit by tracking installed bundles locally.
+
+Suggested local registry responsibilities:
+
+- installed bundle identity
+- language pair metadata
+- install/update timestamp
+- active bundle flag or active bundle reference
+
+DoD:
+- The app can enumerate installed bundles and identify which bundle is active.
+
+### Phase 3.4 — Multi-bundle support
+
+Support more than one dictionary bundle on the same device.
+
+The critical requirement is that storage and query behavior become **bundle-aware** before public multi-bundle release. The exact implementation can be a compound key, namespaced stores, or another equivalent IndexedDB strategy, but lookups must target the active bundle rather than implicitly assuming a single global dictionary.
+
+DoD:
+- Multiple bundles can coexist locally without search ambiguity.
+- Query execution and record resolution operate against the active bundle only.
+
+### Phase 3.5 — Bundle selection and distribution
+
+Add the user-facing pieces needed to choose and acquire dictionaries.
+
+Scope:
+
+- active dictionary selector
+- optional local bundle catalog metadata
+- remote catalog/download flow that reuses the existing importer
+
+Notes:
+
+- Manual import can remain supported.
+- Update orchestration can stay simple at first (detect new bundle version/hash and prompt the user).
+
+DoD:
+- A user can select which installed dictionary is active.
+- The app has a documented path for catalog-driven bundle download/import, even if update logic remains minimal.
+
+### Explicitly deferred beyond Phase 3
+
+These are valid future directions, but they should not be framed as Phase 3 prerequisites:
+
+- prefix-range or Kindle-style narrowing indexes
+- advanced ranking/scoring heuristics
+- speculative performance work not justified by observed bundle size or device behavior
+
+Those belong in a later scaling/performance phase once real multi-bundle usage and device measurements justify them.
 
 ### Phase 2 memory constraint (lock-in before IndexedDB)
 
@@ -351,3 +466,12 @@ A learner can:
 - See results in **Latin** (N'Ko deferred to Branch C)
 - Use the dictionary offline after initial caching/download
 - Experience acceptable lookup latency on a mid-range Android phone
+
+## Definition of Done (Phase 3 — platform generalization)
+
+SiraLex is no longer just a single-dictionary app when:
+
+- The active language pair is determined by bundle metadata, not hardcoded labels
+- Multiple bundles can be installed locally and selected explicitly
+- Search and record resolution are bundle-aware
+- The app has a defined path for catalog/download-based bundle installation

@@ -20,7 +20,8 @@ function idbGet<T>(store: IDBObjectStore, key: IDBValidKey): Promise<T | undefin
 }
 
 /**
- * Fetch enriched records for the given ir_ids, preserving input order.
+ * Fetch enriched records for the given ir_ids within a single bundle,
+ * preserving input order.
  *
  * Missing records (ir_id present in search index but absent from records
  * store) are omitted from the result — the output may be shorter than
@@ -28,15 +29,16 @@ function idbGet<T>(store: IDBObjectStore, key: IDBValidKey): Promise<T | undefin
  */
 export async function resolveRecords(
   db: IDBDatabase,
+  bundleId: string,
   irIds: string[],
 ): Promise<EnrichedRecord[]> {
-  if (irIds.length === 0) return [];
+  if (bundleId.trim() === "" || irIds.length === 0) return [];
 
   const tx = db.transaction(STORE_RECORDS, "readonly");
   const store = tx.objectStore(STORE_RECORDS);
 
   const results = await Promise.all(
-    irIds.map((id) => idbGet<EnrichedRecord>(store, id)),
+    irIds.map((id) => idbGet<EnrichedRecord>(store, [bundleId, id])),
   );
 
   const records: EnrichedRecord[] = [];

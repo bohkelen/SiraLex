@@ -4,6 +4,20 @@ export type BundleManifestV1FileEntry = {
   sha256: string;
 };
 
+export type BundleManifestLanguages = {
+  source_lang?: string;
+  target_lang?: string;
+};
+
+export type BundleManifestLanguageLabels = {
+  source?: string;
+  target?: string;
+};
+
+export type BundleManifestScripts = {
+  target_supported?: string[];
+};
+
 export type BundleManifestV1 = {
   manifest_schema_version: string;
   bundle_id: string;
@@ -24,6 +38,9 @@ export type BundleManifestV1 = {
   update_mode: string;
   files: BundleManifestV1FileEntry[];
   content_sha256: string;
+  languages?: BundleManifestLanguages;
+  language_labels?: BundleManifestLanguageLabels;
+  scripts?: BundleManifestScripts;
   build?: unknown;
 };
 
@@ -61,6 +78,33 @@ function getArray(obj: Record<string, unknown>, key: string): unknown[] | undefi
   return Array.isArray(v) ? v : undefined;
 }
 
+function getOptionalStringObject(
+  raw: unknown,
+  allowedKeys: string[],
+): Record<string, string> | undefined {
+  if (!isObject(raw)) return undefined;
+  const out: Record<string, string> = {};
+  for (const key of allowedKeys) {
+    const value = raw[key];
+    if (typeof value === "string" && value.trim() !== "") {
+      out[key] = value;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function getOptionalStringArrayObject(
+  raw: unknown,
+  key: string,
+): Record<string, string[]> | undefined {
+  if (!isObject(raw)) return undefined;
+  const values = raw[key];
+  if (!Array.isArray(values)) return undefined;
+  const filtered = values.filter((v): v is string => typeof v === "string" && v.trim() !== "");
+  if (filtered.length === 0) return undefined;
+  return { [key]: filtered };
+}
+
 function fmtExpected(actual: string | undefined, expected: string): string {
   return `expected '${expected}', got '${actual ?? "undefined"}'`;
 }
@@ -90,6 +134,15 @@ export function parseAndValidateManifestJson(text: string): BundleManifestValida
   const reconciliation_action = getString(raw, "reconciliation_action");
   const update_mode = getString(raw, "update_mode");
   const content_sha256 = getString(raw, "content_sha256");
+  const languages = getOptionalStringObject(raw["languages"], ["source_lang", "target_lang"]) as
+    | BundleManifestLanguages
+    | undefined;
+  const languageLabels = getOptionalStringObject(raw["language_labels"], ["source", "target"]) as
+    | BundleManifestLanguageLabels
+    | undefined;
+  const scripts = getOptionalStringArrayObject(raw["scripts"], "target_supported") as
+    | BundleManifestScripts
+    | undefined;
 
   const rule_versions_raw = raw["rule_versions"];
   const rule_versions = isObject(rule_versions_raw) ? rule_versions_raw : undefined;
@@ -209,6 +262,9 @@ export function parseAndValidateManifestJson(text: string): BundleManifestValida
     update_mode: update_mode!,
     files,
     content_sha256: content_sha256!,
+    languages,
+    language_labels: languageLabels,
+    scripts,
     build: raw["build"],
   };
 

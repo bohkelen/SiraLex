@@ -165,6 +165,11 @@ def build_bundle(
     bundle_type: str = "full",
     sources_included: list[str] | None = None,
     ir_parser_versions: list[str] | None = None,
+    source_lang: str | None = None,
+    target_lang: str | None = None,
+    source_label: str | None = None,
+    target_label: str | None = None,
+    target_scripts: list[str] | None = None,
 ) -> dict[str, Any]:
     """
     Build an offline bundle directory from normalized records and search index.
@@ -176,6 +181,11 @@ def build_bundle(
         bundle_type: "full" or "seed"
         sources_included: list of source_id values (defaults to ["src_malipense"])
         ir_parser_versions: list of parser versions used
+        source_lang: optional source language code for bundle metadata
+        target_lang: optional target language code for bundle metadata
+        source_label: optional human-readable source language label
+        target_label: optional human-readable target language label
+        target_scripts: optional list of supported target scripts
 
     Returns:
         dict with bundle metadata including bundle_id and bundle_dir path
@@ -184,6 +194,8 @@ def build_bundle(
         sources_included = ["src_malipense"]
     if ir_parser_versions is None:
         ir_parser_versions = ["malipense_lexicon_v3", "malipense_index_v1"]
+    if target_scripts is None:
+        target_scripts = []
 
     # Validate inputs exist
     if not normalized_path.exists():
@@ -258,6 +270,25 @@ def build_bundle(
         "files": files_list,
         "content_sha256": content_hash,
     }
+
+    if source_lang or target_lang:
+        manifest["languages"] = {}
+        if source_lang:
+            manifest["languages"]["source_lang"] = source_lang
+        if target_lang:
+            manifest["languages"]["target_lang"] = target_lang
+
+    if source_label or target_label:
+        manifest["language_labels"] = {}
+        if source_label:
+            manifest["language_labels"]["source"] = source_label
+        if target_label:
+            manifest["language_labels"]["target"] = target_label
+
+    if target_scripts:
+        manifest["scripts"] = {
+            "target_supported": list(target_scripts),
+        }
 
     # Write manifest
     manifest_path = temp_bundle_dir / "bundle.manifest.json"

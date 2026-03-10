@@ -318,6 +318,34 @@ class TestBuildBundle:
         assert "seed" in result["bundle_id"]
         assert result["manifest"]["bundle_type"] == "seed"
 
+    def test_optional_language_metadata(self, bundle_inputs, tmp_path):
+        normalized, search_index = bundle_inputs
+        output_dir = tmp_path / "bundles"
+
+        result = build_bundle(
+            normalized,
+            search_index,
+            output_dir,
+            source_lang="fr",
+            target_lang="mnk",
+            source_label="French",
+            target_label="Maninka",
+            target_scripts=["latin", "nko"],
+        )
+        manifest = result["manifest"]
+
+        assert manifest["languages"] == {
+            "source_lang": "fr",
+            "target_lang": "mnk",
+        }
+        assert manifest["language_labels"] == {
+            "source": "French",
+            "target": "Maninka",
+        }
+        assert manifest["scripts"] == {
+            "target_supported": ["latin", "nko"],
+        }
+
 
 # ===========================================================================
 # Category 5: Bundle verification
