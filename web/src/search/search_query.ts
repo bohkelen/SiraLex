@@ -1,7 +1,7 @@
 /**
  * Phase 2.0.3b — Query execution (retrieval correctness).
  *
- * Single entry point: searchQuery(db, query) → ordered ir_id[].
+ * Single entry point: searchQuery(db, activeBundleId, query) → ordered ir_id[].
  *
  * Uses computeSearchKeys from norm_v1.ts (the same normalization path as the
  * import pipeline) to derive 4 search keys from the raw query string.
@@ -43,9 +43,13 @@ function idbGet<T>(store: IDBObjectStore, key: IDBValidKey): Promise<T | undefin
  * @returns Ordered ir_id list from the first matching level, or empty if
  *          no level matches. The result preserves the stored ir_ids[] order.
  */
-export async function searchQuery(db: IDBDatabase, query: string): Promise<SearchResult> {
+export async function searchQuery(
+  db: IDBDatabase,
+  activeBundleId: string,
+  query: string,
+): Promise<SearchResult> {
   const trimmed = query.trim();
-  if (trimmed === "") {
+  if (activeBundleId.trim() === "" || trimmed === "") {
     return { ir_ids: [], matched_key_type: null, matched_key: null };
   }
 
@@ -59,7 +63,7 @@ export async function searchQuery(db: IDBDatabase, query: string): Promise<Searc
     if (normalizedKeys.length === 0) continue;
 
     for (const normalizedKey of normalizedKeys) {
-      const entry = await idbGet<{ ir_ids: string[] }>(store, [keyType, normalizedKey]);
+      const entry = await idbGet<{ ir_ids: string[] }>(store, [activeBundleId, keyType, normalizedKey]);
       if (entry && Array.isArray(entry.ir_ids) && entry.ir_ids.length > 0) {
         return {
           ir_ids: entry.ir_ids,

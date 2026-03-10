@@ -9,6 +9,7 @@ export type ImportSearchIndexProgress = {
 };
 
 export type ImportSearchIndexOptions = {
+  bundleId: string;
   batchSize?: number; // max writes per transaction
   onProgress?: (p: ImportSearchIndexProgress) => void;
   signal?: AbortSignal;
@@ -16,7 +17,13 @@ export type ImportSearchIndexOptions = {
 };
 
 function nextAnimationFrame(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => resolve());
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
 }
 
 function txDone(tx: IDBTransaction): Promise<void> {
@@ -28,6 +35,7 @@ function txDone(tx: IDBTransaction): Promise<void> {
 }
 
 export type SearchIndexEntry = {
+  bundle_id?: string;
   key_type: string;
   key: string;
   ir_ids: string[];
@@ -36,10 +44,14 @@ export type SearchIndexEntry = {
 export async function importSearchIndexJsonl(
   db: IDBDatabase,
   indexFile: File,
-  options: ImportSearchIndexOptions = {},
+  options: ImportSearchIndexOptions,
 ): Promise<{ entriesWritten: number; linesSeen: number; batchesCommitted: number; duplicateKeysFound: string[] }> {
   const batchSize = options.batchSize ?? 500;
-  const { onProgress, signal, debugDetectDuplicateKeys } = options;
+  const { bundleId, onProgress, signal, debugDetectDuplicateKeys } = options;
+
+  if (typeof bundleId !== "string" || bundleId.trim() === "") {
+    throw new Error("importSearchIndexJsonl requires a non-empty bundleId");
+  }
 
   let bytesRead = 0;
   let linesSeen = 0;
@@ -111,14 +123,16 @@ export async function importSearchIndexJsonl(
     }
 
     if (batchKeySet) {
-      const compoundKey = `${keyType}\0${key}`;
+      const compoundKey = `${bundleId}\0${keyType}\0${key}`;
       if (batchKeySet.has(compoundKey)) {
-        duplicateKeysFound.push(`search_index line ${linesSeen}: duplicate [${keyType}, ${key}] within batch`);
+        duplicateKeysFound.push(
+          `search_index line ${linesSeen}: duplicate [${bundleId}, ${keyType}, ${key}] within batch`,
+        );
       }
       batchKeySet.add(compoundKey);
     }
 
-    batch.push({ key_type: keyType, key, ir_ids: ids });
+    batch.push({ bundle_id: bundleId, key_type: keyType, key, ir_ids: ids });
     if (batch.length >= batchSize) {
       await flushBatch();
     }

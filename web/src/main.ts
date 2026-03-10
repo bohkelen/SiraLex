@@ -3,16 +3,32 @@ import { registerSW } from "virtual:pwa-register";
 
 import { probeJsonlFile } from "./bundle_probe";
 import {
+  buildLanguageMetaFromManifest,
+  getBundleDisplayName,
+  getSearchDirectionText,
+  getSearchPlaceholder,
+  getSourceLabel,
+  getTargetEntriesLabel,
+  type SearchDirection,
+} from "./bundle_labels";
+import {
   parseAndValidateManifestJson,
   validateSelectedFilesAgainstManifest,
   type BundleManifestV1,
 } from "./bundle_manifest";
 import {
+  clearActiveBundleId,
+  deleteBundleData,
   deleteSiralexDb,
+  getActiveBundleId,
   getActiveBundleMeta,
+  getInstalledBundleMeta,
+  listInstalledBundles,
   openSiralexDb,
+  setActiveBundleId,
   setActiveBundleMeta,
   storeHasData,
+  type ActiveBundleMeta,
   STORE_RECORDS,
   STORE_SEARCH_INDEX,
 } from "./idb/siralex_db";
@@ -41,12 +57,22 @@ app.innerHTML = `
     <div class="card" style="margin-top: 16px">
       <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Dictionary</h2>
       <div id="dictStatus" class="mono"></div>
+      <div class="row" style="margin-top: 12px; align-items: center">
+        <div class="field" style="flex: 1">
+          <div class="label">Installed dictionaries</div>
+          <select id="bundleSelect" disabled>
+            <option value="">No dictionaries installed</option>
+          </select>
+        </div>
+      </div>
       <div id="firstRun" style="display: none; margin-top: 12px">
         <p style="color: var(--muted); font-size: 14px; margin: 0 0 12px 0">
           No dictionary installed.<br>
           Download a dictionary bundle and import it.
         </p>
-        <button id="quickImport" class="btn">Import bundle files</button>
+      </div>
+      <div class="row" style="margin-top: 12px">
+        <button id="quickImport" class="btn">Install bundle files</button>
         <input id="quickImportFiles" type="file" multiple accept=".json,.jsonl" style="display: none" />
       </div>
       <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
@@ -63,10 +89,10 @@ app.innerHTML = `
 
       <div class="row" style="margin-top: 12px; align-items: center">
         <div class="field" style="flex: 1">
-          <div class="label" id="searchLabel">Query (FR → Maninka)</div>
-          <input id="searchInput" type="text" placeholder="Type a French word…" disabled autocomplete="off" />
+          <div class="label" id="searchLabel">Query (Source → Target)</div>
+          <input id="searchInput" type="text" placeholder="Type a Source word…" disabled autocomplete="off" />
         </div>
-        <button id="langToggle" class="btn" disabled>FR → Maninka</button>
+        <button id="langToggle" class="btn" disabled>Source → Target</button>
       </div>
 
       <div id="searchMeta" class="mono" style="margin-top: 12px"></div>
@@ -135,6 +161,7 @@ function mustGetEl<T extends Element>(selector: string): T {
 
 // Primary UI elements
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
+const bundleSelect = mustGetEl<HTMLSelectElement>("#bundleSelect");
 const firstRun = mustGetEl<HTMLDivElement>("#firstRun");
 const quickImportBtn = mustGetEl<HTMLButtonElement>("#quickImport");
 const quickImportFiles = mustGetEl<HTMLInputElement>("#quickImportFiles");
@@ -161,6 +188,8 @@ const dbOut = mustGetEl<HTMLDivElement>("#dbOut");
 
 let lastValidatedManifest: BundleManifestV1 | undefined;
 let busy = false;
+let installedBundles: ActiveBundleMeta[] = [];
+let currentActiveBundle: ActiveBundleMeta | undefined;
 
 function fmtBytes(n: number | undefined): string {
   if (n === undefined) return "n/a";
@@ -208,30 +237,83 @@ manifestFile.addEventListener("change", () => {
 });
 updateButtons();
 
+bundleSelect.addEventListener("change", () => {
+  const nextBundleId = bundleSelect.value;
+  if (!nextBundleId) return;
+  void withSingleWriterLock("switch active bundle", async () => {
+    const db = await openSiralexDb();
+    try {
+      await setActiveBundleId(db, nextBundleId);
+    } finally {
+      db.close();
+    }
+    await refreshDbStatus();
+  });
+});
+
 // --- Dictionary status ---
 
 let hasActiveBundle = false;
 
+function renderBundleSelectOptions(activeBundleId: string | undefined) {
+  bundleSelect.innerHTML = "";
+  if (installedBundles.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No dictionaries installed";
+    bundleSelect.appendChild(option);
+    bundleSelect.disabled = true;
+    return;
+  }
+
+  for (const bundle of installedBundles) {
+    const option = document.createElement("option");
+    option.value = bundle.bundle_id;
+    option.textContent = getBundleDisplayName(bundle.bundle_id, bundle.language_meta);
+    if (bundle.bundle_id === activeBundleId) {
+      option.selected = true;
+    }
+    bundleSelect.appendChild(option);
+  }
+
+  bundleSelect.disabled = busy;
+}
+
 async function refreshDbStatus() {
   try {
     const db = await openSiralexDb();
+    const activeBundleId = await getActiveBundleId(db);
     const active = await getActiveBundleMeta(db);
+    const bundles = await listInstalledBundles(db);
+    installedBundles = bundles;
+    currentActiveBundle = active;
+    renderBundleSelectOptions(activeBundleId);
     if (active) {
       hasActiveBundle = true;
       firstRun.style.display = "none";
       const statusText =
-        `Active: ${active.bundle_id}\n` +
+        `Active: ${getBundleDisplayName(active.bundle_id, active.language_meta)}\n` +
+        `Bundle ID: ${active.bundle_id}\n` +
         `Normalization: ${active.normalization_ruleset}\n` +
         `Schema: ${active.record_schema_id}@${active.record_schema_version}\n` +
         `Imported: ${active.imported_at_iso}\n` +
-        `Records: ${active.records_count ?? "n/a"} | Index entries: ${active.index_entries_count ?? "n/a"}\n`;
+        `Records: ${active.records_count ?? "n/a"} | Index entries: ${active.index_entries_count ?? "n/a"}\n` +
+        `Installed bundles: ${bundles.length}\n`;
       dictStatus.textContent = statusText;
       dbOut.textContent = statusText;
     } else {
       hasActiveBundle = false;
       const hasRecordsData = await storeHasData(db, STORE_RECORDS);
       const hasIndexData = await storeHasData(db, STORE_SEARCH_INDEX);
-      if (hasRecordsData || hasIndexData) {
+      if (bundles.length > 0) {
+        firstRun.style.display = "none";
+        importProgress.style.display = "none";
+        const warnText =
+          `Installed bundles present, but no active bundle is selected.\n` +
+          `Choose a dictionary from the selector above to enable search.\n`;
+        dictStatus.textContent = warnText;
+        dbOut.textContent = warnText;
+      } else if (hasRecordsData || hasIndexData) {
         firstRun.style.display = "none";
         importProgress.style.display = "none";
         const warnText =
@@ -250,17 +332,21 @@ async function refreshDbStatus() {
     db.close();
   } catch (e) {
     hasActiveBundle = false;
+    installedBundles = [];
+    currentActiveBundle = undefined;
+    renderBundleSelectOptions(undefined);
     firstRun.style.display = "none";
     importProgress.style.display = "none";
     dictStatus.textContent = `Database error: ${String(e)}\n`;
     dbOut.textContent = dictStatus.textContent;
   }
   searchInput.disabled = !hasActiveBundle;
-  langToggle.disabled = !hasActiveBundle;
+  langToggle.disabled = !hasActiveBundle || busy;
   if (!hasActiveBundle) {
     searchMeta.textContent = "";
     searchResults.innerHTML = "";
   }
+  updateLangToggle();
 }
 
 // --- Writer lock (prevents concurrent import/delete operations) ---
@@ -276,6 +362,7 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
     probeIndex: probeIndexBtn.disabled,
     probeAll: probeAllBtn.disabled,
     quickImport: quickImportBtn.disabled,
+    bundleSelect: bundleSelect.disabled,
   };
   validateManifestBtn.disabled = true;
   importBundleBtn.disabled = true;
@@ -284,6 +371,7 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
   probeIndexBtn.disabled = true;
   probeAllBtn.disabled = true;
   quickImportBtn.disabled = true;
+  bundleSelect.disabled = true;
   try {
     await fn();
   } finally {
@@ -295,8 +383,90 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
     probeIndexBtn.disabled = prev.probeIndex;
     probeAllBtn.disabled = prev.probeAll;
     quickImportBtn.disabled = prev.quickImport;
+    bundleSelect.disabled = prev.bundleSelect;
     updateButtons();
+    await refreshDbStatus();
   }
+}
+
+function buildInstalledBundleMeta(
+  manifest: BundleManifestV1,
+  recordsCount: number,
+  indexCount: number,
+): ActiveBundleMeta {
+  return {
+    bundle_id: manifest.bundle_id,
+    manifest_schema_version: manifest.manifest_schema_version,
+    record_schema_id: manifest.record_schema_id,
+    record_schema_version: manifest.record_schema_version,
+    normalization_ruleset: manifest.rule_versions.normalization,
+    update_mode: manifest.update_mode,
+    reconciliation_action: manifest.reconciliation_action,
+    expected_content_sha256: manifest.content_sha256,
+    imported_at_iso: new Date().toISOString(),
+    records_count: recordsCount,
+    index_entries_count: indexCount,
+    language_meta: buildLanguageMetaFromManifest(manifest),
+  };
+}
+
+async function installBundleIntoDb(
+  db: IDBDatabase,
+  manifest: BundleManifestV1,
+  records: File,
+  searchIndex: File,
+  onUpdate: (message: string) => void,
+): Promise<{ recordsCount: number; indexCount: number; elapsedMs: number }> {
+  await deleteBundleData(db, manifest.bundle_id);
+
+  const t0 = performance.now();
+  let recordsCount = 0;
+  let indexCount = 0;
+  try {
+    const recRes = await importRecordsJsonl(db, records, {
+      bundleId: manifest.bundle_id,
+      batchSize: 500,
+      onProgress: (p) => {
+        onUpdate(
+          `Installing ${manifest.bundle_id}\n\n` +
+            `[records.jsonl]\n` +
+            `bytes read: ${p.bytesRead}\n` +
+            `lines seen: ${p.linesSeen}\n` +
+            `records written: ${p.recordsWritten}\n` +
+            `batches committed: ${p.batchesCommitted}\n`,
+        );
+      },
+    });
+    recordsCount = recRes.recordsWritten;
+
+    const idxRes = await importSearchIndexJsonl(db, searchIndex, {
+      bundleId: manifest.bundle_id,
+      batchSize: 500,
+      onProgress: (p) => {
+        onUpdate(
+          `Installing ${manifest.bundle_id}\n\n` +
+            `[records.jsonl] written: ${recordsCount}\n` +
+            `\n[search_index.jsonl]\n` +
+            `bytes read: ${p.bytesRead}\n` +
+            `lines seen: ${p.linesSeen}\n` +
+            `entries written: ${p.entriesWritten}\n` +
+            `batches committed: ${p.batchesCommitted}\n`,
+        );
+      },
+    });
+    indexCount = idxRes.entriesWritten;
+
+    await setActiveBundleMeta(db, buildInstalledBundleMeta(manifest, recordsCount, indexCount));
+  } catch (e) {
+    await deleteBundleData(db, manifest.bundle_id);
+    throw e;
+  }
+
+  return {
+    recordsCount,
+    indexCount,
+    elapsedMs: performance.now() - t0,
+  };
 }
 
 // --- Quick import (single-action file picker) ---
@@ -361,81 +531,43 @@ async function quickImportBundle(fileList: FileList) {
 
   try {
     const existingDb = await openSiralexDb();
-    const active = await getActiveBundleMeta(existingDb);
-    existingDb.close();
-    if (active?.bundle_id === mfst.bundle_id) {
-      importProgress.textContent = `Bundle already imported: ${mfst.bundle_id}\n`;
+    const installed = await getInstalledBundleMeta(existingDb, mfst.bundle_id);
+    if (installed) {
+      await setActiveBundleId(existingDb, mfst.bundle_id);
+      existingDb.close();
+      importProgress.textContent = `Bundle already installed. Marked active: ${mfst.bundle_id}\n`;
       await refreshDbStatus();
       return;
     }
+    existingDb.close();
   } catch {
     // DB may not exist yet; proceed with import
   }
 
   firstRun.style.display = "none";
-  importProgress.textContent = `Importing ${mfst.bundle_id}...\n`;
-
-  try {
-    await deleteSiralexDb();
-  } catch (e) {
-    importProgress.textContent += `Delete failed: ${String(e)}\nClose other tabs using this app, then retry.\n`;
-    await refreshDbStatus();
-    return;
-  }
+  importProgress.textContent = `Installing ${mfst.bundle_id}...\n`;
 
   const db = await openSiralexDb();
-  const t0 = performance.now();
-  let recordsCount = 0;
-  let indexCount = 0;
   try {
-    const recRes = await importRecordsJsonl(db, recordsFileObj!, {
-      batchSize: 500,
-      onProgress: (p) => {
-        importProgress.textContent =
-          `Importing ${mfst.bundle_id}\n\n` +
-          `records.jsonl: ${p.recordsWritten} records (${p.batchesCommitted} batches)\n`;
+    const result = await installBundleIntoDb(
+      db,
+      mfst,
+      recordsFileObj!,
+      searchIndexFileObj!,
+      (message) => {
+        importProgress.textContent = message;
       },
-    });
-    recordsCount = recRes.recordsWritten;
-
-    const idxRes = await importSearchIndexJsonl(db, searchIndexFileObj!, {
-      batchSize: 500,
-      onProgress: (p) => {
-        importProgress.textContent =
-          `Importing ${mfst.bundle_id}\n\n` +
-          `records.jsonl: ${recordsCount} records — done\n` +
-          `search_index.jsonl: ${p.entriesWritten} entries (${p.batchesCommitted} batches)\n`;
-      },
-    });
-    indexCount = idxRes.entriesWritten;
-
-    await setActiveBundleMeta(db, {
-      bundle_id: mfst.bundle_id,
-      manifest_schema_version: mfst.manifest_schema_version,
-      record_schema_id: mfst.record_schema_id,
-      record_schema_version: mfst.record_schema_version,
-      normalization_ruleset: mfst.rule_versions.normalization,
-      update_mode: mfst.update_mode,
-      reconciliation_action: mfst.reconciliation_action,
-      expected_content_sha256: mfst.content_sha256,
-      imported_at_iso: new Date().toISOString(),
-      records_count: recordsCount,
-      index_entries_count: indexCount,
-    });
-
-    const elapsed = performance.now() - t0;
+    );
     importProgress.textContent =
-      `Import complete: ${mfst.bundle_id}\n` +
-      `${recordsCount} records, ${indexCount} index entries\n` +
-      `${elapsed.toFixed(0)} ms\n`;
+      `Install complete: ${mfst.bundle_id}\n` +
+      `${result.recordsCount} records, ${result.indexCount} index entries\n` +
+      `${result.elapsedMs.toFixed(0)} ms\n`;
   } catch (e) {
     importProgress.textContent += `\nImport failed: ${String(e)}\n`;
-    importProgress.textContent += `Database cleared. Re-import required.\n`;
+    importProgress.textContent += `Partial bundle data removed. Re-import required.\n`;
   } finally {
     db.close();
   }
-
-  await refreshDbStatus();
 }
 
 // --- Developer tools: manifest validation ---
@@ -474,6 +606,7 @@ async function validateManifestAndFiles() {
   lastValidatedManifest = mfst;
   manifestOut.textContent += `Manifest OK\n`;
   manifestOut.textContent += `bundle_id: ${mfst.bundle_id}\n`;
+  manifestOut.textContent += `dictionary: ${getBundleDisplayName(mfst.bundle_id, buildLanguageMetaFromManifest(mfst))}\n`;
   manifestOut.textContent += `normalization: ${mfst.rule_versions.normalization}\n`;
   manifestOut.textContent += `schema: ${mfst.record_schema_id}@${mfst.record_schema_version}\n`;
   manifestOut.textContent += `mode: ${mfst.update_mode} / ${mfst.reconciliation_action}\n`;
@@ -500,97 +633,39 @@ importBundleBtn.addEventListener("click", () => {
 
     try {
       const existingDb = await openSiralexDb();
-      const active = await getActiveBundleMeta(existingDb);
-      existingDb.close();
-      if (active?.bundle_id === mfst.bundle_id) {
-        dbOut.textContent = `Bundle already imported: ${mfst.bundle_id}\n(No-op)\n`;
+      const installed = await getInstalledBundleMeta(existingDb, mfst.bundle_id);
+      if (installed) {
+        await setActiveBundleId(existingDb, mfst.bundle_id);
+        existingDb.close();
+        dbOut.textContent = `Bundle already installed. Marked active: ${mfst.bundle_id}\n`;
         return;
       }
+      existingDb.close();
     } catch {
-      // ignore and proceed; we'll recreate DB via delete+open
-    }
-
-    dbOut.textContent = "Import starting: deleting IndexedDB...\n";
-    try {
-      await deleteSiralexDb();
-    } catch (e) {
-      dbOut.textContent += `Delete failed: ${String(e)}\n`;
-      dbOut.textContent += "Close other tabs using this app, then retry.\n";
-      lastValidatedManifest = undefined;
-      await refreshDbStatus();
-      return;
+      // ignore and proceed; database may not exist yet
     }
 
     const db = await openSiralexDb();
-    const t0 = performance.now();
-    let recordsCount = 0;
-    let indexCount = 0;
     try {
-      dbOut.textContent = `Deleted. Importing bundle ${mfst.bundle_id}...\n`;
-
-      const recRes = await importRecordsJsonl(db, rf, {
-        batchSize: 500,
-        onProgress: (p) => {
-          dbOut.textContent =
-            `Importing bundle (NOT active yet)\n` +
-            `bundle_id: ${mfst.bundle_id}\n` +
-            `\n[records.jsonl]\n` +
-            `bytes read: ${p.bytesRead}\n` +
-            `lines seen: ${p.linesSeen}\n` +
-            `records written: ${p.recordsWritten}\n` +
-            `batches committed: ${p.batchesCommitted}\n`;
-        },
+      dbOut.textContent = `Installing bundle ${mfst.bundle_id}...\n`;
+      const result = await installBundleIntoDb(db, mfst, rf, ix, (message) => {
+        dbOut.textContent = message;
       });
-      recordsCount = recRes.recordsWritten;
-
-      const idxRes = await importSearchIndexJsonl(db, ix, {
-        batchSize: 500,
-        onProgress: (p) => {
-          dbOut.textContent =
-            `Importing bundle (NOT active yet)\n` +
-            `bundle_id: ${mfst.bundle_id}\n` +
-            `\n[records.jsonl] written: ${recordsCount}\n` +
-            `\n[search_index.jsonl]\n` +
-            `bytes read: ${p.bytesRead}\n` +
-            `lines seen: ${p.linesSeen}\n` +
-            `entries written: ${p.entriesWritten}\n` +
-            `batches committed: ${p.batchesCommitted}\n`;
-        },
-      });
-      indexCount = idxRes.entriesWritten;
-
-      await setActiveBundleMeta(db, {
-        bundle_id: mfst.bundle_id,
-        manifest_schema_version: mfst.manifest_schema_version,
-        record_schema_id: mfst.record_schema_id,
-        record_schema_version: mfst.record_schema_version,
-        normalization_ruleset: mfst.rule_versions.normalization,
-        update_mode: mfst.update_mode,
-        reconciliation_action: mfst.reconciliation_action,
-        expected_content_sha256: mfst.content_sha256,
-        imported_at_iso: new Date().toISOString(),
-        records_count: recordsCount,
-        index_entries_count: indexCount,
-      });
-
-      const elapsedMs = performance.now() - t0;
       dbOut.textContent =
-        `Import COMPLETE\n` +
+        `Install COMPLETE\n` +
         `bundle_id: ${mfst.bundle_id}\n` +
-        `records: ${recordsCount}\n` +
-        `index entries: ${indexCount}\n` +
-        `elapsed: ${elapsedMs.toFixed(0)} ms\n` +
+        `records: ${result.recordsCount}\n` +
+        `index entries: ${result.indexCount}\n` +
+        `elapsed: ${result.elapsedMs.toFixed(0)} ms\n` +
         `\nNote: expected_content_sha256 stored from manifest; NOT verified client-side.\n`;
     } catch (e) {
       dbOut.textContent += `\nImport FAILED: ${String(e)}\n`;
-      dbOut.textContent += `Database was cleared at import start (REPLACE_ALL). Please re-validate and re-import.\n`;
+      dbOut.textContent += `Partial bundle data was removed. Please re-validate and re-import.\n`;
       dbOut.textContent += `No bundle has been marked active.\n`;
       lastValidatedManifest = undefined;
     } finally {
       db.close();
     }
-
-    await refreshDbStatus();
   });
 });
 
@@ -677,23 +752,17 @@ probeAllBtn.addEventListener("click", () => {
 
 // --- Language toggle ---
 
-type SearchDirection = "fr_to_mnk" | "mnk_to_fr";
-let searchDirection: SearchDirection = "fr_to_mnk";
+let searchDirection: SearchDirection = "source_to_target";
 
 function updateLangToggle() {
-  if (searchDirection === "fr_to_mnk") {
-    langToggle.textContent = "FR → Maninka";
-    searchLabel.textContent = "Query (FR → Maninka)";
-    searchInput.placeholder = "Type a French word…";
-  } else {
-    langToggle.textContent = "Maninka → FR";
-    searchLabel.textContent = "Query (Maninka → FR)";
-    searchInput.placeholder = "Type a Maninka word…";
-  }
+  const directionText = getSearchDirectionText(searchDirection, currentActiveBundle?.language_meta);
+  langToggle.textContent = directionText;
+  searchLabel.textContent = `Query (${directionText})`;
+  searchInput.placeholder = getSearchPlaceholder(searchDirection, currentActiveBundle?.language_meta);
 }
 
 langToggle.addEventListener("click", () => {
-  searchDirection = searchDirection === "fr_to_mnk" ? "mnk_to_fr" : "fr_to_mnk";
+  searchDirection = searchDirection === "source_to_target" ? "target_to_source" : "source_to_target";
   updateLangToggle();
 });
 
@@ -739,6 +808,7 @@ function showEntryDetail(record: EnrichedRecord) {
   const detail = renderEntryDetail(record, {
     onBack: () => showResultsList(),
     onSearch: (query) => triggerSearch(query),
+    targetEntriesLabel: getTargetEntriesLabel(currentActiveBundle?.language_meta),
   });
   searchResults.appendChild(detail);
 }
@@ -753,7 +823,15 @@ async function runSearch(query: string) {
   let db: IDBDatabase | undefined;
   try {
     db = await openSiralexDb();
-    const result = await searchQuery(db, query);
+    const activeBundleId = await getActiveBundleId(db);
+    if (!activeBundleId) {
+      searchMeta.textContent = "Search disabled: no active bundle.";
+      searchResults.innerHTML = "";
+      lastSearchRecords = [];
+      return;
+    }
+
+    const result = await searchQuery(db, activeBundleId, query);
     if (seq !== searchSeq) return;
 
     if (result.ir_ids.length === 0) {
@@ -765,7 +843,7 @@ async function runSearch(query: string) {
       return;
     }
 
-    const records = await resolveRecords(db, result.ir_ids);
+    const records = await resolveRecords(db, activeBundleId, result.ir_ids);
     if (seq !== searchSeq) return;
     const elapsedMs = performance.now() - t0;
 

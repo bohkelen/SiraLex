@@ -63,6 +63,12 @@ Every bundle MUST include a manifest file (e.g., `bundle.manifest.json`) contain
 - **Scope / segmentation (recommended)**
   - `bundle_scope` (`locale_pack` | `global_seed` | `global_full`)
   - `locales_included[]` (e.g., `["maninka-GN"]`)
+- **Language metadata (recommended for UI consumers)**
+  - `languages.source_lang` (e.g., `fr`)
+  - `languages.target_lang` (e.g., `mnk`)
+  - `language_labels.source` (e.g., `French`)
+  - `language_labels.target` (e.g., `Maninka`)
+  - `scripts.target_supported[]` (e.g., `["latin", "nko"]`) when useful for display/runtime hints
 - **Bundle format metadata (recommended)**
   - `bundle_format` (e.g., `directory` | `tar` | `zip`)
   - `compression` (e.g., `zst` | `gzip` | `none`)
@@ -250,6 +256,14 @@ Consumers MUST enforce compatibility using **both** schema identity and version:
 - `record_schema_id` MUST equal the schema ID the consumer expects (e.g., `lex_v1`)
 - `record_schema_version` MUST be greater than or equal to `consumer_compat.min_record_schema_version`
 
+## Compatibility rule (language metadata)
+
+Language metadata is intentionally additive:
+
+- consumers MUST continue to accept bundles that omit `languages`, `language_labels`, or `scripts`
+- consumers MAY use these fields to drive runtime labels, bundle selectors, and script-aware UI
+- missing language metadata must not invalidate an otherwise compatible bundle
+
 ## Minimal example manifest (illustrative)
 
 ```json
@@ -260,6 +274,17 @@ Consumers MUST enforce compatibility using **both** schema identity and version:
   "created_at": "2026-01-05T00:00:00Z",
   "bundle_scope": "locale_pack",
   "locales_included": ["maninka-GN"],
+  "languages": {
+    "source_lang": "fr",
+    "target_lang": "mnk"
+  },
+  "language_labels": {
+    "source": "French",
+    "target": "Maninka"
+  },
+  "scripts": {
+    "target_supported": ["latin", "nko"]
+  },
   "bundle_format": "zip",
   "compression": "zst",
   "record_schema_id": "lex_v1",

@@ -140,6 +140,7 @@ function renderLexiconEntry(record: EnrichedRecord, d: LexiconDisplayFields): HT
 function renderIndexMapping(
   record: EnrichedRecord,
   d: IndexMappingDisplayFields,
+  targetEntriesLabel: string,
   onSearch?: (query: string) => void,
 ): HTMLElement {
   const wrap = el("div", "entry-detail entry-index");
@@ -151,7 +152,7 @@ function renderIndexMapping(
 
   if (d.target_entries && d.target_entries.length > 0) {
     const targets = el("div", "entry-targets");
-    targets.appendChild(el("div", "targets-label", "Maninka entries:"));
+    targets.appendChild(el("div", "targets-label", targetEntriesLabel));
     for (const t of d.target_entries) {
       if (onSearch) {
         const btn = document.createElement("button");
@@ -183,6 +184,7 @@ function renderIndexMapping(
 export type EntryDetailCallbacks = {
   onBack: () => void;
   onSearch?: (query: string) => void;
+  targetEntriesLabel?: string;
 };
 
 /**
@@ -206,7 +208,14 @@ export function renderEntryDetail(
   if (isLexiconDisplay(record)) {
     container.appendChild(renderLexiconEntry(record, record.display));
   } else if (isIndexMappingDisplay(record)) {
-    container.appendChild(renderIndexMapping(record, record.display, callbacks.onSearch));
+    container.appendChild(
+      renderIndexMapping(
+        record,
+        record.display,
+        callbacks.targetEntriesLabel ?? "Target entries:",
+        callbacks.onSearch,
+      ),
+    );
   } else {
     container.appendChild(el("div", "entry-error", `No display data for ir_id: ${record.ir_id}`));
   }
