@@ -4,11 +4,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { parseAndValidateManifestJson } from "./bundle_manifest";
 import {
+  deleteBundleData,
   deleteSiralexDb,
   getActiveBundleId,
   getActiveBundleMeta,
   listInstalledBundles,
   openSiralexDb,
+  recoverInterruptedBundleInstall,
+  setBundleInstallSession,
   setActiveBundleId,
   setActiveBundleMeta,
 } from "./idb/siralex_db";
@@ -295,6 +298,93 @@ describe("Phase 3 bundle-aware runtime", () => {
       expect(result.ir_ids).toEqual(["rec-a"]);
       const records = await resolveRecords(db, "bundle_full_a_aaaaaaaa", result.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-a"]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("deletes data using storage_scope_id from the registry", async () => {
+    const db = await openSiralexDb();
+    try {
+      await importRecordsJsonl(
+        db,
+        makeJsonlFile("records.jsonl", [
+          {
+            ir_id: "rec-staged",
+            ir_kind: "lexicon_entry",
+            source_id: "src_staged",
+            norm_version: "norm_v1",
+            preferred_form: "hello",
+            variant_forms: ["hello"],
+            search_keys: { casefold: ["hello"] },
+            display: { headword_latin: "hello" },
+          },
+        ]),
+        { bundleId: "bundle_a::sha256:new", batchSize: 10 },
+      );
+      await importSearchIndexJsonl(
+        db,
+        makeJsonlFile("search_index.jsonl", [
+          { key_type: "casefold", key: "hello", ir_ids: ["rec-staged"] },
+        ]),
+        { bundleId: "bundle_a::sha256:new", batchSize: 10 },
+      );
+      await setActiveBundleMeta(db, {
+        bundle_id: "bundle_a",
+        storage_scope_id: "bundle_a::sha256:new",
+        manifest_schema_version: "bundle_manifest_v1",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        normalization_ruleset: "norm_v1",
+        update_mode: "REPLACE_ALL",
+        reconciliation_action: "REPLACE_ALL",
+        imported_at_iso: "2026-03-10T00:00:00Z",
+      });
+
+      let result = await searchQuery(db, "bundle_a::sha256:new", "hello");
+      expect(result.ir_ids).toEqual(["rec-staged"]);
+
+      await deleteBundleData(db, "bundle_a");
+
+      result = await searchQuery(db, "bundle_a::sha256:new", "hello");
+      expect(result.ir_ids).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("recovers interrupted committed installs by cleaning previous storage scope", async () => {
+    const db = await openSiralexDb();
+    try {
+      await importRecordsJsonl(
+        db,
+        makeJsonlFile("records.jsonl", [
+          {
+            ir_id: "rec-old",
+            ir_kind: "lexicon_entry",
+            source_id: "src_old",
+            norm_version: "norm_v1",
+            preferred_form: "old",
+            variant_forms: ["old"],
+            search_keys: { casefold: ["old"] },
+            display: { headword_latin: "old" },
+          },
+        ]),
+        { bundleId: "bundle_a", batchSize: 10 },
+      );
+      await setBundleInstallSession(db, {
+        bundle_id: "bundle_a",
+        storage_scope_id: "bundle_a::sha256:new",
+        previous_storage_scope_id: "bundle_a",
+        started_at_iso: "2026-03-10T00:00:00Z",
+        phase: "committed",
+      });
+
+      const message = await recoverInterruptedBundleInstall(db);
+      expect(message).toContain("Recovered committed install");
+
+      const result = await searchQuery(db, "bundle_a", "old");
+      expect(result.ir_ids).toEqual([]);
     } finally {
       db.close();
     }

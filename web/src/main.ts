@@ -12,28 +12,39 @@ import {
   type SearchDirection,
 } from "./bundle_labels";
 import {
+  compareCatalogEntryToInstalled,
+  deriveBundleAssetUrls,
+  fetchBundleCatalog,
+  type BundleCatalogEntryV1,
+} from "./bundle_catalog";
+import {
   parseAndValidateManifestJson,
   validateSelectedFilesAgainstManifest,
   type BundleManifestV1,
 } from "./bundle_manifest";
 import {
-  clearActiveBundleId,
   deleteBundleData,
   deleteSiralexDb,
   getActiveBundleId,
   getActiveBundleMeta,
+  getBundleStorageScopeId,
+  getCachedBundleCatalog,
   getInstalledBundleMeta,
   listInstalledBundles,
   openSiralexDb,
+  recoverInterruptedBundleInstall,
+  setCachedBundleCatalog,
   setActiveBundleId,
-  setActiveBundleMeta,
   storeHasData,
   type ActiveBundleMeta,
+  type CachedBundleCatalog,
   STORE_RECORDS,
   STORE_SEARCH_INDEX,
 } from "./idb/siralex_db";
-import { importRecordsJsonl } from "./import/import_records";
-import { importSearchIndexJsonl } from "./import/import_search_index";
+import {
+  installBundleIntoDb,
+  installRemoteCatalogBundle,
+} from "./install/bundle_install";
 import { searchQuery } from "./search/search_query";
 import { resolveRecords } from "./search/resolve_records";
 import { renderResultsList } from "./render/render_results";
@@ -65,6 +76,15 @@ app.innerHTML = `
           </select>
         </div>
       </div>
+      <div class="row" style="margin-top: 12px; align-items: end">
+        <div class="field" style="flex: 1">
+          <div class="label">Catalog URL</div>
+          <input id="catalogUrl" type="text" placeholder="https://example.org/catalog.json or /catalog.json" autocomplete="off" />
+        </div>
+        <button id="loadCatalog" class="btn">Load catalog</button>
+      </div>
+      <div id="catalogStatus" class="mono" style="margin-top: 12px"></div>
+      <div id="catalogList" style="margin-top: 12px"></div>
       <div id="firstRun" style="display: none; margin-top: 12px">
         <p style="color: var(--muted); font-size: 14px; margin: 0 0 12px 0">
           No dictionary installed.<br>
@@ -74,6 +94,7 @@ app.innerHTML = `
       <div class="row" style="margin-top: 12px">
         <button id="quickImport" class="btn">Install bundle files</button>
         <input id="quickImportFiles" type="file" multiple accept=".json,.jsonl" style="display: none" />
+        <button id="cancelInstall" class="btn" style="display: none">Cancel install</button>
       </div>
       <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
       <div class="row" style="margin-top: 12px">
@@ -162,9 +183,14 @@ function mustGetEl<T extends Element>(selector: string): T {
 // Primary UI elements
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const bundleSelect = mustGetEl<HTMLSelectElement>("#bundleSelect");
+const catalogUrlInput = mustGetEl<HTMLInputElement>("#catalogUrl");
+const loadCatalogBtn = mustGetEl<HTMLButtonElement>("#loadCatalog");
+const catalogStatus = mustGetEl<HTMLDivElement>("#catalogStatus");
+const catalogList = mustGetEl<HTMLDivElement>("#catalogList");
 const firstRun = mustGetEl<HTMLDivElement>("#firstRun");
 const quickImportBtn = mustGetEl<HTMLButtonElement>("#quickImport");
 const quickImportFiles = mustGetEl<HTMLInputElement>("#quickImportFiles");
+const cancelInstallBtn = mustGetEl<HTMLButtonElement>("#cancelInstall");
 const importProgress = mustGetEl<HTMLDivElement>("#importProgress");
 const clearDbBtn = mustGetEl<HTMLButtonElement>("#clearDb");
 const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
@@ -190,6 +216,14 @@ let lastValidatedManifest: BundleManifestV1 | undefined;
 let busy = false;
 let installedBundles: ActiveBundleMeta[] = [];
 let currentActiveBundle: ActiveBundleMeta | undefined;
+let catalogLoading = false;
+let loadedCatalogBundles: BundleCatalogEntryV1[] = [];
+let loadedCatalogUrl: string | undefined;
+let loadedCatalogWarnings: string[] = [];
+let loadedCatalogFetchedAtIso: string | undefined;
+let loadedCatalogSource: "network" | "cache" | undefined;
+let remoteInstallAbortController: AbortController | undefined;
+let remoteInstallBundleId: string | undefined;
 
 function fmtBytes(n: number | undefined): string {
   if (n === undefined) return "n/a";
@@ -218,6 +252,53 @@ function updateButtons() {
   importBundleBtn.disabled = !lastValidatedManifest;
 }
 
+function updateCatalogControls() {
+  catalogUrlInput.disabled = busy || catalogLoading;
+  loadCatalogBtn.disabled = busy || catalogLoading || catalogUrlInput.value.trim() === "";
+}
+
+function updateInstallControls() {
+  const installInProgress = remoteInstallAbortController !== undefined;
+  cancelInstallBtn.style.display = installInProgress ? "" : "none";
+  cancelInstallBtn.disabled = !installInProgress;
+}
+
+function buildCachedCatalogSnapshot(
+  requestUrl: string,
+  responseUrl: string,
+  warnings: string[],
+  bundles: BundleCatalogEntryV1[],
+): CachedBundleCatalog {
+  return {
+    request_url: requestUrl,
+    response_url: responseUrl,
+    fetched_at_iso: new Date().toISOString(),
+    warnings,
+    catalog: {
+      catalog_schema_version: "bundle_catalog_v1",
+      bundles: bundles.map((bundle) => ({
+        bundle_id: bundle.bundle_id,
+        name: bundle.name,
+        version: bundle.version,
+        size_bytes: bundle.size_bytes,
+        url_base: bundle.url_base,
+        content_sha256: bundle.content_sha256,
+        language_meta: bundle.language_meta,
+      })),
+    },
+  };
+}
+
+function applyCachedCatalog(cached: CachedBundleCatalog, source: "network" | "cache") {
+  loadedCatalogBundles = cached.catalog.bundles;
+  loadedCatalogUrl = cached.response_url;
+  loadedCatalogWarnings = cached.warnings;
+  loadedCatalogFetchedAtIso = cached.fetched_at_iso;
+  loadedCatalogSource = source;
+  catalogUrlInput.value = cached.request_url;
+  updateCatalogControls();
+}
+
 function invalidateManifestValidation() {
   lastValidatedManifest = undefined;
   manifestOut.textContent = "";
@@ -236,6 +317,16 @@ manifestFile.addEventListener("change", () => {
   updateButtons();
 });
 updateButtons();
+updateCatalogControls();
+updateInstallControls();
+
+catalogUrlInput.addEventListener("input", () => {
+  updateCatalogControls();
+});
+
+cancelInstallBtn.addEventListener("click", () => {
+  remoteInstallAbortController?.abort(new Error(`Install cancelled by user for ${remoteInstallBundleId ?? "bundle"}`));
+});
 
 bundleSelect.addEventListener("change", () => {
   const nextBundleId = bundleSelect.value;
@@ -254,6 +345,136 @@ bundleSelect.addEventListener("change", () => {
 // --- Dictionary status ---
 
 let hasActiveBundle = false;
+
+function getCatalogPresentationState(entry: BundleCatalogEntryV1): {
+  badgeClass: string;
+  badgeLabel: string;
+  note?: string;
+} {
+  const installed = installedBundles.find((bundle) => bundle.bundle_id === entry.bundle_id);
+  const comparison = compareCatalogEntryToInstalled(entry, installed);
+  const isActive = currentActiveBundle?.bundle_id === entry.bundle_id;
+
+  if (comparison.state === "update_available") {
+    return {
+      badgeClass: "catalog-badge-update",
+      badgeLabel: "Update available",
+      note: isActive ? "Installed version is active on this device." : "Installed version differs from catalog hash.",
+    };
+  }
+
+  if (comparison.state === "installed_current") {
+    return {
+      badgeClass: isActive ? "catalog-badge-active" : "catalog-badge-installed",
+      badgeLabel: isActive ? "Active" : "Installed",
+      note: entry.version ? `Catalog version ${entry.version}` : undefined,
+    };
+  }
+
+  return {
+    badgeClass: "catalog-badge-available",
+    badgeLabel: "Available",
+  };
+}
+
+function getCatalogActionLabel(entry: BundleCatalogEntryV1): string {
+  const installed = installedBundles.find((bundle) => bundle.bundle_id === entry.bundle_id);
+  const comparison = compareCatalogEntryToInstalled(entry, installed);
+  if (currentActiveBundle?.bundle_id === entry.bundle_id && comparison.state === "installed_current") {
+    return "Active";
+  }
+  if (comparison.state === "update_available") return "Update";
+  if (comparison.state === "installed_current") return "Use installed";
+  return "Install";
+}
+
+function renderCatalogList() {
+  catalogList.innerHTML = "";
+
+  if (loadedCatalogBundles.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "catalog-empty";
+    empty.textContent = "No catalog loaded.";
+    catalogList.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "catalog-list";
+
+  for (const entry of loadedCatalogBundles) {
+    const item = document.createElement("article");
+    item.className = "catalog-item";
+
+    const header = document.createElement("div");
+    header.className = "catalog-item-header";
+
+    const titleBlock = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "catalog-item-title";
+    title.textContent = entry.name;
+    const bundleId = document.createElement("div");
+    bundleId.className = "catalog-item-subtitle";
+    bundleId.textContent = entry.bundle_id;
+    titleBlock.append(title, bundleId);
+
+    const presentation = getCatalogPresentationState(entry);
+    const badge = document.createElement("span");
+    badge.className = `catalog-badge ${presentation.badgeClass}`;
+    badge.textContent = presentation.badgeLabel;
+    header.append(titleBlock, badge);
+
+    const meta = document.createElement("div");
+    meta.className = "catalog-item-meta";
+    const metaParts = [
+      entry.version ? `Version ${entry.version}` : undefined,
+      fmtBytes(entry.size_bytes),
+      `Hash ${entry.content_sha256}`,
+    ].filter((part): part is string => part !== undefined);
+    meta.textContent = metaParts.join(" | ");
+
+    const source = document.createElement("div");
+    source.className = "catalog-item-subtitle";
+    if (loadedCatalogUrl) {
+      const urls = deriveBundleAssetUrls(loadedCatalogUrl, entry);
+      source.textContent = `Bundle source: ${urls.base_url}`;
+      const files = document.createElement("div");
+      files.className = "catalog-item-subtitle";
+      files.textContent =
+        `Manifest: ${urls.manifest_url}\n` +
+        `Records: ${urls.records_url}\n` +
+        `Index: ${urls.search_index_url}`;
+      item.append(header, meta, source, files);
+    } else {
+      source.textContent = `Source base: ${entry.url_base}`;
+      item.append(header, meta, source);
+    }
+
+    if (presentation.note) {
+      const note = document.createElement("div");
+      note.className = "catalog-item-note";
+      note.textContent = presentation.note;
+      item.append(note);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "row";
+    const actionBtn = document.createElement("button");
+    actionBtn.className = "btn";
+    actionBtn.textContent = getCatalogActionLabel(entry);
+    actionBtn.disabled = busy || !loadedCatalogUrl || actionBtn.textContent === "Active";
+    actionBtn.addEventListener("click", () => {
+      void withSingleWriterLock(`install catalog bundle ${entry.bundle_id}`, async () => {
+        await installCatalogEntry(entry);
+      });
+    });
+    actions.appendChild(actionBtn);
+    item.append(actions);
+    list.appendChild(item);
+  }
+
+  catalogList.appendChild(list);
+}
 
 function renderBundleSelectOptions(activeBundleId: string | undefined) {
   bundleSelect.innerHTML = "";
@@ -340,7 +561,8 @@ async function refreshDbStatus() {
     dictStatus.textContent = `Database error: ${String(e)}\n`;
     dbOut.textContent = dictStatus.textContent;
   }
-  searchInput.disabled = !hasActiveBundle;
+  renderCatalogList();
+  searchInput.disabled = !hasActiveBundle || busy;
   langToggle.disabled = !hasActiveBundle || busy;
   if (!hasActiveBundle) {
     searchMeta.textContent = "";
@@ -354,6 +576,8 @@ async function refreshDbStatus() {
 async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
   if (busy) return;
   busy = true;
+  clearTimeout(searchDebounceTimer);
+  searchSeq += 1;
   const prev = {
     validate: validateManifestBtn.disabled,
     importBundle: importBundleBtn.disabled,
@@ -363,6 +587,8 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
     probeAll: probeAllBtn.disabled,
     quickImport: quickImportBtn.disabled,
     bundleSelect: bundleSelect.disabled,
+    loadCatalog: loadCatalogBtn.disabled,
+    catalogUrl: catalogUrlInput.disabled,
   };
   validateManifestBtn.disabled = true;
   importBundleBtn.disabled = true;
@@ -372,6 +598,10 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
   probeAllBtn.disabled = true;
   quickImportBtn.disabled = true;
   bundleSelect.disabled = true;
+  loadCatalogBtn.disabled = true;
+  catalogUrlInput.disabled = true;
+  searchInput.disabled = true;
+  langToggle.disabled = true;
   try {
     await fn();
   } finally {
@@ -384,89 +614,12 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
     probeAllBtn.disabled = prev.probeAll;
     quickImportBtn.disabled = prev.quickImport;
     bundleSelect.disabled = prev.bundleSelect;
+    loadCatalogBtn.disabled = prev.loadCatalog;
+    catalogUrlInput.disabled = prev.catalogUrl;
     updateButtons();
+    updateCatalogControls();
     await refreshDbStatus();
   }
-}
-
-function buildInstalledBundleMeta(
-  manifest: BundleManifestV1,
-  recordsCount: number,
-  indexCount: number,
-): ActiveBundleMeta {
-  return {
-    bundle_id: manifest.bundle_id,
-    manifest_schema_version: manifest.manifest_schema_version,
-    record_schema_id: manifest.record_schema_id,
-    record_schema_version: manifest.record_schema_version,
-    normalization_ruleset: manifest.rule_versions.normalization,
-    update_mode: manifest.update_mode,
-    reconciliation_action: manifest.reconciliation_action,
-    expected_content_sha256: manifest.content_sha256,
-    imported_at_iso: new Date().toISOString(),
-    records_count: recordsCount,
-    index_entries_count: indexCount,
-    language_meta: buildLanguageMetaFromManifest(manifest),
-  };
-}
-
-async function installBundleIntoDb(
-  db: IDBDatabase,
-  manifest: BundleManifestV1,
-  records: File,
-  searchIndex: File,
-  onUpdate: (message: string) => void,
-): Promise<{ recordsCount: number; indexCount: number; elapsedMs: number }> {
-  await deleteBundleData(db, manifest.bundle_id);
-
-  const t0 = performance.now();
-  let recordsCount = 0;
-  let indexCount = 0;
-  try {
-    const recRes = await importRecordsJsonl(db, records, {
-      bundleId: manifest.bundle_id,
-      batchSize: 500,
-      onProgress: (p) => {
-        onUpdate(
-          `Installing ${manifest.bundle_id}\n\n` +
-            `[records.jsonl]\n` +
-            `bytes read: ${p.bytesRead}\n` +
-            `lines seen: ${p.linesSeen}\n` +
-            `records written: ${p.recordsWritten}\n` +
-            `batches committed: ${p.batchesCommitted}\n`,
-        );
-      },
-    });
-    recordsCount = recRes.recordsWritten;
-
-    const idxRes = await importSearchIndexJsonl(db, searchIndex, {
-      bundleId: manifest.bundle_id,
-      batchSize: 500,
-      onProgress: (p) => {
-        onUpdate(
-          `Installing ${manifest.bundle_id}\n\n` +
-            `[records.jsonl] written: ${recordsCount}\n` +
-            `\n[search_index.jsonl]\n` +
-            `bytes read: ${p.bytesRead}\n` +
-            `lines seen: ${p.linesSeen}\n` +
-            `entries written: ${p.entriesWritten}\n` +
-            `batches committed: ${p.batchesCommitted}\n`,
-        );
-      },
-    });
-    indexCount = idxRes.entriesWritten;
-
-    await setActiveBundleMeta(db, buildInstalledBundleMeta(manifest, recordsCount, indexCount));
-  } catch (e) {
-    await deleteBundleData(db, manifest.bundle_id);
-    throw e;
-  }
-
-  return {
-    recordsCount,
-    indexCount,
-    elapsedMs: performance.now() - t0,
-  };
 }
 
 // --- Quick import (single-action file picker) ---
@@ -533,11 +686,17 @@ async function quickImportBundle(fileList: FileList) {
     const existingDb = await openSiralexDb();
     const installed = await getInstalledBundleMeta(existingDb, mfst.bundle_id);
     if (installed) {
-      await setActiveBundleId(existingDb, mfst.bundle_id);
-      existingDb.close();
-      importProgress.textContent = `Bundle already installed. Marked active: ${mfst.bundle_id}\n`;
-      await refreshDbStatus();
-      return;
+      if (installed.expected_content_sha256 === mfst.content_sha256) {
+        await setActiveBundleId(existingDb, mfst.bundle_id);
+        existingDb.close();
+        importProgress.textContent = `Bundle already installed. Marked active: ${mfst.bundle_id}\n`;
+        await refreshDbStatus();
+        return;
+      }
+      importProgress.textContent =
+        `Updating installed bundle ${mfst.bundle_id}.\n` +
+        `Existing hash: ${installed.expected_content_sha256 ?? "unknown"}\n` +
+        `New hash: ${mfst.content_sha256}\n`;
     }
     existingDb.close();
   } catch {
@@ -552,8 +711,10 @@ async function quickImportBundle(fileList: FileList) {
     const result = await installBundleIntoDb(
       db,
       mfst,
-      recordsFileObj!,
-      searchIndexFileObj!,
+      {
+        recordsSource: recordsFileObj!,
+        searchIndexSource: searchIndexFileObj!,
+      },
       (message) => {
         importProgress.textContent = message;
       },
@@ -562,6 +723,9 @@ async function quickImportBundle(fileList: FileList) {
       `Install complete: ${mfst.bundle_id}\n` +
       `${result.recordsCount} records, ${result.indexCount} index entries\n` +
       `${result.elapsedMs.toFixed(0)} ms\n`;
+    if (result.cleanupWarning) {
+      importProgress.textContent += `\n${result.cleanupWarning}\n`;
+    }
   } catch (e) {
     importProgress.textContent += `\nImport failed: ${String(e)}\n`;
     importProgress.textContent += `Partial bundle data removed. Re-import required.\n`;
@@ -569,6 +733,142 @@ async function quickImportBundle(fileList: FileList) {
     db.close();
   }
 }
+
+// --- Catalog loading (Phase 4.1) ---
+
+async function loadCatalogFromUrl() {
+  const catalogUrl = catalogUrlInput.value.trim();
+  if (catalogUrl === "") return;
+
+  catalogLoading = true;
+  updateCatalogControls();
+  catalogStatus.textContent = `Loading catalog from ${catalogUrl}...\n`;
+
+  try {
+    const result = await fetchBundleCatalog(catalogUrl, {
+      baseUrl: window.location.href,
+    });
+    const cached = buildCachedCatalogSnapshot(
+      result.requestUrl,
+      result.responseUrl,
+      result.warnings,
+      result.catalog.bundles,
+    );
+    const db = await openSiralexDb();
+    try {
+      await setCachedBundleCatalog(db, cached);
+    } finally {
+      db.close();
+    }
+    applyCachedCatalog(cached, "network");
+    catalogStatus.textContent =
+      `Catalog loaded.\n` +
+      `Source: ${result.responseUrl}\n` +
+      `Bundles: ${result.catalog.bundles.length}\n` +
+      `Fetched at: ${cached.fetched_at_iso}\n` +
+      `Remote policy: https anywhere; http only for same-origin or local hubs (localhost, .local, private IPs).\n` +
+      `Bundle URL contract: url_base + bundle.manifest.json / records.jsonl / search_index.jsonl\n`;
+    for (const warning of result.warnings) {
+      catalogStatus.textContent += `WARN: ${warning}\n`;
+    }
+  } catch (e) {
+    catalogStatus.textContent = `Catalog load failed: ${String(e)}\n`;
+    if (loadedCatalogBundles.length > 0 && loadedCatalogUrl && loadedCatalogFetchedAtIso) {
+      catalogStatus.textContent +=
+        `Showing cached catalog from ${loadedCatalogUrl}\n` +
+        `Fetched at: ${loadedCatalogFetchedAtIso}\n`;
+    }
+  } finally {
+    catalogLoading = false;
+    updateCatalogControls();
+    renderCatalogList();
+  }
+}
+
+async function restoreCachedCatalogFromDb() {
+  const db = await openSiralexDb();
+  try {
+    const cached = await getCachedBundleCatalog(db);
+    if (!cached) return;
+    applyCachedCatalog(cached, "cache");
+    catalogStatus.textContent =
+      `Cached catalog restored.\n` +
+      `Source: ${cached.response_url}\n` +
+      `Fetched at: ${cached.fetched_at_iso}\n` +
+      `Load catalog to refresh from the network.\n`;
+    for (const warning of cached.warnings) {
+      catalogStatus.textContent += `WARN: ${warning}\n`;
+    }
+  } finally {
+    db.close();
+  }
+}
+
+async function installCatalogEntry(entry: BundleCatalogEntryV1) {
+  if (!loadedCatalogUrl) {
+    importProgress.style.display = "";
+    importProgress.textContent = "No catalog source URL is available for this entry.\n";
+    return;
+  }
+
+  const existingDb = await openSiralexDb();
+  try {
+    const installed = await getInstalledBundleMeta(existingDb, entry.bundle_id);
+    if (installed?.expected_content_sha256 === entry.content_sha256) {
+      await setActiveBundleId(existingDb, entry.bundle_id);
+      importProgress.style.display = "";
+      importProgress.textContent = `Bundle already installed. Marked active: ${entry.bundle_id}\n`;
+      return;
+    }
+  } finally {
+    existingDb.close();
+  }
+
+  const controller = new AbortController();
+  remoteInstallAbortController = controller;
+  remoteInstallBundleId = entry.bundle_id;
+  updateInstallControls();
+  importProgress.style.display = "";
+  importProgress.textContent = `Preparing remote install for ${entry.bundle_id}...\n`;
+
+  const db = await openSiralexDb();
+  try {
+    const { manifest, result } = await installRemoteCatalogBundle(db, entry, loadedCatalogUrl, {
+      signal: controller.signal,
+      onUpdate: (message) => {
+        importProgress.textContent = message;
+      },
+      storageEstimate:
+        typeof navigator !== "undefined" && navigator.storage?.estimate
+          ? async () => await navigator.storage.estimate()
+          : undefined,
+    });
+
+    if (result.skippedBecauseCurrent) {
+      await setActiveBundleId(db, manifest.bundle_id);
+      importProgress.textContent = `Bundle already installed. Marked active: ${manifest.bundle_id}\n`;
+    } else {
+      importProgress.textContent =
+        `Remote install complete: ${manifest.bundle_id}\n` +
+        `${result.recordsCount} records, ${result.indexCount} index entries\n` +
+        `${result.elapsedMs.toFixed(0)} ms\n`;
+      if (result.cleanupWarning) {
+        importProgress.textContent += `\n${result.cleanupWarning}\n`;
+      }
+    }
+  } catch (e) {
+    importProgress.textContent = `Remote install failed: ${String(e)}\n`;
+  } finally {
+    remoteInstallAbortController = undefined;
+    remoteInstallBundleId = undefined;
+    updateInstallControls();
+    db.close();
+  }
+}
+
+loadCatalogBtn.addEventListener("click", () => {
+  void loadCatalogFromUrl();
+});
 
 // --- Developer tools: manifest validation ---
 
@@ -635,10 +935,16 @@ importBundleBtn.addEventListener("click", () => {
       const existingDb = await openSiralexDb();
       const installed = await getInstalledBundleMeta(existingDb, mfst.bundle_id);
       if (installed) {
-        await setActiveBundleId(existingDb, mfst.bundle_id);
-        existingDb.close();
-        dbOut.textContent = `Bundle already installed. Marked active: ${mfst.bundle_id}\n`;
-        return;
+        if (installed.expected_content_sha256 === mfst.content_sha256) {
+          await setActiveBundleId(existingDb, mfst.bundle_id);
+          existingDb.close();
+          dbOut.textContent = `Bundle already installed. Marked active: ${mfst.bundle_id}\n`;
+          return;
+        }
+        dbOut.textContent =
+          `Updating installed bundle ${mfst.bundle_id}.\n` +
+          `Existing hash: ${installed.expected_content_sha256 ?? "unknown"}\n` +
+          `New hash: ${mfst.content_sha256}\n`;
       }
       existingDb.close();
     } catch {
@@ -648,9 +954,17 @@ importBundleBtn.addEventListener("click", () => {
     const db = await openSiralexDb();
     try {
       dbOut.textContent = `Installing bundle ${mfst.bundle_id}...\n`;
-      const result = await installBundleIntoDb(db, mfst, rf, ix, (message) => {
-        dbOut.textContent = message;
-      });
+      const result = await installBundleIntoDb(
+        db,
+        mfst,
+        {
+          recordsSource: rf,
+          searchIndexSource: ix,
+        },
+        (message) => {
+          dbOut.textContent = message;
+        },
+      );
       dbOut.textContent =
         `Install COMPLETE\n` +
         `bundle_id: ${mfst.bundle_id}\n` +
@@ -658,6 +972,9 @@ importBundleBtn.addEventListener("click", () => {
         `index entries: ${result.indexCount}\n` +
         `elapsed: ${result.elapsedMs.toFixed(0)} ms\n` +
         `\nNote: expected_content_sha256 stored from manifest; NOT verified client-side.\n`;
+      if (result.cleanupWarning) {
+        dbOut.textContent += `\n${result.cleanupWarning}\n`;
+      }
     } catch (e) {
       dbOut.textContent += `\nImport FAILED: ${String(e)}\n`;
       dbOut.textContent += `Partial bundle data was removed. Please re-validate and re-import.\n`;
@@ -814,6 +1131,10 @@ function showEntryDetail(record: EnrichedRecord) {
 }
 
 async function runSearch(query: string) {
+  if (busy) {
+    searchMeta.textContent = "Search temporarily unavailable during install/update.";
+    return;
+  }
   if (!hasActiveBundle) {
     searchMeta.textContent = "Search disabled: no active bundle.";
     return;
@@ -823,15 +1144,16 @@ async function runSearch(query: string) {
   let db: IDBDatabase | undefined;
   try {
     db = await openSiralexDb();
-    const activeBundleId = await getActiveBundleId(db);
-    if (!activeBundleId) {
+    const activeBundleMeta = await getActiveBundleMeta(db);
+    if (!activeBundleMeta) {
       searchMeta.textContent = "Search disabled: no active bundle.";
       searchResults.innerHTML = "";
       lastSearchRecords = [];
       return;
     }
+    const activeStorageScopeId = getBundleStorageScopeId(activeBundleMeta);
 
-    const result = await searchQuery(db, activeBundleId, query);
+    const result = await searchQuery(db, activeStorageScopeId, query);
     if (seq !== searchSeq) return;
 
     if (result.ir_ids.length === 0) {
@@ -843,7 +1165,7 @@ async function runSearch(query: string) {
       return;
     }
 
-    const records = await resolveRecords(db, activeBundleId, result.ir_ids);
+    const records = await resolveRecords(db, activeStorageScopeId, result.ir_ids);
     if (seq !== searchSeq) return;
     const elapsedMs = performance.now() - t0;
 
@@ -863,4 +1185,21 @@ async function runSearch(query: string) {
   }
 }
 
-void refreshDbStatus();
+async function initializeAppState() {
+  let recoveryMessage: string | undefined;
+  const db = await openSiralexDb();
+  try {
+    recoveryMessage = await recoverInterruptedBundleInstall(db);
+  } finally {
+    db.close();
+  }
+
+  await restoreCachedCatalogFromDb();
+  if (recoveryMessage) {
+    importProgress.style.display = "";
+    importProgress.textContent = `${recoveryMessage}\n`;
+  }
+  await refreshDbStatus();
+}
+
+void initializeAppState();

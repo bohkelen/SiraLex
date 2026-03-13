@@ -21,14 +21,16 @@ export type StreamJsonlOptions = {
   signal?: AbortSignal;
 };
 
+export type JsonlByteSource = Blob | ReadableStream<Uint8Array>;
+
 function throwIfAborted(signal: AbortSignal | undefined) {
   if (signal?.aborted) {
-    throw new Error("Aborted");
+    throw signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason ?? "Aborted"));
   }
 }
 
 /**
- * Stream a File as JSONL lines without building large intermediate arrays.
+ * Stream a Blob or ReadableStream as JSONL lines without building large intermediate arrays.
  *
  * Important:
  * - This does NOT trim whitespace: JSONL is line-delimited JSON; leading/trailing
@@ -36,13 +38,14 @@ function throwIfAborted(signal: AbortSignal | undefined) {
  * - Uses incremental newline scanning (avoids buffer.split("\n") blowups).
  */
 export async function* streamJsonlLines(
-  file: File,
+  source: JsonlByteSource,
   options: StreamJsonlOptions = {},
 ): AsyncGenerator<string> {
   const maxLineBytes = options.maxLineBytes ?? MAX_JSONL_LINE_BYTES;
   const { onProgress, signal } = options;
 
-  const reader = file.stream().getReader();
+  const stream = source instanceof ReadableStream ? source : source.stream();
+  const reader = stream.getReader();
 
   let bytesRead = 0;
   let linesEmitted = 0;

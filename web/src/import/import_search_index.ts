@@ -1,5 +1,5 @@
 import { STORE_SEARCH_INDEX } from "../idb/siralex_db";
-import { streamJsonlLines, type JsonlStreamProgress } from "./jsonl_stream";
+import { streamJsonlLines, type JsonlByteSource, type JsonlStreamProgress } from "./jsonl_stream";
 
 export type ImportSearchIndexProgress = {
   bytesRead: number;
@@ -43,7 +43,7 @@ export type SearchIndexEntry = {
 
 export async function importSearchIndexJsonl(
   db: IDBDatabase,
-  indexFile: File,
+  indexFile: JsonlByteSource,
   options: ImportSearchIndexOptions,
 ): Promise<{ entriesWritten: number; linesSeen: number; batchesCommitted: number; duplicateKeysFound: string[] }> {
   const batchSize = options.batchSize ?? 500;
@@ -86,7 +86,9 @@ export async function importSearchIndexJsonl(
   }
 
   for await (const line of streamJsonlLines(indexFile, { onProgress: handleStreamProgress, signal })) {
-    if (signal?.aborted) throw new Error("Aborted");
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason ?? "Aborted"));
+    }
     linesSeen += 1;
 
     let obj: unknown;

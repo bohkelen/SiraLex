@@ -1,5 +1,5 @@
 import { STORE_RECORDS } from "../idb/siralex_db";
-import { streamJsonlLines, type JsonlStreamProgress } from "./jsonl_stream";
+import { streamJsonlLines, type JsonlByteSource, type JsonlStreamProgress } from "./jsonl_stream";
 
 export type ImportRecordsProgress = {
   bytesRead: number;
@@ -36,7 +36,7 @@ function txDone(tx: IDBTransaction): Promise<void> {
 
 export async function importRecordsJsonl(
   db: IDBDatabase,
-  recordsFile: File,
+  recordsFile: JsonlByteSource,
   options: ImportRecordsOptions,
 ): Promise<{ recordsWritten: number; linesSeen: number; batchesCommitted: number; duplicateKeysFound: string[] }> {
   const batchSize = options.batchSize ?? 500;
@@ -82,7 +82,9 @@ export async function importRecordsJsonl(
   }
 
   for await (const line of streamJsonlLines(recordsFile, { onProgress: handleStreamProgress, signal })) {
-    if (signal?.aborted) throw new Error("Aborted");
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason ?? "Aborted"));
+    }
     linesSeen += 1;
 
     let obj: unknown;

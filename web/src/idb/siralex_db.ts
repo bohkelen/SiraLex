@@ -24,6 +24,7 @@ export type BundleLanguageMeta = {
 
 export type ActiveBundleMeta = {
   bundle_id: string;
+  storage_scope_id?: string;
   manifest_schema_version: string;
   record_schema_id: string;
   record_schema_version: string;
@@ -35,6 +36,38 @@ export type ActiveBundleMeta = {
   records_count?: number;
   index_entries_count?: number;
   language_meta?: BundleLanguageMeta;
+};
+
+export type CachedBundleCatalog = {
+  request_url: string;
+  response_url: string;
+  fetched_at_iso: string;
+  warnings: string[];
+  catalog: {
+    catalog_schema_version: string;
+    bundles: Array<{
+      bundle_id: string;
+      name: string;
+      version?: string;
+      size_bytes: number;
+      url_base: string;
+      content_sha256: string;
+      language_meta?: {
+        source_lang?: string;
+        target_lang?: string;
+        source_label?: string;
+        target_label?: string;
+      };
+    }>;
+  };
+};
+
+export type BundleInstallSession = {
+  bundle_id: string;
+  storage_scope_id: string;
+  started_at_iso: string;
+  phase: "staging" | "committed";
+  previous_storage_scope_id?: string;
 };
 
 function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {
@@ -136,6 +169,8 @@ export async function metaDelete(db: IDBDatabase, key: string): Promise<void> {
 }
 
 export const META_ACTIVE_BUNDLE_ID_KEY = "active_bundle_id";
+export const META_CACHED_BUNDLE_CATALOG_KEY = "cached_bundle_catalog";
+export const META_BUNDLE_INSTALL_SESSION_KEY = "bundle_install_session";
 
 export async function getActiveBundleId(db: IDBDatabase): Promise<string | undefined> {
   return await metaGet<string>(db, META_ACTIVE_BUNDLE_ID_KEY);
@@ -159,6 +194,10 @@ export async function getInstalledBundleMeta(
   return value as ActiveBundleMeta | undefined;
 }
 
+export function getBundleStorageScopeId(meta: Pick<ActiveBundleMeta, "bundle_id" | "storage_scope_id">): string {
+  return meta.storage_scope_id ?? meta.bundle_id;
+}
+
 export async function listInstalledBundles(db: IDBDatabase): Promise<ActiveBundleMeta[]> {
   const tx = db.transaction(STORE_BUNDLES_REGISTRY, "readonly");
   const req = tx.objectStore(STORE_BUNDLES_REGISTRY).getAll();
@@ -176,6 +215,30 @@ export async function deleteInstalledBundleMeta(db: IDBDatabase, bundleId: strin
   const tx = db.transaction(STORE_BUNDLES_REGISTRY, "readwrite");
   tx.objectStore(STORE_BUNDLES_REGISTRY).delete(bundleId);
   await txDone(tx);
+}
+
+export async function getCachedBundleCatalog(db: IDBDatabase): Promise<CachedBundleCatalog | undefined> {
+  return await metaGet<CachedBundleCatalog>(db, META_CACHED_BUNDLE_CATALOG_KEY);
+}
+
+export async function setCachedBundleCatalog(db: IDBDatabase, cached: CachedBundleCatalog): Promise<void> {
+  await metaSet(db, META_CACHED_BUNDLE_CATALOG_KEY, cached);
+}
+
+export async function clearCachedBundleCatalog(db: IDBDatabase): Promise<void> {
+  await metaDelete(db, META_CACHED_BUNDLE_CATALOG_KEY);
+}
+
+export async function getBundleInstallSession(db: IDBDatabase): Promise<BundleInstallSession | undefined> {
+  return await metaGet<BundleInstallSession>(db, META_BUNDLE_INSTALL_SESSION_KEY);
+}
+
+export async function setBundleInstallSession(db: IDBDatabase, session: BundleInstallSession): Promise<void> {
+  await metaSet(db, META_BUNDLE_INSTALL_SESSION_KEY, session);
+}
+
+export async function clearBundleInstallSession(db: IDBDatabase): Promise<void> {
+  await metaDelete(db, META_BUNDLE_INSTALL_SESSION_KEY);
 }
 
 export async function getActiveBundleMeta(db: IDBDatabase): Promise<ActiveBundleMeta | undefined> {
@@ -206,9 +269,14 @@ async function deleteStoreRowsByBundleId(
   await txDone(tx);
 }
 
+export async function deleteBundleScopeData(db: IDBDatabase, storageScopeId: string): Promise<void> {
+  await deleteStoreRowsByBundleId(db, STORE_RECORDS, storageScopeId);
+  await deleteStoreRowsByBundleId(db, STORE_SEARCH_INDEX, storageScopeId);
+}
+
 export async function deleteBundleData(db: IDBDatabase, bundleId: string): Promise<void> {
-  await deleteStoreRowsByBundleId(db, STORE_RECORDS, bundleId);
-  await deleteStoreRowsByBundleId(db, STORE_SEARCH_INDEX, bundleId);
+  const installed = await getInstalledBundleMeta(db, bundleId);
+  await deleteBundleScopeData(db, installed ? getBundleStorageScopeId(installed) : bundleId);
   await deleteInstalledBundleMeta(db, bundleId);
   const activeBundleId = await getActiveBundleId(db);
   if (activeBundleId === bundleId) {
@@ -222,4 +290,21 @@ export async function setActiveBundleMeta(db: IDBDatabase, meta: ActiveBundleMet
   // are fully imported and the registry entry has been written successfully.
   await putInstalledBundleMeta(db, meta);
   await setActiveBundleId(db, meta.bundle_id);
+}
+
+export async function recoverInterruptedBundleInstall(db: IDBDatabase): Promise<string | undefined> {
+  const session = await getBundleInstallSession(db);
+  if (!session) return undefined;
+
+  if (session.phase === "staging") {
+    await deleteBundleScopeData(db, session.storage_scope_id);
+    await clearBundleInstallSession(db);
+    return `Recovered interrupted staged install for ${session.bundle_id}. Partial staged data was removed.`;
+  }
+
+  if (session.previous_storage_scope_id && session.previous_storage_scope_id !== session.storage_scope_id) {
+    await deleteBundleScopeData(db, session.previous_storage_scope_id);
+  }
+  await clearBundleInstallSession(db);
+  return `Recovered committed install for ${session.bundle_id}. Previous bundle data cleanup completed.`;
 }
