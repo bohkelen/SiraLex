@@ -108,6 +108,90 @@ input[type="text"]::placeholder {
   white-space: pre-wrap;
 }
 
+.catalog-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 12px;
+  border: 1px dashed color-mix(in oklab, var(--panel) 65%, white 15%);
+  border-radius: 10px;
+}
+
+.catalog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.catalog-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--panel) 72%, white 18%);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--panel) 90%, black 10%);
+}
+
+.catalog-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.catalog-item-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.catalog-item-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.catalog-item-meta {
+  font-size: 12px;
+  color: color-mix(in oklab, var(--text) 90%, var(--muted) 10%);
+}
+
+.catalog-item-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.catalog-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+}
+
+.catalog-badge-active {
+  color: #bfdbfe;
+  background: color-mix(in oklab, var(--accent) 18%, transparent 82%);
+  border-color: color-mix(in oklab, var(--accent) 35%, transparent 65%);
+}
+
+.catalog-badge-installed {
+  color: #d1fae5;
+  background: color-mix(in oklab, #10b981 18%, transparent 82%);
+  border-color: color-mix(in oklab, #10b981 35%, transparent 65%);
+}
+
+.catalog-badge-update {
+  color: #fde68a;
+  background: color-mix(in oklab, #f59e0b 18%, transparent 82%);
+  border-color: color-mix(in oklab, #f59e0b 35%, transparent 65%);
+}
+
+.catalog-badge-available {
+  color: var(--muted);
+  background: color-mix(in oklab, var(--panel) 88%, white 12%);
+  border-color: color-mix(in oklab, var(--panel) 65%, white 20%);
+}
+
 a {
   color: var(--accent);
 }
