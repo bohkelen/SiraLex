@@ -102,7 +102,7 @@ async function seedInstalledBundleScope(
   );
   await importSearchIndexJsonl(
     db,
-    new Blob([makeJsonl([{ key_type: "casefold", key: lookupKey, ir_ids: [`${storageScopeId}-rec`] }])]),
+    new Blob([makeJsonl([{ key_type: "tgt_casefold", key: lookupKey, ir_ids: [`${storageScopeId}-rec`] }])]),
     { bundleId: storageScopeId, batchSize: 10 },
   );
 }
@@ -129,7 +129,7 @@ describe("Phase 4.2 remote install", () => {
         display: { headword_latin: "bonjour" },
       },
     ]);
-    const indexText = makeJsonl([{ key_type: "casefold", key: "hello", ir_ids: ["rec-1"] }]);
+    const indexText = makeJsonl([{ key_type: "tgt_casefold", key: "hello", ir_ids: ["rec-1"] }]);
     const manifestText = JSON.stringify({
       manifest_schema_version: "bundle_manifest_v1",
       bundle_id: "maninka_fr_v1",
@@ -202,7 +202,7 @@ describe("Phase 4.2 remote install", () => {
       const installed = await getInstalledBundleMeta(db, "maninka_fr_v1");
       expect(installed?.expected_content_sha256).toBe("sha256:bundle");
 
-      const resultIds = await searchQuery(db, active!.storage_scope_id!, "hello");
+      const resultIds = await searchQuery(db, active!.storage_scope_id!, "target_to_source", "hello");
       expect(resultIds.ir_ids).toEqual(["rec-1"]);
       const records = await resolveRecords(db, active!.storage_scope_id!, resultIds.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-1"]);
@@ -318,7 +318,7 @@ describe("Phase 4.2 remote install", () => {
     );
     const indexText = makeJsonl(
       Array.from({ length: 4 }, (_, index) => ({
-        key_type: "casefold",
+        key_type: "tgt_casefold",
         key: `hello-${index + 1}`,
         ir_ids: [`new-rec-${index + 1}`],
       })),
@@ -409,8 +409,8 @@ describe("Phase 4.2 remote install", () => {
       expect((await getInstalledBundleMeta(db, "maninka_fr_v1"))?.expected_content_sha256).toBe("sha256:old");
       expect(await getBundleInstallSession(db)).toBeUndefined();
       expect(await recoverInterruptedBundleInstall(db)).toBeUndefined();
-      expect((await searchQuery(db, oldScope, "hello")).ir_ids).toEqual([`${oldScope}-rec`]);
-      expect((await searchQuery(db, newScope, "hello")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, oldScope, "target_to_source", "hello")).ir_ids).toEqual([`${oldScope}-rec`]);
+      expect((await searchQuery(db, newScope, "target_to_source", "hello")).ir_ids).toEqual([]);
     } finally {
       db.close();
     }
@@ -433,7 +433,7 @@ describe("Phase 4.2 remote install", () => {
     );
     const indexText = makeJsonl(
       Array.from({ length: 4 }, (_, index) => ({
-        key_type: "casefold",
+        key_type: "tgt_casefold",
         key: `hello-${index + 1}`,
         ir_ids: [`new-rec-${Math.min(index + 1, 3)}`],
       })),
@@ -524,8 +524,8 @@ describe("Phase 4.2 remote install", () => {
       expect((await getInstalledBundleMeta(db, "maninka_fr_v1"))?.expected_content_sha256).toBe("sha256:old");
       expect(await getBundleInstallSession(db)).toBeUndefined();
       expect(await recoverInterruptedBundleInstall(db)).toBeUndefined();
-      expect((await searchQuery(db, oldScope, "hello")).ir_ids).toEqual([`${oldScope}-rec`]);
-      expect((await searchQuery(db, newScope, "hello-1")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, oldScope, "target_to_source", "hello")).ir_ids).toEqual([`${oldScope}-rec`]);
+      expect((await searchQuery(db, newScope, "target_to_source", "hello-1")).ir_ids).toEqual([]);
     } finally {
       db.close();
     }

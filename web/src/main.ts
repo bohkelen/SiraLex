@@ -1153,7 +1153,7 @@ async function runSearch(query: string) {
     }
     const activeStorageScopeId = getBundleStorageScopeId(activeBundleMeta);
 
-    const result = await searchQuery(db, activeStorageScopeId, query);
+    const result = await searchQuery(db, activeStorageScopeId, searchDirection, query);
     if (seq !== searchSeq) return;
 
     if (result.ir_ids.length === 0) {

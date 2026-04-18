@@ -105,27 +105,42 @@ class TestBuildInvertedIndex:
             search_keys={"casefold": ["hello"]},
         )]
         index = build_inverted_index(records)
-        assert ("casefold", "hello") in index
-        assert index[("casefold", "hello")] == {"aaa"}
+        assert ("tgt_casefold", "hello") in index
+        assert index[("tgt_casefold", "hello")] == {"aaa"}
 
     def test_single_record_multiple_key_types(self):
         records = [FIXTURE_LEXICON_DOBEN]
         index = build_inverted_index(records)
 
-        assert ("casefold", "dɔ́bɛ̀n") in index
-        assert ("diacritics_insensitive", "dɔbɛn") in index
-        assert ("diacritics_insensitive", "doben") in index
-        assert FIXTURE_LEXICON_DOBEN["ir_id"] in index[("casefold", "dɔ́bɛ̀n")]
+        assert ("tgt_casefold", "dɔ́bɛ̀n") in index
+        assert ("tgt_diacritics_insensitive", "dɔbɛn") in index
+        assert ("tgt_diacritics_insensitive", "doben") in index
+        assert FIXTURE_LEXICON_DOBEN["ir_id"] in index[("tgt_casefold", "dɔ́bɛ̀n")]
 
     def test_multiple_records_key_collision(self):
         """Two records sharing the same diacritics_insensitive key."""
         records = [FIXTURE_LEXICON_DOBEN, FIXTURE_LEXICON_DOBEN_ALT]
         index = build_inverted_index(records)
 
-        doben_ids = index[("diacritics_insensitive", "doben")]
+        doben_ids = index[("tgt_diacritics_insensitive", "doben")]
         assert FIXTURE_LEXICON_DOBEN["ir_id"] in doben_ids
         assert FIXTURE_LEXICON_DOBEN_ALT["ir_id"] in doben_ids
         assert len(doben_ids) == 2
+
+    def test_bilingual_bundle_emits_source_and_target_key_families(self):
+        records = [FIXTURE_LEXICON_DOBEN, FIXTURE_INDEX_ABANDONNER]
+        index = build_inverted_index(records)
+
+        assert ("tgt_casefold", "dɔ́bɛ̀n") in index
+        assert ("src_casefold", "abandonner") in index
+        assert index[("src_casefold", "abandonner")] == {"eeee5555ffff6666"}
+        assert index[("tgt_casefold", "dɔ́bɛ̀n")] == {"aaaa1111bbbb2222"}
+
+    def test_mono_direction_bundle_only_emits_present_direction(self):
+        index = build_inverted_index([FIXTURE_INDEX_ABANDONNER])
+
+        assert ("src_casefold", "abandonner") in index
+        assert all(not key_type.startswith("tgt_") for key_type, _ in index.keys())
 
     def test_empty_records_list(self):
         index = build_inverted_index([])
@@ -143,14 +158,23 @@ class TestBuildInvertedIndex:
             search_keys={"casefold": ["", "hello"]},
         )]
         index = build_inverted_index(records)
-        assert ("casefold", "") not in index
-        assert ("casefold", "hello") in index
+        assert ("tgt_casefold", "") not in index
+        assert ("tgt_casefold", "hello") in index
 
     def test_missing_ir_id_skipped(self):
         """Records without ir_id should be skipped."""
         records = [{"search_keys": {"casefold": ["hello"]}}]
         index = build_inverted_index(records)
         assert len(index) == 0
+
+    def test_unsupported_ir_kind_is_skipped(self):
+        records = [make_normalized_record(
+            ir_id="aaa",
+            ir_kind="unsupported_kind",
+            search_keys={"casefold": ["hello"]},
+        )]
+        index = build_inverted_index(records)
+        assert index == {}
 
 
 # ===========================================================================
@@ -162,23 +186,23 @@ class TestSerializeIndex:
 
     def test_sorted_by_key_type_then_key(self):
         index = {
-            ("nospace", "b"): {"id1"},
-            ("casefold", "a"): {"id2"},
-            ("casefold", "b"): {"id3"},
-            ("diacritics_insensitive", "a"): {"id4"},
+            ("tgt_nospace", "b"): {"id1"},
+            ("src_casefold", "a"): {"id2"},
+            ("tgt_casefold", "b"): {"id3"},
+            ("src_diacritics_insensitive", "a"): {"id4"},
         }
         entries = serialize_index(index)
 
         key_type_key_pairs = [(e["key_type"], e["key"]) for e in entries]
         assert key_type_key_pairs == [
-            ("casefold", "a"),
-            ("casefold", "b"),
-            ("diacritics_insensitive", "a"),
-            ("nospace", "b"),
+            ("src_casefold", "a"),
+            ("src_diacritics_insensitive", "a"),
+            ("tgt_casefold", "b"),
+            ("tgt_nospace", "b"),
         ]
 
     def test_ir_ids_sorted(self):
-        index = {("casefold", "x"): {"ccc", "aaa", "bbb"}}
+        index = {("tgt_casefold", "x"): {"ccc", "aaa", "bbb"}}
         entries = serialize_index(index)
         assert entries[0]["ir_ids"] == ["aaa", "bbb", "ccc"]
 
@@ -187,13 +211,13 @@ class TestSerializeIndex:
         assert entries == []
 
     def test_entry_schema(self):
-        index = {("casefold", "hello"): {"id1"}}
+        index = {("src_casefold", "hello"): {"id1"}}
         entries = serialize_index(index)
         assert len(entries) == 1
         entry = entries[0]
         assert set(entry.keys()) == {"key", "key_type", "ir_ids"}
         assert entry["key"] == "hello"
-        assert entry["key_type"] == "casefold"
+        assert entry["key_type"] == "src_casefold"
         assert entry["ir_ids"] == ["id1"]
 
 
@@ -261,12 +285,38 @@ class TestProcessNormalizedFile:
             # Find the "doben" diacritics_insensitive entry
             doben_entries = [
                 e for e in entries
-                if e["key"] == "doben" and e["key_type"] == "diacritics_insensitive"
+                if e["key"] == "doben" and e["key_type"] == "tgt_diacritics_insensitive"
             ]
             assert len(doben_entries) == 1
             assert len(doben_entries[0]["ir_ids"]) == 2
             assert FIXTURE_LEXICON_DOBEN["ir_id"] in doben_entries[0]["ir_ids"]
             assert FIXTURE_LEXICON_DOBEN_ALT["ir_id"] in doben_entries[0]["ir_ids"]
+
+    def test_asymmetric_bundle_keeps_source_and_target_keys_isolated(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = Path(tmpdir) / "normalized.jsonl"
+            output_path = Path(tmpdir) / "index.jsonl"
+
+            self._write_jsonl(input_path, [
+                FIXTURE_LEXICON_DOBEN_ALT,
+                FIXTURE_INDEX_ABANDONNER,
+            ])
+
+            process_normalized_file(input_path, output_path)
+            entries = self._read_jsonl(output_path)
+
+            assert any(
+                e["key_type"] == "src_casefold" and e["key"] == "abandonner"
+                for e in entries
+            )
+            assert any(
+                e["key_type"] == "tgt_casefold" and e["key"] == "dòbèn"
+                for e in entries
+            )
+            assert not any(
+                e["key_type"] == "src_casefold" and e["key"] == "dòbèn"
+                for e in entries
+            )
 
     def test_determinism(self):
         """Running twice on the same input produces identical output bytes."""
@@ -330,10 +380,10 @@ class TestProcessNormalizedFile:
             stats = process_normalized_file(input_path, output_path)
 
             # FIXTURE_LEXICON_DOBEN has keys in all 4 types
-            assert "casefold" in stats["unique_keys_by_type"]
-            assert "diacritics_insensitive" in stats["unique_keys_by_type"]
-            assert "punct_stripped" in stats["unique_keys_by_type"]
-            assert "nospace" in stats["unique_keys_by_type"]
+            assert "tgt_casefold" in stats["unique_keys_by_type"]
+            assert "tgt_diacritics_insensitive" in stats["unique_keys_by_type"]
+            assert "tgt_punct_stripped" in stats["unique_keys_by_type"]
+            assert "tgt_nospace" in stats["unique_keys_by_type"]
 
     def test_output_lines_are_valid_json(self):
         """Every output line must be valid JSON with the right schema."""
