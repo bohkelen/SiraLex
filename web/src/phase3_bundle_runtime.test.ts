@@ -120,7 +120,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       await importSearchIndexJsonl(
         db,
         makeJsonlFile("search_index.jsonl", [
-          { key_type: "casefold", key: "hello", ir_ids: ["rec-a"] },
+          { key_type: "tgt_casefold", key: "hello", ir_ids: ["rec-a"] },
         ]),
         { bundleId: bundleA, batchSize: 10 },
       );
@@ -162,7 +162,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       await importSearchIndexJsonl(
         db,
         makeJsonlFile("search_index.jsonl", [
-          { key_type: "casefold", key: "hello", ir_ids: ["rec-b"] },
+          { key_type: "tgt_casefold", key: "hello", ir_ids: ["rec-b"] },
         ]),
         { bundleId: bundleB, batchSize: 10 },
       );
@@ -191,7 +191,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       let active = await getActiveBundleMeta(db);
       expect(active?.bundle_id).toBe(bundleB);
 
-      let result = await searchQuery(db, bundleB, "hello");
+      let result = await searchQuery(db, bundleB, "target_to_source", "hello");
       expect(result.ir_ids).toEqual(["rec-b"]);
       let records = await resolveRecords(db, bundleB, result.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-b"]);
@@ -200,7 +200,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       active = await getActiveBundleMeta(db);
       expect(active?.bundle_id).toBe(bundleA);
 
-      result = await searchQuery(db, bundleA, "hello");
+      result = await searchQuery(db, bundleA, "target_to_source", "hello");
       expect(result.ir_ids).toEqual(["rec-a"]);
       records = await resolveRecords(db, bundleA, result.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-a"]);
@@ -234,7 +234,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       await importSearchIndexJsonl(
         db,
         makeJsonlFile("search_index.jsonl", [
-          { key_type: "casefold", key: "hello", ir_ids: ["rec-a"] },
+          { key_type: "tgt_casefold", key: "hello", ir_ids: ["rec-a"] },
         ]),
         { bundleId: bundleA, batchSize: 10 },
       );
@@ -268,7 +268,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       await importSearchIndexJsonl(
         db,
         makeJsonlFile("search_index.jsonl", [
-          { key_type: "casefold", key: "hello", ir_ids: ["rec-b"] },
+          { key_type: "tgt_casefold", key: "hello", ir_ids: ["rec-b"] },
         ]),
         { bundleId: bundleB, batchSize: 10 },
       );
@@ -294,7 +294,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       const active = await getActiveBundleMeta(db);
       expect(active?.bundle_id).toBe("bundle_full_a_aaaaaaaa");
 
-      const result = await searchQuery(db, "bundle_full_a_aaaaaaaa", "hello");
+      const result = await searchQuery(db, "bundle_full_a_aaaaaaaa", "target_to_source", "hello");
       expect(result.ir_ids).toEqual(["rec-a"]);
       const records = await resolveRecords(db, "bundle_full_a_aaaaaaaa", result.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-a"]);
@@ -325,7 +325,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       await importSearchIndexJsonl(
         db,
         makeJsonlFile("search_index.jsonl", [
-          { key_type: "casefold", key: "hello", ir_ids: ["rec-staged"] },
+          { key_type: "tgt_casefold", key: "hello", ir_ids: ["rec-staged"] },
         ]),
         { bundleId: "bundle_a::sha256:new", batchSize: 10 },
       );
@@ -341,12 +341,12 @@ describe("Phase 3 bundle-aware runtime", () => {
         imported_at_iso: "2026-03-10T00:00:00Z",
       });
 
-      let result = await searchQuery(db, "bundle_a::sha256:new", "hello");
+      let result = await searchQuery(db, "bundle_a::sha256:new", "target_to_source", "hello");
       expect(result.ir_ids).toEqual(["rec-staged"]);
 
       await deleteBundleData(db, "bundle_a");
 
-      result = await searchQuery(db, "bundle_a::sha256:new", "hello");
+      result = await searchQuery(db, "bundle_a::sha256:new", "target_to_source", "hello");
       expect(result.ir_ids).toEqual([]);
     } finally {
       db.close();
@@ -383,8 +383,139 @@ describe("Phase 3 bundle-aware runtime", () => {
       const message = await recoverInterruptedBundleInstall(db);
       expect(message).toContain("Recovered committed install");
 
-      const result = await searchQuery(db, "bundle_a", "old");
+      const result = await searchQuery(db, "bundle_a", "target_to_source", "old");
       expect(result.ir_ids).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("filters search to the selected direction within a bilingual bundle", async () => {
+    const db = await openSiralexDb();
+    try {
+      const bundleId = "bundle_full_bilingual_aaaaaaaa";
+
+      await importRecordsJsonl(
+        db,
+        makeJsonlFile("records.jsonl", [
+          {
+            ir_id: "rec-source",
+            ir_kind: "index_mapping",
+            source_id: "src_index",
+            norm_version: "norm_v1",
+            preferred_form: "abandonner",
+            variant_forms: ["abandonner"],
+            search_keys: { casefold: ["abandonner"] },
+            display: {
+              source_term: "abandonner",
+              source_lang: "fr",
+              target_entries: [{ lexicon_url: "../lexicon/b.htm", anchor: "e1", display_text: "bàn" }],
+            },
+          },
+          {
+            ir_id: "rec-target",
+            ir_kind: "lexicon_entry",
+            source_id: "src_lexicon",
+            norm_version: "norm_v1",
+            preferred_form: "bàn",
+            variant_forms: ["bàn"],
+            search_keys: { casefold: ["bàn"] },
+            display: { headword_latin: "bàn" },
+          },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+      await importSearchIndexJsonl(
+        db,
+        makeJsonlFile("search_index.jsonl", [
+          { key_type: "src_casefold", key: "abandonner", ir_ids: ["rec-source"] },
+          { key_type: "tgt_casefold", key: "bàn", ir_ids: ["rec-target"] },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+
+      expect((await searchQuery(db, bundleId, "source_to_target", "abandonner")).ir_ids).toEqual(["rec-source"]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "bàn")).ir_ids).toEqual(["rec-target"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "bàn")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "abandonner")).ir_ids).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("fails closed when a bundle only contains one direction family", async () => {
+    const db = await openSiralexDb();
+    try {
+      const bundleId = "bundle_full_target_only_aaaaaaaa";
+
+      await importRecordsJsonl(
+        db,
+        makeJsonlFile("records.jsonl", [
+          {
+            ir_id: "rec-target",
+            ir_kind: "lexicon_entry",
+            source_id: "src_lexicon",
+            norm_version: "norm_v1",
+            preferred_form: "bàn",
+            variant_forms: ["bàn"],
+            search_keys: { casefold: ["bàn"] },
+            display: { headword_latin: "bàn" },
+          },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+      await importSearchIndexJsonl(
+        db,
+        makeJsonlFile("search_index.jsonl", [
+          { key_type: "tgt_casefold", key: "bàn", ir_ids: ["rec-target"] },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+
+      expect((await searchQuery(db, bundleId, "target_to_source", "bàn")).ir_ids).toEqual(["rec-target"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "bàn")).ir_ids).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("falls back to undirected key types for bundles built before Phase 4.2.5", async () => {
+    const db = await openSiralexDb();
+    try {
+      const bundleId = "bundle_legacy_undirected_keys";
+
+      await importRecordsJsonl(
+        db,
+        makeJsonlFile("records.jsonl", [
+          {
+            ir_id: "rec-ouverture",
+            ir_kind: "index_mapping",
+            source_id: "src_malipense",
+            norm_version: "norm_v1",
+            preferred_form: "ouverture",
+            variant_forms: ["ouverture"],
+            search_keys: { casefold: ["ouverture"], diacritics_insensitive: ["ouverture"] },
+            display: {
+              source_term: "ouverture",
+              source_lang: "fr",
+              target_entries: [{ lexicon_url: "../lexicon/d.htm", anchor: "e2204", display_text: "dá" }],
+            },
+          },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+      // Legacy format: undirected key_type (no src_ / tgt_ prefix)
+      await importSearchIndexJsonl(
+        db,
+        makeJsonlFile("search_index.jsonl", [
+          { key_type: "casefold", key: "ouverture", ir_ids: ["rec-ouverture"] },
+          { key_type: "diacritics_insensitive", key: "ouverture", ir_ids: ["rec-ouverture"] },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+
+      expect((await searchQuery(db, bundleId, "source_to_target", "ouverture")).ir_ids).toEqual(["rec-ouverture"]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "ouverture")).ir_ids).toEqual(["rec-ouverture"]);
     } finally {
       db.close();
     }

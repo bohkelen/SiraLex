@@ -2,7 +2,8 @@
 Search index builder: Normalized JSONL → Inverted search index JSONL.
 
 Reads normalized records and materializes a flat inverted index where
-each line maps a (key_type, key) pair to a sorted list of ir_ids.
+each line maps a directional (key_type, key) pair to a sorted list of
+ir_ids.
 
 This module never mutates normalized records. Output is a separate JSONL
 file that can be used for offline search resolution.
@@ -10,7 +11,7 @@ file that can be used for offline search resolution.
 Output schema (one JSON object per line):
 {
   "key": "dɔbɛn",
-  "key_type": "diacritics_insensitive",
+  "key_type": "tgt_diacritics_insensitive",
   "ir_ids": ["964909ef6912ff64", ...]
 }
 
@@ -25,6 +26,20 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+SOURCE_DIRECTION_PREFIX = "src"
+TARGET_DIRECTION_PREFIX = "tgt"
+
+INDEX_MAPPING_KIND = "index_mapping"
+LEXICON_ENTRY_KIND = "lexicon_entry"
+
+
+def directional_key_type(ir_kind: str, key_type: str) -> str | None:
+    if ir_kind == INDEX_MAPPING_KIND:
+        return f"{SOURCE_DIRECTION_PREFIX}_{key_type}"
+    if ir_kind == LEXICON_ENTRY_KIND:
+        return f"{TARGET_DIRECTION_PREFIX}_{key_type}"
+    return None
+
 
 def build_inverted_index(
     normalized_records: list[dict[str, Any]],
@@ -37,22 +52,31 @@ def build_inverted_index(
             "ir_id" and "search_keys" fields.
 
     Returns:
-        dict mapping (key_type, key) → set of ir_ids
+        dict mapping (directional key_type, key) → set of ir_ids
     """
     index: dict[tuple[str, str], set[str]] = defaultdict(set)
 
     for record in normalized_records:
         ir_id = record.get("ir_id", "")
+        ir_kind = record.get("ir_kind", "")
         search_keys = record.get("search_keys", {})
 
         if not ir_id:
             logger.warning("Normalized record missing ir_id, skipping")
             continue
 
+        if not isinstance(search_keys, dict):
+            logger.warning("Normalized record %s has invalid search_keys, skipping", ir_id)
+            continue
+
         for key_type, keys in search_keys.items():
+            directional_type = directional_key_type(ir_kind, key_type)
+            if directional_type is None:
+                logger.warning("Normalized record %s has unsupported ir_kind=%r, skipping", ir_id, ir_kind)
+                break
             for key in keys:
                 if key:  # skip empty keys
-                    index[(key_type, key)].add(ir_id)
+                    index[(directional_type, key)].add(ir_id)
 
     return index
 

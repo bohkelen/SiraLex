@@ -8,6 +8,7 @@ Guiding constraints:
 - **Offline-first**: the dictionary must remain usable without connectivity.
 - **Provenance-first**: store provenance at **entry**, **sense**, and **example** levels.
 - **Community trust**: no hallucinated language; uncertainty is surfaced.
+- **Product language scope is explicit**: shipped dictionary surfaces are limited to **French/English ↔ Maninka**. If upstream source data contains other languages (for example Russian glosses/examples), those may remain in frozen source artifacts for provenance/history, but they are **out of scope for the product** and should not expand the runtime dictionary language set.
 
 ---
 
@@ -383,6 +384,41 @@ UI labels should be generated from manifest metadata instead of hardcoded string
 DoD:
 - Search labels, toggle text, placeholders, and entry-render labels are derived from the active bundle metadata.
 - Frontend runtime code no longer embeds a specific target language in its direction model.
+- Runtime search semantics enforce the selected direction instead of treating the toggle as display-only state.
+
+#### Phase 4.2.5 — Directional search semantics
+
+This mini-phase makes the direction toggle real at query time without changing the normalized record schema.
+
+Bundle contract:
+
+- `search_index.jsonl` stores directional `key_type` values rather than a separate `direction` field
+- source-side keys use the `src_` prefix
+- target-side keys use the `tgt_` prefix
+- the exactness ladder stays the same within each direction family:
+  - `src_casefold` → `src_diacritics_insensitive` → `src_punct_stripped` → `src_nospace`
+  - `tgt_casefold` → `tgt_diacritics_insensitive` → `tgt_punct_stripped` → `tgt_nospace`
+
+Runtime rule:
+
+- `source_to_target` searches only `src_*` keys
+- `target_to_source` searches only `tgt_*` keys
+- search still stops at the first matching exactness level and preserves stored `ir_ids[]` order
+
+Current bundle-generation mapping:
+
+- `index_mapping` records emit `src_*` keys from `fields_raw.source_term`
+- `lexicon_entry` records emit `tgt_*` keys from headword/variant normalization
+
+**Recommended future: bundle-level capability flag**
+
+Right now the runtime tries the directional ladder first and falls back to the legacy (undirected) ladder only when the directional ladder returns zero results. That can create subtle ranking distortions later (e.g. directional bundle has a weak match, legacy fallback would have had a strong match → confusing ordering). To avoid hybrid logic:
+
+- Add a manifest flag, e.g. `search_index_directional: true`.
+- **If directional bundle** (flag true): never fallback; use only the directional ladder.
+- **If legacy bundle** (flag absent or false): always use the legacy ladder only; do not try directional keys.
+
+Then each bundle type has a single, predictable code path and no mixed ranking.
 
 ### Phase 3.3 — Installed bundle registry
 
@@ -436,6 +472,41 @@ These are valid future directions, but they should not be framed as Phase 3 prer
 - speculative performance work not justified by observed bundle size or device behavior
 
 Those belong in a later scaling/performance phase once real multi-bundle usage and device measurements justify them.
+
+### Phase 5+ problem — Search Index Granularity Improvement
+
+This is a real search-quality problem, but it is **not a Phase 4.3 blocker**. Phase 4.3 should continue on the current directional contract and runtime semantics.
+
+Current limitation:
+
+- the search index is built from whole normalized source terms and target headword/variant forms
+- it does **not** break gloss-like source strings into smaller atomic searchable units
+- this can reduce match quality for:
+  - multiword phrases
+  - punctuation-heavy glosses
+  - diacritics variants when users search partial or simplified forms
+
+Scope for the later improvement:
+
+- break gloss into tokens
+- index atomic searchable units
+- possibly add n-gram / phrase indexing
+- improve matching for:
+  - multiword phrases
+  - punctuation-heavy glosses
+  - diacritics variants
+
+Guardrails:
+
+- do not replace the current bundle/search contract prematurely
+- do not block directional indexing rollout on this work
+- base any tokenization or phrase-indexing rules on observed bundle behavior and real query needs, not speculative over-design
+
+DoD (future):
+
+- the project has a documented, versioned indexing strategy for atomic units vs whole-string keys
+- real-bundle tests show better retrieval for phrase-heavy and punctuation-heavy source entries without regressing deterministic bundle generation
+- any new indexing mode is explicit in bundle metadata/versioning rather than silently changing search semantics
 
 ### Phase 2 memory constraint (lock-in before IndexedDB)
 
