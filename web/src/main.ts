@@ -8,6 +8,7 @@ import {
   getSearchDirectionText,
   getSearchPlaceholder,
   getSourceLabel,
+  getTargetLabel,
   getTargetEntriesLabel,
   type SearchDirection,
 } from "./bundle_labels";
@@ -76,6 +77,8 @@ app.innerHTML = `
           </select>
         </div>
       </div>
+      <div id="installedBundleStatus" class="mono" style="margin-top: 12px"></div>
+      <div id="installedBundleList" style="margin-top: 12px"></div>
       <div class="row" style="margin-top: 12px; align-items: end">
         <div class="field" style="flex: 1">
           <div class="label">Catalog URL</div>
@@ -183,6 +186,8 @@ function mustGetEl<T extends Element>(selector: string): T {
 // Primary UI elements
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const bundleSelect = mustGetEl<HTMLSelectElement>("#bundleSelect");
+const installedBundleStatus = mustGetEl<HTMLDivElement>("#installedBundleStatus");
+const installedBundleList = mustGetEl<HTMLDivElement>("#installedBundleList");
 const catalogUrlInput = mustGetEl<HTMLInputElement>("#catalogUrl");
 const loadCatalogBtn = mustGetEl<HTMLButtonElement>("#loadCatalog");
 const catalogStatus = mustGetEl<HTMLDivElement>("#catalogStatus");
@@ -224,6 +229,7 @@ let loadedCatalogFetchedAtIso: string | undefined;
 let loadedCatalogSource: "network" | "cache" | undefined;
 let remoteInstallAbortController: AbortController | undefined;
 let remoteInstallBundleId: string | undefined;
+let currentStorageEstimate: { usage?: number; quota?: number } | undefined;
 
 function fmtBytes(n: number | undefined): string {
   if (n === undefined) return "n/a";
@@ -239,6 +245,144 @@ function fmtBytes(n: number | undefined): string {
 
 function fmtMs(ms: number): string {
   return `${ms.toFixed(0)} ms`;
+}
+
+function getManifestPayloadBytes(manifest: BundleManifestV1): number | undefined {
+  const total = manifest.files.reduce((sum, file) => sum + file.byte_length, 0);
+  return total > 0 ? total : undefined;
+}
+
+function getInstalledBundleName(bundle: ActiveBundleMeta): string {
+  return bundle.display_name ?? getBundleDisplayName(bundle.bundle_id, bundle.language_meta);
+}
+
+function formatInstalledAt(iso: string | undefined): string {
+  return iso?.trim() ? iso : "n/a";
+}
+
+function getKnownBundlePayloadBytes(bundles: ActiveBundleMeta[]): number | undefined {
+  const known = bundles
+    .map((bundle) => bundle.storage_bytes)
+    .filter((value): value is number => typeof value === "number" && value >= 0);
+  if (known.length === 0) return undefined;
+  return known.reduce((sum, value) => sum + value, 0);
+}
+
+function renderInstalledBundleManager() {
+  installedBundleList.innerHTML = "";
+
+  const knownPayloadBytes = getKnownBundlePayloadBytes(installedBundles);
+  const unknownSizeCount = installedBundles.filter((bundle) => bundle.storage_bytes === undefined).length;
+  const statusLines = [
+    `Installed bundles: ${installedBundles.length}`,
+    `Active bundle: ${currentActiveBundle ? getInstalledBundleName(currentActiveBundle) : "none"}`,
+    `Known payload total: ${fmtBytes(knownPayloadBytes)}`,
+    `Browser storage usage: ${fmtBytes(currentStorageEstimate?.usage)} / ${fmtBytes(currentStorageEstimate?.quota)}`,
+  ];
+  if (unknownSizeCount > 0) {
+    statusLines.push(`Size metadata missing for ${unknownSizeCount} installed bundle(s).`);
+  }
+  installedBundleStatus.textContent = statusLines.join("\n");
+
+  if (installedBundles.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "catalog-empty";
+    empty.textContent = "No installed bundle metadata yet.";
+    installedBundleList.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "catalog-list";
+
+  for (const bundle of installedBundles) {
+    const item = document.createElement("article");
+    item.className = "catalog-item";
+
+    const header = document.createElement("div");
+    header.className = "catalog-item-header";
+
+    const titleBlock = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "catalog-item-title";
+    title.textContent = getInstalledBundleName(bundle);
+    const bundleId = document.createElement("div");
+    bundleId.className = "catalog-item-subtitle";
+    bundleId.textContent = bundle.bundle_id;
+    titleBlock.append(title, bundleId);
+
+    const badge = document.createElement("span");
+    const isActive = currentActiveBundle?.bundle_id === bundle.bundle_id;
+    badge.className = `catalog-badge ${isActive ? "catalog-badge-active" : "catalog-badge-installed"}`;
+    badge.textContent = isActive ? "Active" : "Installed";
+    header.append(titleBlock, badge);
+
+    const meta = document.createElement("div");
+    meta.className = "catalog-item-meta";
+    const labels = `${getSourceLabel(bundle.language_meta)} → ${getTargetLabel(bundle.language_meta)}`;
+    const metaParts = [
+      bundle.version ? `Version ${bundle.version}` : undefined,
+      labels,
+      `${bundle.records_count ?? "n/a"} records`,
+      `${bundle.index_entries_count ?? "n/a"} index entries`,
+      fmtBytes(bundle.storage_bytes),
+    ].filter((part): part is string => part !== undefined);
+    meta.textContent = metaParts.join(" | ");
+
+    const note = document.createElement("div");
+    note.className = "catalog-item-note";
+    note.textContent =
+      `Installed: ${formatInstalledAt(bundle.imported_at_iso)}\n` +
+      `Storage scope: ${getBundleStorageScopeId(bundle)}\n` +
+      `Normalization: ${bundle.normalization_ruleset} | Schema: ${bundle.record_schema_id}@${bundle.record_schema_version}`;
+
+    const actions = document.createElement("div");
+    actions.className = "row";
+
+    const useBtn = document.createElement("button");
+    useBtn.className = "btn";
+    useBtn.textContent = isActive ? "Active" : "Use";
+    useBtn.disabled = busy || isActive;
+    useBtn.addEventListener("click", () => {
+      void withSingleWriterLock(`switch active bundle ${bundle.bundle_id}`, async () => {
+        const db = await openSiralexDb();
+        try {
+          await setActiveBundleId(db, bundle.bundle_id);
+        } finally {
+          db.close();
+        }
+        importProgress.style.display = "";
+        importProgress.textContent = `Active bundle set: ${bundle.bundle_id}\n`;
+      });
+    });
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "btn";
+    removeBtn.textContent = "Remove";
+    removeBtn.disabled = busy;
+    removeBtn.addEventListener("click", () => {
+      const confirmed =
+        typeof window === "undefined" ||
+        window.confirm(`Remove installed bundle ${bundle.bundle_id} from this device?`);
+      if (!confirmed) return;
+      void withSingleWriterLock(`remove bundle ${bundle.bundle_id}`, async () => {
+        const db = await openSiralexDb();
+        try {
+          await deleteBundleData(db, bundle.bundle_id);
+        } finally {
+          db.close();
+        }
+        importProgress.style.display = "";
+        importProgress.textContent = `Removed bundle: ${bundle.bundle_id}\n`;
+      });
+    });
+
+    actions.append(useBtn, removeBtn);
+    item.append(header, meta, note, actions);
+    list.appendChild(item);
+  }
+
+  installedBundleList.appendChild(list);
 }
 
 function updateButtons() {
@@ -490,7 +634,7 @@ function renderBundleSelectOptions(activeBundleId: string | undefined) {
   for (const bundle of installedBundles) {
     const option = document.createElement("option");
     option.value = bundle.bundle_id;
-    option.textContent = getBundleDisplayName(bundle.bundle_id, bundle.language_meta);
+    option.textContent = getInstalledBundleName(bundle);
     if (bundle.bundle_id === activeBundleId) {
       option.selected = true;
     }
@@ -503,59 +647,70 @@ function renderBundleSelectOptions(activeBundleId: string | undefined) {
 async function refreshDbStatus() {
   try {
     const db = await openSiralexDb();
-    const activeBundleId = await getActiveBundleId(db);
-    const active = await getActiveBundleMeta(db);
-    const bundles = await listInstalledBundles(db);
-    installedBundles = bundles;
-    currentActiveBundle = active;
-    renderBundleSelectOptions(activeBundleId);
-    if (active) {
-      hasActiveBundle = true;
-      firstRun.style.display = "none";
-      const statusText =
-        `Active: ${getBundleDisplayName(active.bundle_id, active.language_meta)}\n` +
-        `Bundle ID: ${active.bundle_id}\n` +
-        `Normalization: ${active.normalization_ruleset}\n` +
-        `Schema: ${active.record_schema_id}@${active.record_schema_version}\n` +
-        `Imported: ${active.imported_at_iso}\n` +
-        `Records: ${active.records_count ?? "n/a"} | Index entries: ${active.index_entries_count ?? "n/a"}\n` +
-        `Installed bundles: ${bundles.length}\n`;
-      dictStatus.textContent = statusText;
-      dbOut.textContent = statusText;
-    } else {
-      hasActiveBundle = false;
-      const hasRecordsData = await storeHasData(db, STORE_RECORDS);
-      const hasIndexData = await storeHasData(db, STORE_SEARCH_INDEX);
-      if (bundles.length > 0) {
+    try {
+      const activeBundleId = await getActiveBundleId(db);
+      const active = await getActiveBundleMeta(db);
+      const bundles = await listInstalledBundles(db);
+      currentStorageEstimate =
+        typeof navigator !== "undefined" && navigator.storage?.estimate
+          ? await navigator.storage.estimate()
+          : undefined;
+      installedBundles = bundles;
+      currentActiveBundle = active;
+      renderBundleSelectOptions(activeBundleId);
+      renderInstalledBundleManager();
+      if (active) {
+        hasActiveBundle = true;
         firstRun.style.display = "none";
-        importProgress.style.display = "none";
-        const warnText =
-          `Installed bundles present, but no active bundle is selected.\n` +
-          `Choose a dictionary from the selector above to enable search.\n`;
-        dictStatus.textContent = warnText;
-        dbOut.textContent = warnText;
-      } else if (hasRecordsData || hasIndexData) {
-        firstRun.style.display = "none";
-        importProgress.style.display = "none";
-        const warnText =
-          `Warning: partial data from a failed or interrupted import.\n` +
-          `No active bundle. Search is disabled.\n` +
-          `Delete the database and re-import.\n`;
-        dictStatus.textContent = warnText;
-        dbOut.textContent = warnText;
+        const statusText =
+          `Active: ${getInstalledBundleName(active)}\n` +
+          `Bundle ID: ${active.bundle_id}\n` +
+          `Storage scope: ${getBundleStorageScopeId(active)}\n` +
+          `Normalization: ${active.normalization_ruleset}\n` +
+          `Schema: ${active.record_schema_id}@${active.record_schema_version}\n` +
+          `Imported: ${active.imported_at_iso}\n` +
+          `Records: ${active.records_count ?? "n/a"} | Index entries: ${active.index_entries_count ?? "n/a"}\n` +
+          `Approx payload: ${fmtBytes(active.storage_bytes)}\n`;
+        dictStatus.textContent = statusText;
+        dbOut.textContent = statusText;
       } else {
-        firstRun.style.display = "";
-        importProgress.style.display = "none";
-        dictStatus.textContent = "";
-        dbOut.textContent = "No active bundle.\n";
+        hasActiveBundle = false;
+        const hasRecordsData = await storeHasData(db, STORE_RECORDS);
+        const hasIndexData = await storeHasData(db, STORE_SEARCH_INDEX);
+        if (bundles.length > 0) {
+          firstRun.style.display = "none";
+          importProgress.style.display = "none";
+          const warnText =
+            `Installed bundles present, but no active bundle is selected.\n` +
+            `Choose a dictionary from the selector or installed-bundles list to enable search.\n`;
+          dictStatus.textContent = warnText;
+          dbOut.textContent = warnText;
+        } else if (hasRecordsData || hasIndexData) {
+          firstRun.style.display = "none";
+          importProgress.style.display = "none";
+          const warnText =
+            `Warning: partial data from a failed or interrupted import.\n` +
+            `No active bundle. Search is disabled.\n` +
+            `Delete the database and re-import.\n`;
+          dictStatus.textContent = warnText;
+          dbOut.textContent = warnText;
+        } else {
+          firstRun.style.display = "";
+          importProgress.style.display = "none";
+          dictStatus.textContent = "";
+          dbOut.textContent = "No active bundle.\n";
+        }
       }
+    } finally {
+      db.close();
     }
-    db.close();
   } catch (e) {
     hasActiveBundle = false;
     installedBundles = [];
     currentActiveBundle = undefined;
+    currentStorageEstimate = undefined;
     renderBundleSelectOptions(undefined);
+    renderInstalledBundleManager();
     firstRun.style.display = "none";
     importProgress.style.display = "none";
     dictStatus.textContent = `Database error: ${String(e)}\n`;
@@ -717,6 +872,11 @@ async function quickImportBundle(fileList: FileList) {
       },
       (message) => {
         importProgress.textContent = message;
+      },
+      undefined,
+      {
+        displayName: getBundleDisplayName(mfst.bundle_id, buildLanguageMetaFromManifest(mfst)),
+        storageBytes: getManifestPayloadBytes(mfst),
       },
     );
     importProgress.textContent =
@@ -963,6 +1123,11 @@ importBundleBtn.addEventListener("click", () => {
         },
         (message) => {
           dbOut.textContent = message;
+        },
+        undefined,
+        {
+          displayName: getBundleDisplayName(mfst.bundle_id, buildLanguageMetaFromManifest(mfst)),
+          storageBytes: getManifestPayloadBytes(mfst),
         },
       );
       dbOut.textContent =

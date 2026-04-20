@@ -24,7 +24,10 @@ export type BundleLanguageMeta = {
 
 export type ActiveBundleMeta = {
   bundle_id: string;
+  display_name?: string;
+  version?: string;
   storage_scope_id?: string;
+  storage_bytes?: number;
   manifest_schema_version: string;
   record_schema_id: string;
   record_schema_version: string;

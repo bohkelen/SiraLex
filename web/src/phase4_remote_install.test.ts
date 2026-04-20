@@ -200,6 +200,9 @@ describe("Phase 4.2 remote install", () => {
       expect(active?.storage_scope_id).toBe("maninka_fr_v1::sha256:bundle");
 
       const installed = await getInstalledBundleMeta(db, "maninka_fr_v1");
+      expect(installed?.display_name).toBe("French ↔ Maninka");
+      expect(installed?.version).toBe("1.0.0");
+      expect(installed?.storage_bytes).toBe(entry.size_bytes);
       expect(installed?.expected_content_sha256).toBe("sha256:bundle");
 
       const resultIds = await searchQuery(db, active!.storage_scope_id!, "target_to_source", "hello");
