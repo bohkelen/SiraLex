@@ -52,6 +52,12 @@ export type InstallRemoteBundleOptions = {
   storageEstimate?: () => Promise<{ usage?: number; quota?: number }>;
 };
 
+export type InstallBundleMetadata = {
+  displayName?: string;
+  version?: string;
+  storageBytes?: number;
+};
+
 function createLinkedAbortSignal(timeoutMs: number, externalSignal?: AbortSignal): {
   signal: AbortSignal;
   cleanup: () => void;
@@ -158,15 +164,26 @@ async function fetchBodyStream(
   return createByteLengthValidatedStream(response.body, expectedBytes);
 }
 
+function computeManifestPayloadBytes(manifest: BundleManifestV1): number | undefined {
+  const total = manifest.files.reduce((sum, file) => {
+    return typeof file.byte_length === "number" ? sum + file.byte_length : sum;
+  }, 0);
+  return total > 0 ? total : undefined;
+}
+
 function buildInstalledBundleMeta(
   manifest: BundleManifestV1,
   storageScopeId: string,
   recordsCount: number,
   indexCount: number,
+  metadata?: InstallBundleMetadata,
 ): ActiveBundleMeta {
   return {
     bundle_id: manifest.bundle_id,
+    display_name: metadata?.displayName,
+    version: metadata?.version,
     storage_scope_id: storageScopeId,
+    storage_bytes: metadata?.storageBytes ?? computeManifestPayloadBytes(manifest),
     manifest_schema_version: manifest.manifest_schema_version,
     record_schema_id: manifest.record_schema_id,
     record_schema_version: manifest.record_schema_version,
@@ -187,6 +204,7 @@ export async function installBundleIntoDb(
   sources: InstallBundleSources,
   onUpdate: (message: string) => void,
   signal?: AbortSignal,
+  metadata?: InstallBundleMetadata,
 ): Promise<InstallBundleResult> {
   const recovered = await recoverInterruptedBundleInstall(db);
   if (recovered) {
@@ -256,7 +274,10 @@ export async function installBundleIntoDb(
     });
     indexCount = idxRes.entriesWritten;
 
-    await setActiveBundleMeta(db, buildInstalledBundleMeta(manifest, nextStorageScopeId, recordsCount, indexCount));
+    await setActiveBundleMeta(
+      db,
+      buildInstalledBundleMeta(manifest, nextStorageScopeId, recordsCount, indexCount, metadata),
+    );
     await setBundleInstallSession(db, {
       bundle_id: manifest.bundle_id,
       storage_scope_id: nextStorageScopeId,
@@ -392,6 +413,11 @@ export async function installRemoteCatalogBundle(
       },
       onUpdate,
       signal,
+      {
+        displayName: entry.name,
+        version: entry.version,
+        storageBytes: entry.size_bytes,
+      },
     );
 
     return { manifest, result };
