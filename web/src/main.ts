@@ -268,6 +268,26 @@ function getKnownBundlePayloadBytes(bundles: ActiveBundleMeta[]): number | undef
   return known.reduce((sum, value) => sum + value, 0);
 }
 
+function getLoadedCatalogEntry(bundleId: string): BundleCatalogEntryV1 | undefined {
+  return loadedCatalogBundles.find((entry) => entry.bundle_id === bundleId);
+}
+
+function getCatalogEntryRuntimeState(entry: BundleCatalogEntryV1): {
+  installed?: ActiveBundleMeta;
+  isActive: boolean;
+  comparison: ReturnType<typeof compareCatalogEntryToInstalled>;
+  activateOnCommit: boolean;
+} {
+  const installed = installedBundles.find((bundle) => bundle.bundle_id === entry.bundle_id);
+  const isActive = currentActiveBundle?.bundle_id === entry.bundle_id;
+  return {
+    installed,
+    isActive,
+    comparison: compareCatalogEntryToInstalled(entry, installed),
+    activateOnCommit: !installed || isActive,
+  };
+}
+
 function renderInstalledBundleManager() {
   installedBundleList.innerHTML = "";
 
@@ -311,11 +331,30 @@ function renderInstalledBundleManager() {
     bundleId.textContent = bundle.bundle_id;
     titleBlock.append(title, bundleId);
 
-    const badge = document.createElement("span");
     const isActive = currentActiveBundle?.bundle_id === bundle.bundle_id;
-    badge.className = `catalog-badge ${isActive ? "catalog-badge-active" : "catalog-badge-installed"}`;
-    badge.textContent = isActive ? "Active" : "Installed";
-    header.append(titleBlock, badge);
+    const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
+    const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
+    const updateAvailable = catalogState?.comparison.state === "update_available";
+    const badges = document.createElement("div");
+    badges.className = "row";
+    if (isActive) {
+      const activeBadge = document.createElement("span");
+      activeBadge.className = "catalog-badge catalog-badge-active";
+      activeBadge.textContent = "Active";
+      badges.appendChild(activeBadge);
+    }
+    if (updateAvailable) {
+      const updateBadge = document.createElement("span");
+      updateBadge.className = "catalog-badge catalog-badge-update";
+      updateBadge.textContent = "Update available";
+      badges.appendChild(updateBadge);
+    } else if (!isActive) {
+      const installedBadge = document.createElement("span");
+      installedBadge.className = "catalog-badge catalog-badge-installed";
+      installedBadge.textContent = "Installed";
+      badges.appendChild(installedBadge);
+    }
+    header.append(titleBlock, badges);
 
     const meta = document.createElement("div");
     meta.className = "catalog-item-meta";
@@ -335,9 +374,27 @@ function renderInstalledBundleManager() {
       `Installed: ${formatInstalledAt(bundle.imported_at_iso)}\n` +
       `Storage scope: ${getBundleStorageScopeId(bundle)}\n` +
       `Normalization: ${bundle.normalization_ruleset} | Schema: ${bundle.record_schema_id}@${bundle.record_schema_version}`;
+    if (updateAvailable && catalogEntry) {
+      note.textContent +=
+        `\nInstalled hash: ${bundle.expected_content_sha256 ?? "unknown"}` +
+        `\nCatalog hash: ${catalogEntry.content_sha256}`;
+    }
 
     const actions = document.createElement("div");
     actions.className = "row";
+
+    if (updateAvailable && catalogEntry) {
+      const updateBtn = document.createElement("button");
+      updateBtn.className = "btn";
+      updateBtn.textContent = "Update";
+      updateBtn.disabled = busy || !loadedCatalogUrl;
+      updateBtn.addEventListener("click", () => {
+        void withSingleWriterLock(`update bundle ${bundle.bundle_id}`, async () => {
+          await installCatalogEntry(catalogEntry, catalogState?.activateOnCommit ?? isActive);
+        });
+      });
+      actions.appendChild(updateBtn);
+    }
 
     const useBtn = document.createElement("button");
     useBtn.className = "btn";
@@ -495,9 +552,7 @@ function getCatalogPresentationState(entry: BundleCatalogEntryV1): {
   badgeLabel: string;
   note?: string;
 } {
-  const installed = installedBundles.find((bundle) => bundle.bundle_id === entry.bundle_id);
-  const comparison = compareCatalogEntryToInstalled(entry, installed);
-  const isActive = currentActiveBundle?.bundle_id === entry.bundle_id;
+  const { comparison, isActive } = getCatalogEntryRuntimeState(entry);
 
   if (comparison.state === "update_available") {
     return {
@@ -522,9 +577,8 @@ function getCatalogPresentationState(entry: BundleCatalogEntryV1): {
 }
 
 function getCatalogActionLabel(entry: BundleCatalogEntryV1): string {
-  const installed = installedBundles.find((bundle) => bundle.bundle_id === entry.bundle_id);
-  const comparison = compareCatalogEntryToInstalled(entry, installed);
-  if (currentActiveBundle?.bundle_id === entry.bundle_id && comparison.state === "installed_current") {
+  const { comparison, isActive } = getCatalogEntryRuntimeState(entry);
+  if (isActive && comparison.state === "installed_current") {
     return "Active";
   }
   if (comparison.state === "update_available") return "Update";
@@ -608,8 +662,9 @@ function renderCatalogList() {
     actionBtn.textContent = getCatalogActionLabel(entry);
     actionBtn.disabled = busy || !loadedCatalogUrl || actionBtn.textContent === "Active";
     actionBtn.addEventListener("click", () => {
+      const { activateOnCommit } = getCatalogEntryRuntimeState(entry);
       void withSingleWriterLock(`install catalog bundle ${entry.bundle_id}`, async () => {
-        await installCatalogEntry(entry);
+        await installCatalogEntry(entry, activateOnCommit);
       });
     });
     actions.appendChild(actionBtn);
@@ -837,9 +892,11 @@ async function quickImportBundle(fileList: FileList) {
     return;
   }
 
+  let activateOnCommit = true;
   try {
     const existingDb = await openSiralexDb();
     const installed = await getInstalledBundleMeta(existingDb, mfst.bundle_id);
+    const activeBundleId = await getActiveBundleId(existingDb);
     if (installed) {
       if (installed.expected_content_sha256 === mfst.content_sha256) {
         await setActiveBundleId(existingDb, mfst.bundle_id);
@@ -848,10 +905,12 @@ async function quickImportBundle(fileList: FileList) {
         await refreshDbStatus();
         return;
       }
+      activateOnCommit = activeBundleId === mfst.bundle_id;
       importProgress.textContent =
         `Updating installed bundle ${mfst.bundle_id}.\n` +
         `Existing hash: ${installed.expected_content_sha256 ?? "unknown"}\n` +
-        `New hash: ${mfst.content_sha256}\n`;
+        `New hash: ${mfst.content_sha256}\n` +
+        `${activateOnCommit ? "Updated bundle will remain active." : "Current active bundle will remain unchanged."}\n`;
     }
     existingDb.close();
   } catch {
@@ -878,6 +937,7 @@ async function quickImportBundle(fileList: FileList) {
         displayName: getBundleDisplayName(mfst.bundle_id, buildLanguageMetaFromManifest(mfst)),
         storageBytes: getManifestPayloadBytes(mfst),
       },
+      activateOnCommit,
     );
     importProgress.textContent =
       `Install complete: ${mfst.bundle_id}\n` +
@@ -964,7 +1024,7 @@ async function restoreCachedCatalogFromDb() {
   }
 }
 
-async function installCatalogEntry(entry: BundleCatalogEntryV1) {
+async function installCatalogEntry(entry: BundleCatalogEntryV1, activateOnCommit = true) {
   if (!loadedCatalogUrl) {
     importProgress.style.display = "";
     importProgress.textContent = "No catalog source URL is available for this entry.\n";
@@ -994,6 +1054,7 @@ async function installCatalogEntry(entry: BundleCatalogEntryV1) {
   const db = await openSiralexDb();
   try {
     const { manifest, result } = await installRemoteCatalogBundle(db, entry, loadedCatalogUrl, {
+      activateOnCommit,
       signal: controller.signal,
       onUpdate: (message) => {
         importProgress.textContent = message;
@@ -1091,9 +1152,11 @@ importBundleBtn.addEventListener("click", () => {
     const ix = indexFile.files?.[0];
     if (!mfst || !rf || !ix) return;
 
+    let activateOnCommit = true;
     try {
       const existingDb = await openSiralexDb();
       const installed = await getInstalledBundleMeta(existingDb, mfst.bundle_id);
+      const activeBundleId = await getActiveBundleId(existingDb);
       if (installed) {
         if (installed.expected_content_sha256 === mfst.content_sha256) {
           await setActiveBundleId(existingDb, mfst.bundle_id);
@@ -1101,10 +1164,12 @@ importBundleBtn.addEventListener("click", () => {
           dbOut.textContent = `Bundle already installed. Marked active: ${mfst.bundle_id}\n`;
           return;
         }
+        activateOnCommit = activeBundleId === mfst.bundle_id;
         dbOut.textContent =
           `Updating installed bundle ${mfst.bundle_id}.\n` +
           `Existing hash: ${installed.expected_content_sha256 ?? "unknown"}\n` +
-          `New hash: ${mfst.content_sha256}\n`;
+          `New hash: ${mfst.content_sha256}\n` +
+          `${activateOnCommit ? "Updated bundle will remain active." : "Current active bundle will remain unchanged."}\n`;
       }
       existingDb.close();
     } catch {
@@ -1129,6 +1194,7 @@ importBundleBtn.addEventListener("click", () => {
           displayName: getBundleDisplayName(mfst.bundle_id, buildLanguageMetaFromManifest(mfst)),
           storageBytes: getManifestPayloadBytes(mfst),
         },
+        activateOnCommit,
       );
       dbOut.textContent =
         `Install COMPLETE\n` +

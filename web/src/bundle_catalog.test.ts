@@ -258,5 +258,16 @@ describe("Phase 4.1 update semantics", () => {
       installed: true,
       contentMatches: false,
     });
+
+    expect(
+      compareCatalogEntryToInstalled(entry, {
+        bundle_id: "bambara_fr_v1",
+        expected_content_sha256: "sha256:new",
+      }),
+    ).toMatchObject({
+      state: "not_installed",
+      installed: false,
+      contentMatches: false,
+    });
   });
 });

@@ -10,6 +10,7 @@ import {
   getInstalledBundleMeta,
   openSiralexDb,
   recoverInterruptedBundleInstall,
+  setActiveBundleId,
   setActiveBundleMeta,
 } from "./idb/siralex_db";
 import { importRecordsJsonl } from "./import/import_records";
@@ -209,6 +210,216 @@ describe("Phase 4.2 remote install", () => {
       expect(resultIds.ir_ids).toEqual(["rec-1"]);
       const records = await resolveRecords(db, active!.storage_scope_id!, resultIds.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-1"]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("keeps an updated active bundle active and serves the new scope", async () => {
+    const oldScope = "maninka_fr_v1::sha256:old";
+    const newScope = "maninka_fr_v1::sha256:new";
+    const recordsText = makeJsonl([
+      {
+        ir_id: "rec-new",
+        ir_kind: "lexicon_entry",
+        source_id: "src_new",
+        norm_version: "norm_v1",
+        preferred_form: "updated-entry",
+        variant_forms: ["updated-entry"],
+        search_keys: { casefold: ["hello"] },
+        display: { headword_latin: "updated-entry" },
+      },
+    ]);
+    const indexText = makeJsonl([{ key_type: "tgt_casefold", key: "hello", ir_ids: ["rec-new"] }]);
+    const manifestText = JSON.stringify({
+      manifest_schema_version: "bundle_manifest_v1",
+      bundle_id: "maninka_fr_v1",
+      bundle_type: "full",
+      bundle_format: "directory",
+      compression: "none",
+      record_schema_id: "normalized_v1",
+      record_schema_version: "1",
+      rule_versions: { normalization: "norm_v1" },
+      sources: { included: ["src"], excluded: [] },
+      reconciliation_action: "REPLACE_ALL",
+      update_mode: "REPLACE_ALL",
+      files: [
+        {
+          path: "records.jsonl",
+          byte_length: new TextEncoder().encode(recordsText).byteLength,
+          sha256: "sha256:records",
+        },
+        {
+          path: "search_index.jsonl",
+          byte_length: new TextEncoder().encode(indexText).byteLength,
+          sha256: "sha256:index",
+        },
+      ],
+      content_sha256: "sha256:new",
+    });
+    const entry: BundleCatalogEntryV1 = {
+      bundle_id: "maninka_fr_v1",
+      name: "French ↔ Maninka",
+      size_bytes: new TextEncoder().encode(recordsText).byteLength + new TextEncoder().encode(indexText).byteLength,
+      url_base: "./bundles/maninka_fr_v1/",
+      content_sha256: "sha256:new",
+    };
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.endsWith("/bundle.manifest.json")) return makeResponse(manifestText, "application/json");
+      if (url.endsWith("/records.jsonl")) return makeResponse(recordsText, "application/json");
+      if (url.endsWith("/search_index.jsonl")) return makeResponse(indexText, "application/json");
+      return new Response("not found", { status: 404, statusText: "Not Found" });
+    };
+
+    const db = await openSiralexDb();
+    try {
+      await seedInstalledBundleScope(db, oldScope, "old-entry", "hello");
+      await setActiveBundleMeta(db, {
+        bundle_id: "maninka_fr_v1",
+        storage_scope_id: oldScope,
+        manifest_schema_version: "bundle_manifest_v1",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        normalization_ruleset: "norm_v1",
+        update_mode: "REPLACE_ALL",
+        reconciliation_action: "REPLACE_ALL",
+        expected_content_sha256: "sha256:old",
+        imported_at_iso: "2026-03-11T00:00:00Z",
+        records_count: 1,
+        index_entries_count: 1,
+      });
+
+      await installRemoteCatalogBundle(db, entry, "https://example.test/catalog.json", {
+        fetchImpl,
+        activateOnCommit: true,
+      });
+
+      const active = await getActiveBundleMeta(db);
+      expect(active?.bundle_id).toBe("maninka_fr_v1");
+      expect(active?.storage_scope_id).toBe(newScope);
+      expect((await getInstalledBundleMeta(db, "maninka_fr_v1"))?.storage_scope_id).toBe(newScope);
+
+      const resultIds = await searchQuery(db, newScope, "target_to_source", "hello");
+      expect(resultIds.ir_ids).toEqual(["rec-new"]);
+      const records = await resolveRecords(db, newScope, resultIds.ir_ids);
+      expect(records.map((record) => record.preferred_form)).toEqual(["updated-entry"]);
+      expect((await searchQuery(db, oldScope, "target_to_source", "hello")).ir_ids).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("updates a non-active bundle without changing the current active bundle", async () => {
+    const activeScope = "bundle_a::sha256:active";
+    const oldScope = "bundle_b::sha256:old";
+    const newScope = "bundle_b::sha256:new";
+    const recordsText = makeJsonl([
+      {
+        ir_id: "bundle-b-new",
+        ir_kind: "lexicon_entry",
+        source_id: "bundle-b-src",
+        norm_version: "norm_v1",
+        preferred_form: "bundle-b-updated",
+        variant_forms: ["bundle-b-updated"],
+        search_keys: { casefold: ["bundle-b"] },
+        display: { headword_latin: "bundle-b-updated" },
+      },
+    ]);
+    const indexText = makeJsonl([{ key_type: "tgt_casefold", key: "bundle-b", ir_ids: ["bundle-b-new"] }]);
+    const manifestText = JSON.stringify({
+      manifest_schema_version: "bundle_manifest_v1",
+      bundle_id: "bundle_b",
+      bundle_type: "full",
+      bundle_format: "directory",
+      compression: "none",
+      record_schema_id: "normalized_v1",
+      record_schema_version: "1",
+      rule_versions: { normalization: "norm_v1" },
+      sources: { included: ["src"], excluded: [] },
+      reconciliation_action: "REPLACE_ALL",
+      update_mode: "REPLACE_ALL",
+      files: [
+        {
+          path: "records.jsonl",
+          byte_length: new TextEncoder().encode(recordsText).byteLength,
+          sha256: "sha256:records",
+        },
+        {
+          path: "search_index.jsonl",
+          byte_length: new TextEncoder().encode(indexText).byteLength,
+          sha256: "sha256:index",
+        },
+      ],
+      content_sha256: "sha256:new",
+    });
+    const entry: BundleCatalogEntryV1 = {
+      bundle_id: "bundle_b",
+      name: "Bundle B",
+      size_bytes: new TextEncoder().encode(recordsText).byteLength + new TextEncoder().encode(indexText).byteLength,
+      url_base: "./bundles/bundle_b/",
+      content_sha256: "sha256:new",
+    };
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.endsWith("/bundle.manifest.json")) return makeResponse(manifestText, "application/json");
+      if (url.endsWith("/records.jsonl")) return makeResponse(recordsText, "application/json");
+      if (url.endsWith("/search_index.jsonl")) return makeResponse(indexText, "application/json");
+      return new Response("not found", { status: 404, statusText: "Not Found" });
+    };
+
+    const db = await openSiralexDb();
+    try {
+      await seedInstalledBundleScope(db, activeScope, "active-entry", "bundle-a");
+      await seedInstalledBundleScope(db, oldScope, "old-bundle-b", "bundle-b");
+      await setActiveBundleMeta(db, {
+        bundle_id: "bundle_a",
+        storage_scope_id: activeScope,
+        manifest_schema_version: "bundle_manifest_v1",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        normalization_ruleset: "norm_v1",
+        update_mode: "REPLACE_ALL",
+        reconciliation_action: "REPLACE_ALL",
+        expected_content_sha256: "sha256:active",
+        imported_at_iso: "2026-03-11T00:00:00Z",
+        records_count: 1,
+        index_entries_count: 1,
+      });
+      await setActiveBundleMeta(db, {
+        bundle_id: "bundle_b",
+        storage_scope_id: oldScope,
+        manifest_schema_version: "bundle_manifest_v1",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        normalization_ruleset: "norm_v1",
+        update_mode: "REPLACE_ALL",
+        reconciliation_action: "REPLACE_ALL",
+        expected_content_sha256: "sha256:old",
+        imported_at_iso: "2026-03-11T00:00:00Z",
+        records_count: 1,
+        index_entries_count: 1,
+      });
+      await setActiveBundleId(db, "bundle_a");
+
+      await installRemoteCatalogBundle(db, entry, "https://example.test/catalog.json", {
+        fetchImpl,
+        activateOnCommit: false,
+      });
+
+      const active = await getActiveBundleMeta(db);
+      expect(active?.bundle_id).toBe("bundle_a");
+      expect(active?.storage_scope_id).toBe(activeScope);
+
+      const installedB = await getInstalledBundleMeta(db, "bundle_b");
+      expect(installedB?.storage_scope_id).toBe(newScope);
+      expect(installedB?.expected_content_sha256).toBe("sha256:new");
+
+      const activeIds = await searchQuery(db, activeScope, "target_to_source", "bundle-a");
+      expect(activeIds.ir_ids).toEqual([`${activeScope}-rec`]);
+      const updatedIds = await searchQuery(db, newScope, "target_to_source", "bundle-b");
+      expect(updatedIds.ir_ids).toEqual(["bundle-b-new"]);
+      expect((await searchQuery(db, oldScope, "target_to_source", "bundle-b")).ir_ids).toEqual([]);
     } finally {
       db.close();
     }
