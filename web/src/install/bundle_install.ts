@@ -14,6 +14,7 @@ import {
   deleteBundleScopeData,
   getBundleStorageScopeId,
   getInstalledBundleMeta,
+  putInstalledBundleMeta,
   recoverInterruptedBundleInstall,
   setActiveBundleMeta,
   setBundleInstallSession,
@@ -50,6 +51,7 @@ export type InstallRemoteBundleOptions = {
   timeoutMs?: number;
   onUpdate?: (message: string) => void;
   storageEstimate?: () => Promise<{ usage?: number; quota?: number }>;
+  activateOnCommit?: boolean;
 };
 
 export type InstallBundleMetadata = {
@@ -205,6 +207,7 @@ export async function installBundleIntoDb(
   onUpdate: (message: string) => void,
   signal?: AbortSignal,
   metadata?: InstallBundleMetadata,
+  activateOnCommit = true,
 ): Promise<InstallBundleResult> {
   const recovered = await recoverInterruptedBundleInstall(db);
   if (recovered) {
@@ -274,10 +277,12 @@ export async function installBundleIntoDb(
     });
     indexCount = idxRes.entriesWritten;
 
-    await setActiveBundleMeta(
-      db,
-      buildInstalledBundleMeta(manifest, nextStorageScopeId, recordsCount, indexCount, metadata),
-    );
+    const installedMeta = buildInstalledBundleMeta(manifest, nextStorageScopeId, recordsCount, indexCount, metadata);
+    if (activateOnCommit) {
+      await setActiveBundleMeta(db, installedMeta);
+    } else {
+      await putInstalledBundleMeta(db, installedMeta);
+    }
     await setBundleInstallSession(db, {
       bundle_id: manifest.bundle_id,
       storage_scope_id: nextStorageScopeId,
@@ -354,13 +359,15 @@ export async function installRemoteCatalogBundle(
 
     const installed = await getInstalledBundleMeta(db, entry.bundle_id);
     if (installed?.expected_content_sha256 === entry.content_sha256) {
-      await setActiveBundleMeta(
-        db,
-        {
-          ...installed,
-          imported_at_iso: installed.imported_at_iso,
-        },
-      );
+      const installedMeta = {
+        ...installed,
+        imported_at_iso: installed.imported_at_iso,
+      };
+      if (options.activateOnCommit ?? true) {
+        await setActiveBundleMeta(db, installedMeta);
+      } else {
+        await putInstalledBundleMeta(db, installedMeta);
+      }
       return {
         manifest,
         result: {
@@ -418,6 +425,7 @@ export async function installRemoteCatalogBundle(
         version: entry.version,
         storageBytes: entry.size_bytes,
       },
+      options.activateOnCommit ?? true,
     );
 
     return { manifest, result };
