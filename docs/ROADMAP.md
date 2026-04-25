@@ -243,7 +243,7 @@ DoD:
 | 9 | Phase 3.2 — Language-agnostic UI + direction semantics | Next platform step | Pending |
 | 10 | Phase 3.3 — Installed bundle registry | Next platform step | Pending |
 | 11 | Phase 3.4 — Multi-bundle support | Next platform step | Pending |
-| 12 | Phase 3.5 — Bundle selection + distribution | Next platform step | Pending |
+| 12 | Phase 3.5 — Bundle selection + distribution | Next platform step | ✅ Complete |
 | 13 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
 | 14 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
 
@@ -444,9 +444,11 @@ DoD:
 - Multiple bundles can coexist locally without search ambiguity.
 - Query execution and record resolution operate against the active bundle only.
 
-### Phase 3.5 — Bundle selection and distribution
+### Phase 3.5 — Bundle selection and distribution ✅
 
 Add the user-facing pieces needed to choose and acquire dictionaries.
+
+Status note: catalog-driven bundle acquisition is implemented and documented.
 
 Scope:
 
@@ -458,6 +460,7 @@ Notes:
 
 - Manual import can remain supported.
 - Update orchestration can stay simple at first (detect new bundle version/hash and prompt the user).
+- Future task: unify catalog schema naming (`version` vs `catalog_schema_version`) and declare a single canonical catalog field before wider external bundle publishing.
 
 DoD:
 - A user can select which installed dictionary is active.

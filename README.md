@@ -18,6 +18,14 @@ Offline-first dictionary and sentence analysis tooling for the Manding language 
   - Anonymous suggestions/corrections for spelling, translations, examples, POS, N’Ko, and notes
   - Moderation workflow with **audit trail + rollback** (planned early; expanded later)
 
+## How to Use SiraLex
+
+Phase 4.5 bundle distribution and user operation are documented here:
+
+- `docs/USER_GUIDE.md`
+- `docs/BUNDLE_DISTRIBUTION.md`
+- `docs/BUILD_BUNDLE.md`
+
 ## Credits and thanks (data sources)
 
 This project builds on and modernizes existing scholarly/lexicographic resources. We are deeply grateful to the authors, maintainers, and contributors of these works.
