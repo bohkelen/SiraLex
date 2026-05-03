@@ -84,6 +84,32 @@ describe("Phase 3 manifest parsing", () => {
     expect(result.manifest?.language_labels).toEqual({ source: "French", target: "Maninka" });
     expect(result.manifest?.scripts).toEqual({ target_supported: ["latin", "nko"] });
   });
+
+  it("accepts versioned normalization rulesets beyond norm_v1", () => {
+    const result = parseAndValidateManifestJson(
+      JSON.stringify({
+        manifest_schema_version: "bundle_manifest_v1",
+        bundle_id: "bundle_full_norm_v2_22222222",
+        bundle_type: "full",
+        bundle_format: "directory",
+        compression: "none",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        rule_versions: { normalization: "norm_v2" },
+        sources: { included: ["src_malipense"], excluded: [] },
+        reconciliation_action: "REPLACE_ALL",
+        update_mode: "REPLACE_ALL",
+        files: [
+          { path: "records.jsonl", byte_length: 10, sha256: "sha256:aaa" },
+          { path: "search_index.jsonl", byte_length: 20, sha256: "sha256:bbb" },
+        ],
+        content_sha256: "sha256:ccc",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.manifest?.rule_versions.normalization).toBe("norm_v2");
+  });
 });
 
 describe("Phase 3 bundle-aware runtime", () => {
@@ -204,6 +230,70 @@ describe("Phase 3 bundle-aware runtime", () => {
       expect(result.ir_ids).toEqual(["rec-a"]);
       records = await resolveRecords(db, bundleA, result.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-a"]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("resolves norm_v2 phrase and N'Ko keys while keeping directions isolated", async () => {
+    const db = await openSiralexDb();
+    try {
+      const bundleId = "bundle_full_norm_v2_search";
+
+      await importRecordsJsonl(
+        db,
+        makeJsonlFile("records.jsonl", [
+          {
+            ir_id: "rec-source",
+            ir_kind: "index_mapping",
+            source_id: "src_malipense",
+            norm_version: "norm_v2",
+            preferred_form: "a) bon travail! (une salutation), b) merci! (pour un travail)",
+            variant_forms: [
+              "a) bon travail! (une salutation), b) merci! (pour un travail)",
+              "bon travail",
+              "merci",
+              "bon réveil",
+            ],
+            search_keys: {
+              casefold: ["bon travail", "merci", "bon réveil"],
+            },
+            display: { source_term: "a) bon travail! (une salutation), b) merci! (pour un travail)" },
+          },
+          {
+            ir_id: "rec-target",
+            ir_kind: "lexicon_entry",
+            source_id: "src_malipense",
+            norm_version: "norm_v2",
+            preferred_form: "dàa",
+            variant_forms: ["dàa", "ߘߊ߰"],
+            search_keys: {
+              casefold: ["dàa", "ߘߊ߰"],
+            },
+            display: { headword_latin: "dàa", headword_nko_provided: "ߘߊ߰" },
+          },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+      await importSearchIndexJsonl(
+        db,
+        makeJsonlFile("search_index.jsonl", [
+          { key_type: "src_casefold", key: "bon travail", ir_ids: ["rec-source"] },
+          { key_type: "src_casefold", key: "merci", ir_ids: ["rec-source"] },
+          { key_type: "src_casefold", key: "bon réveil", ir_ids: ["rec-source"] },
+          { key_type: "tgt_casefold", key: "ߘߊ߰", ir_ids: ["rec-target"] },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+
+      expect((await searchQuery(db, bundleId, "source_to_target", "bon travail")).ir_ids).toEqual(["rec-source"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "merci")).ir_ids).toEqual(["rec-source"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "bon réveil")).ir_ids).toEqual(["rec-source"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "bon re\u0301veil")).ir_ids).toEqual(["rec-source"]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "ߘߊ߰")).ir_ids).toEqual(["rec-target"]);
+
+      expect((await searchQuery(db, bundleId, "target_to_source", "bon travail")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "ߘߊ߰")).ir_ids).toEqual([]);
     } finally {
       db.close();
     }

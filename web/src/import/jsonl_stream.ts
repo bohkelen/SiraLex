@@ -23,6 +23,10 @@ export type StreamJsonlOptions = {
 
 export type JsonlByteSource = Blob | ReadableStream<Uint8Array>;
 
+function errorToString(e: unknown): string {
+  return e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+}
+
 function throwIfAborted(signal: AbortSignal | undefined) {
   if (signal?.aborted) {
     throw signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason ?? "Aborted"));
@@ -82,7 +86,15 @@ export async function* streamJsonlLines(
   try {
     while (true) {
       throwIfAborted(signal);
-      const { value, done } = await reader.read();
+      let readResult: ReadableStreamReadResult<Uint8Array>;
+      try {
+        readResult = await reader.read();
+      } catch (e) {
+        throw new Error(
+          `JSONL stream reader error after ${bytesRead} bytes and ${linesEmitted} lines: ${errorToString(e)}`,
+        );
+      }
+      const { value, done } = readResult;
       if (done) break;
       if (!value) continue;
 

@@ -50,6 +50,23 @@ function makeLineChunkedStream(text: string): ReadableStream<Uint8Array> {
   });
 }
 
+function makeDelayedLineChunkedStream(text: string, delayMs: number): ReadableStream<Uint8Array> {
+  const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  const encoder = new TextEncoder();
+  let index = 0;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (index >= lines.length) {
+        controller.close();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      controller.enqueue(encoder.encode(lines[index]!));
+      index += 1;
+    },
+  });
+}
+
 function makeResponse(body: string, contentType: string): Response {
   const bytes = new TextEncoder().encode(body);
   return new Response(makeStream(body), {
@@ -64,6 +81,22 @@ function makeResponse(body: string, contentType: string): Response {
 function makeResponseWithUrl(body: string, contentType: string, url: string, chunked = false): Response {
   const bytes = new TextEncoder().encode(body);
   const response = new Response(chunked ? makeLineChunkedStream(body) : makeStream(body), {
+    status: 200,
+    headers: {
+      "content-type": contentType,
+      "content-length": String(bytes.byteLength),
+    },
+  });
+  Object.defineProperty(response, "url", {
+    value: url,
+    configurable: true,
+  });
+  return response;
+}
+
+function makeDelayedResponseWithUrl(body: string, contentType: string, url: string, delayMs: number): Response {
+  const bytes = new TextEncoder().encode(body);
+  const response = new Response(makeDelayedLineChunkedStream(body, delayMs), {
     status: 200,
     headers: {
       "content-type": contentType,
@@ -210,6 +243,98 @@ describe("Phase 4.2 remote install", () => {
       expect(resultIds.ir_ids).toEqual(["rec-1"]);
       const records = await resolveRecords(db, active!.storage_scope_id!, resultIds.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-1"]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("does not timeout an active payload stream just because total elapsed time exceeds response-start timeout", async () => {
+    const recordsText = makeJsonl([
+      {
+        ir_id: "rec-slow",
+        ir_kind: "lexicon_entry",
+        source_id: "src_slow",
+        norm_version: "norm_v1",
+        preferred_form: "slow-entry",
+        variant_forms: ["slow-entry"],
+        search_keys: { casefold: ["slow-hello"] },
+        display: { headword_latin: "slow-entry" },
+      },
+    ]);
+    const indexText = makeJsonl([
+      { key_type: "tgt_casefold", key: "slow-hello", ir_ids: ["rec-slow"] },
+      { key_type: "tgt_casefold", key: "slow-hello-2", ir_ids: ["rec-slow"] },
+      { key_type: "tgt_casefold", key: "slow-hello-3", ir_ids: ["rec-slow"] },
+    ]);
+    const manifestText = JSON.stringify({
+      manifest_schema_version: "bundle_manifest_v1",
+      bundle_id: "maninka_fr_slow",
+      bundle_type: "full",
+      bundle_format: "directory",
+      compression: "none",
+      record_schema_id: "normalized_v1",
+      record_schema_version: "1",
+      rule_versions: { normalization: "norm_v1" },
+      sources: { included: ["src"], excluded: [] },
+      reconciliation_action: "REPLACE_ALL",
+      update_mode: "REPLACE_ALL",
+      files: [
+        {
+          path: "records.jsonl",
+          byte_length: new TextEncoder().encode(recordsText).byteLength,
+          sha256: "sha256:records-slow",
+        },
+        {
+          path: "search_index.jsonl",
+          byte_length: new TextEncoder().encode(indexText).byteLength,
+          sha256: "sha256:index-slow",
+        },
+      ],
+      content_sha256: "sha256:bundle-slow",
+    });
+
+    const entry: BundleCatalogEntryV1 = {
+      bundle_id: "maninka_fr_slow",
+      name: "French ↔ Maninka Slow Stream",
+      version: "1.0.0",
+      size_bytes: new TextEncoder().encode(recordsText).byteLength + new TextEncoder().encode(indexText).byteLength,
+      url_base: "./bundles/maninka_fr_slow/",
+      content_sha256: "sha256:bundle-slow",
+    };
+
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.endsWith("/bundle.manifest.json")) {
+        return makeResponseWithUrl(manifestText, "application/json", url);
+      }
+      if (url.endsWith("/records.jsonl")) {
+        return makeDelayedResponseWithUrl(recordsText, "application/json", url, 4);
+      }
+      if (url.endsWith("/search_index.jsonl")) {
+        return makeDelayedResponseWithUrl(indexText, "application/json", url, 4);
+      }
+      return new Response("not found", { status: 404, statusText: "Not Found" });
+    };
+
+    const db = await openSiralexDb();
+    try {
+      const { manifest, result } = await installRemoteCatalogBundle(
+        db,
+        entry,
+        "https://example.test/catalog.json",
+        {
+          fetchImpl,
+          timeoutMs: 5,
+        },
+      );
+
+      expect(manifest.bundle_id).toBe("maninka_fr_slow");
+      expect(result.recordsCount).toBe(1);
+      expect(result.indexCount).toBe(3);
+
+      const active = await getActiveBundleMeta(db);
+      expect(active?.bundle_id).toBe("maninka_fr_slow");
+      expect(active?.storage_scope_id).toBe("maninka_fr_slow::sha256:bundle-slow");
     } finally {
       db.close();
     }

@@ -247,6 +247,38 @@ When proposing `norm_v(N+1)`:
 - run the ruleset on the fixture set and review diffs
 - only then publish the new ruleset as the current default
 
+## `norm_v2` source-term decomposition contract
+
+`norm_v2` extends variant derivation for `index_mapping.fields_raw.source_term`
+without changing the underlying per-string key transforms from `norm_v1`.
+
+Normative contract:
+
+1. The full original `source_term` MUST be preserved as an emitted variant.
+2. Enumerations such as `a)`, `b)`, `1.`, `2.` MAY be split into additive
+   phrase candidates.
+3. Segment splitting MUST occur only on top-level commas, semicolons, and
+   slashes; delimiters inside parentheses MUST NOT create extra segments.
+4. If a segment ends with trailing parenthetical context, the ruleset MAY emit
+   both:
+   - the full segment
+   - a variant without that trailing parenthetical
+5. Cleaned variants MAY strip only leading/trailing punctuation; internal
+   multiword phrases MUST remain intact.
+6. Noise filtering MUST be deterministic and versioned. In `norm_v2` this
+   includes:
+   - minimum phrase length
+   - stopword-only filtering
+7. Token explosion MUST be bounded by explicit versioned limits. In `norm_v2`
+   this means:
+   - no whitespace tokenization
+   - capped top-level split segments per source term
+   - capped emitted phrases per source term
+
+These rules are additive alias-generation only. They MUST NOT replace the
+stored original source string, and they MUST NOT silently rewrite frozen
+`norm_v1` outputs in place.
+
 ## Minimal metadata contract (summary)
 
 Normalized records SHOULD be able to carry:

@@ -12,7 +12,7 @@ from pathlib import Path
 # Add shared to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "shared"))
 
-from normalization.norm_v1 import RULESET_ID
+from normalization.norm_v2 import RULESET_ID
 from .normalize import process_ir_files
 
 logger = logging.getLogger(__name__)

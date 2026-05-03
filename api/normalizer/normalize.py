@@ -12,7 +12,7 @@ Output schema (one JSON object per line):
   "ir_id": "...",
   "ir_kind": "lexicon_entry" | "index_mapping",
   "source_id": "...",
-  "norm_version": "norm_v1",
+  "norm_version": "<current ruleset>",
   "preferred_form": "...",
   "variant_forms": ["...", ...],
   "search_keys": {
@@ -34,9 +34,10 @@ from typing import Any, Iterator
 # Add shared to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "shared"))
 
-from normalization.norm_v1 import (
+from normalization.norm_v2 import (
     RULESET_ID,
     compute_search_keys,
+    extract_source_phrases,
     normalize_nfc,
 )
 
@@ -79,6 +80,7 @@ def normalize_lexicon_entry(ir_unit: dict[str, Any]) -> NormalizedRecord:
     record_locator = ir_unit.get("record_locator", {})
 
     headword = fields_raw.get("headword_latin", "")
+    headword_nko = fields_raw.get("headword_nko_provided", "")
     anchor_names = record_locator.get("anchor_names", [])
 
     # Preferred form is the source's own headword
@@ -94,6 +96,12 @@ def normalize_lexicon_entry(ir_unit: dict[str, Any]) -> NormalizedRecord:
             variant_forms.insert(0, preferred_form)
     else:
         variant_forms = [preferred_form] if preferred_form else []
+
+    # Add source-provided N'Ko headword as an additional searchable variant.
+    if headword_nko:
+        nko_nfc = normalize_nfc(headword_nko)
+        if not any(normalize_nfc(v) == nko_nfc for v in variant_forms):
+            variant_forms.append(headword_nko)
 
     # Compute search keys from all variant forms
     search_keys = compute_search_keys(variant_forms)
@@ -114,15 +122,16 @@ def normalize_index_mapping(ir_unit: dict[str, Any]) -> NormalizedRecord:
     Normalize an index_mapping IR unit.
 
     Preferred form: fields_raw.source_term (the French headword)
-    Variant forms: [source_term] (index mappings have no variant forms)
+    Variant forms: additive source phrases derived from fields_raw.source_term
+    while always preserving the full original source_term.
     """
     fields_raw = ir_unit.get("fields_raw", {})
 
     source_term = fields_raw.get("source_term", "")
 
-    # For index mappings, there's only one form
+    # For index mappings, preserve the original and add deterministic phrases.
     preferred_form = source_term
-    variant_forms = [source_term] if source_term else []
+    variant_forms = extract_source_phrases(source_term)
 
     # Compute search keys
     search_keys = compute_search_keys(variant_forms)
