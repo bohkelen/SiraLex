@@ -153,6 +153,39 @@ def _count_records_by_kind(normalized_path: Path) -> dict[str, int]:
     return counts
 
 
+def _detect_normalization_ruleset(normalized_path: Path) -> str:
+    """
+    Detect the normalization ruleset used by the normalized records.
+
+    All normalized records in a bundle must share the same norm_version.
+    """
+    detected: str | None = None
+
+    with open(normalized_path, "r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            record = json.loads(line)
+            norm_version = record.get("norm_version")
+            if not isinstance(norm_version, str) or not norm_version:
+                raise ValueError(
+                    f"Normalized record missing norm_version at {normalized_path}:{line_num}"
+                )
+            if detected is None:
+                detected = norm_version
+            elif norm_version != detected:
+                raise ValueError(
+                    "Normalized records mix multiple norm_version values: "
+                    f"{detected!r} and {norm_version!r}"
+                )
+
+    if detected is None:
+        raise ValueError(f"No normalized records found in {normalized_path}")
+
+    return detected
+
+
 # ---------------------------------------------------------------------------
 # Bundle builder
 # ---------------------------------------------------------------------------
@@ -205,6 +238,7 @@ def build_bundle(
 
     # Count records by ir_kind for informational metadata
     record_counts = _count_records_by_kind(normalized_path)
+    normalization_ruleset = _detect_normalization_ruleset(normalized_path)
 
     # Date string for bundle ID
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -254,7 +288,7 @@ def build_bundle(
         "record_schema_id": "normalized_v1",
         "record_schema_version": "1",
         "rule_versions": {
-            "normalization": "norm_v1",
+            "normalization": normalization_ruleset,
         },
         "sources": {
             "included": sorted(sources_included),

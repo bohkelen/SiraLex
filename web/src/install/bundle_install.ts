@@ -30,7 +30,7 @@ import {
 } from "../import/import_search_index";
 import type { JsonlByteSource } from "../import/jsonl_stream";
 
-export const DEFAULT_BUNDLE_FETCH_TIMEOUT_MS = 30_000;
+export const DEFAULT_BUNDLE_FETCH_START_TIMEOUT_MS = 30_000;
 
 export type InstallBundleResult = {
   recordsCount: number;
@@ -140,30 +140,38 @@ async function fetchBodyStream(
   url: string,
   expectedBytes: number,
   fetchImpl: typeof fetch,
-  signal: AbortSignal,
+  signal: AbortSignal | undefined,
+  responseStartTimeoutMs: number,
   currentBaseUrl?: string,
 ): Promise<ReadableStream<Uint8Array>> {
-  const response = await fetchImpl(url, {
-    headers: { Accept: "application/octet-stream,application/json,text/plain" },
-    signal,
-  });
-  if (!response.ok) {
-    throw new Error(`Bundle request failed: ${response.status} ${response.statusText} (${url})`);
-  }
-  validateRemoteUrlPolicy(response.url || url, currentBaseUrl);
-
-  const contentLength = response.headers.get("content-length");
-  if (contentLength) {
-    const parsed = Number(contentLength);
-    if (Number.isFinite(parsed) && parsed !== expectedBytes) {
-      throw new Error(`Remote payload byte_length mismatch: expected ${expectedBytes}, got ${parsed}`);
+  const timeout = createLinkedAbortSignal(responseStartTimeoutMs, signal);
+  try {
+    const response = await fetchImpl(url, {
+      headers: { Accept: "application/octet-stream,application/json,text/plain" },
+      signal: timeout.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Bundle request failed: ${response.status} ${response.statusText} (${url})`);
     }
-  }
-  if (!response.body) {
-    throw new Error(`Bundle response body missing for ${url}`);
-  }
+    validateRemoteUrlPolicy(response.url || url, currentBaseUrl);
 
-  return createByteLengthValidatedStream(response.body, expectedBytes);
+    const contentLength = response.headers.get("content-length");
+    if (contentLength) {
+      const parsed = Number(contentLength);
+      if (Number.isFinite(parsed) && parsed !== expectedBytes) {
+        throw new Error(`Remote payload byte_length mismatch: expected ${expectedBytes}, got ${parsed}`);
+      }
+    }
+    if (!response.body) {
+      throw new Error(`Bundle response body missing for ${url}`);
+    }
+
+    // Once the response body is available, do not enforce a total elapsed
+    // timeout while bytes are actively being streamed and imported.
+    return createByteLengthValidatedStream(response.body, expectedBytes);
+  } finally {
+    timeout.cleanup();
+  }
 }
 
 function computeManifestPayloadBytes(manifest: BundleManifestV1): number | undefined {
@@ -239,6 +247,7 @@ export async function installBundleIntoDb(
   let recordsCount = 0;
   let indexCount = 0;
   let cleanupWarning: string | undefined;
+  let stage = "staging: records import";
   try {
     const recRes = await importRecordsJsonl(db, sources.recordsSource, {
       bundleId: nextStorageScopeId,
@@ -258,6 +267,7 @@ export async function installBundleIntoDb(
     });
     recordsCount = recRes.recordsWritten;
 
+    stage = "staging: search_index import";
     const idxRes = await importSearchIndexJsonl(db, sources.searchIndexSource, {
       bundleId: nextStorageScopeId,
       batchSize: 500,
@@ -277,6 +287,7 @@ export async function installBundleIntoDb(
     });
     indexCount = idxRes.entriesWritten;
 
+    stage = "committing bundle metadata";
     const installedMeta = buildInstalledBundleMeta(manifest, nextStorageScopeId, recordsCount, indexCount, metadata);
     if (activateOnCommit) {
       await setActiveBundleMeta(db, installedMeta);
@@ -292,6 +303,7 @@ export async function installBundleIntoDb(
     });
 
     if (previousStorageScopeId && previousStorageScopeId !== nextStorageScopeId) {
+      stage = "cleanup: previous bundle scope removal";
       try {
         await deleteBundleScopeData(db, previousStorageScopeId);
         await clearBundleInstallSession(db);
@@ -301,6 +313,7 @@ export async function installBundleIntoDb(
           `Cleanup will be retried on next app load.`;
       }
     } else {
+      stage = "cleanup: clear install session";
       await clearBundleInstallSession(db);
     }
   } catch (e) {
@@ -325,111 +338,115 @@ export async function installRemoteCatalogBundle(
 ): Promise<{ manifest: BundleManifestV1; result: InstallBundleResult }> {
   const onUpdate = options.onUpdate ?? (() => undefined);
   const fetchImpl = options.fetchImpl ?? fetch;
-  const timeoutMs = options.timeoutMs ?? DEFAULT_BUNDLE_FETCH_TIMEOUT_MS;
-  const { signal, cleanup } = createLinkedAbortSignal(timeoutMs, options.signal);
+  const responseStartTimeoutMs = options.timeoutMs ?? DEFAULT_BUNDLE_FETCH_START_TIMEOUT_MS;
+  const signal = options.signal;
 
+  const urls = deriveBundleAssetUrls(catalogUrl, entry);
+  onUpdate(`Installing ${entry.bundle_id}\nStage: fetching manifest\n`);
+  const manifestTimeout = createLinkedAbortSignal(responseStartTimeoutMs, signal);
+  let manifestResponse: Response;
   try {
-    const urls = deriveBundleAssetUrls(catalogUrl, entry);
-    onUpdate(`Installing ${entry.bundle_id}\nStage: fetching manifest\n`);
-    const manifestResponse = await fetchImpl(urls.manifest_url, {
+    manifestResponse = await fetchImpl(urls.manifest_url, {
       headers: { Accept: "application/json" },
-      signal,
+      signal: manifestTimeout.signal,
     });
-    if (!manifestResponse.ok) {
-      throw new Error(`Bundle request failed: ${manifestResponse.status} ${manifestResponse.statusText} (${urls.manifest_url})`);
-    }
-    validateRemoteUrlPolicy(manifestResponse.url || urls.manifest_url, catalogUrl);
-    const manifestText = await manifestResponse.text();
-    const parsed = parseAndValidateManifestJson(manifestText);
-    if (!parsed.ok || !parsed.manifest) {
-      throw new Error(`Manifest validation failed: ${parsed.errors.join("; ")}`);
-    }
-
-    const manifest = parsed.manifest;
-    if (manifest.bundle_id !== entry.bundle_id) {
-      throw new Error(
-        `Catalog/manifest bundle_id mismatch: catalog=${entry.bundle_id}, manifest=${manifest.bundle_id}`,
-      );
-    }
-    if (manifest.content_sha256 !== entry.content_sha256) {
-      throw new Error(
-        `Catalog/manifest content_sha256 mismatch: catalog=${entry.content_sha256}, manifest=${manifest.content_sha256}`,
-      );
-    }
-
-    const installed = await getInstalledBundleMeta(db, entry.bundle_id);
-    if (installed?.expected_content_sha256 === entry.content_sha256) {
-      const installedMeta = {
-        ...installed,
-        imported_at_iso: installed.imported_at_iso,
-      };
-      if (options.activateOnCommit ?? true) {
-        await setActiveBundleMeta(db, installedMeta);
-      } else {
-        await putInstalledBundleMeta(db, installedMeta);
-      }
-      return {
-        manifest,
-        result: {
-          recordsCount: installed.records_count ?? 0,
-          indexCount: installed.index_entries_count ?? 0,
-          elapsedMs: 0,
-          skippedBecauseCurrent: true,
-        },
-      };
-    }
-
-    const recordsEntry = getManifestFileEntry(manifest, "records.jsonl");
-    const indexEntry = getManifestFileEntry(manifest, "search_index.jsonl");
-
-    if (options.storageEstimate) {
-      const estimate = await options.storageEstimate();
-      const usage = estimate.usage ?? 0;
-      const quota = estimate.quota;
-      const requiredBytes = recordsEntry.byte_length + indexEntry.byte_length;
-      if (typeof quota === "number" && quota - usage < requiredBytes) {
-        throw new Error(
-          `Insufficient storage headroom: need ${requiredBytes} bytes, have ${Math.max(0, quota - usage)} bytes`,
-        );
-      }
-    }
-
-    onUpdate(`Installing ${entry.bundle_id}\nStage: fetching records.jsonl\n`);
-    const recordsStream = await fetchBodyStream(
-      urls.records_url,
-      recordsEntry.byte_length,
-      fetchImpl,
-      signal,
-      catalogUrl,
-    );
-    onUpdate(`Installing ${entry.bundle_id}\nStage: fetching search_index.jsonl\n`);
-    const indexStream = await fetchBodyStream(
-      urls.search_index_url,
-      indexEntry.byte_length,
-      fetchImpl,
-      signal,
-      catalogUrl,
-    );
-
-    const result = await installBundleIntoDb(
-      db,
-      manifest,
-      {
-        recordsSource: recordsStream,
-        searchIndexSource: indexStream,
-      },
-      onUpdate,
-      signal,
-      {
-        displayName: entry.name,
-        version: entry.version,
-        storageBytes: entry.size_bytes,
-      },
-      options.activateOnCommit ?? true,
-    );
-
-    return { manifest, result };
   } finally {
-    cleanup();
+    manifestTimeout.cleanup();
   }
+  if (!manifestResponse.ok) {
+    throw new Error(`Bundle request failed: ${manifestResponse.status} ${manifestResponse.statusText} (${urls.manifest_url})`);
+  }
+  validateRemoteUrlPolicy(manifestResponse.url || urls.manifest_url, catalogUrl);
+  const manifestText = await manifestResponse.text();
+  const parsed = parseAndValidateManifestJson(manifestText);
+  if (!parsed.ok || !parsed.manifest) {
+    throw new Error(`Manifest validation failed: ${parsed.errors.join("; ")}`);
+  }
+
+  const manifest = parsed.manifest;
+  if (manifest.bundle_id !== entry.bundle_id) {
+    throw new Error(
+      `Catalog/manifest bundle_id mismatch: catalog=${entry.bundle_id}, manifest=${manifest.bundle_id}`,
+    );
+  }
+  if (manifest.content_sha256 !== entry.content_sha256) {
+    throw new Error(
+      `Catalog/manifest content_sha256 mismatch: catalog=${entry.content_sha256}, manifest=${manifest.content_sha256}`,
+    );
+  }
+
+  const installed = await getInstalledBundleMeta(db, entry.bundle_id);
+  if (installed?.expected_content_sha256 === entry.content_sha256) {
+    const installedMeta = {
+      ...installed,
+      imported_at_iso: installed.imported_at_iso,
+    };
+    if (options.activateOnCommit ?? true) {
+      await setActiveBundleMeta(db, installedMeta);
+    } else {
+      await putInstalledBundleMeta(db, installedMeta);
+    }
+    return {
+      manifest,
+      result: {
+        recordsCount: installed.records_count ?? 0,
+        indexCount: installed.index_entries_count ?? 0,
+        elapsedMs: 0,
+        skippedBecauseCurrent: true,
+      },
+    };
+  }
+
+  const recordsEntry = getManifestFileEntry(manifest, "records.jsonl");
+  const indexEntry = getManifestFileEntry(manifest, "search_index.jsonl");
+
+  if (options.storageEstimate) {
+    const estimate = await options.storageEstimate();
+    const usage = estimate.usage ?? 0;
+    const quota = estimate.quota;
+    const requiredBytes = recordsEntry.byte_length + indexEntry.byte_length;
+    if (typeof quota === "number" && quota - usage < requiredBytes) {
+      throw new Error(
+        `Insufficient storage headroom: need ${requiredBytes} bytes, have ${Math.max(0, quota - usage)} bytes`,
+      );
+    }
+  }
+
+  onUpdate(`Installing ${entry.bundle_id}\nStage: fetching records.jsonl\n`);
+  const recordsStream = await fetchBodyStream(
+    urls.records_url,
+    recordsEntry.byte_length,
+    fetchImpl,
+    signal,
+    responseStartTimeoutMs,
+    catalogUrl,
+  );
+  onUpdate(`Installing ${entry.bundle_id}\nStage: fetching search_index.jsonl\n`);
+  const indexStream = await fetchBodyStream(
+    urls.search_index_url,
+    indexEntry.byte_length,
+    fetchImpl,
+    signal,
+    responseStartTimeoutMs,
+    catalogUrl,
+  );
+
+  const result = await installBundleIntoDb(
+    db,
+    manifest,
+    {
+      recordsSource: recordsStream,
+      searchIndexSource: indexStream,
+    },
+    onUpdate,
+    signal,
+    {
+      displayName: entry.name,
+      version: entry.version,
+      storageBytes: entry.size_bytes,
+    },
+    options.activateOnCommit ?? true,
+  );
+
+  return { manifest, result };
 }

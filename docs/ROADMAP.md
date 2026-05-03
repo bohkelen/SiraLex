@@ -1,4 +1,4 @@
-# Roadmap (Phase 0 → Phase 3)
+# Roadmap (Phase 0 → Phase 5)
 
 This roadmap documents the execution path to a usable, offline-first **French/English ↔ Maninka (Guinea)** dictionary and sentence analysis app with **Latin + N'Ko** as first-class scripts.
 
@@ -239,15 +239,17 @@ DoD:
 | 5b | Phase 2.0.3b — Query execution (retrieval correctness) | Primary focus | ✅ Complete |
 | 6 | Phase 2.0.4 — Results display + entry view (presentation correctness) | Primary focus | ✅ Complete |
 | 7 | Phase 2.0.5 — Offline PWA finalization (first-install → offline proof) | Primary focus | ✅ Complete |
-| 8 | Phase 3.1 — Manifest language metadata | Next platform step | Pending |
-| 9 | Phase 3.2 — Language-agnostic UI + direction semantics | Next platform step | Pending |
-| 10 | Phase 3.3 — Installed bundle registry | Next platform step | Pending |
-| 11 | Phase 3.4 — Multi-bundle support | Next platform step | Pending |
-| 12 | Phase 3.5 — Bundle selection + distribution | Next platform step | ✅ Complete |
-| 13 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
-| 14 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
+| 8 | Phase 3.1 — Manifest language metadata | Platform generalization | ✅ Complete |
+| 9 | Phase 3.2 — Language-agnostic UI + direction semantics | Platform generalization | ✅ Complete |
+| 10 | Phase 3.3 — Installed bundle registry | Platform generalization | ✅ Complete |
+| 11 | Phase 3.4 — Multi-bundle support | Platform generalization | ✅ Complete |
+| 12 | Phase 3.5 — Bundle selection + distribution | Platform generalization | ✅ Complete |
+| 13 | Phase 5 — Search/index quality improvement | Next primary focus | Pending |
+| 14 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
+| 15 | HTTPS deployment + iPhone offline validation | Release-readiness track | Pending |
+| 16 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
 
-Phase 2.0 (Branch A) has now served its purpose: it proved that the offline-first runtime, bundle ingestion, IndexedDB storage, search query execution, rendering, and PWA shell all work end-to-end for the first dictionary bundle. The next primary track is Phase 3: generalize the platform so language metadata, installed bundles, and active dictionary behavior are runtime concerns rather than hardcoded assumptions. Phase 1.5 backend work (Branch B) can still proceed in parallel as light, spec-level work. Branch C remains explicitly deferred until real usage data exists.
+Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. The next primary engineering track is therefore **Phase 5 — Search/index quality improvement**, not a return to earlier platform milestones. Phase 1.5 backend work can still proceed in parallel as light spec work, and HTTPS/iPhone validation remains an important release-readiness track. Branch C remains explicitly deferred until real usage data exists.
 
 The completed Phase 2.0 work followed clean layer separation:
 
@@ -330,7 +332,7 @@ DoD:
 
 ---
 
-## Phase 3 — Platform generalization + bundle metadata
+## Phase 3 — Platform generalization + bundle metadata ✅
 
 Goal: evolve SiraLex from a proven offline dictionary for the first language pair into a reusable platform that can host multiple language bundles without embedding language-specific logic in the app.
 
@@ -348,9 +350,11 @@ Goal: evolve SiraLex from a proven offline dictionary for the first language pai
 - The current importer, search key generation, and normalized record/search-index formats are already strong foundations and should be reused rather than replaced.
 - Do not treat large-scale search optimization as a Phase 3 blocker. Keep the architecture open for future indexing improvements, but do not over-engineer before real bundle scale requires it.
 
-### Phase 3.1 — Manifest language metadata
+### Phase 3.1 — Manifest language metadata ✅
 
 Extend `bundle.manifest.json` so the UI can describe the installed dictionary accurately.
+
+Status note: implemented in the manifest type/parser, bundle builder emission, and compatibility tests.
 
 Recommended metadata:
 
@@ -370,9 +374,11 @@ DoD:
 - A bundle can declare its language pair and display labels in the manifest.
 - The app can parse that metadata safely, with sensible fallback behavior when absent.
 
-### Phase 3.2 — Language-agnostic UI and direction semantics
+### Phase 3.2 — Language-agnostic UI and direction semantics ✅
 
 Replace language-specific frontend assumptions such as `FR → Maninka`, `Maninka → FR`, and enum values like `fr_to_mnk`.
+
+Status note: implemented with runtime-derived labels and `source_to_target` / `target_to_source` search semantics.
 
 Required direction semantics:
 
@@ -386,7 +392,7 @@ DoD:
 - Frontend runtime code no longer embeds a specific target language in its direction model.
 - Runtime search semantics enforce the selected direction instead of treating the toggle as display-only state.
 
-#### Phase 4.2.5 — Directional search semantics
+#### Phase 4.2.5 — Directional search semantics *(partially complete)*
 
 This mini-phase makes the direction toggle real at query time without changing the normalized record schema.
 
@@ -410,7 +416,13 @@ Current bundle-generation mapping:
 - `index_mapping` records emit `src_*` keys from `fields_raw.source_term`
 - `lexicon_entry` records emit `tgt_*` keys from headword/variant normalization
 
-**Recommended future: bundle-level capability flag**
+Current status:
+
+- directional `src_*` / `tgt_*` query execution is implemented
+- legacy fallback is still present for older bundles
+- the bundle-level capability flag is still not formalized in the typed manifest/runtime contract
+
+**Remaining future step: bundle-level capability flag**
 
 Right now the runtime tries the directional ladder first and falls back to the legacy (undirected) ladder only when the directional ladder returns zero results. That can create subtle ranking distortions later (e.g. directional bundle has a weak match, legacy fallback would have had a strong match → confusing ordering). To avoid hybrid logic:
 
@@ -420,9 +432,11 @@ Right now the runtime tries the directional ladder first and falls back to the l
 
 Then each bundle type has a single, predictable code path and no mixed ranking.
 
-### Phase 3.3 — Installed bundle registry
+### Phase 3.3 — Installed bundle registry ✅
 
 Phase 2 proved the runtime for one imported bundle. Phase 3 should make bundle installation explicit by tracking installed bundles locally.
+
+Status note: implemented with a dedicated bundle registry store plus active bundle metadata and install/update timestamps.
 
 Suggested local registry responsibilities:
 
@@ -434,9 +448,11 @@ Suggested local registry responsibilities:
 DoD:
 - The app can enumerate installed bundles and identify which bundle is active.
 
-### Phase 3.4 — Multi-bundle support
+### Phase 3.4 — Multi-bundle support ✅
 
 Support more than one dictionary bundle on the same device.
+
+Status note: implemented with bundle-scoped IndexedDB keys and active-bundle-scoped query/record resolution.
 
 The critical requirement is that storage and query behavior become **bundle-aware** before public multi-bundle release. The exact implementation can be a compound key, namespaced stores, or another equivalent IndexedDB strategy, but lookups must target the active bundle rather than implicitly assuming a single global dictionary.
 
@@ -466,19 +482,13 @@ DoD:
 - A user can select which installed dictionary is active.
 - The app has a documented path for catalog-driven bundle download/import, even if update logic remains minimal.
 
-### Explicitly deferred beyond Phase 3
+---
 
-These are valid future directions, but they should not be framed as Phase 3 prerequisites:
+## Phase 5 — Search/index quality improvement
 
-- prefix-range or Kindle-style narrowing indexes
-- advanced ranking/scoring heuristics
-- speculative performance work not justified by observed bundle size or device behavior
+This is now the next primary engineering milestone.
 
-Those belong in a later scaling/performance phase once real multi-bundle usage and device measurements justify them.
-
-### Phase 5+ problem — Search Index Granularity Improvement
-
-This is a real search-quality problem, but it is **not a Phase 4.3 blocker**. Phase 4.3 should continue on the current directional contract and runtime semantics.
+The current runtime can install, switch, update, and query bundles correctly, but search usefulness is still limited by the granularity and shape of the current index.
 
 Current limitation:
 
@@ -487,29 +497,60 @@ Current limitation:
 - this can reduce match quality for:
   - multiword phrases
   - punctuation-heavy glosses
-  - diacritics variants when users search partial or simplified forms
+  - diacritics and spacing variants
+  - partial phrase lookups
+  - N'Ko search quality once that surface becomes more important
 
-Scope for the later improvement:
+Primary scope:
 
-- break gloss into tokens
-- index atomic searchable units
-- possibly add n-gram / phrase indexing
-- improve matching for:
-  - multiword phrases
-  - punctuation-heavy glosses
-  - diacritics variants
+- tokenization
+- gloss splitting
+- phrase matching
+- diacritics/spacing behavior
+- N'Ko search quality
 
 Guardrails:
 
 - do not replace the current bundle/search contract prematurely
-- do not block directional indexing rollout on this work
-- base any tokenization or phrase-indexing rules on observed bundle behavior and real query needs, not speculative over-design
+- do not silently change search semantics without versioned bundle metadata
+- base tokenization and phrase-indexing rules on observed bundle behavior and real query needs, not speculative over-design
+- keep deterministic bundle generation as a non-negotiable constraint
 
-DoD (future):
+Current implementation direction:
 
-- the project has a documented, versioned indexing strategy for atomic units vs whole-string keys
-- real-bundle tests show better retrieval for phrase-heavy and punctuation-heavy source entries without regressing deterministic bundle generation
-- any new indexing mode is explicit in bundle metadata/versioning rather than silently changing search semantics
+- introduce `norm_v2` rather than mutating frozen `norm_v1`
+- keep the original `index_mapping.fields_raw.source_term` as-is
+- add deterministic extracted source phrases additively at normalization time
+- keep runtime query execution unchanged; improved retrieval comes from better
+  `src_*` / `tgt_*` key coverage, not from new client heuristics
+- include source-provided N'Ko headwords in target-side variants so `tgt_*`
+  keys can match real N'Ko queries
+
+DoD:
+
+- the project has a documented, versioned indexing strategy for whole-string keys versus atomic searchable units
+- real-bundle tests show materially better retrieval for phrase-heavy and punctuation-heavy source entries without regressing deterministic bundle generation
+- any new indexing/search mode is explicit in bundle metadata/versioning rather than silently changing runtime behavior
+
+### Parallel validation track — HTTPS deployment + iPhone offline validation
+
+This is important, but it is not the next core engineering milestone.
+
+Scope:
+
+- deploy the app shell over HTTPS
+- validate install/offline behavior on iPhone/iOS Safari for the shipped PWA flow
+- confirm the real constraints of offline app shell + IndexedDB + bundle installation on iOS
+
+### Explicitly deferred beyond Phase 5
+
+These are valid future directions, but they should not be framed as Phase 3 prerequisites:
+
+- prefix-range or Kindle-style narrowing indexes
+- advanced ranking/scoring heuristics
+- speculative performance work not justified by observed bundle size or device behavior
+
+Those belong in a later scaling/performance phase once real multi-bundle usage and device measurements justify them.
 
 ### Phase 2 memory constraint (lock-in before IndexedDB)
 
@@ -549,3 +590,5 @@ SiraLex is no longer just a single-dictionary app when:
 - Multiple bundles can be installed locally and selected explicitly
 - Search and record resolution are bundle-aware
 - The app has a defined path for catalog/download-based bundle installation
+
+Those conditions are now satisfied for the current runtime scope.

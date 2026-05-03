@@ -15,7 +15,7 @@
  */
 
 import { STORE_SEARCH_INDEX } from "../idb/siralex_db";
-import { computeSearchKeys, type SearchKeys } from "../norm/norm_v1";
+import { computeSearchKeys, normalizeNfc, type SearchKeys } from "../norm/norm_v1";
 import type { SearchDirection } from "../bundle_labels";
 
 const KEY_TYPE_ORDER: (keyof SearchKeys)[] = [
@@ -73,7 +73,7 @@ export async function searchQuery(
     return { ir_ids: [], matched_key_type: null, matched_key: null };
   }
 
-  const keys = computeSearchKeys([trimmed]);
+  const keys = computeSearchKeys([normalizeNfc(trimmed)]);
 
   const tx = db.transaction(STORE_SEARCH_INDEX, "readonly");
   const store = tx.objectStore(STORE_SEARCH_INDEX);

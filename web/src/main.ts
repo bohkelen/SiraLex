@@ -231,6 +231,23 @@ let remoteInstallAbortController: AbortController | undefined;
 let remoteInstallBundleId: string | undefined;
 let currentStorageEstimate: { usage?: number; quota?: number } | undefined;
 
+function formatErrorDetails(e: unknown): string {
+  const details = [`String(e): ${String(e)}`];
+  if (e && typeof e === "object") {
+    const maybeError = e as {
+      name?: unknown;
+      message?: unknown;
+      stack?: unknown;
+    };
+    details.push(`e.name: ${String(maybeError.name ?? "")}`);
+    details.push(`e.message: ${String(maybeError.message ?? "")}`);
+    if (maybeError.stack !== undefined) {
+      details.push(`e.stack:\n${String(maybeError.stack)}`);
+    }
+  }
+  return details.join("\n");
+}
+
 function fmtBytes(n: number | undefined): string {
   if (n === undefined) return "n/a";
   const units = ["B", "KB", "MB", "GB"];
@@ -1078,7 +1095,10 @@ async function installCatalogEntry(entry: BundleCatalogEntryV1, activateOnCommit
       }
     }
   } catch (e) {
-    importProgress.textContent = `Remote install failed: ${String(e)}\n`;
+    console.error("REMOTE INSTALL FAILED", e);
+    importProgress.textContent =
+      `Install FAILED\n` +
+      `${formatErrorDetails(e)}\n`;
   } finally {
     remoteInstallAbortController = undefined;
     remoteInstallBundleId = undefined;

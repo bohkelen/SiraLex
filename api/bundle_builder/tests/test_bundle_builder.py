@@ -48,6 +48,43 @@ SAMPLE_NORMALIZED_RECORDS = [
     },
 ]
 
+SAMPLE_NORMALIZED_RECORDS_V2 = [
+    {
+        "ir_id": "ffff1111eeee2222",
+        "ir_kind": "index_mapping",
+        "source_id": "src_malipense",
+        "norm_version": "norm_v2",
+        "preferred_form": "a) bon travail! (une salutation), b) merci! (pour un travail)",
+        "variant_forms": [
+            "a) bon travail! (une salutation), b) merci! (pour un travail)",
+            "bon travail",
+            "merci",
+        ],
+        "search_keys": {
+            "casefold": [
+                "a) bon travail! (une salutation), b) merci! (pour un travail)",
+                "bon travail",
+                "merci",
+            ],
+            "diacritics_insensitive": [
+                "a) bon travail! (une salutation), b) merci! (pour un travail)",
+                "bon travail",
+                "merci",
+            ],
+            "punct_stripped": [
+                "a bon travail une salutation b merci pour un travail",
+                "bon travail",
+                "merci",
+            ],
+            "nospace": [
+                "a)bontravail!(unesalutation),b)merci!(pouruntravail)",
+                "bontravail",
+                "merci",
+            ],
+        },
+    },
+]
+
 SAMPLE_INDEX_ENTRIES = [
     {
         "key": "test",
@@ -69,6 +106,15 @@ def bundle_inputs(tmp_path):
     normalized = tmp_path / "normalized.jsonl"
     search_index = tmp_path / "search_index.jsonl"
     write_jsonl(normalized, SAMPLE_NORMALIZED_RECORDS)
+    write_jsonl(search_index, SAMPLE_INDEX_ENTRIES)
+    return normalized, search_index
+
+
+@pytest.fixture
+def bundle_inputs_v2(tmp_path):
+    normalized = tmp_path / "normalized_v2.jsonl"
+    search_index = tmp_path / "search_index_v2.jsonl"
+    write_jsonl(normalized, SAMPLE_NORMALIZED_RECORDS_V2)
     write_jsonl(search_index, SAMPLE_INDEX_ENTRIES)
     return normalized, search_index
 
@@ -228,6 +274,15 @@ class TestBuildBundle:
         manifest = result["manifest"]
 
         assert manifest["rule_versions"]["normalization"] == "norm_v1"
+
+    def test_rule_versions_follow_normalized_records(self, bundle_inputs_v2, tmp_path):
+        normalized, search_index = bundle_inputs_v2
+        output_dir = tmp_path / "bundles"
+
+        result = build_bundle(normalized, search_index, output_dir)
+        manifest = result["manifest"]
+
+        assert manifest["rule_versions"]["normalization"] == "norm_v2"
 
     def test_sources_included(self, bundle_inputs, tmp_path):
         normalized, search_index = bundle_inputs

@@ -27,6 +27,20 @@ Normalization ruleset: `norm_v1` (pure Unicode transforms, no auxiliary data)
 
 **Immutability contract**: these artifacts will never be modified in place. Any future corrections or rule changes produce new versions (e.g., `malipense_lexicon_v4`, `norm_v2`).
 
+## Post-freeze normalization evolution
+
+The dataset freeze above remains authoritative for `norm_v1`.
+
+Search-quality improvements that change how variant forms are derived must ship
+as a new normalization ruleset and new derived artifacts, never by rewriting
+the frozen `norm_v1` outputs in place.
+
+Current planned successor:
+
+- `norm_v2`: keeps the full original `source_term`, adds deterministic
+  source-phrase extraction for `index_mapping`, and includes
+  `headword_nko_provided` in `lexicon_entry.variant_forms`
+
 ## How to cite
 
 If you use this dataset in research or other projects, please cite:

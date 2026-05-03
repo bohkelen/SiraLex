@@ -91,6 +91,39 @@ FIXTURE_INDEX_ABANDONNER = make_normalized_record(
     },
 )
 
+FIXTURE_INDEX_GLOSS_V2 = make_normalized_record(
+    ir_id="ffff7777aaaa8888",
+    ir_kind="index_mapping",
+    norm_version="norm_v2",
+    preferred_form="a) bon travail! (une salutation), b) merci! (pour un travail)",
+    variant_forms=[
+        "a) bon travail! (une salutation), b) merci! (pour un travail)",
+        "bon travail",
+        "merci",
+        "bon réveil",
+    ],
+    search_keys={
+        "casefold": ["bon travail", "merci", "bon réveil"],
+        "diacritics_insensitive": ["bon travail", "merci", "bon reveil"],
+        "punct_stripped": ["bon travail", "merci", "bon reveil"],
+        "nospace": ["bontravail", "merci", "bonreveil"],
+    },
+)
+
+FIXTURE_LEXICON_NKO_V2 = make_normalized_record(
+    ir_id="1111eeee2222ffff",
+    ir_kind="lexicon_entry",
+    norm_version="norm_v2",
+    preferred_form="dàa",
+    variant_forms=["dàa", "ߘߊ߰"],
+    search_keys={
+        "casefold": ["dàa", "ߘߊ߰"],
+        "diacritics_insensitive": ["daa", "ߘߊ"],
+        "punct_stripped": ["daa", "ߘߊ"],
+        "nospace": ["daa", "ߘߊ"],
+    },
+)
+
 
 # ===========================================================================
 # Category 1: Basic inverted index construction
@@ -135,6 +168,18 @@ class TestBuildInvertedIndex:
         assert ("src_casefold", "abandonner") in index
         assert index[("src_casefold", "abandonner")] == {"eeee5555ffff6666"}
         assert index[("tgt_casefold", "dɔ́bɛ̀n")] == {"aaaa1111bbbb2222"}
+
+    def test_v2_gloss_phrases_emit_directional_source_keys(self):
+        index = build_inverted_index([FIXTURE_INDEX_GLOSS_V2])
+
+        assert index[("src_casefold", "bon travail")] == {"ffff7777aaaa8888"}
+        assert index[("src_casefold", "merci")] == {"ffff7777aaaa8888"}
+        assert index[("src_casefold", "bon réveil")] == {"ffff7777aaaa8888"}
+
+    def test_v2_nko_variant_emits_directional_target_keys(self):
+        index = build_inverted_index([FIXTURE_LEXICON_NKO_V2])
+
+        assert index[("tgt_casefold", "ߘߊ߰")] == {"1111eeee2222ffff"}
 
     def test_mono_direction_bundle_only_emits_present_direction(self):
         index = build_inverted_index([FIXTURE_INDEX_ABANDONNER])

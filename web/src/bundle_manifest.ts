@@ -57,12 +57,11 @@ export const EXPECTED_MANIFEST = {
   compression: "none",
   record_schema_id: "normalized_v1",
   record_schema_version: "1",
-  rule_versions: {
-    normalization: "norm_v1",
-  },
   reconciliation_action: "REPLACE_ALL",
   update_mode: "REPLACE_ALL",
 } as const;
+
+const NORMALIZATION_RULESET_RE = /^norm_v\d+$/;
 
 function isObject(x: unknown): x is Record<string, unknown> {
   return typeof x === "object" && x !== null;
@@ -203,12 +202,11 @@ export function parseAndValidateManifestJson(text: string): BundleManifestValida
       `record_schema_version mismatch: ${fmtExpected(record_schema_version, EXPECTED_MANIFEST.record_schema_version)}`,
     );
   }
-  if (normalization_ruleset && normalization_ruleset !== EXPECTED_MANIFEST.rule_versions.normalization) {
+  if (normalization_ruleset && !NORMALIZATION_RULESET_RE.test(normalization_ruleset)) {
     errors.push(
-      `rule_versions.normalization mismatch: ${fmtExpected(
-        normalization_ruleset,
-        EXPECTED_MANIFEST.rule_versions.normalization,
-      )}`,
+      `rule_versions.normalization mismatch: expected versioned norm_vN value, got '${
+        normalization_ruleset ?? "undefined"
+      }'`,
     );
   }
   if (reconciliation_action && reconciliation_action !== EXPECTED_MANIFEST.reconciliation_action) {

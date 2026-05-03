@@ -32,7 +32,7 @@ Input artifact:
 Example path:
 
 ```text
-data/normalized/malipense_normalized_norm_v1.jsonl
+data/normalized/<dataset>_normalized_norm_vN.jsonl
 ```
 
 ## Step 2: Build the Search Index
@@ -73,6 +73,13 @@ Result:
 - `bundle.manifest.json`
 - `records.jsonl`
 - `search_index.jsonl`
+
+The bundle manifest's `rule_versions.normalization` value is derived from the
+normalized records' `norm_version`. This is how new rulesets such as
+`norm_v2` remain explicit in published bundles.
+
+For the formal `norm_v2` source-term phrase extraction contract, see
+`docs/GLOSS_DECOMPOSITION.md`.
 
 Expected shape:
 

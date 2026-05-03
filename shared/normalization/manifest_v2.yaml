@@ -1,0 +1,25 @@
+ruleset_id: norm_v2
+
+description: >
+  Additive search-quality ruleset. Reuses norm_v1 key transforms while
+  expanding the forms that feed them: index_mapping source terms gain
+  deterministic phrase extraction, and lexicon_entry target variants include
+  source-provided N'Ko headwords when available. Phrase extraction is
+  constrained by a minimum length, stopword filtering, and capped segment /
+  phrase counts to keep index growth controlled.
+
+changelog:
+  - version: norm_v2
+    date: "2026-04-25"
+    description: >
+      Preserve original source_term, add extracted source phrases for
+      gloss-like index entries, and include headword_nko_provided in
+      lexicon_entry variant_forms.
+
+data_files: []
+
+code_files:
+  - path: norm_v2.py
+    description: "norm_v2 phrase extraction and additive form selection"
+  - path: norm_v1.py
+    description: "Shared search-key transforms reused unchanged by norm_v2"
