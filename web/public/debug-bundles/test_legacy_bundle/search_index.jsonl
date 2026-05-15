@@ -1,0 +1,32 @@
+{"key": "alpha_fr", "key_type": "casefold", "ir_ids": ["diag_idx_alpha"]}
+{"key": "alpha_mnk", "key_type": "casefold", "ir_ids": ["diag_lex_alpha"]}
+{"key": "beta_fr", "key_type": "casefold", "ir_ids": ["diag_idx_beta"]}
+{"key": "beta_mnk", "key_type": "casefold", "ir_ids": ["diag_lex_beta"]}
+{"key": "bon travail", "key_type": "casefold", "ir_ids": ["diag_idx_bon_travail"]}
+{"key": "bon_mnk", "key_type": "casefold", "ir_ids": ["diag_lex_bon_mnk"]}
+{"key": "dàa dá", "key_type": "casefold", "ir_ids": ["diag_lex_daa_da"]}
+{"key": "ouverture", "key_type": "casefold", "ir_ids": ["diag_idx_ouverture"]}
+{"key": "alpha_fr", "key_type": "diacritics_insensitive", "ir_ids": ["diag_idx_alpha"]}
+{"key": "alpha_mnk", "key_type": "diacritics_insensitive", "ir_ids": ["diag_lex_alpha"]}
+{"key": "beta_fr", "key_type": "diacritics_insensitive", "ir_ids": ["diag_idx_beta"]}
+{"key": "beta_mnk", "key_type": "diacritics_insensitive", "ir_ids": ["diag_lex_beta"]}
+{"key": "bon travail", "key_type": "diacritics_insensitive", "ir_ids": ["diag_idx_bon_travail"]}
+{"key": "bon_mnk", "key_type": "diacritics_insensitive", "ir_ids": ["diag_lex_bon_mnk"]}
+{"key": "daa da", "key_type": "diacritics_insensitive", "ir_ids": ["diag_lex_daa_da"]}
+{"key": "ouverture", "key_type": "diacritics_insensitive", "ir_ids": ["diag_idx_ouverture"]}
+{"key": "alpha_fr", "key_type": "nospace", "ir_ids": ["diag_idx_alpha"]}
+{"key": "alpha_mnk", "key_type": "nospace", "ir_ids": ["diag_lex_alpha"]}
+{"key": "beta_fr", "key_type": "nospace", "ir_ids": ["diag_idx_beta"]}
+{"key": "beta_mnk", "key_type": "nospace", "ir_ids": ["diag_lex_beta"]}
+{"key": "bon_mnk", "key_type": "nospace", "ir_ids": ["diag_lex_bon_mnk"]}
+{"key": "bontravail", "key_type": "nospace", "ir_ids": ["diag_idx_bon_travail"]}
+{"key": "daada", "key_type": "nospace", "ir_ids": ["diag_lex_daa_da"]}
+{"key": "ouverture", "key_type": "nospace", "ir_ids": ["diag_idx_ouverture"]}
+{"key": "alphafr", "key_type": "punct_stripped", "ir_ids": ["diag_idx_alpha"]}
+{"key": "alphamnk", "key_type": "punct_stripped", "ir_ids": ["diag_lex_alpha"]}
+{"key": "betafr", "key_type": "punct_stripped", "ir_ids": ["diag_idx_beta"]}
+{"key": "betamnk", "key_type": "punct_stripped", "ir_ids": ["diag_lex_beta"]}
+{"key": "bon travail", "key_type": "punct_stripped", "ir_ids": ["diag_idx_bon_travail"]}
+{"key": "bonmnk", "key_type": "punct_stripped", "ir_ids": ["diag_lex_bon_mnk"]}
+{"key": "daa da", "key_type": "punct_stripped", "ir_ids": ["diag_lex_daa_da"]}
+{"key": "ouverture", "key_type": "punct_stripped", "ir_ids": ["diag_idx_ouverture"]}

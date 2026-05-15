@@ -45,13 +45,16 @@ npm run dev
 
 ## Notes (scope discipline)
 
-This phase is scaffolding only:
+This folder started as Phase 2.0.1 scaffolding, but the runtime has since moved
+well beyond that initial scope.
 
-- No bundle loading yet
-- No JS normalization parity yet
-- No search UI yet
+Completed since the initial scaffold:
 
-Those land in Phase 2.0.2+ per `docs/ROADMAP.md`.
+- Bundle loading/import and IndexedDB storage
+- JS normalization parity for query-time lookup behavior
+- Search UI, entry rendering, offline shell behavior, and multi-bundle flows
+
+See `docs/ROADMAP.md` for the milestone history and the current follow-up work.
 
 ## Performance constraint (important)
 

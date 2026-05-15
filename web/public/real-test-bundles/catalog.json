@@ -1,0 +1,21 @@
+{
+  "catalog_schema_version": "bundle_catalog_v1",
+  "bundles": [
+    {
+      "bundle_id": "bundle_full_20260418_1dc526df",
+      "name": "French ↔ Maninka Real Directional Test Bundle",
+      "version": "real-directional-1",
+      "size_bytes": 21323831,
+      "url_base": "./bundle_full_20260418_1dc526df/",
+      "content_sha256": "sha256:1dc526dfd4c3c32f32135677df84b3e162deeeb723d4ac77590f4876290ce18b",
+      "languages": {
+        "source_lang": "fr",
+        "target_lang": "mnk"
+      },
+      "language_labels": {
+        "source": "French",
+        "target": "Maninka"
+      }
+    }
+  ]
+}

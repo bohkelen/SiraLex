@@ -239,7 +239,7 @@ describe("Phase 4.2 remote install", () => {
       expect(installed?.storage_bytes).toBe(entry.size_bytes);
       expect(installed?.expected_content_sha256).toBe("sha256:bundle");
 
-      const resultIds = await searchQuery(db, active!.storage_scope_id!, "target_to_source", "hello");
+      const resultIds = await searchQuery(db, active!.storage_scope_id!, "target_to_source", "hello", true);
       expect(resultIds.ir_ids).toEqual(["rec-1"]);
       const records = await resolveRecords(db, active!.storage_scope_id!, resultIds.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-1"]);
@@ -425,11 +425,11 @@ describe("Phase 4.2 remote install", () => {
       expect(active?.storage_scope_id).toBe(newScope);
       expect((await getInstalledBundleMeta(db, "maninka_fr_v1"))?.storage_scope_id).toBe(newScope);
 
-      const resultIds = await searchQuery(db, newScope, "target_to_source", "hello");
+      const resultIds = await searchQuery(db, newScope, "target_to_source", "hello", true);
       expect(resultIds.ir_ids).toEqual(["rec-new"]);
       const records = await resolveRecords(db, newScope, resultIds.ir_ids);
       expect(records.map((record) => record.preferred_form)).toEqual(["updated-entry"]);
-      expect((await searchQuery(db, oldScope, "target_to_source", "hello")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, oldScope, "target_to_source", "hello", true)).ir_ids).toEqual([]);
     } finally {
       db.close();
     }
@@ -540,11 +540,11 @@ describe("Phase 4.2 remote install", () => {
       expect(installedB?.storage_scope_id).toBe(newScope);
       expect(installedB?.expected_content_sha256).toBe("sha256:new");
 
-      const activeIds = await searchQuery(db, activeScope, "target_to_source", "bundle-a");
+      const activeIds = await searchQuery(db, activeScope, "target_to_source", "bundle-a", true);
       expect(activeIds.ir_ids).toEqual([`${activeScope}-rec`]);
-      const updatedIds = await searchQuery(db, newScope, "target_to_source", "bundle-b");
+      const updatedIds = await searchQuery(db, newScope, "target_to_source", "bundle-b", true);
       expect(updatedIds.ir_ids).toEqual(["bundle-b-new"]);
-      expect((await searchQuery(db, oldScope, "target_to_source", "bundle-b")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, oldScope, "target_to_source", "bundle-b", true)).ir_ids).toEqual([]);
     } finally {
       db.close();
     }
@@ -748,8 +748,8 @@ describe("Phase 4.2 remote install", () => {
       expect((await getInstalledBundleMeta(db, "maninka_fr_v1"))?.expected_content_sha256).toBe("sha256:old");
       expect(await getBundleInstallSession(db)).toBeUndefined();
       expect(await recoverInterruptedBundleInstall(db)).toBeUndefined();
-      expect((await searchQuery(db, oldScope, "target_to_source", "hello")).ir_ids).toEqual([`${oldScope}-rec`]);
-      expect((await searchQuery(db, newScope, "target_to_source", "hello")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, oldScope, "target_to_source", "hello", true)).ir_ids).toEqual([`${oldScope}-rec`]);
+      expect((await searchQuery(db, newScope, "target_to_source", "hello", true)).ir_ids).toEqual([]);
     } finally {
       db.close();
     }
@@ -863,8 +863,8 @@ describe("Phase 4.2 remote install", () => {
       expect((await getInstalledBundleMeta(db, "maninka_fr_v1"))?.expected_content_sha256).toBe("sha256:old");
       expect(await getBundleInstallSession(db)).toBeUndefined();
       expect(await recoverInterruptedBundleInstall(db)).toBeUndefined();
-      expect((await searchQuery(db, oldScope, "target_to_source", "hello")).ir_ids).toEqual([`${oldScope}-rec`]);
-      expect((await searchQuery(db, newScope, "target_to_source", "hello-1")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, oldScope, "target_to_source", "hello", true)).ir_ids).toEqual([`${oldScope}-rec`]);
+      expect((await searchQuery(db, newScope, "target_to_source", "hello-1", true)).ir_ids).toEqual([]);
     } finally {
       db.close();
     }

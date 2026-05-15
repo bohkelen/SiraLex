@@ -93,6 +93,14 @@ SAMPLE_INDEX_ENTRIES = [
     },
 ]
 
+SAMPLE_INDEX_ENTRIES_DIRECTIONAL = [
+    {
+        "key": "bon travail",
+        "key_type": "src_casefold",
+        "ir_ids": ["ffff1111eeee2222"],
+    },
+]
+
 
 def write_jsonl(path: Path, records: list[dict]) -> None:
     with open(path, "w", encoding="utf-8") as f:
@@ -115,7 +123,7 @@ def bundle_inputs_v2(tmp_path):
     normalized = tmp_path / "normalized_v2.jsonl"
     search_index = tmp_path / "search_index_v2.jsonl"
     write_jsonl(normalized, SAMPLE_NORMALIZED_RECORDS_V2)
-    write_jsonl(search_index, SAMPLE_INDEX_ENTRIES)
+    write_jsonl(search_index, SAMPLE_INDEX_ENTRIES_DIRECTIONAL)
     return normalized, search_index
 
 
@@ -284,6 +292,24 @@ class TestBuildBundle:
 
         assert manifest["rule_versions"]["normalization"] == "norm_v2"
 
+    def test_emits_directional_flag_true_for_norm_v2(self, bundle_inputs_v2, tmp_path):
+        normalized, search_index = bundle_inputs_v2
+        output_dir = tmp_path / "bundles"
+
+        result = build_bundle(normalized, search_index, output_dir)
+        manifest = result["manifest"]
+
+        assert manifest["search_index_directional"] is True
+
+    def test_emits_directional_flag_false_for_legacy(self, bundle_inputs, tmp_path):
+        normalized, search_index = bundle_inputs
+        output_dir = tmp_path / "bundles"
+
+        result = build_bundle(normalized, search_index, output_dir)
+        manifest = result["manifest"]
+
+        assert manifest["search_index_directional"] is False
+
     def test_sources_included(self, bundle_inputs, tmp_path):
         normalized, search_index = bundle_inputs
         output_dir = tmp_path / "bundles"
@@ -372,6 +398,36 @@ class TestBuildBundle:
 
         assert "seed" in result["bundle_id"]
         assert result["manifest"]["bundle_type"] == "seed"
+
+    def test_directional_mode_rejects_legacy_key_families(self, bundle_inputs_v2, tmp_path):
+        normalized, _ = bundle_inputs_v2
+        search_index = tmp_path / "search_index_legacy_for_v2.jsonl"
+        write_jsonl(search_index, SAMPLE_INDEX_ENTRIES)
+
+        with pytest.raises(ValueError, match="Directional bundle mode requires src_\\*/tgt_\\*"):
+            build_bundle(normalized, search_index, tmp_path / "bundles")
+
+    def test_legacy_mode_rejects_directional_key_families(self, bundle_inputs, tmp_path):
+        normalized, _ = bundle_inputs
+        search_index = tmp_path / "search_index_directional_for_legacy.jsonl"
+        write_jsonl(search_index, SAMPLE_INDEX_ENTRIES_DIRECTIONAL)
+
+        with pytest.raises(ValueError, match="Legacy bundle mode requires undirected key families only"):
+            build_bundle(normalized, search_index, tmp_path / "bundles")
+
+    def test_rejects_mixed_key_families(self, bundle_inputs, tmp_path):
+        normalized, _ = bundle_inputs
+        search_index = tmp_path / "search_index_mixed.jsonl"
+        write_jsonl(
+            search_index,
+            [
+                {"key": "test", "key_type": "casefold", "ir_ids": ["aaaa1111bbbb2222"]},
+                {"key": "test", "key_type": "tgt_casefold", "ir_ids": ["aaaa1111bbbb2222"]},
+            ],
+        )
+
+        with pytest.raises(ValueError, match="mixes directional and legacy key families"):
+            build_bundle(normalized, search_index, tmp_path / "bundles")
 
     def test_optional_language_metadata(self, bundle_inputs, tmp_path):
         normalized, search_index = bundle_inputs

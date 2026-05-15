@@ -46,6 +46,19 @@ import {
   installBundleIntoDb,
   installRemoteCatalogBundle,
 } from "./install/bundle_install";
+import {
+  clearQueryLogsFromUi,
+  exportQueryLogsFromUi,
+  getQueryLogCountFromDb,
+} from "./query_logging/query_log_controls";
+import { queryLogHitMiss } from "./query_logging/query_log_inspect";
+import { listRecentQueryLogs } from "./query_logging/query_log_store";
+import {
+  appendSearchQueryLogIfEnabled,
+  getQueryLoggingEnabled,
+  setQueryLoggingEnabled,
+} from "./query_logging/query_log_runtime";
+import type { QueryLogEventV1 } from "./query_logging/query_log_types";
 import { searchQuery } from "./search/search_query";
 import { resolveRecords } from "./search/resolve_records";
 import { renderResultsList } from "./render/render_results";
@@ -96,7 +109,7 @@ app.innerHTML = `
       </div>
       <div class="row" style="margin-top: 12px">
         <button id="quickImport" class="btn">Install bundle files</button>
-        <input id="quickImportFiles" type="file" multiple accept=".json,.jsonl" style="display: none" />
+        <input id="quickImportFiles" type="file" multiple style="display: none" />
         <button id="cancelInstall" class="btn" style="display: none">Cancel install</button>
       </div>
       <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
@@ -110,6 +123,35 @@ app.innerHTML = `
       <p class="subtitle">
         Type a query to search the dictionary. Uses the exactness ladder: casefold → diacritics_insensitive → punct_stripped → nospace.
       </p>
+
+      <div style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
+        <div class="row" style="align-items: center; justify-content: space-between; gap: 12px">
+          <div>
+            <div class="label">Validation logging</div>
+            <div id="queryLoggingStatus" class="mono">Off</div>
+            <div id="queryLoggingCount" class="mono" style="margin-top: 4px">0 logs</div>
+          </div>
+          <button id="queryLoggingToggle" class="btn" type="button">Turn On</button>
+        </div>
+        <div class="row" style="margin-top: 8px; gap: 8px">
+          <button id="queryLogExport" class="btn" type="button">Export logs</button>
+          <button id="queryLogClear" class="btn" type="button">Clear logs</button>
+        </div>
+        <p class="subtitle" style="margin: 8px 0 0 0">
+          Logs stay on this device. No automatic upload.
+        </p>
+        <div id="queryLogMessage" class="mono" style="margin-top: 8px"></div>
+        <div style="margin-top: 12px">
+          <div class="label">Recent query logs (debug)</div>
+          <p id="recentQueryLogsOffNote" class="mono" style="margin: 8px 0 0 0; display: none">Logging is off.</p>
+          <div id="recentQueryLogsActive" style="display: none; margin-top: 8px">
+            <div class="row" style="margin-bottom: 8px">
+              <button id="recentQueryLogsRefresh" class="btn" type="button">Refresh</button>
+            </div>
+            <div id="recentQueryLogsTableHost"></div>
+          </div>
+        </div>
+      </div>
 
       <div class="row" style="margin-top: 12px; align-items: center">
         <div class="field" style="flex: 1">
@@ -142,11 +184,11 @@ app.innerHTML = `
         <div class="row" style="margin-top: 12px">
           <div class="field">
             <div class="label">records.jsonl (enriched)</div>
-            <input id="recordsFile" type="file" accept=".jsonl,.txt,application/json" />
+            <input id="recordsFile" type="file" />
           </div>
           <div class="field">
             <div class="label">search_index.jsonl</div>
-            <input id="indexFile" type="file" accept=".jsonl,.txt,application/json" />
+            <input id="indexFile" type="file" />
           </div>
         </div>
 
@@ -203,6 +245,16 @@ const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
 const searchMeta = mustGetEl<HTMLDivElement>("#searchMeta");
 const searchResults = mustGetEl<HTMLDivElement>("#searchResults");
 const langToggle = mustGetEl<HTMLButtonElement>("#langToggle");
+const queryLoggingStatus = mustGetEl<HTMLDivElement>("#queryLoggingStatus");
+const queryLoggingCount = mustGetEl<HTMLDivElement>("#queryLoggingCount");
+const queryLoggingToggleBtn = mustGetEl<HTMLButtonElement>("#queryLoggingToggle");
+const queryLogExportBtn = mustGetEl<HTMLButtonElement>("#queryLogExport");
+const queryLogClearBtn = mustGetEl<HTMLButtonElement>("#queryLogClear");
+const queryLogMessage = mustGetEl<HTMLDivElement>("#queryLogMessage");
+const recentQueryLogsOffNote = mustGetEl<HTMLParagraphElement>("#recentQueryLogsOffNote");
+const recentQueryLogsActive = mustGetEl<HTMLDivElement>("#recentQueryLogsActive");
+const recentQueryLogsRefreshBtn = mustGetEl<HTMLButtonElement>("#recentQueryLogsRefresh");
+const recentQueryLogsTableHost = mustGetEl<HTMLDivElement>("#recentQueryLogsTableHost");
 
 // Developer tools elements
 const recordsFile = mustGetEl<HTMLInputElement>("#recordsFile");
@@ -1322,12 +1374,160 @@ probeAllBtn.addEventListener("click", () => {
 
 let searchDirection: SearchDirection = "source_to_target";
 
+const RECENT_QUERY_LOGS_LIMIT = 50;
+
+async function fetchRecentQueryLogs(limit: number): Promise<QueryLogEventV1[]> {
+  let db: IDBDatabase | undefined;
+  try {
+    db = await openSiralexDb();
+    return await listRecentQueryLogs(db, { limit });
+  } finally {
+    db?.close();
+  }
+}
+
+function styleInspectCell(el: HTMLElement): void {
+  el.style.border = "1px solid var(--border)";
+  el.style.padding = "4px 6px";
+  el.style.textAlign = "left";
+  el.style.verticalAlign = "top";
+}
+
+function renderRecentQueryLogs(rows: QueryLogEventV1[]): DocumentFragment {
+  const frag = document.createDocumentFragment();
+  if (rows.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "mono";
+    empty.textContent = "No logs yet.";
+    frag.appendChild(empty);
+    return frag;
+  }
+
+  const table = document.createElement("table");
+  table.style.borderCollapse = "collapse";
+  table.style.width = "100%";
+  table.style.fontSize = "13px";
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const label of ["query_raw", "hit/miss", "ladder_level_hit", "timestamp_iso"]) {
+    const th = document.createElement("th");
+    th.textContent = label;
+    styleInspectCell(th);
+    headRow.appendChild(th);
+  }
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    const tdRaw = document.createElement("td");
+    tdRaw.textContent = row.query_raw;
+    styleInspectCell(tdRaw);
+    const tdHit = document.createElement("td");
+    tdHit.textContent = queryLogHitMiss(row);
+    styleInspectCell(tdHit);
+    const tdLadder = document.createElement("td");
+    tdLadder.textContent = row.ladder_level_hit;
+    styleInspectCell(tdLadder);
+    const tdTs = document.createElement("td");
+    tdTs.textContent = row.timestamp_iso;
+    styleInspectCell(tdTs);
+    tr.append(tdRaw, tdHit, tdLadder, tdTs);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  const tableScroll = document.createElement("div");
+  tableScroll.className = "recent-query-logs-table-scroll";
+  tableScroll.appendChild(table);
+  frag.appendChild(tableScroll);
+  return frag;
+}
+
+async function updateRecentQueryLogsView() {
+  if (!getQueryLoggingEnabled()) {
+    recentQueryLogsOffNote.style.display = "";
+    recentQueryLogsActive.style.display = "none";
+    recentQueryLogsTableHost.replaceChildren();
+    return;
+  }
+
+  recentQueryLogsOffNote.style.display = "none";
+  recentQueryLogsActive.style.display = "";
+
+  try {
+    const rows = await fetchRecentQueryLogs(RECENT_QUERY_LOGS_LIMIT);
+    recentQueryLogsTableHost.replaceChildren(renderRecentQueryLogs(rows));
+  } catch (e) {
+    recentQueryLogsTableHost.replaceChildren();
+    const err = document.createElement("p");
+    err.className = "mono";
+    err.textContent = `Recent logs error: ${String(e)}`;
+    recentQueryLogsTableHost.appendChild(err);
+  }
+}
+
+async function refreshQueryLoggingCount() {
+  const result = await getQueryLogCountFromDb();
+  queryLoggingCount.textContent = result.message;
+  if (!result.ok) {
+    queryLogMessage.textContent = result.message;
+  }
+}
+
+function updateQueryLoggingToggleState() {
+  const enabled = getQueryLoggingEnabled();
+  queryLoggingStatus.textContent = enabled ? "On" : "Off";
+  queryLoggingToggleBtn.textContent = enabled ? "Turn Off" : "Turn On";
+  queryLoggingToggleBtn.setAttribute("aria-pressed", enabled ? "true" : "false");
+}
+
+async function renderQueryLoggingToggle() {
+  updateQueryLoggingToggleState();
+  queryLogMessage.textContent = "";
+  await refreshQueryLoggingCount();
+  await updateRecentQueryLogsView();
+}
+
 function updateLangToggle() {
   const directionText = getSearchDirectionText(searchDirection, currentActiveBundle?.language_meta);
   langToggle.textContent = directionText;
   searchLabel.textContent = `Query (${directionText})`;
   searchInput.placeholder = getSearchPlaceholder(searchDirection, currentActiveBundle?.language_meta);
 }
+
+queryLoggingToggleBtn.addEventListener("click", () => {
+  const nextEnabled = !getQueryLoggingEnabled();
+  setQueryLoggingEnabled(nextEnabled);
+  if (!nextEnabled) {
+    cancelPendingSettledQueryLog();
+  }
+  updateQueryLoggingToggleState();
+  queryLogMessage.textContent = "";
+  void updateRecentQueryLogsView();
+});
+
+queryLogExportBtn.addEventListener("click", () => {
+  void (async () => {
+    const result = await exportQueryLogsFromUi();
+    queryLogMessage.textContent = result.message;
+    await refreshQueryLoggingCount();
+  })();
+});
+
+queryLogClearBtn.addEventListener("click", () => {
+  void (async () => {
+    const result = await clearQueryLogsFromUi();
+    queryLogMessage.textContent = result.message;
+    await refreshQueryLoggingCount();
+    await updateRecentQueryLogsView();
+  })();
+});
+
+recentQueryLogsRefreshBtn.addEventListener("click", () => {
+  void updateRecentQueryLogsView();
+});
 
 langToggle.addEventListener("click", () => {
   searchDirection = searchDirection === "source_to_target" ? "target_to_source" : "source_to_target";
@@ -1336,12 +1536,66 @@ langToggle.addEventListener("click", () => {
 
 // --- Search + results ---
 
+const QUERY_LOGGING_SETTLE_DELAY_MS = 800;
+
+type SettledQueryLogPayload = {
+  seq: number;
+  query: string;
+  direction: SearchDirection;
+  result: Awaited<ReturnType<typeof searchQuery>>;
+  activeBundleMeta: ActiveBundleMeta;
+  storageScopeId: string;
+};
+
 let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+let queryLoggingSettleTimer: ReturnType<typeof setTimeout> | undefined;
+let pendingSettledLogPayload: SettledQueryLogPayload | undefined;
 let searchSeq = 0;
 let lastSearchRecords: EnrichedRecord[] = [];
 
+function cancelPendingSettledQueryLog() {
+  if (queryLoggingSettleTimer !== undefined) {
+    clearTimeout(queryLoggingSettleTimer);
+    queryLoggingSettleTimer = undefined;
+  }
+  pendingSettledLogPayload = undefined;
+}
+
+function scheduleSettledQueryLog(payload: SettledQueryLogPayload) {
+  cancelPendingSettledQueryLog();
+  pendingSettledLogPayload = payload;
+
+  queryLoggingSettleTimer = setTimeout(() => {
+    const pending = pendingSettledLogPayload;
+    queryLoggingSettleTimer = undefined;
+    pendingSettledLogPayload = undefined;
+
+    if (!pending) return;
+    if (pending.seq !== searchSeq) return;
+    if (pending.query.trim() === "") return;
+    if (searchInput.value !== pending.query) return;
+    if (searchDirection !== pending.direction) return;
+    if (!currentActiveBundle) return;
+    if (currentActiveBundle.bundle_id !== pending.activeBundleMeta.bundle_id) return;
+    if (getBundleStorageScopeId(currentActiveBundle) !== pending.storageScopeId) return;
+    if (!getQueryLoggingEnabled()) return;
+
+    void appendSearchQueryLogIfEnabled({
+      queryRaw: pending.query,
+      direction: pending.direction,
+      result: pending.result,
+      activeBundleMeta: pending.activeBundleMeta,
+      storageScopeId: pending.storageScopeId,
+    }).then(async () => {
+      await refreshQueryLoggingCount();
+      await updateRecentQueryLogsView();
+    });
+  }, QUERY_LOGGING_SETTLE_DELAY_MS);
+}
+
 searchInput.addEventListener("input", () => {
   clearTimeout(searchDebounceTimer);
+  cancelPendingSettledQueryLog();
   const query = searchInput.value;
   if (query.trim() === "") {
     searchSeq += 1;
@@ -1404,7 +1658,13 @@ async function runSearch(query: string) {
     }
     const activeStorageScopeId = getBundleStorageScopeId(activeBundleMeta);
 
-    const result = await searchQuery(db, activeStorageScopeId, searchDirection, query);
+    const result = await searchQuery(
+      db,
+      activeStorageScopeId,
+      searchDirection,
+      query,
+      activeBundleMeta.search_index_directional === true,
+    );
     if (seq !== searchSeq) return;
 
     if (result.ir_ids.length === 0) {
@@ -1413,6 +1673,14 @@ async function runSearch(query: string) {
         `Query: "${query}" — No matches (all 4 levels checked). ${elapsedMs.toFixed(1)} ms`;
       searchResults.innerHTML = "";
       lastSearchRecords = [];
+      scheduleSettledQueryLog({
+        seq,
+        query,
+        direction: searchDirection,
+        result,
+        activeBundleMeta,
+        storageScopeId: activeStorageScopeId,
+      });
       return;
     }
 
@@ -1426,6 +1694,14 @@ async function runSearch(query: string) {
 
     lastSearchRecords = records;
     showResultsList();
+    scheduleSettledQueryLog({
+      seq,
+      query,
+      direction: searchDirection,
+      result,
+      activeBundleMeta,
+      storageScopeId: activeStorageScopeId,
+    });
   } catch (e) {
     if (seq !== searchSeq) return;
     searchMeta.textContent = `Search error: ${String(e)}`;
@@ -1437,6 +1713,7 @@ async function runSearch(query: string) {
 }
 
 async function initializeAppState() {
+  await renderQueryLoggingToggle();
   let recoveryMessage: string | undefined;
   const db = await openSiralexDb();
   try {

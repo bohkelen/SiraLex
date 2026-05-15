@@ -1,0 +1,58 @@
+{
+  "manifest_schema_version": "bundle_manifest_v1",
+  "bundle_id": "bundle_full_20260418_e1c98a70",
+  "bundle_type": "full",
+  "bundle_format": "directory",
+  "compression": "none",
+  "record_schema_id": "normalized_v1",
+  "record_schema_version": "1",
+  "rule_versions": {
+    "normalization": "norm_v1"
+  },
+  "sources": {
+    "included": [
+      "src_debug_directional"
+    ],
+    "excluded": []
+  },
+  "reconciliation_action": "REPLACE_ALL",
+  "update_mode": "REPLACE_ALL",
+  "build": {
+    "ir_parser_versions": [
+      "debug_fixture_v1"
+    ],
+    "git_commit": "bdb24735980e21d90631daa0a701e17ec879acbe",
+    "record_counts": {
+      "index_mappings": 4,
+      "lexicon_entries": 4
+    }
+  },
+  "files": [
+    {
+      "path": "records.jsonl",
+      "byte_length": 3625,
+      "sha256": "sha256:52dd0cc609cb36c80a03a5cb3d20cabc5e3df037c5a03d8d1a5fd7f77c491513"
+    },
+    {
+      "path": "search_index.jsonl",
+      "byte_length": 2691,
+      "sha256": "sha256:1d06d66eefcefc5e62a389ac36e2621e63c0b3b2371cf49873c00799ca4525fd"
+    }
+  ],
+  "content_sha256": "sha256:e1c98a70d17d67436f434d229ac50c5d8ddff5737a0a1aa0dd3e32307aef6a31",
+  "languages": {
+    "source_lang": "fr",
+    "target_lang": "mnk"
+  },
+  "language_labels": {
+    "source": "French",
+    "target": "Maninka"
+  },
+  "scripts": {
+    "target_supported": [
+      "latin",
+      "nko"
+    ]
+  },
+  "search_index_directional": true
+}

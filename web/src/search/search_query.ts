@@ -46,18 +46,10 @@ function idbGet<T>(store: IDBObjectStore, key: IDBValidKey): Promise<T | undefin
 /**
  * Search the IndexedDB search_index store using the exactness ladder.
  *
- * Phase 4.2.5: Prefer directional key types (src_* / tgt_*) so that the
- * selected search direction only hits keys for that side. For bundles built
- * before directional indexing (legacy bundles with undirected key_type like
- * "casefold"), falls back to the undirected ladder so search still works.
- *
- * Future improvement (recommended): Use a bundle-level capability flag
- * (e.g. manifest "search_index_directional": true) so that:
- * - Directional bundle → NEVER fallback; use only the directional ladder.
- * - Legacy bundle → ALWAYS use the legacy (undirected) ladder only.
- * This avoids hybrid "try directional then fallback" logic, which can cause
- * subtle ranking distortions (e.g. weak directional match vs strong legacy
- * match producing confusing result order).
+ * The search path is selected by a bundle-level capability flag:
+ * - directional bundle -> directional key families only (src_* / tgt_*)
+ * - legacy bundle -> undirected key families only
+ * No mixed fallback is allowed.
  *
  * @returns Ordered ir_id list from the first matching level, or empty if
  *          no level matches. The result preserves the stored ir_ids[] order.
@@ -67,6 +59,7 @@ export async function searchQuery(
   activeBundleId: string,
   direction: SearchDirection,
   query: string,
+  searchIndexDirectional: boolean,
 ): Promise<SearchResult> {
   const trimmed = query.trim();
   if (activeBundleId.trim() === "" || trimmed === "") {
@@ -78,31 +71,14 @@ export async function searchQuery(
   const tx = db.transaction(STORE_SEARCH_INDEX, "readonly");
   const store = tx.objectStore(STORE_SEARCH_INDEX);
 
-  // 1) Directional ladder (bundles built with Phase 4.2.5+ index)
+  // Exactly one ladder is used, selected by bundle contract.
   for (const keyType of KEY_TYPE_ORDER) {
     const normalizedKeys = keys[keyType];
     if (normalizedKeys.length === 0) continue;
-    const directionalKeyType = toDirectionalKeyType(direction, keyType);
+    const storageKeyType = searchIndexDirectional ? toDirectionalKeyType(direction, keyType) : keyType;
 
     for (const normalizedKey of normalizedKeys) {
-      const entry = await idbGet<{ ir_ids: string[] }>(store, [activeBundleId, directionalKeyType, normalizedKey]);
-      if (entry && Array.isArray(entry.ir_ids) && entry.ir_ids.length > 0) {
-        return {
-          ir_ids: entry.ir_ids,
-          matched_key_type: keyType,
-          matched_key: normalizedKey,
-        };
-      }
-    }
-  }
-
-  // 2) Legacy fallback: undirected key types (bundles built before Phase 4.2.5)
-  for (const keyType of KEY_TYPE_ORDER) {
-    const normalizedKeys = keys[keyType];
-    if (normalizedKeys.length === 0) continue;
-
-    for (const normalizedKey of normalizedKeys) {
-      const entry = await idbGet<{ ir_ids: string[] }>(store, [activeBundleId, keyType, normalizedKey]);
+      const entry = await idbGet<{ ir_ids: string[] }>(store, [activeBundleId, storageKeyType, normalizedKey]);
       if (entry && Array.isArray(entry.ir_ids) && entry.ir_ids.length > 0) {
         return {
           ir_ids: entry.ir_ids,
