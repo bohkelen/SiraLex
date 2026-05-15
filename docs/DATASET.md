@@ -35,11 +35,15 @@ Search-quality improvements that change how variant forms are derived must ship
 as a new normalization ruleset and new derived artifacts, never by rewriting
 the frozen `norm_v1` outputs in place.
 
-Current planned successor:
+Current shipped successor for new derived artifacts:
 
 - `norm_v2`: keeps the full original `source_term`, adds deterministic
   source-phrase extraction for `index_mapping`, and includes
   `headword_nko_provided` in `lexicon_entry.variant_forms`
+
+`norm_v1` remains the authoritative ruleset for the frozen v1.0 dataset above.
+`norm_v2` is the validated successor for improved search-quality bundle builds;
+it does not retroactively rewrite the frozen `norm_v1` outputs.
 
 ## How to cite
 

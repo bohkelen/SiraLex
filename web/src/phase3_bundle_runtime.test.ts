@@ -17,6 +17,7 @@ import {
 } from "./idb/siralex_db";
 import { importRecordsJsonl } from "./import/import_records";
 import { importSearchIndexJsonl } from "./import/import_search_index";
+import { installBundleIntoDb } from "./install/bundle_install";
 import { resolveRecords } from "./search/resolve_records";
 import { searchQuery } from "./search/search_query";
 
@@ -52,6 +53,7 @@ describe("Phase 3 manifest parsing", () => {
     expect(result.manifest?.languages).toBeUndefined();
     expect(result.manifest?.language_labels).toBeUndefined();
     expect(result.manifest?.scripts).toBeUndefined();
+    expect(result.manifest?.search_index_directional).toBeUndefined();
   });
 
   it("parses optional language metadata when present", () => {
@@ -109,6 +111,33 @@ describe("Phase 3 manifest parsing", () => {
 
     expect(result.ok).toBe(true);
     expect(result.manifest?.rule_versions.normalization).toBe("norm_v2");
+  });
+
+  it("parses search_index_directional when present", () => {
+    const result = parseAndValidateManifestJson(
+      JSON.stringify({
+        manifest_schema_version: "bundle_manifest_v1",
+        bundle_id: "bundle_full_directional_33333333",
+        bundle_type: "full",
+        bundle_format: "directory",
+        compression: "none",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        rule_versions: { normalization: "norm_v2" },
+        sources: { included: ["src_malipense"], excluded: [] },
+        reconciliation_action: "REPLACE_ALL",
+        update_mode: "REPLACE_ALL",
+        search_index_directional: true,
+        files: [
+          { path: "records.jsonl", byte_length: 10, sha256: "sha256:aaa" },
+          { path: "search_index.jsonl", byte_length: 20, sha256: "sha256:bbb" },
+        ],
+        content_sha256: "sha256:ccc",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.manifest?.search_index_directional).toBe(true);
   });
 });
 
@@ -217,7 +246,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       let active = await getActiveBundleMeta(db);
       expect(active?.bundle_id).toBe(bundleB);
 
-      let result = await searchQuery(db, bundleB, "target_to_source", "hello");
+      let result = await searchQuery(db, bundleB, "target_to_source", "hello", true);
       expect(result.ir_ids).toEqual(["rec-b"]);
       let records = await resolveRecords(db, bundleB, result.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-b"]);
@@ -226,7 +255,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       active = await getActiveBundleMeta(db);
       expect(active?.bundle_id).toBe(bundleA);
 
-      result = await searchQuery(db, bundleA, "target_to_source", "hello");
+      result = await searchQuery(db, bundleA, "target_to_source", "hello", true);
       expect(result.ir_ids).toEqual(["rec-a"]);
       records = await resolveRecords(db, bundleA, result.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-a"]);
@@ -286,14 +315,14 @@ describe("Phase 3 bundle-aware runtime", () => {
         { bundleId, batchSize: 10 },
       );
 
-      expect((await searchQuery(db, bundleId, "source_to_target", "bon travail")).ir_ids).toEqual(["rec-source"]);
-      expect((await searchQuery(db, bundleId, "source_to_target", "merci")).ir_ids).toEqual(["rec-source"]);
-      expect((await searchQuery(db, bundleId, "source_to_target", "bon réveil")).ir_ids).toEqual(["rec-source"]);
-      expect((await searchQuery(db, bundleId, "source_to_target", "bon re\u0301veil")).ir_ids).toEqual(["rec-source"]);
-      expect((await searchQuery(db, bundleId, "target_to_source", "ߘߊ߰")).ir_ids).toEqual(["rec-target"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "bon travail", true)).ir_ids).toEqual(["rec-source"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "merci", true)).ir_ids).toEqual(["rec-source"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "bon réveil", true)).ir_ids).toEqual(["rec-source"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "bon re\u0301veil", true)).ir_ids).toEqual(["rec-source"]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "ߘߊ߰", true)).ir_ids).toEqual(["rec-target"]);
 
-      expect((await searchQuery(db, bundleId, "target_to_source", "bon travail")).ir_ids).toEqual([]);
-      expect((await searchQuery(db, bundleId, "source_to_target", "ߘߊ߰")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "bon travail", true)).ir_ids).toEqual([]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "ߘߊ߰", true)).ir_ids).toEqual([]);
     } finally {
       db.close();
     }
@@ -384,7 +413,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       const active = await getActiveBundleMeta(db);
       expect(active?.bundle_id).toBe("bundle_full_a_aaaaaaaa");
 
-      const result = await searchQuery(db, "bundle_full_a_aaaaaaaa", "target_to_source", "hello");
+      const result = await searchQuery(db, "bundle_full_a_aaaaaaaa", "target_to_source", "hello", true);
       expect(result.ir_ids).toEqual(["rec-a"]);
       const records = await resolveRecords(db, "bundle_full_a_aaaaaaaa", result.ir_ids);
       expect(records.map((record) => record.ir_id)).toEqual(["rec-a"]);
@@ -431,12 +460,12 @@ describe("Phase 3 bundle-aware runtime", () => {
         imported_at_iso: "2026-03-10T00:00:00Z",
       });
 
-      let result = await searchQuery(db, "bundle_a::sha256:new", "target_to_source", "hello");
+      let result = await searchQuery(db, "bundle_a::sha256:new", "target_to_source", "hello", true);
       expect(result.ir_ids).toEqual(["rec-staged"]);
 
       await deleteBundleData(db, "bundle_a");
 
-      result = await searchQuery(db, "bundle_a::sha256:new", "target_to_source", "hello");
+      result = await searchQuery(db, "bundle_a::sha256:new", "target_to_source", "hello", true);
       expect(result.ir_ids).toEqual([]);
     } finally {
       db.close();
@@ -473,7 +502,7 @@ describe("Phase 3 bundle-aware runtime", () => {
       const message = await recoverInterruptedBundleInstall(db);
       expect(message).toContain("Recovered committed install");
 
-      const result = await searchQuery(db, "bundle_a", "target_to_source", "old");
+      const result = await searchQuery(db, "bundle_a", "target_to_source", "old", false);
       expect(result.ir_ids).toEqual([]);
     } finally {
       db.close();
@@ -524,10 +553,10 @@ describe("Phase 3 bundle-aware runtime", () => {
         { bundleId, batchSize: 10 },
       );
 
-      expect((await searchQuery(db, bundleId, "source_to_target", "abandonner")).ir_ids).toEqual(["rec-source"]);
-      expect((await searchQuery(db, bundleId, "target_to_source", "bàn")).ir_ids).toEqual(["rec-target"]);
-      expect((await searchQuery(db, bundleId, "source_to_target", "bàn")).ir_ids).toEqual([]);
-      expect((await searchQuery(db, bundleId, "target_to_source", "abandonner")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "abandonner", true)).ir_ids).toEqual(["rec-source"]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "bàn", true)).ir_ids).toEqual(["rec-target"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "bàn", true)).ir_ids).toEqual([]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "abandonner", true)).ir_ids).toEqual([]);
     } finally {
       db.close();
     }
@@ -562,14 +591,14 @@ describe("Phase 3 bundle-aware runtime", () => {
         { bundleId, batchSize: 10 },
       );
 
-      expect((await searchQuery(db, bundleId, "target_to_source", "bàn")).ir_ids).toEqual(["rec-target"]);
-      expect((await searchQuery(db, bundleId, "source_to_target", "bàn")).ir_ids).toEqual([]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "bàn", true)).ir_ids).toEqual(["rec-target"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "bàn", true)).ir_ids).toEqual([]);
     } finally {
       db.close();
     }
   });
 
-  it("falls back to undirected key types for bundles built before Phase 4.2.5", async () => {
+  it("uses undirected key types for legacy bundles", async () => {
     const db = await openSiralexDb();
     try {
       const bundleId = "bundle_legacy_undirected_keys";
@@ -604,8 +633,146 @@ describe("Phase 3 bundle-aware runtime", () => {
         { bundleId, batchSize: 10 },
       );
 
-      expect((await searchQuery(db, bundleId, "source_to_target", "ouverture")).ir_ids).toEqual(["rec-ouverture"]);
-      expect((await searchQuery(db, bundleId, "target_to_source", "ouverture")).ir_ids).toEqual(["rec-ouverture"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "ouverture", false)).ir_ids).toEqual(["rec-ouverture"]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "ouverture", false)).ir_ids).toEqual(["rec-ouverture"]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("imports old manifest without directional flag and searches via legacy ladder", async () => {
+    const parsed = parseAndValidateManifestJson(
+      JSON.stringify({
+        manifest_schema_version: "bundle_manifest_v1",
+        bundle_id: "bundle_legacy_missing_directional_flag",
+        bundle_type: "full",
+        bundle_format: "directory",
+        compression: "none",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        rule_versions: { normalization: "norm_v1" },
+        sources: { included: ["src_malipense"], excluded: [] },
+        reconciliation_action: "REPLACE_ALL",
+        update_mode: "REPLACE_ALL",
+        files: [
+          { path: "records.jsonl", byte_length: 10, sha256: "sha256:aaa" },
+          { path: "search_index.jsonl", byte_length: 20, sha256: "sha256:bbb" },
+        ],
+        content_sha256: "sha256:legacycompat",
+      }),
+    );
+    expect(parsed.ok).toBe(true);
+    expect(parsed.manifest).toBeDefined();
+    expect(parsed.manifest?.search_index_directional).toBeUndefined();
+
+    const db = await openSiralexDb();
+    try {
+      const installResult = await installBundleIntoDb(
+        db,
+        parsed.manifest!,
+        {
+          recordsSource: makeJsonlFile("records.jsonl", [
+            {
+              ir_id: "rec-legacy",
+              ir_kind: "index_mapping",
+              source_id: "src_malipense",
+              norm_version: "norm_v1",
+              preferred_form: "ouverture",
+              variant_forms: ["ouverture"],
+              search_keys: { casefold: ["ouverture"] },
+              display: { source_term: "ouverture" },
+            },
+          ]),
+          searchIndexSource: makeJsonlFile("search_index.jsonl", [
+            { key_type: "casefold", key: "ouverture", ir_ids: ["rec-legacy"] },
+          ]),
+        },
+        () => undefined,
+      );
+      expect(installResult.recordsCount).toBe(1);
+      expect(installResult.indexCount).toBe(1);
+
+      const active = await getActiveBundleMeta(db);
+      expect(active?.bundle_id).toBe("bundle_legacy_missing_directional_flag");
+      expect(active?.search_index_directional).toBe(false);
+
+      const storageScopeId = active?.storage_scope_id ?? active?.bundle_id ?? "";
+      const result = await searchQuery(
+        db,
+        storageScopeId,
+        "source_to_target",
+        "ouverture",
+        active?.search_index_directional === true,
+      );
+      expect(result.ir_ids).toEqual(["rec-legacy"]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("directional mode does not fallback to legacy key families", async () => {
+    const db = await openSiralexDb();
+    try {
+      const bundleId = "bundle_directional_no_legacy_fallback";
+      await importRecordsJsonl(
+        db,
+        makeJsonlFile("records.jsonl", [
+          {
+            ir_id: "rec-directional",
+            ir_kind: "index_mapping",
+            source_id: "src_malipense",
+            norm_version: "norm_v2",
+            preferred_form: "bonjour",
+            variant_forms: ["bonjour"],
+            search_keys: { casefold: ["bonjour"] },
+            display: { source_term: "bonjour" },
+          },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+      await importSearchIndexJsonl(
+        db,
+        makeJsonlFile("search_index.jsonl", [
+          { key_type: "casefold", key: "bonjour", ir_ids: ["rec-directional"] },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+
+      expect((await searchQuery(db, bundleId, "source_to_target", "bonjour", true)).ir_ids).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("legacy mode does not attempt directional key families", async () => {
+    const db = await openSiralexDb();
+    try {
+      const bundleId = "bundle_legacy_no_directional_attempt";
+      await importRecordsJsonl(
+        db,
+        makeJsonlFile("records.jsonl", [
+          {
+            ir_id: "rec-directional-only",
+            ir_kind: "index_mapping",
+            source_id: "src_malipense",
+            norm_version: "norm_v1",
+            preferred_form: "bonjour",
+            variant_forms: ["bonjour"],
+            search_keys: { casefold: ["bonjour"] },
+            display: { source_term: "bonjour" },
+          },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+      await importSearchIndexJsonl(
+        db,
+        makeJsonlFile("search_index.jsonl", [
+          { key_type: "src_casefold", key: "bonjour", ir_ids: ["rec-directional-only"] },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+
+      expect((await searchQuery(db, bundleId, "source_to_target", "bonjour", false)).ir_ids).toEqual([]);
     } finally {
       db.close();
     }

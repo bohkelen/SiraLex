@@ -36,6 +36,7 @@ export type BundleManifestV1 = {
   };
   reconciliation_action: string;
   update_mode: string;
+  search_index_directional?: boolean;
   files: BundleManifestV1FileEntry[];
   content_sha256: string;
   languages?: BundleManifestLanguages;
@@ -75,6 +76,11 @@ function getString(obj: Record<string, unknown>, key: string): string | undefine
 function getArray(obj: Record<string, unknown>, key: string): unknown[] | undefined {
   const v = obj[key];
   return Array.isArray(v) ? v : undefined;
+}
+
+function getOptionalBoolean(obj: Record<string, unknown>, key: string): boolean | undefined {
+  const v = obj[key];
+  return typeof v === "boolean" ? v : undefined;
 }
 
 function getOptionalStringObject(
@@ -132,6 +138,7 @@ export function parseAndValidateManifestJson(text: string): BundleManifestValida
   const record_schema_version = getString(raw, "record_schema_version");
   const reconciliation_action = getString(raw, "reconciliation_action");
   const update_mode = getString(raw, "update_mode");
+  const search_index_directional = getOptionalBoolean(raw, "search_index_directional");
   const content_sha256 = getString(raw, "content_sha256");
   const languages = getOptionalStringObject(raw["languages"], ["source_lang", "target_lang"]) as
     | BundleManifestLanguages
@@ -157,6 +164,9 @@ export function parseAndValidateManifestJson(text: string): BundleManifestValida
   if (!record_schema_version) errors.push("Missing/invalid field: record_schema_version");
   if (!reconciliation_action) errors.push("Missing/invalid field: reconciliation_action");
   if (!update_mode) errors.push("Missing/invalid field: update_mode");
+  if ("search_index_directional" in raw && typeof raw["search_index_directional"] !== "boolean") {
+    errors.push("Invalid field: search_index_directional must be boolean when present");
+  }
   if (!content_sha256) errors.push("Missing/invalid field: content_sha256");
   if (!normalization_ruleset) errors.push("Missing/invalid field: rule_versions.normalization");
 
@@ -258,6 +268,7 @@ export function parseAndValidateManifestJson(text: string): BundleManifestValida
       : { included: [], excluded: [] },
     reconciliation_action: reconciliation_action!,
     update_mode: update_mode!,
+    search_index_directional,
     files,
     content_sha256: content_sha256!,
     languages,

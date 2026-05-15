@@ -1,0 +1,37 @@
+{
+  "catalog_schema_version": "bundle_catalog_v1",
+  "bundles": [
+    {
+      "bundle_id": "bundle_full_20260418_e1c98a70",
+      "name": "French ↔ Maninka Diagnostic Directional Bundle",
+      "version": "debug-1",
+      "size_bytes": 6316,
+      "url_base": "./test_directional_bundle/",
+      "content_sha256": "sha256:e1c98a70d17d67436f434d229ac50c5d8ddff5737a0a1aa0dd3e32307aef6a31",
+      "languages": {
+        "source_lang": "fr",
+        "target_lang": "mnk"
+      },
+      "language_labels": {
+        "source": "French",
+        "target": "Maninka"
+      }
+    },
+    {
+      "bundle_id": "bundle_full_20260418_b7053979",
+      "name": "French ↔ Maninka Legacy Diagnostic Bundle",
+      "version": "debug-legacy-1",
+      "size_bytes": 6188,
+      "url_base": "./test_legacy_bundle/",
+      "content_sha256": "sha256:b70539792d8875bbd53d98e03edf73e57af955587d4e2fccb25e6740601ec5a7",
+      "languages": {
+        "source_lang": "fr",
+        "target_lang": "mnk"
+      },
+      "language_labels": {
+        "source": "French",
+        "target": "Maninka"
+      }
+    }
+  ]
+}

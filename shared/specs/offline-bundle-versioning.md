@@ -80,10 +80,18 @@ Every bundle MUST include a manifest file (e.g., `bundle.manifest.json`) contain
   - `consumer_compat.min_record_schema_version`
   - `consumer_compat.min_app_version` (OPTIONAL)
 - **Rule versions (required)**
-  - `rule_versions.normalization` (e.g., `norm_v1`) — see `shared/specs/normalization-versioning.md`
+  - `rule_versions.normalization` (e.g., `norm_v1`, `norm_v2`) — see `shared/specs/normalization-versioning.md`
   - `rule_versions.transliteration` (e.g., `nko_translit_v1`) when applicable
   - `rule_versions.pos_mapping` (e.g., `posmap_v1`) when applicable
   - `rule_versions.url_canonicalization` (e.g., `urlcanon_v1`) when applicable
+- **Directional search capability (required for new bundle builds)**
+  - `search_index_directional` (`true` | `false`)
+  - consumer behavior is strict and single-path:
+    - `true` -> use directional `src_*` / `tgt_*` ladders only
+    - `false` or absent -> use legacy undirected ladder only
+  - mixed fallback between directional and legacy ladders is not allowed
+  - bundle builders must emit this field for current builds; older legacy
+    bundles may omit it for backward compatibility
 - **Corrections (required if corrections are applied)**
   - `corrections.correctionset_id`
   - `corrections.sha256` (or include the corrections payload file in `files[]`)

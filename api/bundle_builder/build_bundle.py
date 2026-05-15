@@ -24,6 +24,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+LEGACY_KEY_TYPES = {
+    "casefold",
+    "diacritics_insensitive",
+    "punct_stripped",
+    "nospace",
+}
+
+DIRECTIONAL_KEY_TYPES = {
+    f"{family}_{key_type}"
+    for family in ("src", "tgt")
+    for key_type in LEGACY_KEY_TYPES
+}
+
+
 # ---------------------------------------------------------------------------
 # Hashing utilities
 # ---------------------------------------------------------------------------
@@ -186,6 +200,74 @@ def _detect_normalization_ruleset(normalized_path: Path) -> str:
     return detected
 
 
+def _is_directional_ruleset(normalization_ruleset: str) -> bool:
+    """
+    Declare search-index direction capability from build ruleset contract.
+
+    Current contract:
+    - norm_v2 bundles are directional
+    - older rulesets are treated as legacy
+    """
+    return normalization_ruleset == "norm_v2"
+
+
+def _collect_search_index_key_types(search_index_path: Path) -> set[str]:
+    key_types: set[str] = set()
+    with open(search_index_path, "r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"Invalid JSON in search index at {search_index_path}:{line_num}: {exc}"
+                ) from exc
+            key_type = entry.get("key_type")
+            if not isinstance(key_type, str) or not key_type.strip():
+                raise ValueError(
+                    f"Missing/invalid key_type in search index at {search_index_path}:{line_num}"
+                )
+            key_types.add(key_type)
+    return key_types
+
+
+def _validate_search_index_key_families(
+    search_index_path: Path,
+    search_index_directional: bool,
+) -> None:
+    key_types = _collect_search_index_key_types(search_index_path)
+    if not key_types:
+        raise ValueError(f"No search index entries found in {search_index_path}")
+
+    seen_legacy = key_types & LEGACY_KEY_TYPES
+    seen_directional = key_types & DIRECTIONAL_KEY_TYPES
+    seen_unknown = key_types - LEGACY_KEY_TYPES - DIRECTIONAL_KEY_TYPES
+
+    if seen_unknown:
+        unknown = ", ".join(sorted(seen_unknown))
+        raise ValueError(
+            f"Unsupported search index key_type values in {search_index_path}: {unknown}"
+        )
+
+    if seen_legacy and seen_directional:
+        raise ValueError(
+            "Search index mixes directional and legacy key families, which is not allowed: "
+            f"legacy={sorted(seen_legacy)}, directional={sorted(seen_directional)}"
+        )
+
+    if search_index_directional and not seen_directional:
+        raise ValueError(
+            "Directional bundle mode requires src_*/tgt_* key families in search_index.jsonl"
+        )
+
+    if not search_index_directional and seen_directional:
+        raise ValueError(
+            "Legacy bundle mode requires undirected key families only in search_index.jsonl"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Bundle builder
 # ---------------------------------------------------------------------------
@@ -239,6 +321,8 @@ def build_bundle(
     # Count records by ir_kind for informational metadata
     record_counts = _count_records_by_kind(normalized_path)
     normalization_ruleset = _detect_normalization_ruleset(normalized_path)
+    search_index_directional = _is_directional_ruleset(normalization_ruleset)
+    _validate_search_index_key_families(search_index_path, search_index_directional)
 
     # Date string for bundle ID
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -290,6 +374,7 @@ def build_bundle(
         "rule_versions": {
             "normalization": normalization_ruleset,
         },
+        "search_index_directional": search_index_directional,
         "sources": {
             "included": sorted(sources_included),
             "excluded": [],

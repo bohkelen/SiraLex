@@ -23,6 +23,7 @@ body {
   max-width: 900px;
   margin: 0 auto;
   padding: 24px;
+  box-sizing: border-box;
 }
 
 .card {
@@ -49,9 +50,14 @@ body {
   flex-wrap: wrap;
 }
 
+.row > * {
+  min-width: 0;
+}
+
 .field {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .label {
@@ -106,6 +112,7 @@ input[type="text"]::placeholder {
   font-size: 12px;
   color: color-mix(in oklab, var(--text) 92%, var(--muted) 8%);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .catalog-empty {
@@ -139,9 +146,14 @@ input[type="text"]::placeholder {
   gap: 12px;
 }
 
+.catalog-item-header > * {
+  min-width: 0;
+}
+
 .catalog-item-title {
   font-size: 15px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .catalog-item-subtitle {
@@ -153,11 +165,13 @@ input[type="text"]::placeholder {
 .catalog-item-meta {
   font-size: 12px;
   color: color-mix(in oklab, var(--text) 90%, var(--muted) 10%);
+  overflow-wrap: anywhere;
 }
 
 .catalog-item-note {
   font-size: 12px;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .catalog-badge {
@@ -443,6 +457,18 @@ button.target-link .target-text {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
   color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.recent-query-logs-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 12px;
+  }
 }
 
 .entry-error {

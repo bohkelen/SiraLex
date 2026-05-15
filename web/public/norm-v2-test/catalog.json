@@ -1,0 +1,21 @@
+{
+  "catalog_schema_version": "bundle_catalog_v1",
+  "bundles": [
+    {
+      "bundle_id": "bundle_full_20260427_ad0e7deb",
+      "name": "French ↔ Maninka norm_v2 Validation Bundle",
+      "version": "norm-v2-validation-1",
+      "size_bytes": 24538796,
+      "url_base": "./bundles/bundle_full_20260427_ad0e7deb/",
+      "content_sha256": "sha256:ad0e7deb88adfe13fae35da3f991e5d09637f2f2c1d9a73cf55eed53d8230390",
+      "languages": {
+        "source_lang": "fr",
+        "target_lang": "mnk"
+      },
+      "language_labels": {
+        "source": "French",
+        "target": "Maninka"
+      }
+    }
+  ]
+}

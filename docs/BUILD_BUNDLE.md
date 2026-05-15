@@ -78,6 +78,15 @@ The bundle manifest's `rule_versions.normalization` value is derived from the
 normalized records' `norm_version`. This is how new rulesets such as
 `norm_v2` remain explicit in published bundles.
 
+The builder also emits `search_index_directional` as a bundle capability:
+
+- `norm_v2` build path -> `search_index_directional: true`
+- legacy build path -> `search_index_directional: false`
+
+The builder validates that `search_index.jsonl` key families match the declared
+capability (directional `src_*`/`tgt_*` only vs legacy undirected only). Mixed
+key families fail the build.
+
 For the formal `norm_v2` source-term phrase extraction contract, see
 `docs/GLOSS_DECOMPOSITION.md`.
 

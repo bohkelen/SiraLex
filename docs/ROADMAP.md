@@ -244,12 +244,13 @@ DoD:
 | 10 | Phase 3.3 — Installed bundle registry | Platform generalization | ✅ Complete |
 | 11 | Phase 3.4 — Multi-bundle support | Platform generalization | ✅ Complete |
 | 12 | Phase 3.5 — Bundle selection + distribution | Platform generalization | ✅ Complete |
-| 13 | Phase 5 — Search/index quality improvement | Next primary focus | Pending |
-| 14 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
-| 15 | HTTPS deployment + iPhone offline validation | Release-readiness track | Pending |
-| 16 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
+| 13 | Phase 5a — `norm_v2` indexing shipped | Search/index quality | ✅ Complete |
+| 14 | Phase 5b — Field Validation + Search Reality Calibration | Next primary focus | Pending |
+| 15 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
+| 16 | HTTPS + device validation execution | Active validation track | Pending |
+| 17 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
 
-Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. The next primary engineering track is therefore **Phase 5 — Search/index quality improvement**, not a return to earlier platform milestones. Phase 1.5 backend work can still proceed in parallel as light spec work, and HTTPS/iPhone validation remains an important release-readiness track. Branch C remains explicitly deferred until real usage data exists.
+Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. Search/index quality is no longer a single undifferentiated pending bucket: **Phase 5a** is now treated as complete because `norm_v2` indexing has been implemented and validated, while **Phase 5b** becomes the next primary engineering track for observing real search behavior under real constraints and calibrating future bundle improvements against empirical usage. Directional contract hardening remains necessary, but it is now a bounded subtask inside that validation phase rather than the phase objective. Phase 1.5 backend work can still proceed in parallel as light spec work, and device/deployment validation is elevated into active execution during Phase 5b. Branch C remains explicitly deferred until real usage data exists.
 
 The completed Phase 2.0 work followed clean layer separation:
 
@@ -486,63 +487,219 @@ DoD:
 
 ## Phase 5 — Search/index quality improvement
 
-This is now the next primary engineering milestone.
+Phase 5 now has two parts: the indexing-quality upgrade that shipped as
+`norm_v2`, and the remaining contract/runtime hardening needed so directional
+search behavior is explicit and non-hybrid across bundle generations.
 
-The current runtime can install, switch, update, and query bundles correctly, but search usefulness is still limited by the granularity and shape of the current index.
+### Phase 5a — `norm_v2` indexing shipped ✅
 
-Current limitation:
+This milestone is complete.
 
-- the search index is built from whole normalized source terms and target headword/variant forms
-- it does **not** break gloss-like source strings into smaller atomic searchable units
-- this can reduce match quality for:
-  - multiword phrases
-  - punctuation-heavy glosses
-  - diacritics and spacing variants
-  - partial phrase lookups
-  - N'Ko search quality once that surface becomes more important
+What shipped:
 
-Primary scope:
+- `norm_v2` was introduced additively rather than mutating frozen `norm_v1`
+- `index_mapping.fields_raw.source_term` remains preserved verbatim
+- deterministic extracted source phrases are added at normalization time for
+  better `src_*` key coverage
+- source-provided N'Ko headwords are included in target-side variants so
+  `tgt_*` keys can match real N'Ko queries
+- runtime query execution remains structurally unchanged; improved retrieval
+  comes from better bundle key coverage, not from new client heuristics
 
-- tokenization
-- gloss splitting
-- phrase matching
-- diacritics/spacing behavior
-- N'Ko search quality
+Completion criteria now satisfied:
 
-Guardrails:
+- the project has a documented, versioned indexing strategy for whole-string
+  keys versus atomic searchable units
+- real-bundle validation showed materially better retrieval for phrase-heavy
+  and punctuation-heavy source entries without regressing deterministic bundle
+  generation
+- `norm_v2` remains explicit in derived artifacts and bundle metadata through
+  `rule_versions.normalization`
 
-- do not replace the current bundle/search contract prematurely
-- do not silently change search semantics without versioned bundle metadata
-- base tokenization and phrase-indexing rules on observed bundle behavior and real query needs, not speculative over-design
-- keep deterministic bundle generation as a non-negotiable constraint
+### Phase 5b — Field Validation + Search Reality Calibration
 
-Current implementation direction:
+Primary objective:
+Observe and measure real search behavior under real-world constraints
+(offline-first, low-literacy, mixed-language input).
 
-- introduce `norm_v2` rather than mutating frozen `norm_v1`
-- keep the original `index_mapping.fields_raw.source_term` as-is
-- add deterministic extracted source phrases additively at normalization time
-- keep runtime query execution unchanged; improved retrieval comes from better
-  `src_*` / `tgt_*` key coverage, not from new client heuristics
-- include source-provided N'Ko headwords in target-side variants so `tgt_*`
-  keys can match real N'Ko queries
+This phase transitions SiraLex from architectural correctness to operational
+validation.
 
-DoD:
+#### Scope
 
-- the project has a documented, versioned indexing strategy for whole-string keys versus atomic searchable units
-- real-bundle tests show materially better retrieval for phrase-heavy and punctuation-heavy source entries without regressing deterministic bundle generation
-- any new indexing/search mode is explicit in bundle metadata/versioning rather than silently changing runtime behavior
+This phase introduces a local-first validation layer that captures how users
+actually interact with the search system and where it fails.
 
-### Parallel validation track — HTTPS deployment + iPhone offline validation
+The goal is not to improve search heuristics yet, but to produce reliable
+empirical signals that guide future bundle and normalization improvements.
 
-This is important, but it is not the next core engineering milestone.
+#### Core components
 
-Scope:
+##### 1. Query logging layer (opt-in, local-first)
 
-- deploy the app shell over HTTPS
-- validate install/offline behavior on iPhone/iOS Safari for the shipped PWA flow
-- confirm the real constraints of offline app shell + IndexedDB + bundle installation on iOS
+Capture the following per query:
 
-### Explicitly deferred beyond Phase 5
+- `query_raw`
+- `query_normalized_keys` (output of `computeSearchKeys`)
+- `direction` (`source_to_target` | `target_to_source`)
+- `ladder_level_hit` (`casefold` | `diacritics_insensitive` |
+  `punct_stripped` | `nospace` | `none`)
+- `ir_ids_count`
+- `bundle_id`
+- `bundle_version` (from manifest)
+- `norm_version` (`norm_v1` / `norm_v2`)
+- `app_version` (build identifier)
+- `timestamp`
+- `logging_enabled` (boolean)
+
+Constraints:
+
+- logging must be disabled by default
+- must function fully offline
+- storage must be local-only (IndexedDB or equivalent)
+- must support manual export (JSONL)
+- must support full deletion/reset
+
+##### 2. Failure classification layer (manual, structured)
+
+Provide a mechanism to tag queries with one of:
+
+- `spelling_error`
+- `phrase_mismatch`
+- `language_mismatch`
+- `missing_entry`
+- `index_gap`
+
+Rules:
+
+- no automatic classification
+- tagging can be post-hoc (after export or via debug UI)
+
+##### 3. Local effectiveness metrics
+
+Compute locally:
+
+- `success_rate = queries with results / total queries`
+- `empty_rate = no results / total queries`
+- `fallback_rate = queries not resolved at first ladder level`
+
+No dashboards required. Raw values are sufficient.
+
+##### 4. Bundle feedback loop (offline-compatible)
+
+Define the cycle:
+
+1. Export query logs
+2. Analyze externally
+3. Identify failure patterns
+4. Update:
+   - phrase extraction
+   - normalization rules
+   - index coverage
+5. Rebuild bundle (future `norm_v3`)
+
+No runtime AI involvement.
+
+##### 5. Deployment & device validation (elevated priority)
+
+Must be executed during this phase:
+
+- HTTPS deployment of app shell
+- iPhone (Safari PWA) offline install + reopen validation
+- Android mid-range device validation
+- bundle import friction test
+- offline persistence validation
+
+This is not optional.
+
+##### 6. Directional contract hardening (subtask) ✅
+
+Complete:
+
+- manifest capability is formalized (`search_index_directional`)
+- builder/runtime are aligned on the same directional contract
+- strict runtime path separation (non-hybrid):
+  - directional bundle -> directional ladder only
+  - legacy bundle -> legacy ladder only
+
+Constraint:
+
+- must not delay validation work
+- must not expand scope beyond contract explicitness
+
+#### Privacy & safety constraints
+
+- logging must be explicitly opt-in
+- no automatic upload or transmission
+- export must be manual
+- users must be able to clear all logs instantly
+
+#### Implementation tasks (execution order)
+
+1. **Task 1 — Logging schema + store**
+   - define JSONL schema
+   - create IndexedDB store (for example `query_logs`)
+   - implement append-only write
+2. **Task 2 — Hook into query execution**
+   - instrument Phase 2.0.3b query path
+   - capture ladder resolution result
+   - record bundle + norm metadata
+3. **Task 3 — Debug mode toggle**
+   - UI flag: enable/disable logging
+   - persist setting locally
+4. **Task 4 — Export + reset**
+   - export logs -> JSONL file
+   - add `clear logs` action
+5. **Task 5 — Minimal inspection UI (debug only)**
+   - last N queries
+   - hit/miss indicator
+   - ladder level
+   - no styling, no productization
+6. **Task 6 — Directional contract flag** ✅
+   - manifest capability formalized (`search_index_directional`)
+   - builder/runtime aligned on contract selection and validation
+   - directional and legacy bundles now use distinct, non-hybrid lookup paths
+7. **Task 7 — Device validation execution**
+   - run real device tests
+   - document friction points
+   - document failures
+
+#### Strict boundaries
+
+Do not:
+
+- modify normalization rules
+- introduce fuzzy search
+- introduce ranking/scoring
+- introduce AI assistance
+- expand linguistic scope (Branch C)
+
+This phase is measurement only.
+
+#### Exit criteria
+
+Phase 5b is complete when:
+
+- query logs are captured and exportable
+- validation has been run on:
+  - at least one Android device
+  - at least one iPhone (Safari/PWA)
+- recurring failure classes are observable
+- at least one bundle/index improvement candidate is derived from real query
+  data
+- sufficient query volume exists:
+  - target: `>=100` queries, or
+  - enough diversity to reveal stable failure patterns
+
+#### Outcome definition
+
+You are done when:
+
+- the system produces real behavioral data
+- failures are observable, not theoretical
+- bundle improvements are data-driven, not speculative
+
+### Explicitly deferred beyond Phase 5b
 
 These are valid future directions, but they should not be framed as Phase 3 prerequisites:
 
@@ -551,6 +708,30 @@ These are valid future directions, but they should not be framed as Phase 3 prer
 - speculative performance work not justified by observed bundle size or device behavior
 
 Those belong in a later scaling/performance phase once real multi-bundle usage and device measurements justify them.
+
+#### Product/UX backlog from device validation: single-file manual bundle import
+
+Observation (Task 7, iPhone Safari):
+
+- manual import is now functional after compatibility fixes, but the current
+  three-file selection flow is cognitively awkward for ordinary users:
+  - `bundle.manifest.json`
+  - `records.jsonl`
+  - `search_index.jsonl`
+
+Follow-up direction (not current scope):
+
+- introduce a single distributable bundle package artifact (for example `.zip`
+  or `.siralexbundle`) that contains manifest + payload files
+- let users select one package file for manual sideload
+- unpack locally, then run the existing strict manifest/checksum/import
+  validation flow unchanged
+- keep catalog install as the primary connected-install path
+- keep raw three-file import as advanced/debug fallback
+
+Status:
+
+- backlog only; do not implement as part of current Phase 5b execution
 
 ### Phase 2 memory constraint (lock-in before IndexedDB)
 

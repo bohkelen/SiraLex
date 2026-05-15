@@ -1,18 +1,23 @@
 export const SIRALEX_DB_NAME = "siralex_db";
-export const SIRALEX_DB_VERSION = 2;
+export const SIRALEX_DB_VERSION = 3;
 
 export const STORE_META = "meta" as const;
 export const STORE_RECORDS = "records" as const;
 export const STORE_SEARCH_INDEX = "search_index" as const;
 export const STORE_BUNDLES_REGISTRY = "bundles_registry" as const;
+export const STORE_QUERY_LOGS = "query_logs" as const;
 
 const INDEX_BY_BUNDLE_ID = "by_bundle_id";
+export const QUERY_LOG_INDEX_BY_TIMESTAMP_ISO = "by_timestamp_iso" as const;
+export const QUERY_LOG_INDEX_BY_BUNDLE_ID = "by_bundle_id" as const;
+export const QUERY_LOG_INDEX_BY_STORAGE_SCOPE_ID = "by_storage_scope_id" as const;
 
 export type SiralexObjectStoreName =
   | typeof STORE_META
   | typeof STORE_RECORDS
   | typeof STORE_SEARCH_INDEX
-  | typeof STORE_BUNDLES_REGISTRY;
+  | typeof STORE_BUNDLES_REGISTRY
+  | typeof STORE_QUERY_LOGS;
 
 export type BundleLanguageMeta = {
   source_lang?: string;
@@ -34,6 +39,7 @@ export type ActiveBundleMeta = {
   normalization_ruleset: string;
   update_mode: string;
   reconciliation_action: string;
+  search_index_directional?: boolean;
   expected_content_sha256?: string;
   imported_at_iso: string;
   records_count?: number;
@@ -127,6 +133,15 @@ export async function openSiralexDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_BUNDLES_REGISTRY)) {
         db.createObjectStore(STORE_BUNDLES_REGISTRY, { keyPath: "bundle_id" });
+      }
+      if (!db.objectStoreNames.contains(STORE_QUERY_LOGS)) {
+        const queryLogs = db.createObjectStore(STORE_QUERY_LOGS, {
+          keyPath: "log_id",
+          autoIncrement: true,
+        });
+        queryLogs.createIndex(QUERY_LOG_INDEX_BY_TIMESTAMP_ISO, "timestamp_iso", { unique: false });
+        queryLogs.createIndex(QUERY_LOG_INDEX_BY_BUNDLE_ID, "bundle_id", { unique: false });
+        queryLogs.createIndex(QUERY_LOG_INDEX_BY_STORAGE_SCOPE_ID, "storage_scope_id", { unique: false });
       }
 
       if (oldVersion < 2 && tx != null) {

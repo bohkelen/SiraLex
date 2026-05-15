@@ -200,6 +200,7 @@ function buildInstalledBundleMeta(
     normalization_ruleset: manifest.rule_versions.normalization,
     update_mode: manifest.update_mode,
     reconciliation_action: manifest.reconciliation_action,
+    search_index_directional: manifest.search_index_directional === true,
     expected_content_sha256: manifest.content_sha256,
     imported_at_iso: new Date().toISOString(),
     records_count: recordsCount,
