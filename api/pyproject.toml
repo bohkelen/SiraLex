@@ -23,6 +23,7 @@ siralex-parse-ir = "ir_parser.cli:main"
 siralex-build-index = "search_index.cli:main"
 siralex-build-bundle = "bundle_builder.cli:main"
 siralex-enrich = "enrichment.cli:main"
+siralex-corrections-dry-run = "corrections.cli:main"
 
 [tool.ruff]
 line-length = 100
@@ -32,7 +33,7 @@ target-version = "py310"
 select = ["E", "F", "I", "W"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["snapshot_engine", "ir_parser", "search_index", "bundle_builder", "enrichment"]
+packages = ["snapshot_engine", "ir_parser", "search_index", "bundle_builder", "enrichment", "corrections"]
 
 [build-system]
 requires = ["hatchling"]

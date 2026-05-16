@@ -176,7 +176,7 @@ DoD:
 
 Parts of the feedback loop can be built without a UI. This work is safe and doesn't lock UX decisions.
 
-#### 1. Correction record schema (spec-level)
+#### 1.5A — Correction record schema/specification ✅ *(complete)*
 
 JSON schema for:
 
@@ -187,9 +187,21 @@ JSON schema for:
 - `timestamps`
 - `status`
 
-This is already hinted at in multiple specs — formalizing it completes the data model loop.
+Formal specification has now been drafted:
 
-#### 2. Correction application pipeline (dry-run)
+- Spec: `shared/specs/correction-record-schema-v1.md`
+- Scope includes:
+  - exact schema fields
+  - allowed correction statuses
+  - `target_ir_id` relationship to IR
+  - RFC 6902 patch constraints
+  - validation rules
+  - provenance/audit metadata
+  - test requirements for validation behavior
+
+This milestone is schema-only and does not change runtime behavior.
+
+#### 1.5B — Correction application pipeline (dry-run) ✅ *(complete)*
 
 Tool that:
 
@@ -199,9 +211,37 @@ Tool that:
 
 No UI, no moderation yet — just correctness.
 
+Planning/specification artifact drafted:
+
+- Spec: `shared/specs/correction-application-dry-run.md`
+- Scope includes:
+  - correctionset input format and deterministic ordering
+  - input contracts and IR version context
+  - validation stages and approved-status filtering
+  - conflict policy and deterministic apply/reject behavior
+  - apply-on-copy behavior and output artifact contract
+  - failure reason codes and deterministic test matrix
+
+Implementation completion note:
+
+- correctionset manifest contract validation + `corrections.jsonl` integrity checks (`byte_length` + `sha256`)
+- lifecycle resolution, supersession filtering, and same-target conflict handling
+- deterministic apply-on-copy corrected IR output + machine-readable report generation
+- CLI command: `siralex-corrections-dry-run`
+- focused backend test coverage for lifecycle, integrity, conflicts, patch validation, and deterministic replay
+
+Current boundaries (still intentional):
+
+- correction schema/spec is complete
+- dry-run apply pipeline is complete
+- no UI/moderation workflow exists yet
+- no committed correction-release workflow exists yet
+- dry-run does not persist lifecycle transitions to `applied`
+
 DoD:
-- Correction record JSON schema formalized in `shared/specs/`.
-- Dry-run pipeline can apply corrections to IR and produce a new versioned output.
+- Correction record schema/specification is formalized in `shared/specs/correction-record-schema-v1.md`.
+- Dry-run pipeline specification is formalized in `shared/specs/correction-application-dry-run.md`.
+- Dry-run pipeline implementation is complete with deterministic dry-run outputs and report generation.
 
 ---
 
@@ -245,12 +285,13 @@ DoD:
 | 11 | Phase 3.4 — Multi-bundle support | Platform generalization | ✅ Complete |
 | 12 | Phase 3.5 — Bundle selection + distribution | Platform generalization | ✅ Complete |
 | 13 | Phase 5a — `norm_v2` indexing shipped | Search/index quality | ✅ Complete |
-| 14 | Phase 5b — Field Validation + Search Reality Calibration | Next primary focus | Pending |
-| 15 | Phase 1.5 (spec + backend) — Correction schema + pipeline | Parallel, light | Pending |
-| 16 | HTTPS + device validation execution | Active validation track | Pending |
-| 17 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
+| 14 | Phase 5b — Field Validation + Search Reality Calibration | Validation track | Substantially complete (Android real-device validation deferred pending hardware access) |
+| 15 | Phase 1.5A — Correction record schema/specification | Next formal engineering milestone | ✅ Complete |
+| 16 | Phase 1.5B — Dry-run correction application pipeline | Follows 1.5A approval | ✅ Complete |
+| 17 | HTTPS + Android validation execution | Active validation follow-up | Pending hardware access |
+| 18 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
 
-Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. Search/index quality is no longer a single undifferentiated pending bucket: **Phase 5a** is now treated as complete because `norm_v2` indexing has been implemented and validated, while **Phase 5b** becomes the next primary engineering track for observing real search behavior under real constraints and calibrating future bundle improvements against empirical usage. Directional contract hardening remains necessary, but it is now a bounded subtask inside that validation phase rather than the phase objective. Phase 1.5 backend work can still proceed in parallel as light spec work, and device/deployment validation is elevated into active execution during Phase 5b. Branch C remains explicitly deferred until real usage data exists.
+Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. Search/index quality is no longer a single undifferentiated pending bucket: **Phase 5a** is now treated as complete because `norm_v2` indexing has been implemented and validated, while **Phase 5b** is now substantially complete with Android real-device validation explicitly deferred until hardware access resumes. With that transition, **Phase 1.5A** (correction record schema/specification) and **Phase 1.5B** (dry-run correction application pipeline) are complete for backend dry-run scope. UI/moderation workflows and committed correction-release lifecycle persistence remain intentionally out of scope for this completion state. Branch C remains explicitly deferred until real usage data exists.
 
 The completed Phase 2.0 work followed clean layer separation:
 
