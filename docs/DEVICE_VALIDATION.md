@@ -138,7 +138,7 @@ Resolved and revalidated issues:
 Current assessment:
 
 - iPhone Safari: **validated**
-- Android Chrome: **pending real-device access**
+- Android Chrome: **pending real-device access** (temporarily deferred; no device access for ~2 months)
 - Desktop: **informally validated during prior task reviews, not formally re-run**
 - Overall Task 7: **partially complete pending Android real-device validation**
 
@@ -148,7 +148,8 @@ Reason:
 - Previously observed iPhone blockers/friction sources were fixed and revalidated:
   - manual `.jsonl` import selection now works
   - mobile overflow no longer forces zoom-out
-- Android Chrome real-device validation is still pending.
+- Android Chrome real-device validation is still pending (temporarily deferred
+  until hardware access resumes, expected in ~2 months).
 - Desktop was informally validated during prior task reviews but not formally re-run in Task 7.
 
 Mobile layout overflow - resolved (iPhone Safari):

@@ -612,6 +612,19 @@ Must be executed during this phase:
 
 This is not optional.
 
+Current status note:
+
+- iPhone Safari validation path is complete.
+- Android real-device validation is still pending and remains required for full
+  Phase 5b completion; currently deferred while physical Android hardware is
+  unavailable (expected follow-up window: ~2 months), then rerun and document.
+- Task 8 controlled validation round is complete:
+  - 156 controlled queries executed through the real runtime path
+  - recurring patterns documented from observed outcomes
+  - at least one concrete future bundle/index candidate identified:
+    partial phrase retrieval granularity
+- No search/index behavior changes are part of Task 8 completion.
+
 ##### 6. Directional contract hardening (subtask) ✅
 
 Complete:
@@ -659,10 +672,36 @@ Constraint:
    - manifest capability formalized (`search_index_directional`)
    - builder/runtime aligned on contract selection and validation
    - directional and legacy bundles now use distinct, non-hybrid lookup paths
-7. **Task 7 — Device validation execution**
+7. **Task 7 — Device validation execution** (in progress)
    - run real device tests
    - document friction points
    - document failures
+   - status: iPhone complete; Android pending future access
+8. **Task 8 — First query validation round + search failure analysis** ✅
+   - collect exported validation logs from a meaningful test round
+   - target `>=100` queries, or enough diverse usage to reveal recurring failure patterns
+   - manually classify notable failures using:
+     - `spelling_error`
+     - `phrase_mismatch`
+     - `language_mismatch`
+     - `missing_entry`
+     - `index_gap`
+   - compute basic external summary metrics from exported logs:
+     - total queries
+     - hit rate
+     - miss rate
+     - ladder-level distribution
+   - document recurring failure patterns
+   - derive at least one concrete bundle/index improvement candidate grounded in observed logs
+   - constraints:
+     - no dashboards
+     - no automated classifiers
+     - no ranking/search behavior changes
+   - this is an analysis/validation milestone, not a feature-building milestone
+   - completion note:
+     - controlled Round 1 executed with 156 queries via real runtime path
+     - recurring patterns documented in `docs/QUERY_VALIDATION_ROUND_1.md`
+     - concrete future candidate identified: partial phrase retrieval granularity
 
 #### Strict boundaries
 
