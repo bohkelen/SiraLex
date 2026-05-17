@@ -72,6 +72,10 @@ if (!app) {
   throw new Error("Missing #app root");
 }
 
+const FEATURED_CATALOG_URL =
+  import.meta.env.VITE_FEATURED_CATALOG_URL?.trim() || "/catalog.json";
+const FEATURED_BUNDLE_ID = import.meta.env.VITE_FEATURED_BUNDLE_ID?.trim() || undefined;
+
 app.innerHTML = `
   <div class="container">
     <div class="card">
@@ -80,51 +84,80 @@ app.innerHTML = `
     </div>
 
     <div class="card" style="margin-top: 16px">
-      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Dictionary</h2>
+      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Search</h2>
+      <p class="subtitle">Dictionary-first experience. Install a dictionary if needed, then search.</p>
       <div id="dictStatus" class="mono"></div>
+      <div id="firstRun" style="display: none; margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
+        <div id="featuredInstallStatus" class="mono"></div>
+        <div class="row" style="margin-top: 10px; gap: 8px">
+          <button id="featuredInstall" class="btn">Install dictionary</button>
+          <button id="retryFeaturedInstall" class="btn" style="display: none">Retry install</button>
+        </div>
+      </div>
+
+      <div id="activeDictionaryRow" style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
+        <div class="row" style="align-items: center; justify-content: space-between; gap: 8px">
+          <div class="mono" id="activeDictionarySummary">No active dictionary</div>
+          <button id="openManageDictionaries" class="btn" type="button">Manage dictionaries</button>
+        </div>
+      </div>
+
       <div class="row" style="margin-top: 12px; align-items: center">
         <div class="field" style="flex: 1">
-          <div class="label">Installed dictionaries</div>
-          <select id="bundleSelect" disabled>
-            <option value="">No dictionaries installed</option>
-          </select>
+          <div class="label" id="searchLabel">Query (Source → Target)</div>
+          <input id="searchInput" type="text" placeholder="Type a Source word…" disabled autocomplete="off" />
         </div>
+        <button id="langToggle" class="btn" disabled>Source → Target</button>
       </div>
-      <div id="installedBundleStatus" class="mono" style="margin-top: 12px"></div>
-      <div id="installedBundleList" style="margin-top: 12px"></div>
-      <div class="row" style="margin-top: 12px; align-items: end">
-        <div class="field" style="flex: 1">
-          <div class="label">Catalog URL</div>
-          <input id="catalogUrl" type="text" placeholder="https://example.org/catalog.json or /catalog.json" autocomplete="off" />
-        </div>
-        <button id="loadCatalog" class="btn">Load catalog</button>
-      </div>
-      <div id="catalogStatus" class="mono" style="margin-top: 12px"></div>
-      <div id="catalogList" style="margin-top: 12px"></div>
-      <div id="firstRun" style="display: none; margin-top: 12px">
-        <p style="color: var(--muted); font-size: 14px; margin: 0 0 12px 0">
-          No dictionary installed.<br>
-          Download a dictionary bundle and import it.
-        </p>
-      </div>
-      <div class="row" style="margin-top: 12px">
-        <button id="quickImport" class="btn">Install bundle files</button>
-        <input id="quickImportFiles" type="file" multiple style="display: none" />
-        <button id="cancelInstall" class="btn" style="display: none">Cancel install</button>
-      </div>
-      <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
-      <div class="row" style="margin-top: 12px">
-        <button id="clearDb" class="btn">Delete database</button>
-      </div>
+
+      <div id="searchMeta" class="mono" style="margin-top: 12px"></div>
+      <div id="searchResults" style="margin-top: 12px"></div>
     </div>
 
-    <div class="card" style="margin-top: 16px">
-      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Search</h2>
-      <p class="subtitle">
-        Type a query to search the dictionary. Uses the exactness ladder: casefold → diacritics_insensitive → punct_stripped → nospace.
-      </p>
+    <details id="manageDictionariesPanel" style="margin-top: 16px">
+      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">Manage dictionaries</summary>
+      <div class="card" style="margin-top: 8px">
+        <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Manage dictionaries</h2>
+        <div class="row" style="margin-top: 12px; align-items: center">
+          <div class="field" style="flex: 1">
+            <div class="label">Installed dictionaries</div>
+            <select id="bundleSelect" disabled>
+              <option value="">No dictionaries installed</option>
+            </select>
+          </div>
+        </div>
+        <div id="installedBundleStatus" class="mono" style="margin-top: 12px"></div>
+        <div id="installedBundleList" style="margin-top: 12px"></div>
 
-      <div style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
+        <details style="margin-top: 12px">
+          <summary style="color: var(--muted); font-size: 13px; cursor: pointer">Advanced setup</summary>
+          <div class="row" style="margin-top: 12px; align-items: end">
+            <div class="field" style="flex: 1">
+              <div class="label">Catalog URL</div>
+              <input id="catalogUrl" type="text" placeholder="https://example.org/catalog.json or /catalog.json" autocomplete="off" />
+            </div>
+            <button id="loadCatalog" class="btn">Load catalog</button>
+          </div>
+          <div id="catalogStatus" class="mono" style="margin-top: 12px"></div>
+          <div id="catalogList" style="margin-top: 12px"></div>
+          <div class="row" style="margin-top: 12px">
+            <button id="quickImport" class="btn">Install bundle files</button>
+            <input id="quickImportFiles" type="file" multiple style="display: none" />
+            <button id="cancelInstall" class="btn" style="display: none">Cancel install</button>
+          </div>
+        </details>
+
+        <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
+        <div class="row" style="margin-top: 12px">
+          <button id="clearDb" class="btn">Delete database</button>
+        </div>
+      </div>
+    </details>
+
+    <details style="margin-top: 16px">
+      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">Advanced diagnostics</summary>
+      <div class="card" style="margin-top: 8px">
+        <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Validation diagnostics</h2>
         <div class="row" style="align-items: center; justify-content: space-between; gap: 12px">
           <div>
             <div class="label">Validation logging</div>
@@ -152,18 +185,7 @@ app.innerHTML = `
           </div>
         </div>
       </div>
-
-      <div class="row" style="margin-top: 12px; align-items: center">
-        <div class="field" style="flex: 1">
-          <div class="label" id="searchLabel">Query (Source → Target)</div>
-          <input id="searchInput" type="text" placeholder="Type a Source word…" disabled autocomplete="off" />
-        </div>
-        <button id="langToggle" class="btn" disabled>Source → Target</button>
-      </div>
-
-      <div id="searchMeta" class="mono" style="margin-top: 12px"></div>
-      <div id="searchResults" style="margin-top: 12px"></div>
-    </div>
+    </details>
 
     <details style="margin-top: 16px">
       <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">Developer tools</summary>
@@ -227,6 +249,12 @@ function mustGetEl<T extends Element>(selector: string): T {
 
 // Primary UI elements
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
+const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
+const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
+const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
+const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
+const featuredInstallBtn = mustGetEl<HTMLButtonElement>("#featuredInstall");
+const retryFeaturedInstallBtn = mustGetEl<HTMLButtonElement>("#retryFeaturedInstall");
 const bundleSelect = mustGetEl<HTMLSelectElement>("#bundleSelect");
 const installedBundleStatus = mustGetEl<HTMLDivElement>("#installedBundleStatus");
 const installedBundleList = mustGetEl<HTMLDivElement>("#installedBundleList");
@@ -282,6 +310,7 @@ let loadedCatalogSource: "network" | "cache" | undefined;
 let remoteInstallAbortController: AbortController | undefined;
 let remoteInstallBundleId: string | undefined;
 let currentStorageEstimate: { usage?: number; quota?: number } | undefined;
+let featuredInstallInProgress = false;
 
 function formatErrorDetails(e: unknown): string {
   const details = [`String(e): ${String(e)}`];
@@ -533,6 +562,12 @@ function updateInstallControls() {
   cancelInstallBtn.disabled = !installInProgress;
 }
 
+function updateFeaturedInstallControls() {
+  const disabled = busy || featuredInstallInProgress;
+  featuredInstallBtn.disabled = disabled;
+  retryFeaturedInstallBtn.disabled = disabled;
+}
+
 function buildCachedCatalogSnapshot(
   requestUrl: string,
   responseUrl: string,
@@ -589,6 +624,12 @@ manifestFile.addEventListener("change", () => {
 updateButtons();
 updateCatalogControls();
 updateInstallControls();
+updateFeaturedInstallControls();
+
+openManageDictionariesBtn.addEventListener("click", () => {
+  manageDictionariesPanel.open = true;
+  manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 catalogUrlInput.addEventListener("input", () => {
   updateCatalogControls();
@@ -786,6 +827,9 @@ async function refreshDbStatus() {
       if (active) {
         hasActiveBundle = true;
         firstRun.style.display = "none";
+        retryFeaturedInstallBtn.style.display = "none";
+        featuredInstallStatus.textContent = "";
+        activeDictionarySummary.textContent = `Using: ${getInstalledBundleName(active)} — ready to search`;
         const statusText =
           `Active: ${getInstalledBundleName(active)}\n` +
           `Bundle ID: ${active.bundle_id}\n` +
@@ -795,10 +839,11 @@ async function refreshDbStatus() {
           `Imported: ${active.imported_at_iso}\n` +
           `Records: ${active.records_count ?? "n/a"} | Index entries: ${active.index_entries_count ?? "n/a"}\n` +
           `Approx payload: ${fmtBytes(active.storage_bytes)}\n`;
-        dictStatus.textContent = statusText;
+        dictStatus.textContent = "Dictionary ready for offline search.";
         dbOut.textContent = statusText;
       } else {
         hasActiveBundle = false;
+        activeDictionarySummary.textContent = "No active dictionary";
         const hasRecordsData = await storeHasData(db, STORE_RECORDS);
         const hasIndexData = await storeHasData(db, STORE_SEARCH_INDEX);
         if (bundles.length > 0) {
@@ -821,7 +866,18 @@ async function refreshDbStatus() {
         } else {
           firstRun.style.display = "";
           importProgress.style.display = "none";
-          dictStatus.textContent = "";
+          if (!navigator.onLine) {
+            featuredInstallStatus.textContent =
+              "No dictionary installed and you appear to be offline.\n" +
+              "Connect and retry featured install, or use Manage dictionaries → Advanced setup.";
+            retryFeaturedInstallBtn.style.display = "";
+          } else {
+            featuredInstallStatus.textContent =
+              "Install the deployment-configured featured dictionary to start searching.\n" +
+              "Advanced setup is available for custom catalogs and manual import.";
+            retryFeaturedInstallBtn.style.display = "none";
+          }
+          dictStatus.textContent = "No active dictionary installed yet.";
           dbOut.textContent = "No active bundle.\n";
         }
       }
@@ -843,6 +899,7 @@ async function refreshDbStatus() {
   renderCatalogList();
   searchInput.disabled = !hasActiveBundle || busy;
   langToggle.disabled = !hasActiveBundle || busy;
+  updateFeaturedInstallControls();
   if (!hasActiveBundle) {
     searchMeta.textContent = "";
     searchResults.innerHTML = "";
@@ -1025,13 +1082,17 @@ async function quickImportBundle(fileList: FileList) {
 
 // --- Catalog loading (Phase 4.1) ---
 
-async function loadCatalogFromUrl() {
-  const catalogUrl = catalogUrlInput.value.trim();
+async function loadCatalogFromUrl(
+  catalogUrlOverride?: string,
+  statusTarget: HTMLDivElement = catalogStatus,
+  opts: { updateCatalogInput?: boolean } = {},
+) {
+  const catalogUrl = (catalogUrlOverride ?? catalogUrlInput.value).trim();
   if (catalogUrl === "") return;
 
   catalogLoading = true;
   updateCatalogControls();
-  catalogStatus.textContent = `Loading catalog from ${catalogUrl}...\n`;
+  statusTarget.textContent = `Loading catalog from ${catalogUrl}...\n`;
 
   try {
     const result = await fetchBundleCatalog(catalogUrl, {
@@ -1050,7 +1111,10 @@ async function loadCatalogFromUrl() {
       db.close();
     }
     applyCachedCatalog(cached, "network");
-    catalogStatus.textContent =
+    if (opts.updateCatalogInput !== false) {
+      catalogUrlInput.value = catalogUrl;
+    }
+    statusTarget.textContent =
       `Catalog loaded.\n` +
       `Source: ${result.responseUrl}\n` +
       `Bundles: ${result.catalog.bundles.length}\n` +
@@ -1058,19 +1122,73 @@ async function loadCatalogFromUrl() {
       `Remote policy: https anywhere; http only for same-origin or local hubs (localhost, .local, private IPs).\n` +
       `Bundle URL contract: url_base + bundle.manifest.json / records.jsonl / search_index.jsonl\n`;
     for (const warning of result.warnings) {
-      catalogStatus.textContent += `WARN: ${warning}\n`;
+      statusTarget.textContent += `WARN: ${warning}\n`;
     }
+    return result.catalog.bundles;
   } catch (e) {
-    catalogStatus.textContent = `Catalog load failed: ${String(e)}\n`;
+    statusTarget.textContent = `Catalog load failed: ${String(e)}\n`;
     if (loadedCatalogBundles.length > 0 && loadedCatalogUrl && loadedCatalogFetchedAtIso) {
-      catalogStatus.textContent +=
+      statusTarget.textContent +=
         `Showing cached catalog from ${loadedCatalogUrl}\n` +
         `Fetched at: ${loadedCatalogFetchedAtIso}\n`;
     }
+    throw e;
   } finally {
     catalogLoading = false;
     updateCatalogControls();
     renderCatalogList();
+  }
+}
+
+function getFeaturedCatalogEntry(): BundleCatalogEntryV1 | undefined {
+  if (FEATURED_BUNDLE_ID) {
+    return loadedCatalogBundles.find((entry) => entry.bundle_id === FEATURED_BUNDLE_ID);
+  }
+  return loadedCatalogBundles[0];
+}
+
+async function installFeaturedDictionary() {
+  if (busy || featuredInstallInProgress) return;
+  featuredInstallInProgress = true;
+  updateFeaturedInstallControls();
+  retryFeaturedInstallBtn.style.display = "none";
+  featuredInstallStatus.textContent = "Install started.\n";
+
+  try {
+    if (!navigator.onLine && installedBundles.length === 0) {
+      featuredInstallStatus.textContent =
+        "No dictionary installed and no network connection detected.\n" +
+        "Connect and retry, or use Manage dictionaries → Advanced setup for manual import/custom catalog recovery.";
+      retryFeaturedInstallBtn.style.display = "";
+      return;
+    }
+
+    featuredInstallStatus.textContent += "Downloading/preparing dictionary...\n";
+    await withSingleWriterLock("install featured dictionary", async () => {
+      await loadCatalogFromUrl(FEATURED_CATALOG_URL, featuredInstallStatus, { updateCatalogInput: false });
+      const entry = getFeaturedCatalogEntry();
+      if (!entry) {
+        throw new Error("No featured dictionary entry found in catalog");
+      }
+      const installResult = await installCatalogEntry(entry, true, featuredInstallStatus);
+      if (!installResult.ok) {
+        throw new Error(installResult.message);
+      }
+    });
+
+    featuredInstallStatus.textContent =
+      "Installed and ready to search.\n" +
+      "Manage dictionaries and advanced setup remain available from Manage dictionaries.";
+    dictStatus.textContent = "Dictionary installed and ready for offline search.";
+  } catch (e) {
+    featuredInstallStatus.textContent =
+      "Install failed.\n" +
+      `${String(e)}\n` +
+      "Retry install or open Manage dictionaries → Advanced setup for recovery.";
+    retryFeaturedInstallBtn.style.display = "";
+  } finally {
+    featuredInstallInProgress = false;
+    updateFeaturedInstallControls();
   }
 }
 
@@ -1093,11 +1211,15 @@ async function restoreCachedCatalogFromDb() {
   }
 }
 
-async function installCatalogEntry(entry: BundleCatalogEntryV1, activateOnCommit = true) {
+async function installCatalogEntry(
+  entry: BundleCatalogEntryV1,
+  activateOnCommit = true,
+  progressTarget: HTMLDivElement = importProgress,
+): Promise<{ ok: boolean; message: string }> {
   if (!loadedCatalogUrl) {
-    importProgress.style.display = "";
-    importProgress.textContent = "No catalog source URL is available for this entry.\n";
-    return;
+    progressTarget.style.display = "";
+    progressTarget.textContent = "No catalog source URL is available for this entry.\n";
+    return { ok: false, message: "missing catalog source URL" };
   }
 
   const existingDb = await openSiralexDb();
@@ -1105,9 +1227,9 @@ async function installCatalogEntry(entry: BundleCatalogEntryV1, activateOnCommit
     const installed = await getInstalledBundleMeta(existingDb, entry.bundle_id);
     if (installed?.expected_content_sha256 === entry.content_sha256) {
       await setActiveBundleId(existingDb, entry.bundle_id);
-      importProgress.style.display = "";
-      importProgress.textContent = `Bundle already installed. Marked active: ${entry.bundle_id}\n`;
-      return;
+      progressTarget.style.display = "";
+      progressTarget.textContent = `Bundle already installed. Marked active: ${entry.bundle_id}\n`;
+      return { ok: true, message: "already installed; activated" };
     }
   } finally {
     existingDb.close();
@@ -1117,8 +1239,8 @@ async function installCatalogEntry(entry: BundleCatalogEntryV1, activateOnCommit
   remoteInstallAbortController = controller;
   remoteInstallBundleId = entry.bundle_id;
   updateInstallControls();
-  importProgress.style.display = "";
-  importProgress.textContent = `Preparing remote install for ${entry.bundle_id}...\n`;
+  progressTarget.style.display = "";
+  progressTarget.textContent = `Preparing remote install for ${entry.bundle_id}...\n`;
 
   const db = await openSiralexDb();
   try {
@@ -1126,7 +1248,7 @@ async function installCatalogEntry(entry: BundleCatalogEntryV1, activateOnCommit
       activateOnCommit,
       signal: controller.signal,
       onUpdate: (message) => {
-        importProgress.textContent = message;
+        progressTarget.textContent = message;
       },
       storageEstimate:
         typeof navigator !== "undefined" && navigator.storage?.estimate
@@ -1136,21 +1258,24 @@ async function installCatalogEntry(entry: BundleCatalogEntryV1, activateOnCommit
 
     if (result.skippedBecauseCurrent) {
       await setActiveBundleId(db, manifest.bundle_id);
-      importProgress.textContent = `Bundle already installed. Marked active: ${manifest.bundle_id}\n`;
+      progressTarget.textContent = `Bundle already installed. Marked active: ${manifest.bundle_id}\n`;
+      return { ok: true, message: "already installed; activated" };
     } else {
-      importProgress.textContent =
+      progressTarget.textContent =
         `Remote install complete: ${manifest.bundle_id}\n` +
         `${result.recordsCount} records, ${result.indexCount} index entries\n` +
         `${result.elapsedMs.toFixed(0)} ms\n`;
       if (result.cleanupWarning) {
-        importProgress.textContent += `\n${result.cleanupWarning}\n`;
+        progressTarget.textContent += `\n${result.cleanupWarning}\n`;
       }
+      return { ok: true, message: "installed" };
     }
   } catch (e) {
     console.error("REMOTE INSTALL FAILED", e);
-    importProgress.textContent =
+    progressTarget.textContent =
       `Install FAILED\n` +
       `${formatErrorDetails(e)}\n`;
+    return { ok: false, message: String(e) };
   } finally {
     remoteInstallAbortController = undefined;
     remoteInstallBundleId = undefined;
@@ -1160,7 +1285,15 @@ async function installCatalogEntry(entry: BundleCatalogEntryV1, activateOnCommit
 }
 
 loadCatalogBtn.addEventListener("click", () => {
-  void loadCatalogFromUrl();
+  void loadCatalogFromUrl(undefined, catalogStatus, { updateCatalogInput: true });
+});
+
+featuredInstallBtn.addEventListener("click", () => {
+  void installFeaturedDictionary();
+});
+
+retryFeaturedInstallBtn.addEventListener("click", () => {
+  void installFeaturedDictionary();
 });
 
 // --- Developer tools: manifest validation ---

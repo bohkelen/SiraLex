@@ -290,8 +290,18 @@ DoD:
 | 16 | Phase 1.5B — Dry-run correction application pipeline | Follows 1.5A approval | ✅ Complete |
 | 17 | HTTPS + Android validation execution | Active validation follow-up | Pending hardware access |
 | 18 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
+| 19 | Phase 6B — Consumer Search-First UX + Infrastructure Layering | UX/product milestone | ✅ Complete |
 
-Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. Search/index quality is no longer a single undifferentiated pending bucket: **Phase 5a** is now treated as complete because `norm_v2` indexing has been implemented and validated, while **Phase 5b** is now substantially complete with Android real-device validation explicitly deferred until hardware access resumes. With that transition, **Phase 1.5A** (correction record schema/specification) and **Phase 1.5B** (dry-run correction application pipeline) are complete for backend dry-run scope. UI/moderation workflows and committed correction-release lifecycle persistence remain intentionally out of scope for this completion state. Branch C remains explicitly deferred until real usage data exists.
+Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. Search/index quality is no longer a single undifferentiated pending bucket: **Phase 5a** is now treated as complete because `norm_v2` indexing has been implemented and validated, while **Phase 5b** is now substantially complete with Android real-device validation explicitly deferred until hardware access resumes. With that transition, **Phase 1.5A** (correction record schema/specification) and **Phase 1.5B** (dry-run correction application pipeline) are complete for backend dry-run scope, and **Phase 6B** is complete for consumer UX layering scope. UI/moderation workflows and committed correction-release lifecycle persistence remain intentionally out of scope for this completion state. Branch C remains explicitly deferred until real usage data exists.
+
+### Phase 6B — Consumer Search-First UX + Infrastructure Layering ✅
+
+Completion note:
+
+- consumer search-first UX layering shipped
+- featured dictionary primary install path shipped
+- Manage dictionaries and Advanced diagnostics remain available as secondary infrastructure surfaces
+- no platform capabilities were removed (catalog-driven install, multi-bundle support, manual import, validation diagnostics)
 
 The completed Phase 2.0 work followed clean layer separation:
 
