@@ -51,6 +51,14 @@ import {
   exportQueryLogsFromUi,
   getQueryLogCountFromDb,
 } from "./query_logging/query_log_controls";
+import {
+  getCurrentLocale,
+  type Locale,
+  resolveDefaultLocale,
+  setCurrentLocale,
+  setCurrentLocaleWithPersistence,
+  t,
+} from "./i18n";
 import { queryLogHitMiss } from "./query_logging/query_log_inspect";
 import { listRecentQueryLogs } from "./query_logging/query_log_store";
 import {
@@ -72,6 +80,12 @@ if (!app) {
   throw new Error("Missing #app root");
 }
 
+const DEFAULT_LOCALE = resolveDefaultLocale(
+  import.meta.env.VITE_DEFAULT_LOCALE,
+  typeof navigator !== "undefined" ? navigator.language : undefined,
+);
+setCurrentLocale(DEFAULT_LOCALE);
+
 const FEATURED_CATALOG_URL =
   import.meta.env.VITE_FEATURED_CATALOG_URL?.trim() || "/catalog.json";
 const FEATURED_BUNDLE_ID = import.meta.env.VITE_FEATURED_BUNDLE_ID?.trim() || undefined;
@@ -79,35 +93,46 @@ const FEATURED_BUNDLE_ID = import.meta.env.VITE_FEATURED_BUNDLE_ID?.trim() || un
 app.innerHTML = `
   <div class="container">
     <div class="card">
-      <h1 class="title">SiraLex</h1>
-      <p class="subtitle">Offline-first dictionary</p>
+      <div class="row" style="align-items: start; justify-content: space-between; gap: 12px">
+        <div>
+          <h1 class="title">SiraLex</h1>
+          <p class="subtitle">${t("app.subtitle")}</p>
+        </div>
+        <div class="field locale-control">
+          <div class="label">${t("locale.selectorLabel")}</div>
+          <select id="localeSelect">
+            <option value="fr" ${DEFAULT_LOCALE === "fr" ? "selected" : ""}>${t("locale.french")}</option>
+            <option value="en" ${DEFAULT_LOCALE === "en" ? "selected" : ""}>${t("locale.english")}</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <div class="card" style="margin-top: 16px">
-      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Search</h2>
-      <p class="subtitle">Dictionary-first experience. Install a dictionary if needed, then search.</p>
+      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("search.title")}</h2>
+      <p class="subtitle">${t("search.subtitle")}</p>
       <div id="dictStatus" class="mono"></div>
       <div id="firstRun" style="display: none; margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
         <div id="featuredInstallStatus" class="mono"></div>
         <div class="row" style="margin-top: 10px; gap: 8px">
-          <button id="featuredInstall" class="btn">Install dictionary</button>
-          <button id="retryFeaturedInstall" class="btn" style="display: none">Retry install</button>
+          <button id="featuredInstall" class="btn">${t("firstRun.install")}</button>
+          <button id="retryFeaturedInstall" class="btn" style="display: none">${t("firstRun.retryInstall")}</button>
         </div>
       </div>
 
       <div id="activeDictionaryRow" style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
         <div class="row" style="align-items: center; justify-content: space-between; gap: 8px">
-          <div class="mono" id="activeDictionarySummary">No active dictionary</div>
-          <button id="openManageDictionaries" class="btn" type="button">Manage dictionaries</button>
+          <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
+          <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
         </div>
       </div>
 
       <div class="row" style="margin-top: 12px; align-items: center">
         <div class="field" style="flex: 1">
-          <div class="label" id="searchLabel">Query (Source → Target)</div>
-          <input id="searchInput" type="text" placeholder="Type a Source word…" disabled autocomplete="off" />
+          <div class="label" id="searchLabel">${t("search.queryLabel", { direction: `${t("language.source")} → ${t("language.target")}` })}</div>
+          <input id="searchInput" type="text" placeholder="${t("search.placeholder", { language: t("language.source") })}" disabled autocomplete="off" />
         </div>
-        <button id="langToggle" class="btn" disabled>Source → Target</button>
+        <button id="langToggle" class="btn" disabled>${t("language.source")} → ${t("language.target")}</button>
       </div>
 
       <div id="searchMeta" class="mono" style="margin-top: 12px"></div>
@@ -115,14 +140,14 @@ app.innerHTML = `
     </div>
 
     <details id="manageDictionariesPanel" style="margin-top: 16px">
-      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">Manage dictionaries</summary>
+      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("manage.summary")}</summary>
       <div class="card" style="margin-top: 8px">
-        <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Manage dictionaries</h2>
+        <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("manage.title")}</h2>
         <div class="row" style="margin-top: 12px; align-items: center">
           <div class="field" style="flex: 1">
-            <div class="label">Installed dictionaries</div>
+            <div class="label">${t("manage.installedLabel")}</div>
             <select id="bundleSelect" disabled>
-              <option value="">No dictionaries installed</option>
+              <option value="">${t("manage.noneInstalled")}</option>
             </select>
           </div>
         </div>
@@ -130,56 +155,56 @@ app.innerHTML = `
         <div id="installedBundleList" style="margin-top: 12px"></div>
 
         <details style="margin-top: 12px">
-          <summary style="color: var(--muted); font-size: 13px; cursor: pointer">Advanced setup</summary>
+          <summary style="color: var(--muted); font-size: 13px; cursor: pointer">${t("advancedSetup.summary")}</summary>
           <div class="row" style="margin-top: 12px; align-items: end">
             <div class="field" style="flex: 1">
-              <div class="label">Catalog URL</div>
-              <input id="catalogUrl" type="text" placeholder="https://example.org/catalog.json or /catalog.json" autocomplete="off" />
+              <div class="label">${t("catalog.urlLabel")}</div>
+              <input id="catalogUrl" type="text" placeholder="${t("catalog.urlPlaceholder")}" autocomplete="off" />
             </div>
-            <button id="loadCatalog" class="btn">Load catalog</button>
+            <button id="loadCatalog" class="btn">${t("catalog.load")}</button>
           </div>
           <div id="catalogStatus" class="mono" style="margin-top: 12px"></div>
           <div id="catalogList" style="margin-top: 12px"></div>
           <div class="row" style="margin-top: 12px">
-            <button id="quickImport" class="btn">Install bundle files</button>
+            <button id="quickImport" class="btn">${t("import.installFiles")}</button>
             <input id="quickImportFiles" type="file" multiple style="display: none" />
-            <button id="cancelInstall" class="btn" style="display: none">Cancel install</button>
+            <button id="cancelInstall" class="btn" style="display: none">${t("import.cancel")}</button>
           </div>
         </details>
 
         <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
         <div class="row" style="margin-top: 12px">
-          <button id="clearDb" class="btn">Delete database</button>
+          <button id="clearDb" class="btn">${t("db.delete")}</button>
         </div>
       </div>
     </details>
 
     <details style="margin-top: 16px">
-      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">Advanced diagnostics</summary>
+      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("diagnostics.summary")}</summary>
       <div class="card" style="margin-top: 8px">
-        <h2 class="title" style="font-size: 16px; margin-bottom: 8px">Validation diagnostics</h2>
+        <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("diagnostics.title")}</h2>
         <div class="row" style="align-items: center; justify-content: space-between; gap: 12px">
           <div>
-            <div class="label">Validation logging</div>
-            <div id="queryLoggingStatus" class="mono">Off</div>
-            <div id="queryLoggingCount" class="mono" style="margin-top: 4px">0 logs</div>
+            <div class="label">${t("logging.label")}</div>
+            <div id="queryLoggingStatus" class="mono">${t("logging.off")}</div>
+            <div id="queryLoggingCount" class="mono" style="margin-top: 4px">${t("queryLogs.count.many", { count: 0 })}</div>
           </div>
-          <button id="queryLoggingToggle" class="btn" type="button">Turn On</button>
+          <button id="queryLoggingToggle" class="btn" type="button">${t("logging.turnOn")}</button>
         </div>
         <div class="row" style="margin-top: 8px; gap: 8px">
-          <button id="queryLogExport" class="btn" type="button">Export logs</button>
-          <button id="queryLogClear" class="btn" type="button">Clear logs</button>
+          <button id="queryLogExport" class="btn" type="button">${t("logging.export")}</button>
+          <button id="queryLogClear" class="btn" type="button">${t("logging.clear")}</button>
         </div>
         <p class="subtitle" style="margin: 8px 0 0 0">
-          Logs stay on this device. No automatic upload.
+          ${t("logging.localOnly")}
         </p>
         <div id="queryLogMessage" class="mono" style="margin-top: 8px"></div>
         <div style="margin-top: 12px">
-          <div class="label">Recent query logs (debug)</div>
-          <p id="recentQueryLogsOffNote" class="mono" style="margin: 8px 0 0 0; display: none">Logging is off.</p>
+          <div class="label">${t("logging.recentTitle")}</div>
+          <p id="recentQueryLogsOffNote" class="mono" style="margin: 8px 0 0 0; display: none">${t("logging.offNote")}</p>
           <div id="recentQueryLogsActive" style="display: none; margin-top: 8px">
             <div class="row" style="margin-bottom: 8px">
-              <button id="recentQueryLogsRefresh" class="btn" type="button">Refresh</button>
+              <button id="recentQueryLogsRefresh" class="btn" type="button">${t("logging.refresh")}</button>
             </div>
             <div id="recentQueryLogsTableHost"></div>
           </div>
@@ -188,12 +213,12 @@ app.innerHTML = `
     </details>
 
     <details style="margin-top: 16px">
-      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">Developer tools</summary>
+      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("dev.summary")}</summary>
 
       <div class="card" style="margin-top: 8px">
-        <h3 class="title" style="font-size: 14px; margin-bottom: 8px">Bundle manifest gating</h3>
+        <h3 class="title" style="font-size: 14px; margin-bottom: 8px">${t("dev.gatingTitle")}</h3>
         <p class="subtitle">
-          Select <code>bundle.manifest.json</code> and validate it before any import.
+          ${t("dev.gatingSubtitle")}
         </p>
 
         <div class="row" style="margin-top: 12px">
@@ -205,7 +230,7 @@ app.innerHTML = `
 
         <div class="row" style="margin-top: 12px">
           <div class="field">
-            <div class="label">records.jsonl (enriched)</div>
+            <div class="label">${t("dev.recordsLabel")}</div>
             <input id="recordsFile" type="file" />
           </div>
           <div class="field">
@@ -215,8 +240,8 @@ app.innerHTML = `
         </div>
 
         <div class="row" style="margin-top: 12px">
-          <button id="validateManifest" class="btn" disabled>Validate manifest + selected files</button>
-          <button id="importBundle" class="btn" disabled>Import bundle</button>
+          <button id="validateManifest" class="btn" disabled>${t("dev.validateManifest")}</button>
+          <button id="importBundle" class="btn" disabled>${t("dev.importBundle")}</button>
         </div>
 
         <div id="manifestOut" class="mono" style="margin-top: 12px"></div>
@@ -224,15 +249,15 @@ app.innerHTML = `
       </div>
 
       <div class="card" style="margin-top: 8px">
-        <h3 class="title" style="font-size: 14px; margin-bottom: 8px">Bundle size &amp; memory probe</h3>
+        <h3 class="title" style="font-size: 14px; margin-bottom: 8px">${t("dev.probeTitle")}</h3>
         <p class="subtitle">
-          Select the bundle JSONL files from disk and run a parse probe.
+          ${t("dev.probeSubtitle")}
         </p>
 
         <div class="row" style="margin-top: 12px">
-          <button id="probeRecords" class="btn" disabled>Probe records</button>
-          <button id="probeIndex" class="btn" disabled>Probe index</button>
-          <button id="probeAll" class="btn" disabled>Probe both</button>
+          <button id="probeRecords" class="btn" disabled>${t("dev.probeRecords")}</button>
+          <button id="probeIndex" class="btn" disabled>${t("dev.probeIndex")}</button>
+          <button id="probeAll" class="btn" disabled>${t("dev.probeBoth")}</button>
         </div>
 
         <div id="probeOut" class="mono" style="margin-top: 12px"></div>
@@ -248,6 +273,7 @@ function mustGetEl<T extends Element>(selector: string): T {
 }
 
 // Primary UI elements
+const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
 const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
@@ -351,7 +377,15 @@ function getManifestPayloadBytes(manifest: BundleManifestV1): number | undefined
 }
 
 function getInstalledBundleName(bundle: ActiveBundleMeta): string {
-  return bundle.display_name ?? getBundleDisplayName(bundle.bundle_id, bundle.language_meta);
+  return (
+    bundle.display_name ??
+    getBundleDisplayName(
+      bundle.bundle_id,
+      bundle.language_meta,
+      t("language.source"),
+      t("language.target"),
+    )
+  );
 }
 
 function formatInstalledAt(iso: string | undefined): string {
@@ -368,6 +402,14 @@ function getKnownBundlePayloadBytes(bundles: ActiveBundleMeta[]): number | undef
 
 function getLoadedCatalogEntry(bundleId: string): BundleCatalogEntryV1 | undefined {
   return loadedCatalogBundles.find((entry) => entry.bundle_id === bundleId);
+}
+
+function getLocalizedSourceLabel(meta?: ActiveBundleMeta["language_meta"]): string {
+  return getSourceLabel(meta, t("language.source"));
+}
+
+function getLocalizedTargetLabel(meta?: ActiveBundleMeta["language_meta"]): string {
+  return getTargetLabel(meta, t("language.target"));
 }
 
 function getCatalogEntryRuntimeState(entry: BundleCatalogEntryV1): {
@@ -392,20 +434,25 @@ function renderInstalledBundleManager() {
   const knownPayloadBytes = getKnownBundlePayloadBytes(installedBundles);
   const unknownSizeCount = installedBundles.filter((bundle) => bundle.storage_bytes === undefined).length;
   const statusLines = [
-    `Installed bundles: ${installedBundles.length}`,
-    `Active bundle: ${currentActiveBundle ? getInstalledBundleName(currentActiveBundle) : "none"}`,
-    `Known payload total: ${fmtBytes(knownPayloadBytes)}`,
-    `Browser storage usage: ${fmtBytes(currentStorageEstimate?.usage)} / ${fmtBytes(currentStorageEstimate?.quota)}`,
+    t("manage.status.installedBundles", { count: installedBundles.length }),
+    t("manage.status.activeBundle", {
+      name: currentActiveBundle ? getInstalledBundleName(currentActiveBundle) : "none",
+    }),
+    t("manage.status.knownPayloadTotal", { value: fmtBytes(knownPayloadBytes) }),
+    t("manage.status.browserStorageUsage", {
+      usage: fmtBytes(currentStorageEstimate?.usage),
+      quota: fmtBytes(currentStorageEstimate?.quota),
+    }),
   ];
   if (unknownSizeCount > 0) {
-    statusLines.push(`Size metadata missing for ${unknownSizeCount} installed bundle(s).`);
+    statusLines.push(t("manage.status.sizeMetadataMissing", { count: unknownSizeCount }));
   }
   installedBundleStatus.textContent = statusLines.join("\n");
 
   if (installedBundles.length === 0) {
     const empty = document.createElement("div");
     empty.className = "catalog-empty";
-    empty.textContent = "No installed bundle metadata yet.";
+    empty.textContent = t("manage.noInstalledMetadata");
     installedBundleList.appendChild(empty);
     return;
   }
@@ -438,30 +485,30 @@ function renderInstalledBundleManager() {
     if (isActive) {
       const activeBadge = document.createElement("span");
       activeBadge.className = "catalog-badge catalog-badge-active";
-      activeBadge.textContent = "Active";
+      activeBadge.textContent = t("catalog.badge.active");
       badges.appendChild(activeBadge);
     }
     if (updateAvailable) {
       const updateBadge = document.createElement("span");
       updateBadge.className = "catalog-badge catalog-badge-update";
-      updateBadge.textContent = "Update available";
+      updateBadge.textContent = t("catalog.badge.updateAvailable");
       badges.appendChild(updateBadge);
     } else if (!isActive) {
       const installedBadge = document.createElement("span");
       installedBadge.className = "catalog-badge catalog-badge-installed";
-      installedBadge.textContent = "Installed";
+      installedBadge.textContent = t("catalog.badge.installed");
       badges.appendChild(installedBadge);
     }
     header.append(titleBlock, badges);
 
     const meta = document.createElement("div");
     meta.className = "catalog-item-meta";
-    const labels = `${getSourceLabel(bundle.language_meta)} → ${getTargetLabel(bundle.language_meta)}`;
+    const labels = `${getLocalizedSourceLabel(bundle.language_meta)} → ${getLocalizedTargetLabel(bundle.language_meta)}`;
     const metaParts = [
-      bundle.version ? `Version ${bundle.version}` : undefined,
+      bundle.version ? t("catalog.meta.version", { value: bundle.version }) : undefined,
       labels,
-      `${bundle.records_count ?? "n/a"} records`,
-      `${bundle.index_entries_count ?? "n/a"} index entries`,
+      t("catalog.meta.records", { count: bundle.records_count ?? "n/a" }),
+      t("catalog.meta.indexEntries", { count: bundle.index_entries_count ?? "n/a" }),
       fmtBytes(bundle.storage_bytes),
     ].filter((part): part is string => part !== undefined);
     meta.textContent = metaParts.join(" | ");
@@ -469,13 +516,16 @@ function renderInstalledBundleManager() {
     const note = document.createElement("div");
     note.className = "catalog-item-note";
     note.textContent =
-      `Installed: ${formatInstalledAt(bundle.imported_at_iso)}\n` +
-      `Storage scope: ${getBundleStorageScopeId(bundle)}\n` +
-      `Normalization: ${bundle.normalization_ruleset} | Schema: ${bundle.record_schema_id}@${bundle.record_schema_version}`;
+      `${t("catalog.note.installed", { value: formatInstalledAt(bundle.imported_at_iso) })}\n` +
+      `${t("catalog.note.storageScope", { value: getBundleStorageScopeId(bundle) })}\n` +
+      t("catalog.note.normalizationSchema", {
+        normalization: bundle.normalization_ruleset,
+        schema: `${bundle.record_schema_id}@${bundle.record_schema_version}`,
+      });
     if (updateAvailable && catalogEntry) {
       note.textContent +=
-        `\nInstalled hash: ${bundle.expected_content_sha256 ?? "unknown"}` +
-        `\nCatalog hash: ${catalogEntry.content_sha256}`;
+        `\n${t("catalog.note.installedHash", { value: bundle.expected_content_sha256 ?? "unknown" })}` +
+        `\n${t("catalog.note.catalogHash", { value: catalogEntry.content_sha256 })}`;
     }
 
     const actions = document.createElement("div");
@@ -484,7 +534,7 @@ function renderInstalledBundleManager() {
     if (updateAvailable && catalogEntry) {
       const updateBtn = document.createElement("button");
       updateBtn.className = "btn";
-      updateBtn.textContent = "Update";
+      updateBtn.textContent = t("catalog.action.update");
       updateBtn.disabled = busy || !loadedCatalogUrl;
       updateBtn.addEventListener("click", () => {
         void withSingleWriterLock(`update bundle ${bundle.bundle_id}`, async () => {
@@ -496,7 +546,7 @@ function renderInstalledBundleManager() {
 
     const useBtn = document.createElement("button");
     useBtn.className = "btn";
-    useBtn.textContent = isActive ? "Active" : "Use";
+    useBtn.textContent = isActive ? t("catalog.badge.active") : t("catalog.action.use");
     useBtn.disabled = busy || isActive;
     useBtn.addEventListener("click", () => {
       void withSingleWriterLock(`switch active bundle ${bundle.bundle_id}`, async () => {
@@ -507,18 +557,18 @@ function renderInstalledBundleManager() {
           db.close();
         }
         importProgress.style.display = "";
-        importProgress.textContent = `Active bundle set: ${bundle.bundle_id}\n`;
+        importProgress.textContent = t("bundle.activeSet", { bundleId: bundle.bundle_id });
       });
     });
 
     const removeBtn = document.createElement("button");
     removeBtn.className = "btn";
-    removeBtn.textContent = "Remove";
+    removeBtn.textContent = t("catalog.action.remove");
     removeBtn.disabled = busy;
     removeBtn.addEventListener("click", () => {
       const confirmed =
         typeof window === "undefined" ||
-        window.confirm(`Remove installed bundle ${bundle.bundle_id} from this device?`);
+        window.confirm(t("bundle.removeConfirm", { bundleId: bundle.bundle_id }));
       if (!confirmed) return;
       void withSingleWriterLock(`remove bundle ${bundle.bundle_id}`, async () => {
         const db = await openSiralexDb();
@@ -528,7 +578,7 @@ function renderInstalledBundleManager() {
           db.close();
         }
         importProgress.style.display = "";
-        importProgress.textContent = `Removed bundle: ${bundle.bundle_id}\n`;
+        importProgress.textContent = t("bundle.removed", { bundleId: bundle.bundle_id });
       });
     });
 
@@ -626,6 +676,16 @@ updateCatalogControls();
 updateInstallControls();
 updateFeaturedInstallControls();
 
+localeSelect.addEventListener("change", () => {
+  const nextLocale = localeSelect.value;
+  if (nextLocale !== "fr" && nextLocale !== "en") return;
+  if (nextLocale === getCurrentLocale()) return;
+  setCurrentLocaleWithPersistence(nextLocale as Locale);
+  if (typeof window !== "undefined") {
+    window.location.reload();
+  }
+});
+
 openManageDictionariesBtn.addEventListener("click", () => {
   manageDictionariesPanel.open = true;
   manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -667,33 +727,35 @@ function getCatalogPresentationState(entry: BundleCatalogEntryV1): {
   if (comparison.state === "update_available") {
     return {
       badgeClass: "catalog-badge-update",
-      badgeLabel: "Update available",
-      note: isActive ? "Installed version is active on this device." : "Installed version differs from catalog hash.",
+      badgeLabel: t("catalog.badge.updateAvailable"),
+      note: isActive
+        ? t("catalog.note.activeInstalledVersion")
+        : t("catalog.note.installedVersionDiffers"),
     };
   }
 
   if (comparison.state === "installed_current") {
     return {
       badgeClass: isActive ? "catalog-badge-active" : "catalog-badge-installed",
-      badgeLabel: isActive ? "Active" : "Installed",
-      note: entry.version ? `Catalog version ${entry.version}` : undefined,
+      badgeLabel: isActive ? t("catalog.badge.active") : t("catalog.badge.installed"),
+      note: entry.version ? t("catalog.note.catalogVersion", { value: entry.version }) : undefined,
     };
   }
 
   return {
     badgeClass: "catalog-badge-available",
-    badgeLabel: "Available",
+    badgeLabel: t("catalog.badge.available"),
   };
 }
 
 function getCatalogActionLabel(entry: BundleCatalogEntryV1): string {
   const { comparison, isActive } = getCatalogEntryRuntimeState(entry);
   if (isActive && comparison.state === "installed_current") {
-    return "Active";
+    return t("catalog.badge.active");
   }
-  if (comparison.state === "update_available") return "Update";
-  if (comparison.state === "installed_current") return "Use installed";
-  return "Install";
+  if (comparison.state === "update_available") return t("catalog.action.update");
+  if (comparison.state === "installed_current") return t("catalog.action.useInstalled");
+  return t("catalog.action.install");
 }
 
 function renderCatalogList() {
@@ -702,7 +764,7 @@ function renderCatalogList() {
   if (loadedCatalogBundles.length === 0) {
     const empty = document.createElement("div");
     empty.className = "catalog-empty";
-    empty.textContent = "No catalog loaded.";
+    empty.textContent = t("catalog.empty");
     catalogList.appendChild(empty);
     return;
   }
@@ -735,9 +797,9 @@ function renderCatalogList() {
     const meta = document.createElement("div");
     meta.className = "catalog-item-meta";
     const metaParts = [
-      entry.version ? `Version ${entry.version}` : undefined,
+      entry.version ? t("catalog.meta.version", { value: entry.version }) : undefined,
       fmtBytes(entry.size_bytes),
-      `Hash ${entry.content_sha256}`,
+      t("catalog.meta.hash", { value: entry.content_sha256 }),
     ].filter((part): part is string => part !== undefined);
     meta.textContent = metaParts.join(" | ");
 
@@ -745,16 +807,16 @@ function renderCatalogList() {
     source.className = "catalog-item-subtitle";
     if (loadedCatalogUrl) {
       const urls = deriveBundleAssetUrls(loadedCatalogUrl, entry);
-      source.textContent = `Bundle source: ${urls.base_url}`;
+      source.textContent = t("catalog.meta.bundleSource", { value: urls.base_url });
       const files = document.createElement("div");
       files.className = "catalog-item-subtitle";
       files.textContent =
-        `Manifest: ${urls.manifest_url}\n` +
-        `Records: ${urls.records_url}\n` +
-        `Index: ${urls.search_index_url}`;
+        `${t("catalog.meta.manifest", { value: urls.manifest_url })}\n` +
+        `${t("catalog.meta.recordsFile", { value: urls.records_url })}\n` +
+        t("catalog.meta.indexFile", { value: urls.search_index_url });
       item.append(header, meta, source, files);
     } else {
-      source.textContent = `Source base: ${entry.url_base}`;
+      source.textContent = t("catalog.meta.sourceBase", { value: entry.url_base });
       item.append(header, meta, source);
     }
 
@@ -770,7 +832,7 @@ function renderCatalogList() {
     const actionBtn = document.createElement("button");
     actionBtn.className = "btn";
     actionBtn.textContent = getCatalogActionLabel(entry);
-    actionBtn.disabled = busy || !loadedCatalogUrl || actionBtn.textContent === "Active";
+    actionBtn.disabled = busy || !loadedCatalogUrl || actionBtn.textContent === t("catalog.badge.active");
     actionBtn.addEventListener("click", () => {
       const { activateOnCommit } = getCatalogEntryRuntimeState(entry);
       void withSingleWriterLock(`install catalog bundle ${entry.bundle_id}`, async () => {
@@ -790,7 +852,7 @@ function renderBundleSelectOptions(activeBundleId: string | undefined) {
   if (installedBundles.length === 0) {
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "No dictionaries installed";
+    option.textContent = t("manage.noneInstalled");
     bundleSelect.appendChild(option);
     bundleSelect.disabled = true;
     return;
@@ -829,7 +891,9 @@ async function refreshDbStatus() {
         firstRun.style.display = "none";
         retryFeaturedInstallBtn.style.display = "none";
         featuredInstallStatus.textContent = "";
-        activeDictionarySummary.textContent = `Using: ${getInstalledBundleName(active)} — ready to search`;
+        activeDictionarySummary.textContent = t("activeDictionary.usingReady", {
+          name: getInstalledBundleName(active),
+        });
         const statusText =
           `Active: ${getInstalledBundleName(active)}\n` +
           `Bundle ID: ${active.bundle_id}\n` +
@@ -839,28 +903,23 @@ async function refreshDbStatus() {
           `Imported: ${active.imported_at_iso}\n` +
           `Records: ${active.records_count ?? "n/a"} | Index entries: ${active.index_entries_count ?? "n/a"}\n` +
           `Approx payload: ${fmtBytes(active.storage_bytes)}\n`;
-        dictStatus.textContent = "Dictionary ready for offline search.";
+        dictStatus.textContent = t("status.dictionaryReady");
         dbOut.textContent = statusText;
       } else {
         hasActiveBundle = false;
-        activeDictionarySummary.textContent = "No active dictionary";
+        activeDictionarySummary.textContent = t("activeDictionary.none");
         const hasRecordsData = await storeHasData(db, STORE_RECORDS);
         const hasIndexData = await storeHasData(db, STORE_SEARCH_INDEX);
         if (bundles.length > 0) {
           firstRun.style.display = "none";
           importProgress.style.display = "none";
-          const warnText =
-            `Installed bundles present, but no active bundle is selected.\n` +
-            `Choose a dictionary from the selector or installed-bundles list to enable search.\n`;
+          const warnText = t("status.noActiveSelection");
           dictStatus.textContent = warnText;
           dbOut.textContent = warnText;
         } else if (hasRecordsData || hasIndexData) {
           firstRun.style.display = "none";
           importProgress.style.display = "none";
-          const warnText =
-            `Warning: partial data from a failed or interrupted import.\n` +
-            `No active bundle. Search is disabled.\n` +
-            `Delete the database and re-import.\n`;
+          const warnText = t("status.partialDataWarning");
           dictStatus.textContent = warnText;
           dbOut.textContent = warnText;
         } else {
@@ -868,17 +927,15 @@ async function refreshDbStatus() {
           importProgress.style.display = "none";
           if (!navigator.onLine) {
             featuredInstallStatus.textContent =
-              "No dictionary installed and you appear to be offline.\n" +
-              "Connect and retry featured install, or use Manage dictionaries → Advanced setup.";
+              t("firstRun.offlineNoDictionary");
             retryFeaturedInstallBtn.style.display = "";
           } else {
             featuredInstallStatus.textContent =
-              "Install the deployment-configured featured dictionary to start searching.\n" +
-              "Advanced setup is available for custom catalogs and manual import.";
+              t("firstRun.onlinePrompt");
             retryFeaturedInstallBtn.style.display = "none";
           }
-          dictStatus.textContent = "No active dictionary installed yet.";
-          dbOut.textContent = "No active bundle.\n";
+          dictStatus.textContent = t("status.noActiveDictionaryInstalled");
+          dbOut.textContent = t("status.noActiveBundle");
         }
       }
     } finally {
@@ -893,7 +950,7 @@ async function refreshDbStatus() {
     renderInstalledBundleManager();
     firstRun.style.display = "none";
     importProgress.style.display = "none";
-    dictStatus.textContent = `Database error: ${String(e)}\n`;
+    dictStatus.textContent = t("status.dbError", { error: String(e) });
     dbOut.textContent = dictStatus.textContent;
   }
   renderCatalogList();
@@ -990,18 +1047,18 @@ async function quickImportBundle(fileList: FileList) {
   if (missing.length > 0) {
     importProgress.style.display = "";
     importProgress.textContent =
-      `Missing required files: ${missing.join(", ")}\n\n` +
-      `Select all 3 bundle files:\n  bundle.manifest.json\n  records.jsonl\n  search_index.jsonl`;
+      t("import.missingRequiredFiles", { files: missing.join(", ") }) +
+      t("import.selectAllThreeFiles");
     return;
   }
 
   importProgress.style.display = "";
-  importProgress.textContent = "Validating manifest...\n";
+  importProgress.textContent = t("import.validatingManifest");
 
   const txt = await manifestFileObj!.text();
   const parsed = parseAndValidateManifestJson(txt);
   if (!parsed.ok || !parsed.manifest) {
-    importProgress.textContent = "Manifest validation failed:\n";
+    importProgress.textContent = t("import.manifestValidationFailed");
     for (const err of parsed.errors) importProgress.textContent += `  ${err}\n`;
     return;
   }
@@ -1013,7 +1070,7 @@ async function quickImportBundle(fileList: FileList) {
     search_index: searchIndexFileObj!,
   });
   if (fileCheck.errors.length > 0) {
-    importProgress.textContent = `File validation failed for ${mfst.bundle_id}:\n`;
+    importProgress.textContent = t("import.fileValidationFailedFor", { bundleId: mfst.bundle_id });
     for (const err of fileCheck.errors) importProgress.textContent += `  ${err}\n`;
     return;
   }
@@ -1027,16 +1084,20 @@ async function quickImportBundle(fileList: FileList) {
       if (installed.expected_content_sha256 === mfst.content_sha256) {
         await setActiveBundleId(existingDb, mfst.bundle_id);
         existingDb.close();
-        importProgress.textContent = `Bundle already installed. Marked active: ${mfst.bundle_id}\n`;
+        importProgress.textContent = t("import.bundleAlreadyInstalledMarkedActive", {
+          bundleId: mfst.bundle_id,
+        });
         await refreshDbStatus();
         return;
       }
       activateOnCommit = activeBundleId === mfst.bundle_id;
       importProgress.textContent =
-        `Updating installed bundle ${mfst.bundle_id}.\n` +
-        `Existing hash: ${installed.expected_content_sha256 ?? "unknown"}\n` +
-        `New hash: ${mfst.content_sha256}\n` +
-        `${activateOnCommit ? "Updated bundle will remain active." : "Current active bundle will remain unchanged."}\n`;
+        t("import.updatingBundle", { bundleId: mfst.bundle_id }) +
+        t("import.existingHash", { hash: installed.expected_content_sha256 ?? "unknown" }) +
+        t("import.newHash", { hash: mfst.content_sha256 }) +
+        (activateOnCommit
+          ? t("import.updatedBundleRemainActive")
+          : t("import.currentActiveRemainUnchanged"));
     }
     existingDb.close();
   } catch {
@@ -1044,7 +1105,7 @@ async function quickImportBundle(fileList: FileList) {
   }
 
   firstRun.style.display = "none";
-  importProgress.textContent = `Installing ${mfst.bundle_id}...\n`;
+  importProgress.textContent = t("import.installingBundle", { bundleId: mfst.bundle_id });
 
   const db = await openSiralexDb();
   try {
@@ -1060,21 +1121,29 @@ async function quickImportBundle(fileList: FileList) {
       },
       undefined,
       {
-        displayName: getBundleDisplayName(mfst.bundle_id, buildLanguageMetaFromManifest(mfst)),
+        displayName: getBundleDisplayName(
+          mfst.bundle_id,
+          buildLanguageMetaFromManifest(mfst),
+          t("language.source"),
+          t("language.target"),
+        ),
         storageBytes: getManifestPayloadBytes(mfst),
       },
       activateOnCommit,
     );
     importProgress.textContent =
-      `Install complete: ${mfst.bundle_id}\n` +
-      `${result.recordsCount} records, ${result.indexCount} index entries\n` +
-      `${result.elapsedMs.toFixed(0)} ms\n`;
+      t("import.installComplete", {
+        bundleId: mfst.bundle_id,
+        records: result.recordsCount,
+        indexEntries: result.indexCount,
+        elapsed: result.elapsedMs.toFixed(0),
+      });
     if (result.cleanupWarning) {
       importProgress.textContent += `\n${result.cleanupWarning}\n`;
     }
   } catch (e) {
-    importProgress.textContent += `\nImport failed: ${String(e)}\n`;
-    importProgress.textContent += `Partial bundle data removed. Re-import required.\n`;
+    importProgress.textContent += t("import.importFailed", { error: String(e) });
+    importProgress.textContent += t("import.partialRemovedReimport");
   } finally {
     db.close();
   }
@@ -1092,7 +1161,7 @@ async function loadCatalogFromUrl(
 
   catalogLoading = true;
   updateCatalogControls();
-  statusTarget.textContent = `Loading catalog from ${catalogUrl}...\n`;
+  statusTarget.textContent = t("catalog.loading", { url: catalogUrl });
 
   try {
     const result = await fetchBundleCatalog(catalogUrl, {
@@ -1114,23 +1183,22 @@ async function loadCatalogFromUrl(
     if (opts.updateCatalogInput !== false) {
       catalogUrlInput.value = catalogUrl;
     }
-    statusTarget.textContent =
-      `Catalog loaded.\n` +
-      `Source: ${result.responseUrl}\n` +
-      `Bundles: ${result.catalog.bundles.length}\n` +
-      `Fetched at: ${cached.fetched_at_iso}\n` +
-      `Remote policy: https anywhere; http only for same-origin or local hubs (localhost, .local, private IPs).\n` +
-      `Bundle URL contract: url_base + bundle.manifest.json / records.jsonl / search_index.jsonl\n`;
+    statusTarget.textContent = t("catalog.loaded", {
+      source: result.responseUrl,
+      count: result.catalog.bundles.length,
+      fetchedAt: cached.fetched_at_iso,
+    });
     for (const warning of result.warnings) {
-      statusTarget.textContent += `WARN: ${warning}\n`;
+      statusTarget.textContent += t("catalog.warnPrefix", { warning });
     }
     return result.catalog.bundles;
   } catch (e) {
-    statusTarget.textContent = `Catalog load failed: ${String(e)}\n`;
+    statusTarget.textContent = t("catalog.loadFailed", { error: String(e) });
     if (loadedCatalogBundles.length > 0 && loadedCatalogUrl && loadedCatalogFetchedAtIso) {
-      statusTarget.textContent +=
-        `Showing cached catalog from ${loadedCatalogUrl}\n` +
-        `Fetched at: ${loadedCatalogFetchedAtIso}\n`;
+      statusTarget.textContent += t("catalog.showingCachedFrom", {
+        url: loadedCatalogUrl,
+        fetchedAt: loadedCatalogFetchedAtIso,
+      });
     }
     throw e;
   } finally {
@@ -1152,23 +1220,21 @@ async function installFeaturedDictionary() {
   featuredInstallInProgress = true;
   updateFeaturedInstallControls();
   retryFeaturedInstallBtn.style.display = "none";
-  featuredInstallStatus.textContent = "Install started.\n";
+  featuredInstallStatus.textContent = t("featured.installStarted");
 
   try {
     if (!navigator.onLine && installedBundles.length === 0) {
-      featuredInstallStatus.textContent =
-        "No dictionary installed and no network connection detected.\n" +
-        "Connect and retry, or use Manage dictionaries → Advanced setup for manual import/custom catalog recovery.";
+      featuredInstallStatus.textContent = t("firstRun.offlineNoDictionary");
       retryFeaturedInstallBtn.style.display = "";
       return;
     }
 
-    featuredInstallStatus.textContent += "Downloading/preparing dictionary...\n";
+    featuredInstallStatus.textContent += t("featured.downloading");
     await withSingleWriterLock("install featured dictionary", async () => {
       await loadCatalogFromUrl(FEATURED_CATALOG_URL, featuredInstallStatus, { updateCatalogInput: false });
       const entry = getFeaturedCatalogEntry();
       if (!entry) {
-        throw new Error("No featured dictionary entry found in catalog");
+        throw new Error(t("featured.noEntryFound"));
       }
       const installResult = await installCatalogEntry(entry, true, featuredInstallStatus);
       if (!installResult.ok) {
@@ -1177,14 +1243,10 @@ async function installFeaturedDictionary() {
     });
 
     featuredInstallStatus.textContent =
-      "Installed and ready to search.\n" +
-      "Manage dictionaries and advanced setup remain available from Manage dictionaries.";
-    dictStatus.textContent = "Dictionary installed and ready for offline search.";
+      t("featured.installed");
+    dictStatus.textContent = t("status.dictionaryReady");
   } catch (e) {
-    featuredInstallStatus.textContent =
-      "Install failed.\n" +
-      `${String(e)}\n` +
-      "Retry install or open Manage dictionaries → Advanced setup for recovery.";
+    featuredInstallStatus.textContent = t("featured.installFailed", { error: String(e) });
     retryFeaturedInstallBtn.style.display = "";
   } finally {
     featuredInstallInProgress = false;
@@ -1198,13 +1260,12 @@ async function restoreCachedCatalogFromDb() {
     const cached = await getCachedBundleCatalog(db);
     if (!cached) return;
     applyCachedCatalog(cached, "cache");
-    catalogStatus.textContent =
-      `Cached catalog restored.\n` +
-      `Source: ${cached.response_url}\n` +
-      `Fetched at: ${cached.fetched_at_iso}\n` +
-      `Load catalog to refresh from the network.\n`;
+    catalogStatus.textContent = t("catalog.cachedRestored", {
+      source: cached.response_url,
+      fetchedAt: cached.fetched_at_iso,
+    });
     for (const warning of cached.warnings) {
-      catalogStatus.textContent += `WARN: ${warning}\n`;
+      catalogStatus.textContent += t("catalog.warnPrefix", { warning });
     }
   } finally {
     db.close();
@@ -1218,7 +1279,7 @@ async function installCatalogEntry(
 ): Promise<{ ok: boolean; message: string }> {
   if (!loadedCatalogUrl) {
     progressTarget.style.display = "";
-    progressTarget.textContent = "No catalog source URL is available for this entry.\n";
+    progressTarget.textContent = t("catalog.missingSourceUrl");
     return { ok: false, message: "missing catalog source URL" };
   }
 
@@ -1228,7 +1289,9 @@ async function installCatalogEntry(
     if (installed?.expected_content_sha256 === entry.content_sha256) {
       await setActiveBundleId(existingDb, entry.bundle_id);
       progressTarget.style.display = "";
-      progressTarget.textContent = `Bundle already installed. Marked active: ${entry.bundle_id}\n`;
+      progressTarget.textContent = t("import.bundleAlreadyInstalledMarkedActive", {
+        bundleId: entry.bundle_id,
+      });
       return { ok: true, message: "already installed; activated" };
     }
   } finally {
@@ -1240,7 +1303,7 @@ async function installCatalogEntry(
   remoteInstallBundleId = entry.bundle_id;
   updateInstallControls();
   progressTarget.style.display = "";
-  progressTarget.textContent = `Preparing remote install for ${entry.bundle_id}...\n`;
+  progressTarget.textContent = t("catalog.prepareRemoteInstall", { bundleId: entry.bundle_id });
 
   const db = await openSiralexDb();
   try {
@@ -1250,6 +1313,19 @@ async function installCatalogEntry(
       onUpdate: (message) => {
         progressTarget.textContent = message;
       },
+      progressCopy: {
+        installingPrefix: t("progress.installingPrefix"),
+        stageLabel: t("progress.stageLabel"),
+        stageFetchingManifest: t("progress.stage.fetchManifest"),
+        stageFetchingRecords: t("progress.stage.fetchRecords"),
+        stageFetchingSearchIndex: t("progress.stage.fetchSearchIndex"),
+        stageStagingPayloads: t("progress.stage.stagingPayloads"),
+        bytesReadLabel: t("progress.bytesReadLabel"),
+        linesSeenLabel: t("progress.linesSeenLabel"),
+        recordsWrittenLabel: t("progress.recordsWrittenLabel"),
+        entriesWrittenLabel: t("progress.entriesWrittenLabel"),
+        batchesCommittedLabel: t("progress.batchesCommittedLabel"),
+      },
       storageEstimate:
         typeof navigator !== "undefined" && navigator.storage?.estimate
           ? async () => await navigator.storage.estimate()
@@ -1258,13 +1334,18 @@ async function installCatalogEntry(
 
     if (result.skippedBecauseCurrent) {
       await setActiveBundleId(db, manifest.bundle_id);
-      progressTarget.textContent = `Bundle already installed. Marked active: ${manifest.bundle_id}\n`;
+      progressTarget.textContent = t("import.bundleAlreadyInstalledMarkedActive", {
+        bundleId: manifest.bundle_id,
+      });
       return { ok: true, message: "already installed; activated" };
     } else {
       progressTarget.textContent =
-        `Remote install complete: ${manifest.bundle_id}\n` +
-        `${result.recordsCount} records, ${result.indexCount} index entries\n` +
-        `${result.elapsedMs.toFixed(0)} ms\n`;
+        t("catalog.remoteInstallComplete", {
+          bundleId: manifest.bundle_id,
+          records: result.recordsCount,
+          indexEntries: result.indexCount,
+          elapsed: result.elapsedMs.toFixed(0),
+        });
       if (result.cleanupWarning) {
         progressTarget.textContent += `\n${result.cleanupWarning}\n`;
       }
@@ -1273,7 +1354,7 @@ async function installCatalogEntry(
   } catch (e) {
     console.error("REMOTE INSTALL FAILED", e);
     progressTarget.textContent =
-      `Install FAILED\n` +
+      t("catalog.installFailedHeader") +
       `${formatErrorDetails(e)}\n`;
     return { ok: false, message: String(e) };
   } finally {
@@ -1332,7 +1413,12 @@ async function validateManifestAndFiles() {
   lastValidatedManifest = mfst;
   manifestOut.textContent += `Manifest OK\n`;
   manifestOut.textContent += `bundle_id: ${mfst.bundle_id}\n`;
-  manifestOut.textContent += `dictionary: ${getBundleDisplayName(mfst.bundle_id, buildLanguageMetaFromManifest(mfst))}\n`;
+  manifestOut.textContent += `dictionary: ${getBundleDisplayName(
+    mfst.bundle_id,
+    buildLanguageMetaFromManifest(mfst),
+    t("language.source"),
+    t("language.target"),
+  )}\n`;
   manifestOut.textContent += `normalization: ${mfst.rule_versions.normalization}\n`;
   manifestOut.textContent += `schema: ${mfst.record_schema_id}@${mfst.record_schema_version}\n`;
   manifestOut.textContent += `mode: ${mfst.update_mode} / ${mfst.reconciliation_action}\n`;
@@ -1396,7 +1482,12 @@ importBundleBtn.addEventListener("click", () => {
         },
         undefined,
         {
-          displayName: getBundleDisplayName(mfst.bundle_id, buildLanguageMetaFromManifest(mfst)),
+          displayName: getBundleDisplayName(
+            mfst.bundle_id,
+            buildLanguageMetaFromManifest(mfst),
+            t("language.source"),
+            t("language.target"),
+          ),
           storageBytes: getManifestPayloadBytes(mfst),
         },
         activateOnCommit,
@@ -1429,12 +1520,12 @@ clearDbBtn.addEventListener("click", () => {
     manifestOut.textContent = "";
     lastValidatedManifest = undefined;
     importProgress.style.display = "";
-    importProgress.textContent = "Deleting database...\n";
+    importProgress.textContent = t("db.deleting");
     try {
       await deleteSiralexDb();
-      importProgress.textContent = "Database deleted.\n";
+      importProgress.textContent = t("db.deleted");
     } catch (e) {
-      importProgress.textContent += `Delete failed: ${String(e)}\n`;
+      importProgress.textContent += t("db.deleteFailed", { error: String(e) });
     }
     await refreshDbStatus();
   });
@@ -1531,7 +1622,7 @@ function renderRecentQueryLogs(rows: QueryLogEventV1[]): DocumentFragment {
   if (rows.length === 0) {
     const empty = document.createElement("p");
     empty.className = "mono";
-    empty.textContent = "No logs yet.";
+    empty.textContent = t("logging.noLogsYet");
     frag.appendChild(empty);
     return frag;
   }
@@ -1596,13 +1687,13 @@ async function updateRecentQueryLogsView() {
     recentQueryLogsTableHost.replaceChildren();
     const err = document.createElement("p");
     err.className = "mono";
-    err.textContent = `Recent logs error: ${String(e)}`;
+    err.textContent = t("logging.recentLogsError", { error: String(e) });
     recentQueryLogsTableHost.appendChild(err);
   }
 }
 
 async function refreshQueryLoggingCount() {
-  const result = await getQueryLogCountFromDb();
+  const result = await getQueryLogCountFromDb({ translate: t });
   queryLoggingCount.textContent = result.message;
   if (!result.ok) {
     queryLogMessage.textContent = result.message;
@@ -1611,8 +1702,8 @@ async function refreshQueryLoggingCount() {
 
 function updateQueryLoggingToggleState() {
   const enabled = getQueryLoggingEnabled();
-  queryLoggingStatus.textContent = enabled ? "On" : "Off";
-  queryLoggingToggleBtn.textContent = enabled ? "Turn Off" : "Turn On";
+  queryLoggingStatus.textContent = enabled ? t("logging.on") : t("logging.off");
+  queryLoggingToggleBtn.textContent = enabled ? t("logging.turnOff") : t("logging.turnOn");
   queryLoggingToggleBtn.setAttribute("aria-pressed", enabled ? "true" : "false");
 }
 
@@ -1624,10 +1715,21 @@ async function renderQueryLoggingToggle() {
 }
 
 function updateLangToggle() {
-  const directionText = getSearchDirectionText(searchDirection, currentActiveBundle?.language_meta);
+  const directionText = getSearchDirectionText(
+    searchDirection,
+    currentActiveBundle?.language_meta,
+    t("language.source"),
+    t("language.target"),
+  );
   langToggle.textContent = directionText;
-  searchLabel.textContent = `Query (${directionText})`;
-  searchInput.placeholder = getSearchPlaceholder(searchDirection, currentActiveBundle?.language_meta);
+  searchLabel.textContent = t("search.queryLabel", { direction: directionText });
+  searchInput.placeholder = getSearchPlaceholder(
+    searchDirection,
+    currentActiveBundle?.language_meta,
+    t("language.source"),
+    t("language.target"),
+    (label) => t("search.placeholder", { language: label }),
+  );
 }
 
 queryLoggingToggleBtn.addEventListener("click", () => {
@@ -1643,7 +1745,7 @@ queryLoggingToggleBtn.addEventListener("click", () => {
 
 queryLogExportBtn.addEventListener("click", () => {
   void (async () => {
-    const result = await exportQueryLogsFromUi();
+    const result = await exportQueryLogsFromUi({ translate: t });
     queryLogMessage.textContent = result.message;
     await refreshQueryLoggingCount();
   })();
@@ -1651,7 +1753,7 @@ queryLogExportBtn.addEventListener("click", () => {
 
 queryLogClearBtn.addEventListener("click", () => {
   void (async () => {
-    const result = await clearQueryLogsFromUi();
+    const result = await clearQueryLogsFromUi({ translate: t });
     queryLogMessage.textContent = result.message;
     await refreshQueryLoggingCount();
     await updateRecentQueryLogsView();
@@ -1763,18 +1865,22 @@ function showEntryDetail(record: EnrichedRecord) {
   const detail = renderEntryDetail(record, {
     onBack: () => showResultsList(),
     onSearch: (query) => triggerSearch(query),
-    targetEntriesLabel: getTargetEntriesLabel(currentActiveBundle?.language_meta),
+    targetEntriesLabel: getTargetEntriesLabel(
+      currentActiveBundle?.language_meta,
+      t("language.target"),
+      (label) => t("entry.targetEntries", { label }),
+    ),
   });
   searchResults.appendChild(detail);
 }
 
 async function runSearch(query: string) {
   if (busy) {
-    searchMeta.textContent = "Search temporarily unavailable during install/update.";
+    searchMeta.textContent = t("search.disabledBusy");
     return;
   }
   if (!hasActiveBundle) {
-    searchMeta.textContent = "Search disabled: no active bundle.";
+    searchMeta.textContent = t("search.disabledNoActiveBundle");
     return;
   }
   const seq = ++searchSeq;
@@ -1784,7 +1890,7 @@ async function runSearch(query: string) {
     db = await openSiralexDb();
     const activeBundleMeta = await getActiveBundleMeta(db);
     if (!activeBundleMeta) {
-      searchMeta.textContent = "Search disabled: no active bundle.";
+      searchMeta.textContent = t("search.disabledNoActiveBundle");
       searchResults.innerHTML = "";
       lastSearchRecords = [];
       return;
@@ -1802,8 +1908,10 @@ async function runSearch(query: string) {
 
     if (result.ir_ids.length === 0) {
       const elapsedMs = performance.now() - t0;
-      searchMeta.textContent =
-        `Query: "${query}" — No matches (all 4 levels checked). ${elapsedMs.toFixed(1)} ms`;
+      searchMeta.textContent = t("search.noMatch", {
+        query,
+        elapsed: elapsedMs.toFixed(1),
+      });
       searchResults.innerHTML = "";
       lastSearchRecords = [];
       scheduleSettledQueryLog({
@@ -1821,9 +1929,13 @@ async function runSearch(query: string) {
     if (seq !== searchSeq) return;
     const elapsedMs = performance.now() - t0;
 
-    searchMeta.textContent =
-      `Query: "${query}" — ${records.length} result(s) at level: ${result.matched_key_type} ` +
-      `[key: "${result.matched_key}"] ${elapsedMs.toFixed(1)} ms`;
+    searchMeta.textContent = t("search.resultMeta", {
+      query,
+      count: records.length,
+      level: String(result.matched_key_type),
+      key: String(result.matched_key),
+      elapsed: elapsedMs.toFixed(1),
+    });
 
     lastSearchRecords = records;
     showResultsList();
@@ -1837,7 +1949,7 @@ async function runSearch(query: string) {
     });
   } catch (e) {
     if (seq !== searchSeq) return;
-    searchMeta.textContent = `Search error: ${String(e)}`;
+    searchMeta.textContent = t("search.error", { error: String(e) });
     searchResults.innerHTML = "";
     lastSearchRecords = [];
   } finally {

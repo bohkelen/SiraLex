@@ -11,10 +11,9 @@ import type {
   IndexMappingDisplayFields,
 } from "../types/records";
 import { isLexiconDisplay, isIndexMappingDisplay } from "../types/records";
+import { t } from "../i18n";
 
 type Summary = { headword: string; pos: string; translation: string; kind: string };
-
-const NO_TRANSLATION = "(no translation available)";
 
 function summarizeLexicon(d: LexiconDisplayFields): Summary {
   const pos = d.pos_hint ?? d.ps_raw ?? "";
@@ -24,8 +23,8 @@ function summarizeLexicon(d: LexiconDisplayFields): Summary {
   return {
     headword: d.headword_latin,
     pos,
-    translation: firstGloss || NO_TRANSLATION,
-    kind: "lexicon",
+    translation: firstGloss || t("render.noTranslation"),
+    kind: t("render.kindLexicon"),
   };
 }
 
@@ -34,8 +33,8 @@ function summarizeIndexMapping(d: IndexMappingDisplayFields): Summary {
   return {
     headword: d.source_term,
     pos: d.source_lang,
-    translation: targetText || NO_TRANSLATION,
-    kind: "index",
+    translation: targetText || t("render.noTranslation"),
+    kind: t("render.kindIndex"),
   };
 }
 

@@ -21,18 +21,23 @@ export function buildLanguageMetaFromManifest(manifest: BundleManifestV1): Bundl
   return Object.values(meta).some((value) => value !== undefined) ? meta : undefined;
 }
 
-export function getSourceLabel(meta?: BundleLanguageMeta): string {
-  return meta?.source_label ?? normalizeCode(meta?.source_lang) ?? "Source";
+export function getSourceLabel(meta?: BundleLanguageMeta, fallbackLabel = "Source"): string {
+  return meta?.source_label ?? normalizeCode(meta?.source_lang) ?? fallbackLabel;
 }
 
-export function getTargetLabel(meta?: BundleLanguageMeta): string {
-  return meta?.target_label ?? normalizeCode(meta?.target_lang) ?? "Target";
+export function getTargetLabel(meta?: BundleLanguageMeta, fallbackLabel = "Target"): string {
+  return meta?.target_label ?? normalizeCode(meta?.target_lang) ?? fallbackLabel;
 }
 
-export function getBundleDisplayName(bundleId: string, meta?: BundleLanguageMeta): string {
-  const source = getSourceLabel(meta);
-  const target = getTargetLabel(meta);
-  if (source === "Source" && target === "Target") {
+export function getBundleDisplayName(
+  bundleId: string,
+  meta?: BundleLanguageMeta,
+  sourceFallbackLabel = "Source",
+  targetFallbackLabel = "Target",
+): string {
+  const source = getSourceLabel(meta, sourceFallbackLabel);
+  const target = getTargetLabel(meta, targetFallbackLabel);
+  if (source === sourceFallbackLabel && target === targetFallbackLabel) {
     return bundleId;
   }
   return `${source} ↔ ${target}`;
@@ -41,23 +46,30 @@ export function getBundleDisplayName(bundleId: string, meta?: BundleLanguageMeta
 export function getSearchDirectionText(
   direction: SearchDirection,
   meta?: BundleLanguageMeta,
+  sourceFallbackLabel = "Source",
+  targetFallbackLabel = "Target",
 ): string {
-  const source = getSourceLabel(meta);
-  const target = getTargetLabel(meta);
+  const source = getSourceLabel(meta, sourceFallbackLabel);
+  const target = getTargetLabel(meta, targetFallbackLabel);
   return direction === "source_to_target" ? `${source} → ${target}` : `${target} → ${source}`;
 }
 
 export function getSearchPlaceholder(
   direction: SearchDirection,
   meta?: BundleLanguageMeta,
+  sourceFallbackLabel = "Source",
+  targetFallbackLabel = "Target",
+  formatLabelWord: (label: string) => string = (label) => `Type a ${label} word…`,
 ): string {
-  const source = getSourceLabel(meta);
-  const target = getTargetLabel(meta);
-  return direction === "source_to_target"
-    ? `Type a ${source} word…`
-    : `Type a ${target} word…`;
+  const source = getSourceLabel(meta, sourceFallbackLabel);
+  const target = getTargetLabel(meta, targetFallbackLabel);
+  return direction === "source_to_target" ? formatLabelWord(source) : formatLabelWord(target);
 }
 
-export function getTargetEntriesLabel(meta?: BundleLanguageMeta): string {
-  return `${getTargetLabel(meta)} entries:`;
+export function getTargetEntriesLabel(
+  meta?: BundleLanguageMeta,
+  targetFallbackLabel = "Target",
+  formatEntriesLabel: (label: string) => string = (label) => `${label} entries:`,
+): string {
+  return formatEntriesLabel(getTargetLabel(meta, targetFallbackLabel));
 }

@@ -17,6 +17,7 @@ import type {
   SubEntry,
 } from "../types/records";
 import { isLexiconDisplay, isIndexMappingDisplay } from "../types/records";
+import { t } from "../i18n";
 
 function el(tag: string, cls?: string, text?: string): HTMLElement {
   const e = document.createElement(tag);
@@ -75,10 +76,10 @@ function renderSense(sense: SenseRaw, index: number): HTMLElement {
   wrap.appendChild(header);
 
   if (sense.usage_note) {
-    wrap.appendChild(el("div", "sense-usage", `Usage: ${sense.usage_note}`));
+    wrap.appendChild(el("div", "sense-usage", t("entry.usage", { value: sense.usage_note })));
   }
   if (sense.synonyms_raw && sense.synonyms_raw.length > 0) {
-    wrap.appendChild(el("div", "sense-synonyms", `Syn: ${sense.synonyms_raw.join(", ")}`));
+    wrap.appendChild(el("div", "sense-synonyms", t("entry.synShort", { value: sense.synonyms_raw.join(", ") })));
   }
   if (sense.examples && sense.examples.length > 0) {
     const exWrap = el("div", "sense-examples");
@@ -107,16 +108,16 @@ function renderLexiconEntry(record: EnrichedRecord, d: LexiconDisplayFields): HT
   wrap.appendChild(header);
 
   if (d.variants_raw && d.variants_raw.length > 0) {
-    wrap.appendChild(el("div", "entry-variants", `Variants: ${d.variants_raw.join(", ")}`));
+    wrap.appendChild(el("div", "entry-variants", t("entry.variants", { value: d.variants_raw.join(", ") })));
   }
   if (d.synonyms_raw && d.synonyms_raw.length > 0) {
-    wrap.appendChild(el("div", "entry-synonyms", `Synonyms: ${d.synonyms_raw.join(", ")}`));
+    wrap.appendChild(el("div", "entry-synonyms", t("entry.synonyms", { value: d.synonyms_raw.join(", ") })));
   }
   if (d.etymology_raw) {
-    wrap.appendChild(el("div", "entry-etymology", `Etymology: ${d.etymology_raw}`));
+    wrap.appendChild(el("div", "entry-etymology", t("entry.etymology", { value: d.etymology_raw })));
   }
   if (d.literal_meaning_raw) {
-    wrap.appendChild(el("div", "entry-literal", `Literal: ${d.literal_meaning_raw}`));
+    wrap.appendChild(el("div", "entry-literal", t("entry.literal", { value: d.literal_meaning_raw })));
   }
 
   if (d.senses && d.senses.length > 0) {
@@ -126,11 +127,11 @@ function renderLexiconEntry(record: EnrichedRecord, d: LexiconDisplayFields): HT
   }
 
   const meta = el("div", "entry-meta");
-  meta.appendChild(el("span", "meta-item", `ir_id: ${record.ir_id}`));
-  meta.appendChild(el("span", "meta-item", `source: ${record.source_id}`));
-  meta.appendChild(el("span", "meta-item", `norm: ${record.norm_version}`));
+  meta.appendChild(el("span", "meta-item", t("entry.meta.irId", { value: record.ir_id })));
+  meta.appendChild(el("span", "meta-item", t("entry.meta.source", { value: record.source_id })));
+  meta.appendChild(el("span", "meta-item", t("entry.meta.norm", { value: record.norm_version })));
   if (d.corpus_count != null) {
-    meta.appendChild(el("span", "meta-item", `corpus: ${d.corpus_count}`));
+    meta.appendChild(el("span", "meta-item", t("entry.meta.corpus", { value: d.corpus_count })));
   }
   wrap.appendChild(meta);
 
@@ -173,9 +174,9 @@ function renderIndexMapping(
   }
 
   const meta = el("div", "entry-meta");
-  meta.appendChild(el("span", "meta-item", `ir_id: ${record.ir_id}`));
-  meta.appendChild(el("span", "meta-item", `source: ${record.source_id}`));
-  meta.appendChild(el("span", "meta-item", `norm: ${record.norm_version}`));
+  meta.appendChild(el("span", "meta-item", t("entry.meta.irId", { value: record.ir_id })));
+  meta.appendChild(el("span", "meta-item", t("entry.meta.source", { value: record.source_id })));
+  meta.appendChild(el("span", "meta-item", t("entry.meta.norm", { value: record.norm_version })));
   wrap.appendChild(meta);
 
   return wrap;
@@ -201,7 +202,7 @@ export function renderEntryDetail(
   const backBtn = document.createElement("button");
   backBtn.className = "btn entry-back";
   backBtn.type = "button";
-  backBtn.textContent = "\u2190 Back to results";
+  backBtn.textContent = t("entry.back");
   backBtn.addEventListener("click", callbacks.onBack);
   container.appendChild(backBtn);
 
@@ -212,12 +213,12 @@ export function renderEntryDetail(
       renderIndexMapping(
         record,
         record.display,
-        callbacks.targetEntriesLabel ?? "Target entries:",
+        callbacks.targetEntriesLabel ?? t("entry.targetEntriesDefault"),
         callbacks.onSearch,
       ),
     );
   } else {
-    container.appendChild(el("div", "entry-error", `No display data for ir_id: ${record.ir_id}`));
+    container.appendChild(el("div", "entry-error", t("entry.noDisplay", { id: record.ir_id })));
   }
 
   return container;

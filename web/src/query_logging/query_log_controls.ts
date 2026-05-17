@@ -17,10 +17,67 @@ type QueryLogControlsDeps = {
   now?: () => Date;
   openDb?: typeof openSiralexDb;
   revokeObjectUrl?: (url: string) => void;
+  translate?: (
+    key:
+      | "queryLogs.clearConfirm"
+      | "queryLogs.noLogsToExport"
+      | "queryLogs.clearCancelled"
+      | "queryLogs.cleared"
+      | "queryLogs.count.one"
+      | "queryLogs.count.many"
+      | "queryLogs.countError"
+      | "queryLogs.exported.one"
+      | "queryLogs.exported.many"
+      | "queryLogs.exportFailed"
+      | "queryLogs.clearFailed",
+    vars?: Record<string, string | number>,
+  ) => string;
 };
 
-const CLEAR_CONFIRMATION_MESSAGE = "Clear all local query logs from this device?";
-const NO_LOGS_TO_EXPORT_MESSAGE = "No logs to export.";
+function t(
+  deps: QueryLogControlsDeps,
+  key:
+    | "queryLogs.clearConfirm"
+    | "queryLogs.noLogsToExport"
+    | "queryLogs.clearCancelled"
+    | "queryLogs.cleared"
+    | "queryLogs.count.one"
+    | "queryLogs.count.many"
+    | "queryLogs.countError"
+    | "queryLogs.exported.one"
+    | "queryLogs.exported.many"
+    | "queryLogs.exportFailed"
+    | "queryLogs.clearFailed",
+  vars?: Record<string, string | number>,
+): string {
+  if (deps.translate) {
+    return deps.translate(key, vars);
+  }
+  switch (key) {
+    case "queryLogs.clearConfirm":
+      return "Clear all local query logs from this device?";
+    case "queryLogs.noLogsToExport":
+      return "No logs to export.";
+    case "queryLogs.clearCancelled":
+      return "Clear cancelled.";
+    case "queryLogs.cleared":
+      return "Cleared query logs.";
+    case "queryLogs.count.one":
+      return "1 log";
+    case "queryLogs.count.many":
+      return `${vars?.count ?? 0} logs`;
+    case "queryLogs.countError":
+      return `Log count error: ${String(vars?.error ?? "")}`;
+    case "queryLogs.exported.one":
+      return "Exported 1 log.";
+    case "queryLogs.exported.many":
+      return `Exported ${vars?.count ?? 0} logs.`;
+    case "queryLogs.exportFailed":
+      return `Export failed: ${String(vars?.error ?? "")}`;
+    case "queryLogs.clearFailed":
+      return `Clear failed: ${String(vars?.error ?? "")}`;
+  }
+}
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -47,13 +104,13 @@ export async function getQueryLogCountFromDb(
     const count = await countLogsFn(db);
     return {
       count,
-      message: count === 1 ? "1 log" : `${count} logs`,
+      message: count === 1 ? t(deps, "queryLogs.count.one") : t(deps, "queryLogs.count.many", { count }),
       ok: true,
     };
   } catch (error) {
     return {
       count: 0,
-      message: `Log count error: ${String(error)}`,
+      message: t(deps, "queryLogs.countError", { error: String(error) }),
       ok: false,
     };
   } finally {
@@ -76,7 +133,7 @@ export async function exportQueryLogsFromUi(
     if (count === 0) {
       return {
         count: 0,
-        message: NO_LOGS_TO_EXPORT_MESSAGE,
+        message: t(deps, "queryLogs.noLogsToExport"),
         ok: true,
       };
     }
@@ -98,13 +155,16 @@ export async function exportQueryLogsFromUi(
 
     return {
       count,
-      message: `Exported ${count === 1 ? "1 log" : `${count} logs`}.`,
+      message:
+        count === 1
+          ? t(deps, "queryLogs.exported.one")
+          : t(deps, "queryLogs.exported.many", { count }),
       ok: true,
     };
   } catch (error) {
     return {
       count: 0,
-      message: `Export failed: ${String(error)}`,
+      message: t(deps, "queryLogs.exportFailed", { error: String(error) }),
       ok: false,
     };
   } finally {
@@ -116,10 +176,10 @@ export async function clearQueryLogsFromUi(
   deps: QueryLogControlsDeps = {},
 ): Promise<QueryLogUiResult> {
   const confirmFn = deps.confirmFn ?? ((message: string) => window.confirm(message));
-  if (!confirmFn(CLEAR_CONFIRMATION_MESSAGE)) {
+  if (!confirmFn(t(deps, "queryLogs.clearConfirm"))) {
     return {
       count: -1,
-      message: "Clear cancelled.",
+      message: t(deps, "queryLogs.clearCancelled"),
       ok: true,
     };
   }
@@ -133,13 +193,13 @@ export async function clearQueryLogsFromUi(
     const count = await countQueryLogs(db);
     return {
       count,
-      message: "Cleared query logs.",
+      message: t(deps, "queryLogs.cleared"),
       ok: true,
     };
   } catch (error) {
     return {
       count: 0,
-      message: `Clear failed: ${String(error)}`,
+      message: t(deps, "queryLogs.clearFailed", { error: String(error) }),
       ok: false,
     };
   } finally {
