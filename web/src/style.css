@@ -91,6 +91,31 @@ input[type="text"]::placeholder {
   color: var(--muted);
 }
 
+#localeSelect {
+  border: 1px solid color-mix(in oklab, var(--panel) 75%, white 25%);
+  background: color-mix(in oklab, var(--panel) 88%, black 12%);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  width: 160px;
+  box-sizing: border-box;
+}
+
+#localeSelect:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 55%, white 10%);
+  outline-offset: 1px;
+}
+
+.locale-control {
+  min-width: 150px;
+}
+
+.locale-control .label {
+  font-size: 14px;
+}
+
 .btn {
   appearance: none;
   border: 1px solid color-mix(in oklab, var(--panel) 75%, white 25%);

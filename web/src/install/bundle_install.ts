@@ -52,6 +52,7 @@ export type InstallRemoteBundleOptions = {
   onUpdate?: (message: string) => void;
   storageEstimate?: () => Promise<{ usage?: number; quota?: number }>;
   activateOnCommit?: boolean;
+  progressCopy?: Partial<InstallProgressCopy>;
 };
 
 export type InstallBundleMetadata = {
@@ -59,6 +60,42 @@ export type InstallBundleMetadata = {
   version?: string;
   storageBytes?: number;
 };
+
+export type InstallProgressCopy = {
+  installingPrefix: string;
+  stageLabel: string;
+  stageFetchingManifest: string;
+  stageFetchingRecords: string;
+  stageFetchingSearchIndex: string;
+  stageStagingPayloads: string;
+  bytesReadLabel: string;
+  linesSeenLabel: string;
+  recordsWrittenLabel: string;
+  entriesWrittenLabel: string;
+  batchesCommittedLabel: string;
+};
+
+const DEFAULT_INSTALL_PROGRESS_COPY: InstallProgressCopy = {
+  installingPrefix: "Installing",
+  stageLabel: "Stage",
+  stageFetchingManifest: "fetching manifest",
+  stageFetchingRecords: "fetching records.jsonl",
+  stageFetchingSearchIndex: "fetching search_index.jsonl",
+  stageStagingPayloads: "staging payloads",
+  bytesReadLabel: "bytes read",
+  linesSeenLabel: "lines seen",
+  recordsWrittenLabel: "records written",
+  entriesWrittenLabel: "entries written",
+  batchesCommittedLabel: "batches committed",
+};
+
+function buildProgressCopy(override?: Partial<InstallProgressCopy>): InstallProgressCopy {
+  return { ...DEFAULT_INSTALL_PROGRESS_COPY, ...override };
+}
+
+function installHeader(copy: InstallProgressCopy, bundleId: string): string {
+  return `${copy.installingPrefix} ${bundleId}`;
+}
 
 function createLinkedAbortSignal(timeoutMs: number, externalSignal?: AbortSignal): {
   signal: AbortSignal;
@@ -217,7 +254,9 @@ export async function installBundleIntoDb(
   signal?: AbortSignal,
   metadata?: InstallBundleMetadata,
   activateOnCommit = true,
+  progressCopyOverride?: Partial<InstallProgressCopy>,
 ): Promise<InstallBundleResult> {
+  const progressCopy = buildProgressCopy(progressCopyOverride);
   const recovered = await recoverInterruptedBundleInstall(db);
   if (recovered) {
     onUpdate(`${recovered}\n`);
@@ -256,13 +295,13 @@ export async function installBundleIntoDb(
       signal,
       onProgress: (p: ImportRecordsProgress) => {
         onUpdate(
-          `Installing ${manifest.bundle_id}\n` +
-            `Stage: staging payloads\n\n` +
+          `${installHeader(progressCopy, manifest.bundle_id)}\n` +
+            `${progressCopy.stageLabel}: ${progressCopy.stageStagingPayloads}\n\n` +
             `[records.jsonl]\n` +
-            `bytes read: ${p.bytesRead}\n` +
-            `lines seen: ${p.linesSeen}\n` +
-            `records written: ${p.recordsWritten}\n` +
-            `batches committed: ${p.batchesCommitted}\n`,
+            `${progressCopy.bytesReadLabel}: ${p.bytesRead}\n` +
+            `${progressCopy.linesSeenLabel}: ${p.linesSeen}\n` +
+            `${progressCopy.recordsWrittenLabel}: ${p.recordsWritten}\n` +
+            `${progressCopy.batchesCommittedLabel}: ${p.batchesCommitted}\n`,
         );
       },
     });
@@ -275,14 +314,14 @@ export async function installBundleIntoDb(
       signal,
       onProgress: (p: ImportSearchIndexProgress) => {
         onUpdate(
-          `Installing ${manifest.bundle_id}\n` +
-            `Stage: staging payloads\n\n` +
-            `[records.jsonl] written: ${recordsCount}\n` +
+          `${installHeader(progressCopy, manifest.bundle_id)}\n` +
+            `${progressCopy.stageLabel}: ${progressCopy.stageStagingPayloads}\n\n` +
+            `[records.jsonl] ${progressCopy.recordsWrittenLabel}: ${recordsCount}\n` +
             `\n[search_index.jsonl]\n` +
-            `bytes read: ${p.bytesRead}\n` +
-            `lines seen: ${p.linesSeen}\n` +
-            `entries written: ${p.entriesWritten}\n` +
-            `batches committed: ${p.batchesCommitted}\n`,
+            `${progressCopy.bytesReadLabel}: ${p.bytesRead}\n` +
+            `${progressCopy.linesSeenLabel}: ${p.linesSeen}\n` +
+            `${progressCopy.entriesWrittenLabel}: ${p.entriesWritten}\n` +
+            `${progressCopy.batchesCommittedLabel}: ${p.batchesCommitted}\n`,
         );
       },
     });
@@ -337,13 +376,14 @@ export async function installRemoteCatalogBundle(
   catalogUrl: string,
   options: InstallRemoteBundleOptions = {},
 ): Promise<{ manifest: BundleManifestV1; result: InstallBundleResult }> {
+  const progressCopy = buildProgressCopy(options.progressCopy);
   const onUpdate = options.onUpdate ?? (() => undefined);
   const fetchImpl = options.fetchImpl ?? fetch;
   const responseStartTimeoutMs = options.timeoutMs ?? DEFAULT_BUNDLE_FETCH_START_TIMEOUT_MS;
   const signal = options.signal;
 
   const urls = deriveBundleAssetUrls(catalogUrl, entry);
-  onUpdate(`Installing ${entry.bundle_id}\nStage: fetching manifest\n`);
+  onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingManifest}\n`);
   const manifestTimeout = createLinkedAbortSignal(responseStartTimeoutMs, signal);
   let manifestResponse: Response;
   try {
@@ -413,7 +453,7 @@ export async function installRemoteCatalogBundle(
     }
   }
 
-  onUpdate(`Installing ${entry.bundle_id}\nStage: fetching records.jsonl\n`);
+  onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingRecords}\n`);
   const recordsStream = await fetchBodyStream(
     urls.records_url,
     recordsEntry.byte_length,
@@ -422,7 +462,7 @@ export async function installRemoteCatalogBundle(
     responseStartTimeoutMs,
     catalogUrl,
   );
-  onUpdate(`Installing ${entry.bundle_id}\nStage: fetching search_index.jsonl\n`);
+  onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingSearchIndex}\n`);
   const indexStream = await fetchBodyStream(
     urls.search_index_url,
     indexEntry.byte_length,
@@ -447,6 +487,7 @@ export async function installRemoteCatalogBundle(
       storageBytes: entry.size_bytes,
     },
     options.activateOnCommit ?? true,
+    progressCopy,
   );
 
   return { manifest, result };

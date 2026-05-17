@@ -291,6 +291,7 @@ DoD:
 | 17 | HTTPS + Android validation execution | Active validation follow-up | Pending hardware access |
 | 18 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
 | 19 | Phase 6B — Consumer Search-First UX + Infrastructure Layering | UX/product milestone | ✅ Complete |
+| 20 | Phase 6D1 — Localization Architecture + French-First Interface Pass | Near-term consumer productization milestone | Implemented (pending review) |
 
 Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. Search/index quality is no longer a single undifferentiated pending bucket: **Phase 5a** is now treated as complete because `norm_v2` indexing has been implemented and validated, while **Phase 5b** is now substantially complete with Android real-device validation explicitly deferred until hardware access resumes. With that transition, **Phase 1.5A** (correction record schema/specification) and **Phase 1.5B** (dry-run correction application pipeline) are complete for backend dry-run scope, and **Phase 6B** is complete for consumer UX layering scope. UI/moderation workflows and committed correction-release lifecycle persistence remain intentionally out of scope for this completion state. Branch C remains explicitly deferred until real usage data exists.
 
@@ -309,6 +310,53 @@ The completed Phase 2.0 work followed clean layer separation:
 - **2.0.3b** = retrieval correctness (query execution) ✅
 - **2.0.4** = presentation correctness (results display + entry view) ✅
 - **2.0.5** = offline correctness (PWA first-install → offline proof) ✅
+
+#### Phase 6D1 — Localization Architecture + French-first interface pass *(implemented, review pending)*
+
+Rationale:
+
+- the dictionary content is French ↔ Maninka
+- Guinea-facing users are more likely to expect a French interface than an English-first shell
+- the current English-first app shell creates audience mismatch even when dictionary behavior is correct
+- this is UI localization work; it is not Branch C linguistic depth and not a data-model change
+
+Implemented scope:
+
+1. **French UI copy coverage** for:
+   - first-run install flow
+   - search screen
+   - progress/success/failure messages
+   - offline fallback text
+   - Manage dictionaries
+   - Advanced setup
+   - Advanced diagnostics
+   - empty states and action buttons
+
+2. **Lightweight localization architecture**:
+   - keyed UI strings
+   - current locale selection
+   - English and French supported initially
+
+3. **Deployment intent**:
+   - current Guinea-facing/public deployment should likely default to French
+   - English remains available as an optional interface language (or deployment-level configuration)
+
+Implementation notes:
+
+- lightweight keyed string layer introduced for consumer shell copy with `en` and `fr`
+- deployment-configured default locale support added (`VITE_DEFAULT_LOCALE`) with fallback order: configured locale → browser locale → `fr`
+- architecture supports future in-app locale toggle; visible toggle intentionally deferred to avoid introducing new UX controls during this pass
+- for Guinea-facing/public Netlify deployment, set `VITE_DEFAULT_LOCALE=fr` to enforce French-first UI regardless of browser locale
+
+Boundaries preserved:
+
+- do not alter dictionary content language coverage
+- do not conflate this phase with Branch C transliteration/morphology work
+
+Sequencing note:
+
+- Phase 6C UX revalidation can proceed on the current build
+- Phase 6D should be considered soon after (or alongside) pilot analysis because it directly affects self-serve audience fit
 
 #### Phase 2.0.3 — Hardening items (tracked for next PR)
 
