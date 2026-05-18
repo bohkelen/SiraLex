@@ -3,6 +3,10 @@
 This document defines the `norm_v2` source-term decomposition contract used for
 `index_mapping.fields_raw.source_term`.
 
+**`norm_v3`** reuses this contract unchanged (implemented by
+`extract_source_phrases` in `shared/normalization/norm_v2.py`, surfaced through
+`norm_v3`); `norm_v3` only adds NFC preprocessing for **search-key inputs**.
+
 The goal is to improve real search quality without replacing or mutating the
 original stored string.
 

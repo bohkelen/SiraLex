@@ -113,6 +113,32 @@ describe("Phase 3 manifest parsing", () => {
     expect(result.manifest?.rule_versions.normalization).toBe("norm_v2");
   });
 
+  it("accepts norm_v3 normalization ruleset in manifests", () => {
+    const result = parseAndValidateManifestJson(
+      JSON.stringify({
+        manifest_schema_version: "bundle_manifest_v1",
+        bundle_id: "bundle_full_norm_v3_aaaaaaaa",
+        bundle_type: "full",
+        bundle_format: "directory",
+        compression: "none",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        rule_versions: { normalization: "norm_v3" },
+        sources: { included: ["src_malipense"], excluded: [] },
+        reconciliation_action: "REPLACE_ALL",
+        update_mode: "REPLACE_ALL",
+        files: [
+          { path: "records.jsonl", byte_length: 10, sha256: "sha256:aaa" },
+          { path: "search_index.jsonl", byte_length: 20, sha256: "sha256:bbb" },
+        ],
+        content_sha256: "sha256:ccc",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.manifest?.rule_versions.normalization).toBe("norm_v3");
+  });
+
   it("parses search_index_directional when present", () => {
     const result = parseAndValidateManifestJson(
       JSON.stringify({
@@ -323,6 +349,111 @@ describe("Phase 3 bundle-aware runtime", () => {
 
       expect((await searchQuery(db, bundleId, "target_to_source", "bon travail", true)).ir_ids).toEqual([]);
       expect((await searchQuery(db, bundleId, "source_to_target", "ߘߊ߰", true)).ir_ids).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  /**
+   Unicode NFC canonicalization (norm_v3): index keys use NFC-composed Latin forms.
+   Unchanged searchQuery + normalizeNfc(query) must hit tgt_casefold "kùn" for both
+   composed and decomposed user input. Synthetic records mirror Python norm_v3 output.
+   */
+  it("resolves norm_v3 NFC-composed target keys with unchanged searchQuery", async () => {
+    const db = await openSiralexDb();
+    try {
+      const bundleId = "bundle_full_norm_v3_nfc_search";
+
+      const kunKeys = {
+        casefold: ["kùn"],
+        diacritics_insensitive: ["kun"],
+        punct_stripped: ["kun"],
+        nospace: ["kun"],
+      };
+      const teteKeys = {
+        casefold: ["tête"],
+        diacritics_insensitive: ["tete"],
+        punct_stripped: ["tete"],
+        nospace: ["tete"],
+      };
+      const senKeys = {
+        casefold: ["sen"],
+        diacritics_insensitive: ["sen"],
+        punct_stripped: ["sen"],
+        nospace: ["sen"],
+      };
+      const piedKeys = {
+        casefold: ["pied"],
+        diacritics_insensitive: ["pied"],
+        punct_stripped: ["pied"],
+        nospace: ["pied"],
+      };
+
+      await importRecordsJsonl(
+        db,
+        makeJsonlFile("records.jsonl", [
+          {
+            ir_id: "rec-map-tete",
+            ir_kind: "index_mapping",
+            source_id: "src_malipense",
+            norm_version: "norm_v3",
+            preferred_form: "tête",
+            variant_forms: ["tête"],
+            search_keys: teteKeys,
+            display: { source_term: "tête" },
+          },
+          {
+            ir_id: "rec-lex-kun",
+            ir_kind: "lexicon_entry",
+            source_id: "src_malipense",
+            norm_version: "norm_v3",
+            preferred_form: "ku\u0300n",
+            variant_forms: ["ku\u0300n"],
+            search_keys: kunKeys,
+            display: { headword_latin: "ku\u0300n" },
+          },
+          {
+            ir_id: "rec-map-pied",
+            ir_kind: "index_mapping",
+            source_id: "src_malipense",
+            norm_version: "norm_v3",
+            preferred_form: "pied",
+            variant_forms: ["pied"],
+            search_keys: piedKeys,
+            display: { source_term: "pied" },
+          },
+          {
+            ir_id: "rec-lex-sen",
+            ir_kind: "lexicon_entry",
+            source_id: "src_malipense",
+            norm_version: "norm_v3",
+            preferred_form: "sen",
+            variant_forms: ["sen"],
+            search_keys: senKeys,
+            display: { headword_latin: "sen" },
+          },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+      await importSearchIndexJsonl(
+        db,
+        makeJsonlFile("search_index.jsonl", [
+          { key_type: "src_casefold", key: "tête", ir_ids: ["rec-map-tete"] },
+          { key_type: "tgt_casefold", key: "kùn", ir_ids: ["rec-lex-kun"] },
+          { key_type: "src_casefold", key: "pied", ir_ids: ["rec-map-pied"] },
+          { key_type: "tgt_casefold", key: "sen", ir_ids: ["rec-lex-sen"] },
+        ]),
+        { bundleId, batchSize: 10 },
+      );
+
+      expect((await searchQuery(db, bundleId, "source_to_target", "tête", true)).ir_ids).toEqual(["rec-map-tete"]);
+      expect((await searchQuery(db, bundleId, "source_to_target", "te\u0302te", true)).ir_ids).toEqual(["rec-map-tete"]);
+
+      expect((await searchQuery(db, bundleId, "target_to_source", "Kùn", true)).ir_ids).toEqual(["rec-lex-kun"]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "ku\u0300n", true)).ir_ids).toEqual(["rec-lex-kun"]);
+
+      expect((await searchQuery(db, bundleId, "source_to_target", "pied", true)).ir_ids).toEqual(["rec-map-pied"]);
+      expect((await searchQuery(db, bundleId, "target_to_source", "Sen", true)).ir_ids).toEqual(["rec-lex-sen"]);
     } finally {
       db.close();
     }

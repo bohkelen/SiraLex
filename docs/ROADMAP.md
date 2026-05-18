@@ -285,15 +285,16 @@ DoD:
 | 11 | Phase 3.4 — Multi-bundle support | Platform generalization | ✅ Complete |
 | 12 | Phase 3.5 — Bundle selection + distribution | Platform generalization | ✅ Complete |
 | 13 | Phase 5a — `norm_v2` indexing shipped | Search/index quality | ✅ Complete |
-| 14 | Phase 5b — Field Validation + Search Reality Calibration | Validation track | Substantially complete (Android real-device validation deferred pending hardware access) |
-| 15 | Phase 1.5A — Correction record schema/specification | Next formal engineering milestone | ✅ Complete |
-| 16 | Phase 1.5B — Dry-run correction application pipeline | Follows 1.5A approval | ✅ Complete |
-| 17 | HTTPS + Android validation execution | Active validation follow-up | Pending hardware access |
-| 18 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
-| 19 | Phase 6B — Consumer Search-First UX + Infrastructure Layering | UX/product milestone | ✅ Complete |
-| 20 | Phase 6D1 — Localization Architecture + French-First Interface Pass | Near-term consumer productization milestone | Implemented (pending review) |
+| 14 | `norm_v3` — NFC search-key canonicalization | Search/index correctness | ✅ Code/spec complete; real `norm_v3` bundle regeneration and distribution pending |
+| 15 | Phase 5b — Field Validation + Search Reality Calibration | Validation track | Substantially complete (Android real-device validation deferred pending hardware access) |
+| 16 | Phase 1.5A — Correction record schema/specification | Next formal engineering milestone | ✅ Complete |
+| 17 | Phase 1.5B — Dry-run correction application pipeline | Follows 1.5A approval | ✅ Complete |
+| 18 | HTTPS + Android validation execution | Active validation follow-up | Pending hardware access |
+| 19 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
+| 20 | Phase 6B — Consumer Search-First UX + Infrastructure Layering | UX/product milestone | ✅ Complete |
+| 21 | Phase 6D1 — Localization Architecture + French-First Interface Pass | Near-term consumer productization milestone | Implemented (pending review) |
 
-Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. Search/index quality is no longer a single undifferentiated pending bucket: **Phase 5a** is now treated as complete because `norm_v2` indexing has been implemented and validated, while **Phase 5b** is now substantially complete with Android real-device validation explicitly deferred until hardware access resumes. With that transition, **Phase 1.5A** (correction record schema/specification) and **Phase 1.5B** (dry-run correction application pipeline) are complete for backend dry-run scope, and **Phase 6B** is complete for consumer UX layering scope. UI/moderation workflows and committed correction-release lifecycle persistence remain intentionally out of scope for this completion state. Branch C remains explicitly deferred until real usage data exists.
+Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. Search/index quality is no longer a single undifferentiated pending bucket: **Phase 5** now includes **`norm_v2` phrase/index improvements** (Phase 5a) and **`norm_v3` NFC search-key canonicalization** as the successor default (see the Phase 5 section), while **Phase 5b** is now substantially complete with Android real-device validation explicitly deferred until hardware access resumes. With that transition, **Phase 1.5A** (correction record schema/specification) and **Phase 1.5B** (dry-run correction application pipeline) are complete for backend dry-run scope, and **Phase 6B** is complete for consumer UX layering scope. UI/moderation workflows and committed correction-release lifecycle persistence remain intentionally out of scope for this completion state. Branch C remains explicitly deferred until real usage data exists.
 
 ### Phase 6B — Consumer Search-First UX + Infrastructure Layering ✅
 
@@ -510,9 +511,9 @@ DoD:
 - Frontend runtime code no longer embeds a specific target language in its direction model.
 - Runtime search semantics enforce the selected direction instead of treating the toggle as display-only state.
 
-#### Phase 4.2.5 — Directional search semantics *(partially complete)*
+#### Phase 4.2.5 — Directional search semantics ✅
 
-This mini-phase makes the direction toggle real at query time without changing the normalized record schema.
+This mini-phase makes the direction toggle real at query time without changing the normalized record schema. *(It was introduced with Phase 3 platform work; the **non-hybrid** manifest/builder/runtime alignment was completed later — see Phase 5b, “Directional contract hardening”.)*
 
 Bundle contract:
 
@@ -534,21 +535,7 @@ Current bundle-generation mapping:
 - `index_mapping` records emit `src_*` keys from `fields_raw.source_term`
 - `lexicon_entry` records emit `tgt_*` keys from headword/variant normalization
 
-Current status:
-
-- directional `src_*` / `tgt_*` query execution is implemented
-- legacy fallback is still present for older bundles
-- the bundle-level capability flag is still not formalized in the typed manifest/runtime contract
-
-**Remaining future step: bundle-level capability flag**
-
-Right now the runtime tries the directional ladder first and falls back to the legacy (undirected) ladder only when the directional ladder returns zero results. That can create subtle ranking distortions later (e.g. directional bundle has a weak match, legacy fallback would have had a strong match → confusing ordering). To avoid hybrid logic:
-
-- Add a manifest flag, e.g. `search_index_directional: true`.
-- **If directional bundle** (flag true): never fallback; use only the directional ladder.
-- **If legacy bundle** (flag absent or false): always use the legacy ladder only; do not try directional keys.
-
-Then each bundle type has a single, predictable code path and no mixed ranking.
+**Status (Phase 5b-aligned):** The bundle manifest exposes **`search_index_directional`**. The builder and runtime use a **single ladder per bundle**: directional bundles (`search_index_directional: true`, including `norm_v2` / `norm_v3` publish paths) use **only** directional `src_*` / `tgt_*` keys; legacy bundles use **only** undirected key families. There is **no** cross-family fallback, so ordering stays predictable.
 
 ### Phase 3.3 — Installed bundle registry ✅
 
@@ -604,9 +591,7 @@ DoD:
 
 ## Phase 5 — Search/index quality improvement
 
-Phase 5 now has two parts: the indexing-quality upgrade that shipped as
-`norm_v2`, and the remaining contract/runtime hardening needed so directional
-search behavior is explicit and non-hybrid across bundle generations.
+Phase 5 covers **indexing rulesets** (`norm_v2`, then **`norm_v3`** as the successor normalizer default for new derived artifacts) and **Phase 5b** — field validation and search-reality calibration. **Directional search** is **fully explicit**: manifests carry **`search_index_directional`**, and the runtime uses a **single** ladder per bundle (directional `src_*` / `tgt_*` **or** legacy undirected keys only — **no hybrid fallback**). That contract alignment shipped as the Phase 5b “Directional contract hardening” subtask.
 
 ### Phase 5a — `norm_v2` indexing shipped ✅
 
@@ -632,6 +617,18 @@ Completion criteria now satisfied:
   generation
 - `norm_v2` remains explicit in derived artifacts and bundle metadata through
   `rule_versions.normalization`
+
+### `norm_v3` — NFC search-key canonicalization (successor default) ✅
+
+**Status:** Implemented. The normalizer’s active ruleset is **`norm_v3`**, which
+preserves the full **`norm_v2`** variant and phrase-extraction contract and adds
+**NFC preprocessing** of search-key input forms so composed and decomposed
+Unicode spellings (e.g. `kùn` vs `kùn`) produce equivalent search-key material.
+Frozen **`norm_v1`** / historical **`norm_v2`** Python modules are unchanged; new
+builds stamp `norm_version: "norm_v3"` and manifest
+`rule_versions.normalization: "norm_v3"`. Directional `src_*` / `tgt_*` bundles
+behave like `norm_v2` from the runtime’s perspective (unchanged
+`searchQuery` + ladder).
 
 ### Phase 5b — Field Validation + Search Reality Calibration
 
@@ -664,7 +661,7 @@ Capture the following per query:
 - `ir_ids_count`
 - `bundle_id`
 - `bundle_version` (from manifest)
-- `norm_version` (`norm_v1` / `norm_v2`)
+- `norm_version` (`norm_v1` / `norm_v2` / `norm_v3`)
 - `app_version` (build identifier)
 - `timestamp`
 - `logging_enabled` (boolean)
@@ -713,7 +710,7 @@ Define the cycle:
    - phrase extraction
    - normalization rules
    - index coverage
-5. Rebuild bundle (future `norm_v3`)
+5. Rebuild normalized JSONL, search index, and bundle under the appropriate `norm_vN` — for example, a refreshed `norm_v3` build, or a future `norm_v4+` only when a new ruleset change is justified.
 
 No runtime AI involvement.
 

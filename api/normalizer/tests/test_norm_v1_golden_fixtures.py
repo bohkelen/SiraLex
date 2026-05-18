@@ -262,7 +262,7 @@ class TestNormalizeLexiconEntry:
         }
         result = normalize_lexicon_entry(ir_unit)
         assert result.preferred_form == "dɔ́bɛ̀n"
-        assert result.norm_version == "norm_v2"
+        assert result.norm_version == "norm_v3"
 
     def test_variant_forms_include_preferred(self):
         ir_unit = {

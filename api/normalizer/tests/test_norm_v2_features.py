@@ -11,9 +11,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "shared"))
 
 from normalization.norm_v2 import (  # noqa: E402
     MAX_SOURCE_PHRASES,
-    RULESET_ID,
     extract_source_phrases,
 )
+from normalization.norm_v3 import RULESET_ID  # noqa: E402 — active pipeline ruleset
 from normalizer.normalize import normalize_index_mapping, normalize_lexicon_entry  # noqa: E402
 
 

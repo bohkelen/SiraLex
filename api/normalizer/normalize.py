@@ -34,7 +34,7 @@ from typing import Any, Iterator
 # Add shared to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "shared"))
 
-from normalization.norm_v2 import (
+from normalization.norm_v3 import (
     RULESET_ID,
     compute_search_keys,
     extract_source_phrases,
