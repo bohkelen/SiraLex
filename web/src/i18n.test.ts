@@ -75,9 +75,9 @@ describe("i18n translations", () => {
   it("uses active locale translations with interpolation", () => {
     const previous = getCurrentLocale();
     setCurrentLocale("fr");
-    expect(t("search.queryLabel", { direction: "FR → Mnk" })).toBe("Requête (FR → Mnk)");
+    expect(t("search.queryLabel", { direction: "FR → Mnk" })).toBe("Recherche (FR → Mnk)");
     setCurrentLocale("en");
-    expect(t("search.queryLabel", { direction: "FR → Mnk" })).toBe("Query (FR → Mnk)");
+    expect(t("search.queryLabel", { direction: "FR → Mnk" })).toBe("Search (FR → Mnk)");
     setCurrentLocale(previous);
   });
 });

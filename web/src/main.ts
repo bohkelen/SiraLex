@@ -45,6 +45,7 @@ import {
 import {
   installBundleIntoDb,
   installRemoteCatalogBundle,
+  type InstallProgressMode,
 } from "./install/bundle_install";
 import {
   clearQueryLogsFromUi,
@@ -113,6 +114,8 @@ app.innerHTML = `
       <p class="subtitle">${t("search.subtitle")}</p>
       <div id="dictStatus" class="mono"></div>
       <div id="firstRun" style="display: none; margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
+        <div class="label">${t("firstRun.title")}</div>
+        <p class="subtitle" style="margin: 6px 0 0 0">${t("firstRun.intro")}</p>
         <div id="featuredInstallStatus" class="mono"></div>
         <div class="row" style="margin-top: 10px; gap: 8px">
           <button id="featuredInstall" class="btn">${t("firstRun.install")}</button>
@@ -127,7 +130,7 @@ app.innerHTML = `
         </div>
       </div>
 
-      <div class="row" style="margin-top: 12px; align-items: center">
+      <div id="searchControlsRow" class="row" style="display: none; margin-top: 12px; align-items: center">
         <div class="field" style="flex: 1">
           <div class="label" id="searchLabel">${t("search.queryLabel", { direction: `${t("language.source")} → ${t("language.target")}` })}</div>
           <input id="searchInput" type="text" placeholder="${t("search.placeholder", { language: t("language.source") })}" disabled autocomplete="off" />
@@ -143,6 +146,7 @@ app.innerHTML = `
       <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("manage.summary")}</summary>
       <div class="card" style="margin-top: 8px">
         <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("manage.title")}</h2>
+        <p class="subtitle" style="margin: 0 0 8px 0">${t("manage.surfaceHint")}</p>
         <div class="row" style="margin-top: 12px; align-items: center">
           <div class="field" style="flex: 1">
             <div class="label">${t("manage.installedLabel")}</div>
@@ -156,6 +160,7 @@ app.innerHTML = `
 
         <details style="margin-top: 12px">
           <summary style="color: var(--muted); font-size: 13px; cursor: pointer">${t("advancedSetup.summary")}</summary>
+          <p class="subtitle" style="margin: 8px 0 0 0">${t("advancedSetup.surfaceHint")}</p>
           <div class="row" style="margin-top: 12px; align-items: end">
             <div class="field" style="flex: 1">
               <div class="label">${t("catalog.urlLabel")}</div>
@@ -183,6 +188,7 @@ app.innerHTML = `
       <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("diagnostics.summary")}</summary>
       <div class="card" style="margin-top: 8px">
         <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("diagnostics.title")}</h2>
+        <p class="subtitle" style="margin: 0 0 8px 0">${t("diagnostics.surfaceHint")}</p>
         <div class="row" style="align-items: center; justify-content: space-between; gap: 12px">
           <div>
             <div class="label">${t("logging.label")}</div>
@@ -298,6 +304,7 @@ const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
 const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
 const searchMeta = mustGetEl<HTMLDivElement>("#searchMeta");
 const searchResults = mustGetEl<HTMLDivElement>("#searchResults");
+const searchControlsRow = mustGetEl<HTMLDivElement>("#searchControlsRow");
 const langToggle = mustGetEl<HTMLButtonElement>("#langToggle");
 const queryLoggingStatus = mustGetEl<HTMLDivElement>("#queryLoggingStatus");
 const queryLoggingCount = mustGetEl<HTMLDivElement>("#queryLoggingCount");
@@ -954,6 +961,7 @@ async function refreshDbStatus() {
     dbOut.textContent = dictStatus.textContent;
   }
   renderCatalogList();
+  searchControlsRow.style.display = hasActiveBundle ? "" : "none";
   searchInput.disabled = !hasActiveBundle || busy;
   langToggle.disabled = !hasActiveBundle || busy;
   updateFeaturedInstallControls();
@@ -1236,7 +1244,7 @@ async function installFeaturedDictionary() {
       if (!entry) {
         throw new Error(t("featured.noEntryFound"));
       }
-      const installResult = await installCatalogEntry(entry, true, featuredInstallStatus);
+      const installResult = await installCatalogEntry(entry, true, featuredInstallStatus, "consumer");
       if (!installResult.ok) {
         throw new Error(installResult.message);
       }
@@ -1276,6 +1284,7 @@ async function installCatalogEntry(
   entry: BundleCatalogEntryV1,
   activateOnCommit = true,
   progressTarget: HTMLDivElement = importProgress,
+  progressMode: InstallProgressMode = "detailed",
 ): Promise<{ ok: boolean; message: string }> {
   if (!loadedCatalogUrl) {
     progressTarget.style.display = "";
@@ -1303,7 +1312,10 @@ async function installCatalogEntry(
   remoteInstallBundleId = entry.bundle_id;
   updateInstallControls();
   progressTarget.style.display = "";
-  progressTarget.textContent = t("catalog.prepareRemoteInstall", { bundleId: entry.bundle_id });
+  progressTarget.textContent =
+    progressMode === "consumer"
+      ? t("progress.consumer.preparing")
+      : t("catalog.prepareRemoteInstall", { bundleId: entry.bundle_id });
 
   const db = await openSiralexDb();
   try {
@@ -1325,7 +1337,10 @@ async function installCatalogEntry(
         recordsWrittenLabel: t("progress.recordsWrittenLabel"),
         entriesWrittenLabel: t("progress.entriesWrittenLabel"),
         batchesCommittedLabel: t("progress.batchesCommittedLabel"),
+        consumerAddingPercent: t("progress.consumer.addingPercent"),
+        consumerPreparing: t("progress.consumer.preparing"),
       },
+      progressMode,
       storageEstimate:
         typeof navigator !== "undefined" && navigator.storage?.estimate
           ? async () => await navigator.storage.estimate()
@@ -1907,10 +1922,8 @@ async function runSearch(query: string) {
     if (seq !== searchSeq) return;
 
     if (result.ir_ids.length === 0) {
-      const elapsedMs = performance.now() - t0;
       searchMeta.textContent = t("search.noMatch", {
         query,
-        elapsed: elapsedMs.toFixed(1),
       });
       searchResults.innerHTML = "";
       lastSearchRecords = [];
@@ -1927,14 +1940,10 @@ async function runSearch(query: string) {
 
     const records = await resolveRecords(db, activeStorageScopeId, result.ir_ids);
     if (seq !== searchSeq) return;
-    const elapsedMs = performance.now() - t0;
 
     searchMeta.textContent = t("search.resultMeta", {
       query,
       count: records.length,
-      level: String(result.matched_key_type),
-      key: String(result.matched_key),
-      elapsed: elapsedMs.toFixed(1),
     });
 
     lastSearchRecords = records;

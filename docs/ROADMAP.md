@@ -345,7 +345,7 @@ Implementation notes:
 
 - lightweight keyed string layer introduced for consumer shell copy with `en` and `fr`
 - deployment-configured default locale support added (`VITE_DEFAULT_LOCALE`) with fallback order: configured locale → browser locale → `fr`
-- architecture supports future in-app locale toggle; visible toggle intentionally deferred to avoid introducing new UX controls during this pass
+- visible in-app locale selector is now present in the app shell (`Français` / `English`) and persists user preference locally (`siralex.ui_locale`)
 - for Guinea-facing/public Netlify deployment, set `VITE_DEFAULT_LOCALE=fr` to enforce French-first UI regardless of browser locale
 
 Boundaries preserved:
@@ -357,6 +357,24 @@ Sequencing note:
 
 - Phase 6C UX revalidation can proceed on the current build
 - Phase 6D should be considered soon after (or alongside) pilot analysis because it directly affects self-serve audience fit
+
+#### Phase 6C feedback carry-forward (implementation follow-up)
+
+Evidence from early Phase 6C user feedback indicates a clear product split:
+
+- ordinary users need stronger first-run guidance and less technical landing copy before first dictionary install
+- advanced/platform capabilities remain required, but should be framed as secondary/optional surfaces
+
+This keeps the existing product philosophy intact:
+
+- primary surface: search + direction toggle + results
+- secondary surfaces: Manage dictionaries, Advanced setup, Advanced diagnostics
+- no platform capability removal
+
+Deferred product finding (not in the immediate patch):
+
+- **Result interpretability / sense differentiation**: users may not know which target form to choose when one source query maps to multiple targets (example reported: `amour` → `jàrabi`, `kànin`, `tin`)
+- treat this as a separate content + presentation track; do not fold it into first-run UX copy changes or phrase-retrieval/search-runtime behavior in the Phase 6C follow-up patch
 
 #### Phase 2.0.3 — Hardening items (tracked for next PR)
 
