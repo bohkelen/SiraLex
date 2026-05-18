@@ -31,6 +31,7 @@ import {
 import type { JsonlByteSource } from "../import/jsonl_stream";
 
 export const DEFAULT_BUNDLE_FETCH_START_TIMEOUT_MS = 30_000;
+export type InstallProgressMode = "detailed" | "consumer";
 
 export type InstallBundleResult = {
   recordsCount: number;
@@ -53,6 +54,7 @@ export type InstallRemoteBundleOptions = {
   storageEstimate?: () => Promise<{ usage?: number; quota?: number }>;
   activateOnCommit?: boolean;
   progressCopy?: Partial<InstallProgressCopy>;
+  progressMode?: InstallProgressMode;
 };
 
 export type InstallBundleMetadata = {
@@ -73,6 +75,8 @@ export type InstallProgressCopy = {
   recordsWrittenLabel: string;
   entriesWrittenLabel: string;
   batchesCommittedLabel: string;
+  consumerAddingPercent: string;
+  consumerPreparing: string;
 };
 
 const DEFAULT_INSTALL_PROGRESS_COPY: InstallProgressCopy = {
@@ -87,6 +91,8 @@ const DEFAULT_INSTALL_PROGRESS_COPY: InstallProgressCopy = {
   recordsWrittenLabel: "records written",
   entriesWrittenLabel: "entries written",
   batchesCommittedLabel: "batches committed",
+  consumerAddingPercent: "Adding dictionary... {percent}%",
+  consumerPreparing: "Preparing dictionary...",
 };
 
 function buildProgressCopy(override?: Partial<InstallProgressCopy>): InstallProgressCopy {
@@ -95,6 +101,11 @@ function buildProgressCopy(override?: Partial<InstallProgressCopy>): InstallProg
 
 function installHeader(copy: InstallProgressCopy, bundleId: string): string {
   return `${copy.installingPrefix} ${bundleId}`;
+}
+
+function formatConsumerAddingPercent(copy: InstallProgressCopy, percent: number): string {
+  const clamped = Math.max(0, Math.min(99, percent));
+  return copy.consumerAddingPercent.replace("{percent}", String(clamped));
 }
 
 function createLinkedAbortSignal(timeoutMs: number, externalSignal?: AbortSignal): {
@@ -255,6 +266,7 @@ export async function installBundleIntoDb(
   metadata?: InstallBundleMetadata,
   activateOnCommit = true,
   progressCopyOverride?: Partial<InstallProgressCopy>,
+  progressMode: InstallProgressMode = "detailed",
 ): Promise<InstallBundleResult> {
   const progressCopy = buildProgressCopy(progressCopyOverride);
   const recovered = await recoverInterruptedBundleInstall(db);
@@ -288,12 +300,20 @@ export async function installBundleIntoDb(
   let indexCount = 0;
   let cleanupWarning: string | undefined;
   let stage = "staging: records import";
+  const recordsEntry = getManifestFileEntry(manifest, "records.jsonl");
+  const indexEntry = getManifestFileEntry(manifest, "search_index.jsonl");
+  const totalPayloadBytes = recordsEntry.byte_length + indexEntry.byte_length;
   try {
     const recRes = await importRecordsJsonl(db, sources.recordsSource, {
       bundleId: nextStorageScopeId,
       batchSize: 500,
       signal,
       onProgress: (p: ImportRecordsProgress) => {
+        if (progressMode === "consumer") {
+          const percent = totalPayloadBytes > 0 ? Math.floor((p.bytesRead / totalPayloadBytes) * 100) : 0;
+          onUpdate(formatConsumerAddingPercent(progressCopy, percent));
+          return;
+        }
         onUpdate(
           `${installHeader(progressCopy, manifest.bundle_id)}\n` +
             `${progressCopy.stageLabel}: ${progressCopy.stageStagingPayloads}\n\n` +
@@ -313,6 +333,12 @@ export async function installBundleIntoDb(
       batchSize: 500,
       signal,
       onProgress: (p: ImportSearchIndexProgress) => {
+        if (progressMode === "consumer") {
+          const bytesDone = recordsEntry.byte_length + p.bytesRead;
+          const percent = totalPayloadBytes > 0 ? Math.floor((bytesDone / totalPayloadBytes) * 100) : 99;
+          onUpdate(formatConsumerAddingPercent(progressCopy, percent));
+          return;
+        }
         onUpdate(
           `${installHeader(progressCopy, manifest.bundle_id)}\n` +
             `${progressCopy.stageLabel}: ${progressCopy.stageStagingPayloads}\n\n` +
@@ -328,6 +354,9 @@ export async function installBundleIntoDb(
     indexCount = idxRes.entriesWritten;
 
     stage = "committing bundle metadata";
+    if (progressMode === "consumer") {
+      onUpdate(progressCopy.consumerPreparing);
+    }
     const installedMeta = buildInstalledBundleMeta(manifest, nextStorageScopeId, recordsCount, indexCount, metadata);
     if (activateOnCommit) {
       await setActiveBundleMeta(db, installedMeta);
@@ -381,9 +410,14 @@ export async function installRemoteCatalogBundle(
   const fetchImpl = options.fetchImpl ?? fetch;
   const responseStartTimeoutMs = options.timeoutMs ?? DEFAULT_BUNDLE_FETCH_START_TIMEOUT_MS;
   const signal = options.signal;
+  const progressMode = options.progressMode ?? "detailed";
 
   const urls = deriveBundleAssetUrls(catalogUrl, entry);
-  onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingManifest}\n`);
+  if (progressMode === "consumer") {
+    onUpdate(progressCopy.consumerPreparing);
+  } else {
+    onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingManifest}\n`);
+  }
   const manifestTimeout = createLinkedAbortSignal(responseStartTimeoutMs, signal);
   let manifestResponse: Response;
   try {
@@ -453,7 +487,9 @@ export async function installRemoteCatalogBundle(
     }
   }
 
-  onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingRecords}\n`);
+  if (progressMode === "detailed") {
+    onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingRecords}\n`);
+  }
   const recordsStream = await fetchBodyStream(
     urls.records_url,
     recordsEntry.byte_length,
@@ -462,7 +498,9 @@ export async function installRemoteCatalogBundle(
     responseStartTimeoutMs,
     catalogUrl,
   );
-  onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingSearchIndex}\n`);
+  if (progressMode === "detailed") {
+    onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingSearchIndex}\n`);
+  }
   const indexStream = await fetchBodyStream(
     urls.search_index_url,
     indexEntry.byte_length,
@@ -488,6 +526,7 @@ export async function installRemoteCatalogBundle(
     },
     options.activateOnCommit ?? true,
     progressCopy,
+    progressMode,
   );
 
   return { manifest, result };
