@@ -29,11 +29,13 @@ Input artifact:
 
 - normalized JSONL file
 
-Example path:
+Example path (substitute the ruleset suffix `N` to match your artifact):
 
 ```text
-data/normalized/<dataset>_normalized_norm_vN.jsonl
+data/normalized/malipense_normalized_norm_vN.jsonl
 ```
+
+Use **`norm_v1`** when reproducing the **frozen v1.0 dataset**. Use the **current successor** artifact — for example **`norm_v3`** — when building the latest search/index bundle from the active normalizer output.
 
 ## Step 2: Build the Search Index
 
@@ -41,7 +43,7 @@ Use `siralex-build-index` to generate `search_index.jsonl` from the normalized r
 
 ```bash
 siralex-build-index \
-  --input data/normalized/malipense_normalized_norm_v1.jsonl \
+  --input data/normalized/malipense_normalized_norm_vN.jsonl \
   --output build/search_index.jsonl
 ```
 
@@ -55,7 +57,7 @@ Use `siralex-build-bundle` to assemble the normalized records and search index i
 
 ```bash
 siralex-build-bundle build \
-  --normalized data/normalized/malipense_normalized_norm_v1.jsonl \
+  --normalized data/normalized/malipense_normalized_norm_vN.jsonl \
   --search-index build/search_index.jsonl \
   --output-dir build/bundles \
   --bundle-type full \
@@ -75,12 +77,12 @@ Result:
 - `search_index.jsonl`
 
 The bundle manifest's `rule_versions.normalization` value is derived from the
-normalized records' `norm_version`. This is how new rulesets such as
-`norm_v2` remain explicit in published bundles.
+normalized records' `norm_version`. This is how rulesets such as
+`norm_v2` / `norm_v3` remain explicit in published bundles.
 
 The builder also emits `search_index_directional` as a bundle capability:
 
-- `norm_v2` build path -> `search_index_directional: true`
+- `norm_v2` / `norm_v3` build path -> `search_index_directional: true`
 - legacy build path -> `search_index_directional: false`
 
 The builder validates that `search_index.jsonl` key families match the declared
@@ -144,11 +146,11 @@ Rules:
 mkdir -p build/bundles
 
 siralex-build-index \
-  --input data/normalized/malipense_normalized_norm_v1.jsonl \
+  --input data/normalized/malipense_normalized_norm_vN.jsonl \
   --output build/search_index.jsonl
 
 siralex-build-bundle build \
-  --normalized data/normalized/malipense_normalized_norm_v1.jsonl \
+  --normalized data/normalized/malipense_normalized_norm_vN.jsonl \
   --search-index build/search_index.jsonl \
   --output-dir build/bundles \
   --bundle-type full \

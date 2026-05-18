@@ -205,10 +205,10 @@ def _is_directional_ruleset(normalization_ruleset: str) -> bool:
     Declare search-index direction capability from build ruleset contract.
 
     Current contract:
-    - norm_v2 bundles are directional
+    - norm_v2 and norm_v3 bundles use directional src_*/tgt_* keys
     - older rulesets are treated as legacy
     """
-    return normalization_ruleset == "norm_v2"
+    return normalization_ruleset in ("norm_v2", "norm_v3")
 
 
 def _collect_search_index_key_types(search_index_path: Path) -> set[str]:

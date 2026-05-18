@@ -85,6 +85,43 @@ SAMPLE_NORMALIZED_RECORDS_V2 = [
     },
 ]
 
+SAMPLE_NORMALIZED_RECORDS_V3 = [
+    {
+        "ir_id": "ffff1111eeee2222",
+        "ir_kind": "index_mapping",
+        "source_id": "src_malipense",
+        "norm_version": "norm_v3",
+        "preferred_form": "a) bon travail! (une salutation), b) merci! (pour un travail)",
+        "variant_forms": [
+            "a) bon travail! (une salutation), b) merci! (pour un travail)",
+            "bon travail",
+            "merci",
+        ],
+        "search_keys": {
+            "casefold": [
+                "a) bon travail! (une salutation), b) merci! (pour un travail)",
+                "bon travail",
+                "merci",
+            ],
+            "diacritics_insensitive": [
+                "a) bon travail! (une salutation), b) merci! (pour un travail)",
+                "bon travail",
+                "merci",
+            ],
+            "punct_stripped": [
+                "a bon travail une salutation b merci pour un travail",
+                "bon travail",
+                "merci",
+            ],
+            "nospace": [
+                "a)bontravail!(unesalutation),b)merci!(pouruntravail)",
+                "bontravail",
+                "merci",
+            ],
+        },
+    },
+]
+
 SAMPLE_INDEX_ENTRIES = [
     {
         "key": "test",
@@ -123,6 +160,15 @@ def bundle_inputs_v2(tmp_path):
     normalized = tmp_path / "normalized_v2.jsonl"
     search_index = tmp_path / "search_index_v2.jsonl"
     write_jsonl(normalized, SAMPLE_NORMALIZED_RECORDS_V2)
+    write_jsonl(search_index, SAMPLE_INDEX_ENTRIES_DIRECTIONAL)
+    return normalized, search_index
+
+
+@pytest.fixture
+def bundle_inputs_v3(tmp_path):
+    normalized = tmp_path / "normalized_v3.jsonl"
+    search_index = tmp_path / "search_index_v3.jsonl"
+    write_jsonl(normalized, SAMPLE_NORMALIZED_RECORDS_V3)
     write_jsonl(search_index, SAMPLE_INDEX_ENTRIES_DIRECTIONAL)
     return normalized, search_index
 
@@ -292,8 +338,26 @@ class TestBuildBundle:
 
         assert manifest["rule_versions"]["normalization"] == "norm_v2"
 
+    def test_rule_versions_follow_normalized_records_v3(self, bundle_inputs_v3, tmp_path):
+        normalized, search_index = bundle_inputs_v3
+        output_dir = tmp_path / "bundles"
+
+        result = build_bundle(normalized, search_index, output_dir)
+        manifest = result["manifest"]
+
+        assert manifest["rule_versions"]["normalization"] == "norm_v3"
+
     def test_emits_directional_flag_true_for_norm_v2(self, bundle_inputs_v2, tmp_path):
         normalized, search_index = bundle_inputs_v2
+        output_dir = tmp_path / "bundles"
+
+        result = build_bundle(normalized, search_index, output_dir)
+        manifest = result["manifest"]
+
+        assert manifest["search_index_directional"] is True
+
+    def test_emits_directional_flag_true_for_norm_v3(self, bundle_inputs_v3, tmp_path):
+        normalized, search_index = bundle_inputs_v3
         output_dir = tmp_path / "bundles"
 
         result = build_bundle(normalized, search_index, output_dir)

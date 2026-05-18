@@ -279,6 +279,26 @@ These rules are additive alias-generation only. They MUST NOT replace the
 stored original source string, and they MUST NOT silently rewrite frozen
 `norm_v1` outputs in place.
 
+## `norm_v3` Unicode search-key canonicalization
+
+`norm_v3` preserves the full **`norm_v2` contract** (same `extract_source_phrases`
+behavior, same `lexicon_entry` / `index_mapping` variant policies in the
+normalizer, same underlying per-string key transforms from `norm_v1`).
+
+**Semantic change (only):** before each variant form is passed into
+`norm_v1.compute_search_keys`, `norm_v3` applies:
+
+1. whitespace normalization (`normalize_whitespace`), then
+2. Unicode **NFC** (`normalize_nfc`).
+
+Display fields (`preferred_form`, `variant_forms` on normalized records) are
+**not** rewritten for NFC; only **search-key derivation inputs** are
+canonicalized. This makes NFC- and NFD-encoded **visually equivalent** strings
+produce identical search-key material and consistent ladder lookup.
+
+Historical `norm_v1` and `norm_v2` code modules remain unchanged; `norm_v3`
+composes them in `shared/normalization/norm_v3.py`.
+
 ## Minimal metadata contract (summary)
 
 Normalized records SHOULD be able to carry:
