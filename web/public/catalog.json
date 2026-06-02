@@ -2,12 +2,12 @@
   "catalog_schema_version": "bundle_catalog_v1",
   "bundles": [
     {
-      "bundle_id": "bundle_full_20260418_1dc526df",
-      "name": "French ↔ Maninka Real Directional Test Bundle",
-      "version": "real-directional-1",
-      "size_bytes": 21323831,
-      "url_base": "./bundle_full_20260418_1dc526df/",
-      "content_sha256": "sha256:1dc526dfd4c3c32f32135677df84b3e162deeeb723d4ac77590f4876290ce18b",
+      "bundle_id": "bundle_full_20260602_7052fa3a",
+      "name": "French ↔ Maninka",
+      "version": "norm-v3-featured-enriched-source-aliases-1",
+      "size_bytes": 24523012,
+      "url_base": "./bundle_full_20260602_7052fa3a/",
+      "content_sha256": "sha256:7052fa3acdc35d4f3c4d0410682bcbe5edaf228bfaf49378aaf22c474fcc01c3",
       "languages": {
         "source_lang": "fr",
         "target_lang": "mnk"
