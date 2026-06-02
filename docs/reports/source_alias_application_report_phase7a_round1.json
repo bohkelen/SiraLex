@@ -1,0 +1,72 @@
+{
+  "alias_tables": [
+    {
+      "schema_version": "source_alias_table_v1",
+      "alias_table_version": "phase7a-round1",
+      "approved_alias_count": 3,
+      "candidate_alias_count": 1,
+      "rejected_alias_count": 0,
+      "applied_alias_count": 3,
+      "skipped_alias_count": 0
+    }
+  ],
+  "aliases": [
+    {
+      "alias_id": "src_alias_phase7a_0001",
+      "status": "approved",
+      "alias_source_term": "Yeux",
+      "canonical_source_terms": [
+        "oeil"
+      ],
+      "resolved_ir_ids": [
+        "51ad9c8e520ea802"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7a_0002",
+      "status": "approved",
+      "alias_source_term": "Grande",
+      "canonical_source_terms": [
+        "grand"
+      ],
+      "resolved_ir_ids": [
+        "cb608c65da0fd421"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7a_0003",
+      "status": "approved",
+      "alias_source_term": "jumelle",
+      "canonical_source_terms": [
+        "jumeau"
+      ],
+      "resolved_ir_ids": [
+        "82f3c9a4b41662c4"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    }
+  ]
+}
