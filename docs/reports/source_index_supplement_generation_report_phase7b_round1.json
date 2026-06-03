@@ -1,0 +1,92 @@
+{
+  "source_index_supplement_tables": [
+    {
+      "schema_version": "source_index_supplement_v1",
+      "supplement_table_version": "phase7b-round1",
+      "approved_supplement_count": 3,
+      "candidate_supplement_count": 1,
+      "rejected_supplement_count": 0,
+      "superseded_supplement_count": 0,
+      "applied_supplement_count": 3
+    }
+  ],
+  "supplements": [
+    {
+      "supplement_id": "src_supp_phase7b_0001",
+      "status": "approved",
+      "source_term": "poil",
+      "supplement_mode": "new_source_mapping",
+      "target_ir_ids": [
+        "43b64456edacdbe0"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved supplement can generate a new source mapping"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0002",
+      "status": "approved",
+      "source_term": "poils",
+      "supplement_mode": "new_source_mapping",
+      "target_ir_ids": [
+        "43b64456edacdbe0"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved supplement can generate a new source mapping"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0003",
+      "status": "approved",
+      "source_term": "tante",
+      "supplement_mode": "additive_source_mapping",
+      "target_ir_ids": [
+        "5e48f28ff5d0daf8"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved supplement can add a reviewed target mapping to an existing source term"
+    }
+  ],
+  "generated_records": [
+    {
+      "supplement_id": "src_supp_phase7b_0001",
+      "generated_ir_id": "ff499fdee22b2b86",
+      "source_term": "poil",
+      "target_display_texts": [
+        "sí"
+      ]
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0002",
+      "generated_ir_id": "ffdd559032fa4284",
+      "source_term": "poils",
+      "target_display_texts": [
+        "sí"
+      ]
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0003",
+      "generated_ir_id": "ff3cec2ec5f139e3",
+      "source_term": "tante",
+      "target_display_texts": [
+        "tɛ́nɛn"
+      ]
+    }
+  ]
+}

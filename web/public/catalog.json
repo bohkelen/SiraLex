@@ -2,12 +2,12 @@
   "catalog_schema_version": "bundle_catalog_v1",
   "bundles": [
     {
-      "bundle_id": "bundle_full_20260602_7052fa3a",
+      "bundle_id": "bundle_full_20260603_d0e4f812",
       "name": "French ↔ Maninka",
-      "version": "norm-v3-featured-enriched-source-aliases-1",
-      "size_bytes": 24523012,
-      "url_base": "./bundle_full_20260602_7052fa3a/",
-      "content_sha256": "sha256:7052fa3acdc35d4f3c4d0410682bcbe5edaf228bfaf49378aaf22c474fcc01c3",
+      "version": "norm-v3-featured-enriched-source-aliases-1-source-index-supplements-1",
+      "size_bytes": 24525108,
+      "url_base": "./bundle_full_20260603_d0e4f812/",
+      "content_sha256": "sha256:d0e4f8121b0681c71f2218dea94744257aca7333c7963880480ab94fbc2fd498",
       "languages": {
         "source_lang": "fr",
         "target_lang": "mnk"
