@@ -2,8 +2,8 @@
 Search index builder: Normalized JSONL → Inverted search index JSONL.
 
 Reads normalized records and materializes a flat inverted index where
-each line maps a directional (key_type, key) pair to a sorted list of
-ir_ids.
+each line maps a directional (key_type, key) pair to an ordered list of
+ir_ids. Posting order preserves first occurrence in normalized record order.
 
 This module never mutates normalized records. Output is a separate JSONL
 file that can be used for offline search resolution.
@@ -43,7 +43,7 @@ def directional_key_type(ir_kind: str, key_type: str) -> str | None:
 
 def build_inverted_index(
     normalized_records: list[dict[str, Any]],
-) -> dict[tuple[str, str], set[str]]:
+) -> dict[tuple[str, str], list[str]]:
     """
     Build an in-memory inverted index from normalized records.
 
@@ -52,9 +52,9 @@ def build_inverted_index(
             "ir_id" and "search_keys" fields.
 
     Returns:
-        dict mapping (directional key_type, key) → set of ir_ids
+        dict mapping (directional key_type, key) → ordered list of ir_ids
     """
-    index: dict[tuple[str, str], set[str]] = defaultdict(set)
+    index: dict[tuple[str, str], list[str]] = defaultdict(list)
 
     for record in normalized_records:
         ir_id = record.get("ir_id", "")
@@ -76,22 +76,25 @@ def build_inverted_index(
                 break
             for key in keys:
                 if key:  # skip empty keys
-                    index[(directional_type, key)].add(ir_id)
+                    postings = index[(directional_type, key)]
+                    if ir_id not in postings:
+                        postings.append(ir_id)
 
     return index
 
 
 def serialize_index(
-    index: dict[tuple[str, str], set[str]],
+    index: dict[tuple[str, str], list[str]],
 ) -> list[dict[str, Any]]:
     """
     Serialize the inverted index into a sorted list of dicts.
 
-    Each dict has: key, key_type, ir_ids (sorted list).
-    The list is sorted by (key_type, key) for deterministic output.
+    Each dict has: key, key_type, ir_ids (ordered list).
+    Entries are sorted by (key_type, key) for deterministic output. Posting
+    lists preserve first-seen record order from build_inverted_index.
 
     Args:
-        index: inverted index mapping (key_type, key) → set of ir_ids
+        index: inverted index mapping (key_type, key) → ordered list of ir_ids
 
     Returns:
         list of dicts, sorted by (key_type, key)
@@ -101,7 +104,7 @@ def serialize_index(
         entries.append({
             "key": key,
             "key_type": key_type,
-            "ir_ids": sorted(ir_ids),
+            "ir_ids": list(ir_ids),
         })
     return entries
 
