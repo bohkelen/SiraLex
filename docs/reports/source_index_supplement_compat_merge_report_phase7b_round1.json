@@ -1,0 +1,263 @@
+{
+  "baseline_bundle_id": "bundle_full_20260602_7052fa3a",
+  "baseline_content_sha256": "sha256:7052fa3acdc35d4f3c4d0410682bcbe5edaf228bfaf49378aaf22c474fcc01c3",
+  "supplement_table_version": "phase7b-round1",
+  "generated_supplement_records": [
+    {
+      "supplement_id": "src_supp_phase7b_0001",
+      "generated_ir_id": "ff499fdee22b2b86",
+      "source_term": "poil",
+      "target_entries": [
+        {
+          "lexicon_url": "../lexicon/s.htm",
+          "anchor": "e7501",
+          "display_text": "sí"
+        }
+      ]
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0002",
+      "generated_ir_id": "ffdd559032fa4284",
+      "source_term": "poils",
+      "target_entries": [
+        {
+          "lexicon_url": "../lexicon/s.htm",
+          "anchor": "e7501",
+          "display_text": "sí"
+        }
+      ]
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0003",
+      "generated_ir_id": "ff3cec2ec5f139e3",
+      "source_term": "tante",
+      "target_entries": [
+        {
+          "lexicon_url": "../lexicon/t.htm",
+          "anchor": "e8121",
+          "display_text": "tɛ́nɛn"
+        }
+      ]
+    }
+  ],
+  "applied_index_changes": [
+    {
+      "supplement_id": "src_supp_phase7b_0001",
+      "source_term": "poil",
+      "key": "poil",
+      "key_type": "src_casefold",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0001",
+      "source_term": "poil",
+      "key": "poil",
+      "key_type": "src_diacritics_insensitive",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0001",
+      "source_term": "poil",
+      "key": "poil",
+      "key_type": "src_punct_stripped",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0001",
+      "source_term": "poil",
+      "key": "poil",
+      "key_type": "src_nospace",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0002",
+      "source_term": "poils",
+      "key": "poils",
+      "key_type": "src_casefold",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0002",
+      "source_term": "poils",
+      "key": "poils",
+      "key_type": "src_diacritics_insensitive",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0002",
+      "source_term": "poils",
+      "key": "poils",
+      "key_type": "src_punct_stripped",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0002",
+      "source_term": "poils",
+      "key": "poils",
+      "key_type": "src_nospace",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0003",
+      "source_term": "tante",
+      "key": "tante",
+      "key_type": "src_casefold",
+      "previous_ir_ids": [
+        "b7f41967e5cfda99"
+      ],
+      "new_ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "operation": "appended_posting"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0003",
+      "source_term": "tante",
+      "key": "tante",
+      "key_type": "src_diacritics_insensitive",
+      "previous_ir_ids": [
+        "b7f41967e5cfda99"
+      ],
+      "new_ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "operation": "appended_posting"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0003",
+      "source_term": "tante",
+      "key": "tante",
+      "key_type": "src_punct_stripped",
+      "previous_ir_ids": [
+        "b7f41967e5cfda99"
+      ],
+      "new_ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "operation": "appended_posting"
+    },
+    {
+      "supplement_id": "src_supp_phase7b_0003",
+      "source_term": "tante",
+      "key": "tante",
+      "key_type": "src_nospace",
+      "previous_ir_ids": [
+        "b7f41967e5cfda99"
+      ],
+      "new_ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "operation": "appended_posting"
+    }
+  ],
+  "non_applied_supplement_rows": [
+    {
+      "supplement_id": "src_supp_phase7b_0004",
+      "status": "candidate",
+      "source_term": "oncle",
+      "supplement_mode": "broad_umbrella_source_mapping",
+      "target_ir_ids": [
+        "50da089833d1173a",
+        "85e1927c3bbad0e8",
+        "2fe1cb3f3a268956",
+        "6a7e9861fb9891e9",
+        "0656aeb5a5486221",
+        "54bd3aa9784c0b58",
+        "2de14f3afb546c12",
+        "c9782e12d1b38f90"
+      ]
+    }
+  ],
+  "unchanged_key_count": 112145,
+  "changed_key_list": [
+    {
+      "key_type": "src_casefold",
+      "key": "tante"
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "tante"
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "tante"
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "tante"
+    }
+  ],
+  "added_key_list": [
+    {
+      "key_type": "src_casefold",
+      "key": "poil"
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "poils"
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "poil"
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "poils"
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "poil"
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "poils"
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "poil"
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "poils"
+    }
+  ],
+  "removed_key_list": [],
+  "target_side_changed_key_list": [],
+  "unexpected_changes": []
+}

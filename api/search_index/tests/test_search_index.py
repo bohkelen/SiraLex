@@ -3,7 +3,7 @@ Golden fixture tests for search index builder.
 
 Tests cover:
 1. Basic inverted index construction from normalized records
-2. Deduplication and deterministic ordering of ir_ids
+2. Deduplication and deterministic first-seen ordering of ir_ids
 3. Multi-record key collision (multiple ir_ids for the same key)
 4. Serialization sort order (by key_type, then key)
 5. Round-trip determinism (same input → same output bytes)
@@ -139,7 +139,7 @@ class TestBuildInvertedIndex:
         )]
         index = build_inverted_index(records)
         assert ("tgt_casefold", "hello") in index
-        assert index[("tgt_casefold", "hello")] == {"aaa"}
+        assert index[("tgt_casefold", "hello")] == ["aaa"]
 
     def test_single_record_multiple_key_types(self):
         records = [FIXTURE_LEXICON_DOBEN]
@@ -166,20 +166,20 @@ class TestBuildInvertedIndex:
 
         assert ("tgt_casefold", "dɔ́bɛ̀n") in index
         assert ("src_casefold", "abandonner") in index
-        assert index[("src_casefold", "abandonner")] == {"eeee5555ffff6666"}
-        assert index[("tgt_casefold", "dɔ́bɛ̀n")] == {"aaaa1111bbbb2222"}
+        assert index[("src_casefold", "abandonner")] == ["eeee5555ffff6666"]
+        assert index[("tgt_casefold", "dɔ́bɛ̀n")] == ["aaaa1111bbbb2222"]
 
     def test_v2_gloss_phrases_emit_directional_source_keys(self):
         index = build_inverted_index([FIXTURE_INDEX_GLOSS_V2])
 
-        assert index[("src_casefold", "bon travail")] == {"ffff7777aaaa8888"}
-        assert index[("src_casefold", "merci")] == {"ffff7777aaaa8888"}
-        assert index[("src_casefold", "bon réveil")] == {"ffff7777aaaa8888"}
+        assert index[("src_casefold", "bon travail")] == ["ffff7777aaaa8888"]
+        assert index[("src_casefold", "merci")] == ["ffff7777aaaa8888"]
+        assert index[("src_casefold", "bon réveil")] == ["ffff7777aaaa8888"]
 
     def test_v2_nko_variant_emits_directional_target_keys(self):
         index = build_inverted_index([FIXTURE_LEXICON_NKO_V2])
 
-        assert index[("tgt_casefold", "ߘߊ߰")] == {"1111eeee2222ffff"}
+        assert index[("tgt_casefold", "ߘߊ߰")] == ["1111eeee2222ffff"]
 
     def test_mono_direction_bundle_only_emits_present_direction(self):
         index = build_inverted_index([FIXTURE_INDEX_ABANDONNER])
@@ -231,10 +231,10 @@ class TestSerializeIndex:
 
     def test_sorted_by_key_type_then_key(self):
         index = {
-            ("tgt_nospace", "b"): {"id1"},
-            ("src_casefold", "a"): {"id2"},
-            ("tgt_casefold", "b"): {"id3"},
-            ("src_diacritics_insensitive", "a"): {"id4"},
+            ("tgt_nospace", "b"): ["id1"],
+            ("src_casefold", "a"): ["id2"],
+            ("tgt_casefold", "b"): ["id3"],
+            ("src_diacritics_insensitive", "a"): ["id4"],
         }
         entries = serialize_index(index)
 
@@ -246,17 +246,17 @@ class TestSerializeIndex:
             ("tgt_nospace", "b"),
         ]
 
-    def test_ir_ids_sorted(self):
-        index = {("tgt_casefold", "x"): {"ccc", "aaa", "bbb"}}
+    def test_ir_ids_preserve_posting_order(self):
+        index = {("tgt_casefold", "x"): ["ccc", "aaa", "bbb"]}
         entries = serialize_index(index)
-        assert entries[0]["ir_ids"] == ["aaa", "bbb", "ccc"]
+        assert entries[0]["ir_ids"] == ["ccc", "aaa", "bbb"]
 
     def test_empty_index(self):
         entries = serialize_index({})
         assert entries == []
 
     def test_entry_schema(self):
-        index = {("src_casefold", "hello"): {"id1"}}
+        index = {("src_casefold", "hello"): ["id1"]}
         entries = serialize_index(index)
         assert len(entries) == 1
         entry = entries[0]
@@ -451,7 +451,7 @@ class TestProcessNormalizedFile:
                     assert isinstance(obj["key_type"], str), f"Line {line_num}: key_type not str"
                     assert isinstance(obj["ir_ids"], list), f"Line {line_num}: ir_ids not list"
                     assert len(obj["ir_ids"]) > 0, f"Line {line_num}: ir_ids empty"
-                    # ir_ids must be sorted
-                    assert obj["ir_ids"] == sorted(obj["ir_ids"]), (
-                        f"Line {line_num}: ir_ids not sorted"
+                    # ir_ids preserve first-seen record order.
+                    assert len(obj["ir_ids"]) == len(set(obj["ir_ids"])), (
+                        f"Line {line_num}: duplicate ir_ids"
                     )

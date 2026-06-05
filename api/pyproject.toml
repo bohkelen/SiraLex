@@ -26,6 +26,10 @@ siralex-enrich = "enrichment.cli:main"
 siralex-corrections-dry-run = "corrections.cli:main"
 siralex-validate-source-aliases = "source_aliases.validate_alias_table:main"
 siralex-apply-source-aliases = "source_aliases.apply_aliases_to_search_index:main"
+siralex-validate-source-index-supplements = "source_index_supplements.validate_supplements:main"
+siralex-generate-source-index-supplements = "source_index_supplements.generate_supplement_records:main"
+siralex-merge-source-index-supplements = "source_index_supplements.merge_supplements_into_search_index:main"
+siralex-mine-source-index-gaps = "source_index_gap_discovery.mine_candidates:main"
 
 [tool.ruff]
 line-length = 100
@@ -35,7 +39,17 @@ target-version = "py310"
 select = ["E", "F", "I", "W"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["snapshot_engine", "ir_parser", "search_index", "bundle_builder", "enrichment", "corrections", "source_aliases"]
+packages = [
+    "snapshot_engine",
+    "ir_parser",
+    "search_index",
+    "bundle_builder",
+    "enrichment",
+    "corrections",
+    "source_aliases",
+    "source_index_supplements",
+    "source_index_gap_discovery",
+]
 
 [build-system]
 requires = ["hatchling"]
