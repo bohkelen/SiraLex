@@ -1,0 +1,52 @@
+{
+  "source_index_supplement_tables": [
+    {
+      "schema_version": "source_index_supplement_v1",
+      "supplement_table_version": "phase7d-round1",
+      "approved_supplement_count": 1,
+      "candidate_supplement_count": 0,
+      "rejected_supplement_count": 0,
+      "superseded_supplement_count": 0,
+      "applied_supplement_count": 1
+    }
+  ],
+  "supplements": [
+    {
+      "supplement_id": "src_supp_phase7d_0001",
+      "status": "approved",
+      "source_term": "oncle",
+      "supplement_mode": "broad_umbrella_source_mapping",
+      "target_ir_ids": [
+        "50da089833d1173a",
+        "85e1927c3bbad0e8",
+        "2fe1cb3f3a268956",
+        "54bd3aa9784c0b58",
+        "2de14f3afb546c12",
+        "c9782e12d1b38f90"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved supplement can generate a broad umbrella source mapping"
+    }
+  ],
+  "generated_records": [
+    {
+      "supplement_id": "src_supp_phase7d_0001",
+      "generated_ir_id": "ff7f0815f52b363b",
+      "source_term": "oncle",
+      "target_display_texts": [
+        "bári",
+        "bárin",
+        "bárinkɛ",
+        "bɛ́nɔɔ",
+        "bɛ́nɔɔba",
+        "bɛ́nɔɔnɛn"
+      ]
+    }
+  ]
+}
