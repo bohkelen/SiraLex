@@ -1,0 +1,59 @@
+{
+  "manifest_schema_version": "bundle_manifest_v1",
+  "bundle_id": "bundle_full_20260606_6b8b401a",
+  "bundle_type": "full",
+  "bundle_format": "directory",
+  "compression": "none",
+  "record_schema_id": "normalized_v1",
+  "record_schema_version": "1",
+  "rule_versions": {
+    "normalization": "norm_v3"
+  },
+  "search_index_directional": true,
+  "sources": {
+    "included": [
+      "src_malipense"
+    ],
+    "excluded": []
+  },
+  "reconciliation_action": "REPLACE_ALL",
+  "update_mode": "REPLACE_ALL",
+  "build": {
+    "ir_parser_versions": [
+      "malipense_index_v1",
+      "malipense_lexicon_v3"
+    ],
+    "git_commit": "4b448abd34b77684d33d0e5c219918c5c13197a0",
+    "record_counts": {
+      "lexicon_entries": 8823,
+      "index_mappings": 10505
+    }
+  },
+  "files": [
+    {
+      "path": "records.jsonl",
+      "byte_length": 14325313,
+      "sha256": "sha256:14353c66ce92b87aba108349b4f5d831961da740469d5295d54d8034ef4cf376"
+    },
+    {
+      "path": "search_index.jsonl",
+      "byte_length": 10201007,
+      "sha256": "sha256:39de3a373db3e836c1cb5799126188f2dd64d9c8e18f0dbc1cf97ef35dabd5cc"
+    }
+  ],
+  "content_sha256": "sha256:6b8b401a5f9389562dbe9843eba3f79ff86a1b3f5d8f79daf292bb6f38618fd7",
+  "languages": {
+    "source_lang": "fr",
+    "target_lang": "mnk"
+  },
+  "language_labels": {
+    "source": "French",
+    "target": "Maninka"
+  },
+  "scripts": {
+    "target_supported": [
+      "latin",
+      "nko"
+    ]
+  }
+}

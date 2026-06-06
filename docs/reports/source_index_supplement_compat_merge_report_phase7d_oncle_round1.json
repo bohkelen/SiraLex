@@ -1,0 +1,114 @@
+{
+  "baseline_bundle_id": "bundle_full_20260603_d0e4f812",
+  "baseline_content_sha256": "sha256:d0e4f8121b0681c71f2218dea94744257aca7333c7963880480ab94fbc2fd498",
+  "supplement_table_version": "phase7d-round1",
+  "generated_supplement_records": [
+    {
+      "supplement_id": "src_supp_phase7d_0001",
+      "generated_ir_id": "ff7f0815f52b363b",
+      "source_term": "oncle",
+      "target_entries": [
+        {
+          "lexicon_url": "../lexicon/b.htm",
+          "anchor": "e689",
+          "display_text": "bári"
+        },
+        {
+          "lexicon_url": "../lexicon/b.htm",
+          "anchor": "e701",
+          "display_text": "bárin"
+        },
+        {
+          "lexicon_url": "../lexicon/b.htm",
+          "anchor": "e704",
+          "display_text": "bárinkɛ"
+        },
+        {
+          "lexicon_url": "../lexicon/b.htm",
+          "anchor": "e973",
+          "display_text": "bɛ́nɔɔ"
+        },
+        {
+          "lexicon_url": "../lexicon/b.htm",
+          "anchor": "e974",
+          "display_text": "bɛ́nɔɔba"
+        },
+        {
+          "lexicon_url": "../lexicon/b.htm",
+          "anchor": "e975",
+          "display_text": "bɛ́nɔɔnɛn"
+        }
+      ]
+    }
+  ],
+  "applied_index_changes": [
+    {
+      "supplement_id": "src_supp_phase7d_0001",
+      "source_term": "oncle",
+      "key": "oncle",
+      "key_type": "src_casefold",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7d_0001",
+      "source_term": "oncle",
+      "key": "oncle",
+      "key_type": "src_diacritics_insensitive",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7d_0001",
+      "source_term": "oncle",
+      "key": "oncle",
+      "key_type": "src_punct_stripped",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "operation": "added_key"
+    },
+    {
+      "supplement_id": "src_supp_phase7d_0001",
+      "source_term": "oncle",
+      "key": "oncle",
+      "key_type": "src_nospace",
+      "previous_ir_ids": [],
+      "new_ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "operation": "added_key"
+    }
+  ],
+  "non_applied_supplement_rows": [],
+  "unchanged_key_count": 112157,
+  "changed_key_list": [],
+  "added_key_list": [
+    {
+      "key_type": "src_casefold",
+      "key": "oncle"
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "oncle"
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "oncle"
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "oncle"
+    }
+  ],
+  "removed_key_list": [],
+  "target_side_changed_key_list": [],
+  "unexpected_changes": []
+}
