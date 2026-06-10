@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -5,6 +6,8 @@ import pytest
 
 from search_index.build_index import build_inverted_index, serialize_index
 from source_index_supplements.generate_supplement_records import (
+    SupplementGenerationError,
+    build_generated_record,
     generate_supplement_records,
     generated_ir_id,
 )
@@ -12,6 +15,7 @@ from source_index_supplements.merge_supplements_into_search_index import (
     merge_supplements_into_search_index,
 )
 from source_index_supplements.validate_supplements import (
+    SupplementRow,
     SupplementValidationError,
     search_keys_for_source_term,
     validate_supplement_table,
@@ -23,6 +27,16 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def read_jsonl(path: Path) -> list[dict]:
+    rows: list[dict] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            text = line.strip()
+            if text:
+                rows.append(json.loads(text))
+    return rows
 
 
 def lexicon_record(ir_id: str, preferred_form: str, gloss_fr: str = "") -> dict:
@@ -162,11 +176,16 @@ def supplement_row(
     return row
 
 
-def make_fixture(tmp_path: Path, supplements: list[dict], index_rows: list[dict] | None = None):
+def make_fixture(
+    tmp_path: Path,
+    supplements: list[dict],
+    index_rows: list[dict] | None = None,
+    records: list[dict] | None = None,
+):
     records_path = tmp_path / "records.jsonl"
     index_path = tmp_path / "search_index.jsonl"
     supplements_path = tmp_path / "supplements.jsonl"
-    write_jsonl(records_path, base_records())
+    write_jsonl(records_path, records or base_records())
     write_jsonl(index_path, index_rows or base_index_rows())
     write_jsonl(supplements_path, supplements)
     return records_path, index_path, supplements_path
@@ -195,6 +214,17 @@ def lookup(index_entries: list[dict], query: str) -> list[str]:
         if storage_key in index:
             return index[storage_key]
     return []
+
+
+def supplement_as_row(row: dict) -> SupplementRow:
+    return SupplementRow(row=row, line_number=1)
+
+
+def expected_generated_record(row: dict, records: list[dict] | None = None) -> dict:
+    return build_generated_record(
+        supplement_as_row(row),
+        {record["ir_id"]: record for record in records or base_records()},
+    )
 
 
 def test_valid_new_source_mapping_passes_validation(tmp_path: Path):
@@ -230,6 +260,21 @@ def test_new_source_mapping_rejects_existing_source_term(tmp_path: Path):
 
     with pytest.raises(SupplementValidationError, match="conflicts with existing source term"):
         validate_supplement_table(supplements_path, records_path, index_path)
+
+
+def test_deferred_validation_allows_existing_source_term_for_replay(tmp_path: Path):
+    row = supplement_row(source_term="tante")
+    records_path, index_path, supplements_path = make_fixture(tmp_path, [row])
+
+    result = validate_supplement_table(
+        supplements_path,
+        records_path,
+        index_path,
+        defer_index_conflicts=True,
+    )
+
+    assert result.outcomes[0].outcome == "applied"
+    assert result.outcomes[0].source_term == "tante"
 
 
 def test_additive_source_mapping_requires_existing_source_term(tmp_path: Path):
@@ -411,4 +456,258 @@ def test_compatibility_merge_only_changes_targeted_source_keys(tmp_path: Path):
         ("src_diacritics_insensitive", "poils"),
         ("src_nospace", "poils"),
         ("src_punct_stripped", "poils"),
+    }
+
+
+def test_already_present_supplement_emits_no_duplicate_record(tmp_path: Path):
+    row = supplement_row()
+    expected = expected_generated_record(row)
+    records = [*base_records(), expected]
+    index_rows = serialize_index(build_inverted_index(records))
+    records_path, index_path, supplements_path = make_fixture(
+        tmp_path,
+        [row],
+        index_rows=index_rows,
+        records=records,
+    )
+
+    generated_records, report = generate_supplement_records(supplements_path, records_path, index_path)
+
+    assert generated_records == []
+    assert report["applied_supplement_count"] == 0
+    assert report["already_present_supplement_count"] == 1
+    assert report["already_present_supplements"][0]["outcome"] == "already_present"
+    assert report["already_present_supplements"][0]["existing_generated_ir_id"] == expected["ir_id"]
+
+
+def test_already_present_supplement_causes_no_index_mutation(tmp_path: Path):
+    row = supplement_row()
+    expected = expected_generated_record(row)
+    records = [*base_records(), expected]
+    index_rows = serialize_index(build_inverted_index(records))
+    records_path, index_path, supplements_path = make_fixture(
+        tmp_path,
+        [row],
+        index_rows=index_rows,
+        records=records,
+    )
+
+    merged_rows, report = merge_supplements_into_search_index(
+        supplement_table_path=supplements_path,
+        records_path=records_path,
+        baseline_search_index_path=index_path,
+        baseline_bundle_dir=make_baseline_bundle_dir(tmp_path),
+    )
+
+    assert {(row["key_type"], row["key"]): row["ir_ids"] for row in merged_rows} == {
+        (row["key_type"], row["key"]): row["ir_ids"] for row in index_rows
+    }
+    assert report["applied_supplement_count"] == 0
+    assert report["already_present_supplement_count"] == 1
+    assert report["changed_key_list"] == []
+    assert report["added_key_list"] == []
+
+
+def test_same_generated_id_with_different_record_content_fails(tmp_path: Path):
+    row = supplement_row()
+    expected = expected_generated_record(row)
+    conflicting = deepcopy(expected)
+    conflicting["preferred_form"] = "different"
+    records = [*base_records(), conflicting]
+    index_rows = serialize_index(build_inverted_index([*base_records(), expected]))
+    records_path, index_path, supplements_path = make_fixture(
+        tmp_path,
+        [row],
+        index_rows=index_rows,
+        records=records,
+    )
+
+    with pytest.raises(SupplementGenerationError, match="generated_record_content_mismatch"):
+        generate_supplement_records(supplements_path, records_path, index_path)
+
+
+def test_same_source_key_points_to_unexpected_ir_id_fails(tmp_path: Path):
+    row = supplement_row()
+    index_rows = [
+        *base_index_rows(),
+        *[
+            {"key_type": key_type, "key": key, "ir_ids": ["unexpected"]}
+            for key_type, key in search_keys_for_source_term("poil")
+        ],
+    ]
+    records_path, index_path, supplements_path = make_fixture(tmp_path, [row], index_rows=index_rows)
+
+    with pytest.raises(SupplementGenerationError, match="source_key_unexpected_postings"):
+        generate_supplement_records(supplements_path, records_path, index_path)
+
+
+def test_expected_record_present_but_source_index_missing_posting_fails(tmp_path: Path):
+    row = supplement_row()
+    expected = expected_generated_record(row)
+    records_path, index_path, supplements_path = make_fixture(
+        tmp_path,
+        [row],
+        records=[*base_records(), expected],
+    )
+
+    with pytest.raises(SupplementGenerationError, match="source_key_missing_expected_posting"):
+        generate_supplement_records(supplements_path, records_path, index_path)
+
+
+def test_expected_source_key_with_duplicate_generated_postings_fails(tmp_path: Path):
+    row = supplement_row()
+    expected = expected_generated_record(row)
+    generated_id = expected["ir_id"]
+    index_rows = [
+        *base_index_rows(),
+        *[
+            {
+                "key_type": key_type,
+                "key": key,
+                "ir_ids": [generated_id, generated_id] if index == 0 else [generated_id],
+            }
+            for index, (key_type, key) in enumerate(search_keys_for_source_term("poil"))
+        ],
+    ]
+    records_path, index_path, supplements_path = make_fixture(
+        tmp_path,
+        [row],
+        index_rows=index_rows,
+        records=[*base_records(), expected],
+    )
+
+    with pytest.raises(SupplementGenerationError, match="source_key_duplicate_posting"):
+        generate_supplement_records(supplements_path, records_path, index_path)
+
+
+def test_expected_source_key_with_correct_ids_in_wrong_order_fails(tmp_path: Path):
+    row = supplement_row(
+        supplement_id="src_supp_test_tante",
+        source_term="tante",
+        target_ir_ids=["id-tanten"],
+        target_forms=["tɛ́nɛn"],
+        supplement_mode="additive_source_mapping",
+        broad_mapping=True,
+    )
+    row["candidate_type"] = "incomplete_source_mapping"
+    row["broad_mapping_rationale"] = "Add paternal aunt to broad tante."
+    row["supporting_evidence_ir_ids"] = ["idx-tante", "idx-tante-pat", "id-tanten"]
+    row["supporting_source_terms"] = ["tante", "tante paternelle"]
+    expected = expected_generated_record(row)
+    generated_id = expected["ir_id"]
+    index_rows = [
+        *[
+            item
+            for item in base_index_rows()
+            if (item["key_type"], item["key"]) not in set(search_keys_for_source_term("tante"))
+        ],
+        *[
+            {"key_type": key_type, "key": key, "ir_ids": [generated_id, "idx-tante"]}
+            for key_type, key in search_keys_for_source_term("tante")
+        ],
+    ]
+    records_path, index_path, supplements_path = make_fixture(
+        tmp_path,
+        [row],
+        index_rows=index_rows,
+        records=[*base_records(), expected],
+    )
+
+    with pytest.raises(SupplementGenerationError, match="source_key_order_mismatch"):
+        generate_supplement_records(supplements_path, records_path, index_path)
+
+
+def test_target_entry_metadata_mismatch_fails(tmp_path: Path):
+    row = supplement_row()
+    expected = expected_generated_record(row)
+    conflicting = deepcopy(expected)
+    conflicting["display"]["target_entries"][0]["anchor"] = "different-anchor"
+    index_rows = serialize_index(build_inverted_index([*base_records(), expected]))
+    records_path, index_path, supplements_path = make_fixture(
+        tmp_path,
+        [row],
+        index_rows=index_rows,
+        records=[*base_records(), conflicting],
+    )
+
+    with pytest.raises(SupplementGenerationError, match="target_entry_metadata_mismatch"):
+        generate_supplement_records(supplements_path, records_path, index_path)
+
+
+def test_deterministic_generated_id_collision_with_unrelated_record_fails(tmp_path: Path):
+    row = supplement_row()
+    expected = expected_generated_record(row)
+    unrelated = {
+        "ir_id": expected["ir_id"],
+        "ir_kind": "lexicon_entry",
+        "source_id": "src_malipense",
+        "norm_version": "norm_v3",
+        "preferred_form": "unrelated",
+        "variant_forms": ["unrelated"],
+        "search_keys": {"casefold": ["unrelated"]},
+        "display": {"headword_latin": "unrelated"},
+    }
+    index_rows = serialize_index(build_inverted_index([*base_records(), expected]))
+    records_path, index_path, supplements_path = make_fixture(
+        tmp_path,
+        [row],
+        index_rows=index_rows,
+        records=[*base_records(), unrelated],
+    )
+
+    with pytest.raises(SupplementGenerationError, match="generated_id_collision_unrelated_record"):
+        generate_supplement_records(supplements_path, records_path, index_path)
+
+
+def test_cumulative_phase7b_phase7d_replay_matches_current_bundle_states():
+    repo_root = Path(__file__).resolve().parents[3]
+    supplements = repo_root / "shared/source_index_supplements/source_index_supplements_v1.jsonl"
+    phase7b_bundle = repo_root / "web/public/bundle_full_20260603_d0e4f812"
+    phase7d_bundle = repo_root / "web/public/bundle_full_20260606_6b8b401a"
+
+    phase7b_rows, phase7b_report = merge_supplements_into_search_index(
+        supplement_table_path=supplements,
+        records_path=phase7b_bundle / "records.jsonl",
+        baseline_search_index_path=phase7b_bundle / "search_index.jsonl",
+        baseline_bundle_dir=phase7b_bundle,
+    )
+    phase7b_outcomes = {
+        item["source_term"]: item["outcome"]
+        for item in [
+            *phase7b_report["applied_supplements"],
+            *phase7b_report["already_present_supplements"],
+        ]
+    }
+    assert phase7b_outcomes == {
+        "poil": "already_present",
+        "poils": "already_present",
+        "tante": "already_present",
+        "oncle": "applied",
+    }
+    assert phase7b_report["applied_supplement_count"] == 1
+    assert {item["source_term"] for item in phase7b_report["applied_supplements"]} == {"oncle"}
+    assert len(phase7b_rows) > 0
+
+    phase7d_rows, phase7d_report = merge_supplements_into_search_index(
+        supplement_table_path=supplements,
+        records_path=phase7d_bundle / "records.jsonl",
+        baseline_search_index_path=phase7d_bundle / "search_index.jsonl",
+        baseline_bundle_dir=phase7d_bundle,
+    )
+    phase7d_outcomes = {
+        item["source_term"]: item["outcome"]
+        for item in phase7d_report["already_present_supplements"]
+    }
+    assert phase7d_outcomes == {
+        "poil": "already_present",
+        "poils": "already_present",
+        "tante": "already_present",
+        "oncle": "already_present",
+    }
+    assert phase7d_report["applied_supplement_count"] == 0
+    assert phase7d_report["changed_key_list"] == []
+    assert phase7d_report["added_key_list"] == []
+    assert {(row["key_type"], row["key"]): row["ir_ids"] for row in phase7d_rows} == {
+        (row["key_type"], row["key"]): row["ir_ids"]
+        for row in read_jsonl(phase7d_bundle / "search_index.jsonl")
     }

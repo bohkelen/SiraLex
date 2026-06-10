@@ -455,13 +455,15 @@ def validate_row_shape(row: SupplementRow, records_by_id: dict[str, dict[str, An
 def validate_approved_row_against_index(
     row: SupplementRow,
     index: dict[tuple[str, str], list[str]],
+    *,
+    defer_index_conflicts: bool = False,
 ) -> SupplementOutcome:
     generated_keys = search_keys_for_source_term(row.source_term)
     generated_key_types = sorted({key_type for key_type, _ in generated_keys})
     existing_postings = lookup_source_term(index, row.source_term)
 
     if row.supplement_mode == "new_source_mapping":
-        if existing_postings:
+        if existing_postings and not defer_index_conflicts:
             raise SupplementValidationError(
                 f"{row.supplement_id}: new_source_mapping conflicts with existing source "
                 f"term {row.source_term!r}; existing={existing_postings}"
@@ -478,7 +480,7 @@ def validate_approved_row_against_index(
         )
 
     if row.supplement_mode == "additive_source_mapping":
-        if not existing_postings:
+        if not existing_postings and not defer_index_conflicts:
             raise SupplementValidationError(
                 f"{row.supplement_id}: additive_source_mapping requires existing source term "
                 f"{row.source_term!r}"
@@ -523,6 +525,8 @@ def validate_supplement_table(
     supplement_table_path: Path,
     records_path: Path,
     search_index_path: Path,
+    *,
+    defer_index_conflicts: bool = False,
 ) -> SupplementValidationResult:
     records_by_id = load_records_by_id(records_path)
     index = load_search_index(search_index_path)
@@ -539,10 +543,6 @@ def validate_supplement_table(
         raise SupplementValidationError(
             f"mixed schema_version values in supplement table: {schema_versions}"
         )
-    if len(supplement_table_versions) > 1:
-        raise SupplementValidationError(
-            f"mixed supplement_table_version values in supplement table: {supplement_table_versions}"
-        )
 
     for row in rows:
         if row.supplement_id in seen_supplement_ids:
@@ -553,7 +553,13 @@ def validate_supplement_table(
 
         validate_row_shape(row, records_by_id)
         if row.status == APPLICABLE_STATUS:
-            outcomes.append(validate_approved_row_against_index(row, index))
+            outcomes.append(
+                validate_approved_row_against_index(
+                    row,
+                    index,
+                    defer_index_conflicts=defer_index_conflicts,
+                )
+            )
 
     return SupplementValidationResult(
         rows=rows,
@@ -589,10 +595,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--records", type=Path, required=True, help="Bundle records.jsonl")
     parser.add_argument("--search-index", type=Path, required=True, help="Base search_index.jsonl")
     parser.add_argument("--output-report", type=Path, default=None, help="Optional report JSON path")
+    parser.add_argument(
+        "--defer-index-conflicts",
+        action="store_true",
+        help=(
+            "Defer source-index precondition conflicts so replay-aware generation/merge "
+            "can classify applied vs already_present vs conflict."
+        ),
+    )
     args = parser.parse_args(argv)
 
     try:
-        result = validate_supplement_table(args.supplements, args.records, args.search_index)
+        result = validate_supplement_table(
+            args.supplements,
+            args.records,
+            args.search_index,
+            defer_index_conflicts=args.defer_index_conflicts,
+        )
     except SupplementValidationError as exc:
         print(f"Source-index supplement validation FAILED: {exc}", file=sys.stderr)
         return 1
