@@ -1,4 +1,4 @@
-# Roadmap (Phase 0 → Phase 5)
+# SiraLex Roadmap
 
 This roadmap documents the execution path to a usable, offline-first **French/English ↔ Maninka (Guinea)** dictionary and sentence analysis app with **Latin + N'Ko** as first-class scripts.
 
@@ -9,6 +9,92 @@ Guiding constraints:
 - **Provenance-first**: store provenance at **entry**, **sense**, and **example** levels.
 - **Community trust**: no hallucinated language; uncertainty is surfaced.
 - **Product language scope is explicit**: shipped dictionary surfaces are limited to **French/English ↔ Maninka**. If upstream source data contains other languages (for example Russian glosses/examples), those may remain in frozen source artifacts for provenance/history, but they are **out of scope for the product** and should not expand the runtime dictionary language set.
+
+---
+
+## How to read this document
+
+This file mixes **historical milestones** (Phases 0–1), **shipped runtime work** (Phases 2–3, 6), and **ongoing calibration** (Phase 5). Use it in this order:
+
+1. **[At a glance](#at-a-glance)** — what is done, what is pending, priority table.
+2. **Phase sections** — details by theme (runtime, platform, search, product UX).
+3. **[Open backlog](#open-backlog--follow-ups)** — intentional follow-ups, not active build work.
+4. **[Definition of Done](#definition-of-done)** — milestone checklists.
+
+Status markers: **✅ Complete** · **in progress** · **deferred** · **pending** (external dependency).
+
+## Contents
+
+- [At a glance](#at-a-glance)
+- [Phase 0 — Repo + infra skeleton](#phase-0--repo--infra-skeleton)
+- [Phase 1 — Data pipeline & frozen dataset](#phase-1--data-pipeline--frozen-dataset)
+- [Phase 2 — Offline dictionary runtime](#phase-2--offline-dictionary-runtime)
+- [Phase 3 — Platform generalization](#phase-3--platform-generalization--bundle-metadata-)
+- [Phase 5 — Search/index quality](#phase-5--searchindex-quality-improvement)
+- [Phase 6 — Consumer product layer](#phase-6--consumer-product-layer)
+- [Phase 1.5 — Corrections (spec + dry-run)](#phase-15--corrections-spec--dry-run)
+- [Deferred — Branch C (linguistic depth)](#deferred--branch-c-linguistic-depth)
+- [Open backlog & follow-ups](#open-backlog--follow-ups)
+- [Definition of Done](#definition-of-done)
+
+---
+
+## At a glance
+
+### What ships today
+
+- **Offline-first web app** with catalog-driven featured dictionary install, multi-bundle support, and directional search.
+- **Featured bundle (in-repo):** `bundle_full_20260518_15605571` (`norm_v3`, display-enriched). Root `web/public/catalog.json` points here. **Production deploy verification** still pending (do not treat as live until confirmed on the host).
+- **Consumer pipeline:** `normalized → enrich → index → bundle → catalog` (`docs/BUILD_BUNDLE.md`).
+- **Controlled `norm_v2` test bundle** remains under `web/public/norm-v2-test/` for validation; not the default featured catalog.
+
+### Priority & status
+
+| Priority | Phase | Type | Status |
+|----------|-------|------|--------|
+| 1 | Phase 1.4.2 — Build and verify the first real bundle | Immediate | ✅ Complete |
+| 2 | Phase 2.0.0 — Enrich bundle with display data | Backend prerequisite | ✅ Complete |
+| 3 | Phase 2.0.1 — Web project scaffolding (Vite + TS) | Primary focus | ✅ Complete |
+| 4 | Phase 2.0.2 — JS normalization mirror (`norm_v1` port) | Primary focus | ✅ Complete |
+| 5 | Phase 2.0.3 — Bundle ingestion (storage correctness) | Primary focus | ✅ Complete |
+| 5b | Phase 2.0.3b — Query execution (retrieval correctness) | Primary focus | ✅ Complete |
+| 6 | Phase 2.0.4 — Results display + entry view (presentation correctness) | Primary focus | ✅ Complete |
+| 7 | Phase 2.0.5 — Offline PWA finalization (first-install → offline proof) | Primary focus | ✅ Complete |
+| 8 | Phase 3.1 — Manifest language metadata | Platform generalization | ✅ Complete |
+| 9 | Phase 3.2 — Language-agnostic UI + direction semantics | Platform generalization | ✅ Complete |
+| 10 | Phase 3.3 — Installed bundle registry | Platform generalization | ✅ Complete |
+| 11 | Phase 3.4 — Multi-bundle support | Platform generalization | ✅ Complete |
+| 12 | Phase 3.5 — Bundle selection + distribution | Platform generalization | ✅ Complete |
+| 13 | Phase 5a — `norm_v2` indexing shipped | Search/index quality | ✅ Complete |
+| 14 | `norm_v3` — NFC search-key canonicalization | Search/index correctness | ✅ Featured enriched bundle generated and root catalog updated; analytical + manual UI validation complete; production deployment verification pending |
+| 15 | Phase 5b — Field Validation + Search Reality Calibration | Validation track | Substantially complete (Android real-device validation deferred pending hardware access) |
+| 16 | Phase 1.5A — Correction record schema/specification | Next formal engineering milestone | ✅ Complete |
+| 17 | Phase 1.5B — Dry-run correction application pipeline | Follows 1.5A approval | ✅ Complete |
+| 18 | HTTPS + Android validation execution | Active validation follow-up | Pending hardware access |
+| 19 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
+| 20 | Phase 6B — Consumer Search-First UX + Infrastructure Layering | UX/product milestone | ✅ Complete |
+| 21 | Phase 6D1 — Localization Architecture + French-First Interface Pass | Near-term consumer productization milestone | Implemented (pending review) |
+
+### Rollout notes (norm_v3 featured bundle)
+
+**Featured enriched bundle (root catalog):** `bundle_full_20260518_15605571`.
+
+**Manual UI sign-off (complete):** `tête` → `kùn` path; reverse `Kùn`; reverse decomposed `kùn`; `pied`; reverse `Sen`.
+
+**Policy note:** plain accentless `Kun` remains a separate search-policy topic, not a defect in this rollout.
+
+**Validation observation (non-blocking):** NFC canonicalization can produce earlier `casefold` hits and narrower first-rung result sets for a small number of queries seen in validation (e.g. `-lú`, `-lù`, and `Kùn` / decomposed `kùn` versus `norm_v2`); under the current first-hit ladder doctrine this is treated as an expected precision shift, not a blocker.
+
+**Decision memo:** plain accentless target-side lookup policy is framed in `docs/PLAIN_KUN_POLICY_DECISION_MEMO.md`; do not implement before Phase 6C logs show real user demand.
+
+### Where the codebase stands
+
+- **Phases 2.0 and 3** — Runtime, PWA, bundle ingestion, query ladder, multi-bundle, and catalog install are **complete** for current scope.
+- **Phase 5a / `norm_v3`** — Indexing rulesets shipped; featured enriched `norm_v3` bundle generated and validated (analytical + manual UI); production URL check pending.
+- **Phase 5b** — Validation layer and Round 1 (156 queries) **complete**; **Android real-device validation** still pending (hardware access).
+- **Phase 1.5A/B** — Correction schema + dry-run pipeline **complete**; UI/moderation and committed correction releases **out of scope**.
+- **Phase 6B / 6D1** — Consumer search-first UX and French-first localization **shipped** (6D1 pending review).
+- **Branch C** — Transliteration / morphology **deferred** until usage data exists.
 
 ---
 
@@ -33,7 +119,9 @@ Goal: create a stable foundation that supports ingestion, provenance, and offlin
 
 ---
 
-## Phase 1 — Data liberation + Offline dictionary (Maninka first)
+
+
+## Phase 1 — Data pipeline & frozen dataset
 
 Goal: ship a usable dictionary + sentence analysis experience for learners, starting with **Maninka (Guinea)**.
 
@@ -86,7 +174,7 @@ Frozen artifacts:
 DoD:
 - Any record can be displayed in Latin and N'Ko, with uncertainty clearly indicated.
 
-> **Status:** Deferred. Transliteration generation is postponed until there are real users, search logs, and correction data to inform the rules. See [Branch C — Linguistic depth](#branch-c--linguistic-depth-deferred) below.
+> **Status:** Deferred. Transliteration generation is postponed until there are real users, search logs, and correction data to inform the rules. See [Deferred — Branch C](#deferred--branch-c-linguistic-depth) below.
 
 ### Phase 1.4 — Search index + Offline bundle pipeline
 
@@ -127,9 +215,21 @@ DoD:
 
 ---
 
-## Evolution branches (post-Phase 1.4.2)
 
-Once the first bundle exists, the project can evolve in three orthogonal directions. **Only one should be primary at a time.**
+
+## Phase 2 — Offline dictionary runtime
+
+Goal: prove the frozen bundle is usable offline in a real browser — import, search, render entries, and work without connectivity.
+
+**Status:** ✅ Complete for Phases 2.0.0–2.0.5 (see priority table above).
+
+### Phase 2.0 overview
+
+Delivered a minimal consumer of the bundle (not “frontend polish”):
+
+- One search box, direction toggle, exact + forgiving ladder search, results → entry view
+- No accounts, no ranking beyond first-match ladder
+- Proves normalized records, latency, and search-key strategy on target devices
 
 ### Phase 2.0.0 — Enriched bundle records ✅
 
@@ -141,243 +241,14 @@ Bundle `records.jsonl` enriched with display fields from IR `fields_raw`. Each r
 - Result: 19,324/19,324 records enriched (0 missing), bundle `bundle_full_20260209_8b28f152` verified
 - Bundle size: 13 MB `records.jsonl` + 7.1 MB `search_index.jsonl` (~20 MB total)
 
----
+Layer separation (shipped):
 
-### Branch A — Phase 2.0: Minimal Offline Dictionary UI *(most leverage, primary focus)*
+- **2.0.3** — storage correctness (import pipeline) ✅
+- **2.0.3b** — retrieval correctness (query execution) ✅
+- **2.0.4** — presentation correctness (results display + entry view) ✅
+- **2.0.5** — offline correctness (PWA first-install → offline proof) ✅
 
-This is the natural next step. Not "frontend polish", but a **read-only consumer of the bundle** that proves the data model is usable by humans, lookup latency is acceptable, and the search key strategy is sane.
-
-#### Scope (keep it disciplined)
-
-- One input box
-- Language toggle (FR → Maninka, Maninka → FR)
-- Exact + forgiving search
-- Results list → entry view
-- No accounts
-- No feedback yet
-- No ranking heuristics beyond "first match"
-
-#### What it proves
-
-- The normalized records are consumable by a real UI
-- Lookup latency is acceptable on target devices
-- The search key strategy works for real queries
-
-#### What it unlocks
-
-Everything else. Without a UI that proves the bundle works, further backend or linguistic work is speculative.
-
-DoD:
-- A learner can search FR → Maninka and Maninka → FR offline in a browser, using the published bundle.
-
----
-
-### Branch B — Phase 1.5: Correction groundwork *(spec + backend, UI-agnostic)*
-
-Parts of the feedback loop can be built without a UI. This work is safe and doesn't lock UX decisions.
-
-#### 1.5A — Correction record schema/specification ✅ *(complete)*
-
-JSON schema for:
-
-- `correction_id`
-- `target_ir_id`
-- RFC 6902 patch
-- `submitter` (anonymous token)
-- `timestamps`
-- `status`
-
-Formal specification has now been drafted:
-
-- Spec: `shared/specs/correction-record-schema-v1.md`
-- Scope includes:
-  - exact schema fields
-  - allowed correction statuses
-  - `target_ir_id` relationship to IR
-  - RFC 6902 patch constraints
-  - validation rules
-  - provenance/audit metadata
-  - test requirements for validation behavior
-
-This milestone is schema-only and does not change runtime behavior.
-
-#### 1.5B — Correction application pipeline (dry-run) ✅ *(complete)*
-
-Tool that:
-
-- Takes IR JSONL
-- Applies approved corrections
-- Produces new IR version
-
-No UI, no moderation yet — just correctness.
-
-Planning/specification artifact drafted:
-
-- Spec: `shared/specs/correction-application-dry-run.md`
-- Scope includes:
-  - correctionset input format and deterministic ordering
-  - input contracts and IR version context
-  - validation stages and approved-status filtering
-  - conflict policy and deterministic apply/reject behavior
-  - apply-on-copy behavior and output artifact contract
-  - failure reason codes and deterministic test matrix
-
-Implementation completion note:
-
-- correctionset manifest contract validation + `corrections.jsonl` integrity checks (`byte_length` + `sha256`)
-- lifecycle resolution, supersession filtering, and same-target conflict handling
-- deterministic apply-on-copy corrected IR output + machine-readable report generation
-- CLI command: `siralex-corrections-dry-run`
-- focused backend test coverage for lifecycle, integrity, conflicts, patch validation, and deterministic replay
-
-Current boundaries (still intentional):
-
-- correction schema/spec is complete
-- dry-run apply pipeline is complete
-- no UI/moderation workflow exists yet
-- no committed correction-release workflow exists yet
-- dry-run does not persist lifecycle transitions to `applied`
-
-DoD:
-- Correction record schema/specification is formalized in `shared/specs/correction-record-schema-v1.md`.
-- Dry-run pipeline specification is formalized in `shared/specs/correction-application-dry-run.md`.
-- Dry-run pipeline implementation is complete with deterministic dry-run outputs and report generation.
-
----
-
-### Branch C — Linguistic depth *(deferred)*
-
-This includes:
-
-- Transliteration (Latin → N'Ko)
-- Cross-entry variant graph
-- Morphology
-- Sense clustering
-
-> **Do not start this until:**
->
-> - You have users
-> - You have search logs
-> - You have correction data
->
-> Otherwise you'll invent rules in a vacuum. Transliteration generation was correctly deferred for this reason.
-
-DoD:
-- Defined per-feature when the prerequisites are met.
-
----
-
-## Recommended ordering
-
-| Priority | Phase | Type | Status |
-|----------|-------|------|--------|
-| 1 | Phase 1.4.2 — Build and verify the first real bundle | Immediate | ✅ Complete |
-| 2 | Phase 2.0.0 — Enrich bundle with display data | Backend prerequisite | ✅ Complete |
-| 3 | Phase 2.0.1 — Web project scaffolding (Vite + TS) | Primary focus | ✅ Complete |
-| 4 | Phase 2.0.2 — JS normalization mirror (`norm_v1` port) | Primary focus | ✅ Complete |
-| 5 | Phase 2.0.3 — Bundle ingestion (storage correctness) | Primary focus | ✅ Complete |
-| 5b | Phase 2.0.3b — Query execution (retrieval correctness) | Primary focus | ✅ Complete |
-| 6 | Phase 2.0.4 — Results display + entry view (presentation correctness) | Primary focus | ✅ Complete |
-| 7 | Phase 2.0.5 — Offline PWA finalization (first-install → offline proof) | Primary focus | ✅ Complete |
-| 8 | Phase 3.1 — Manifest language metadata | Platform generalization | ✅ Complete |
-| 9 | Phase 3.2 — Language-agnostic UI + direction semantics | Platform generalization | ✅ Complete |
-| 10 | Phase 3.3 — Installed bundle registry | Platform generalization | ✅ Complete |
-| 11 | Phase 3.4 — Multi-bundle support | Platform generalization | ✅ Complete |
-| 12 | Phase 3.5 — Bundle selection + distribution | Platform generalization | ✅ Complete |
-| 13 | Phase 5a — `norm_v2` indexing shipped | Search/index quality | ✅ Complete |
-| 14 | `norm_v3` — NFC search-key canonicalization | Search/index correctness | ✅ Code/spec complete; real `norm_v3` bundle regeneration and distribution pending |
-| 15 | Phase 5b — Field Validation + Search Reality Calibration | Validation track | Substantially complete (Android real-device validation deferred pending hardware access) |
-| 16 | Phase 1.5A — Correction record schema/specification | Next formal engineering milestone | ✅ Complete |
-| 17 | Phase 1.5B — Dry-run correction application pipeline | Follows 1.5A approval | ✅ Complete |
-| 18 | HTTPS + Android validation execution | Active validation follow-up | Pending hardware access |
-| 19 | Branch C — Transliteration, morphology, linguistic inference | Only after users + data | Deferred |
-| 20 | Phase 6B — Consumer Search-First UX + Infrastructure Layering | UX/product milestone | ✅ Complete |
-| 21 | Phase 6D1 — Localization Architecture + French-First Interface Pass | Near-term consumer productization milestone | Implemented (pending review) |
-
-Phase 2.0 (Branch A) and the originally planned Phase 3 platform work have now served their purpose: the runtime proves bundle ingestion, IndexedDB storage, query execution, rendering, offline shell behavior, manifest-driven language metadata, installed bundle registry, active bundle selection, multi-bundle isolation, and catalog-driven install/update flows. The roadmap was previously lagging behind this implementation reality. Search/index quality is no longer a single undifferentiated pending bucket: **Phase 5** now includes **`norm_v2` phrase/index improvements** (Phase 5a) and **`norm_v3` NFC search-key canonicalization** as the successor default (see the Phase 5 section), while **Phase 5b** is now substantially complete with Android real-device validation explicitly deferred until hardware access resumes. With that transition, **Phase 1.5A** (correction record schema/specification) and **Phase 1.5B** (dry-run correction application pipeline) are complete for backend dry-run scope, and **Phase 6B** is complete for consumer UX layering scope. UI/moderation workflows and committed correction-release lifecycle persistence remain intentionally out of scope for this completion state. Branch C remains explicitly deferred until real usage data exists.
-
-### Phase 6B — Consumer Search-First UX + Infrastructure Layering ✅
-
-Completion note:
-
-- consumer search-first UX layering shipped
-- featured dictionary primary install path shipped
-- Manage dictionaries and Advanced diagnostics remain available as secondary infrastructure surfaces
-- no platform capabilities were removed (catalog-driven install, multi-bundle support, manual import, validation diagnostics)
-
-The completed Phase 2.0 work followed clean layer separation:
-
-- **2.0.3** = storage correctness (import pipeline) ✅
-- **2.0.3b** = retrieval correctness (query execution) ✅
-- **2.0.4** = presentation correctness (results display + entry view) ✅
-- **2.0.5** = offline correctness (PWA first-install → offline proof) ✅
-
-#### Phase 6D1 — Localization Architecture + French-first interface pass *(implemented, review pending)*
-
-Rationale:
-
-- the dictionary content is French ↔ Maninka
-- Guinea-facing users are more likely to expect a French interface than an English-first shell
-- the current English-first app shell creates audience mismatch even when dictionary behavior is correct
-- this is UI localization work; it is not Branch C linguistic depth and not a data-model change
-
-Implemented scope:
-
-1. **French UI copy coverage** for:
-   - first-run install flow
-   - search screen
-   - progress/success/failure messages
-   - offline fallback text
-   - Manage dictionaries
-   - Advanced setup
-   - Advanced diagnostics
-   - empty states and action buttons
-
-2. **Lightweight localization architecture**:
-   - keyed UI strings
-   - current locale selection
-   - English and French supported initially
-
-3. **Deployment intent**:
-   - current Guinea-facing/public deployment should likely default to French
-   - English remains available as an optional interface language (or deployment-level configuration)
-
-Implementation notes:
-
-- lightweight keyed string layer introduced for consumer shell copy with `en` and `fr`
-- deployment-configured default locale support added (`VITE_DEFAULT_LOCALE`) with fallback order: configured locale → browser locale → `fr`
-- visible in-app locale selector is now present in the app shell (`Français` / `English`) and persists user preference locally (`siralex.ui_locale`)
-- for Guinea-facing/public Netlify deployment, set `VITE_DEFAULT_LOCALE=fr` to enforce French-first UI regardless of browser locale
-
-Boundaries preserved:
-
-- do not alter dictionary content language coverage
-- do not conflate this phase with Branch C transliteration/morphology work
-
-Sequencing note:
-
-- Phase 6C UX revalidation can proceed on the current build
-- Phase 6D should be considered soon after (or alongside) pilot analysis because it directly affects self-serve audience fit
-
-#### Phase 6C feedback carry-forward (implementation follow-up)
-
-Evidence from early Phase 6C user feedback indicates a clear product split:
-
-- ordinary users need stronger first-run guidance and less technical landing copy before first dictionary install
-- advanced/platform capabilities remain required, but should be framed as secondary/optional surfaces
-
-This keeps the existing product philosophy intact:
-
-- primary surface: search + direction toggle + results
-- secondary surfaces: Manage dictionaries, Advanced setup, Advanced diagnostics
-- no platform capability removal
-
-Deferred product finding (not in the immediate patch):
-
-- **Result interpretability / sense differentiation**: users may not know which target form to choose when one source query maps to multiple targets (example reported: `amour` → `jàrabi`, `kànin`, `tin`)
-- treat this as a separate content + presentation track; do not fold it into first-run UX copy changes or phrase-retrieval/search-runtime behavior in the Phase 6C follow-up patch
-
-#### Phase 2.0.3 — Hardening items (tracked for next PR)
+### Phase 2.0.3 — Hardening items (tracked for next PR)
 
 These items were identified during PR C review. They should be addressed alongside or before Phase 2.0.3b:
 
@@ -387,7 +258,7 @@ These items were identified during PR C review. They should be addressed alongsi
 
 3. **Max line length metric in bundle manifest** — The 4 MiB `MAX_JSONL_LINE_BYTES` cap is generous. The bundle builder should record the actual max line length in `search_index.jsonl` as a non-enforced informational metric in the manifest (future).
 
-#### Phase 2.0.3b — Query execution (retrieval correctness)
+### Phase 2.0.3b — Query execution (retrieval correctness)
 
 Goal: given a user query string, return an ordered list of `ir_id` values from IndexedDB.
 
@@ -400,15 +271,17 @@ Goal: given a user query string, return an ordered list of `ir_id` values from I
 - No prefix search, no suggestions, no fuzzy matching
 
 Performance expectations (87k entries, exact compound key lookup):
+
 - O(1) per lookup, 1–3 ms on mid-range Android
 - Worst case: 4 lookups (only `nospace` matches) = ~4–12 ms
 - No batching needed
 
 DoD:
+
 - A user can type a query in the harness and see matching `ir_id` values from IndexedDB.
 - Query uses the same normalization path as the import pipeline.
 
-#### Phase 2.0.4 — Results display + entry view (presentation correctness)
+### Phase 2.0.4 — Results display + entry view (presentation correctness)
 
 Goal: render search results as human-readable dictionary entries.
 
@@ -421,9 +294,10 @@ Goal: render search results as human-readable dictionary entries.
 - No styling polish, no animations
 
 DoD:
+
 - A user can type a query, see a results list, and tap into a full entry view.
 
-#### Phase 2.0.5 — Offline PWA finalization (first-install → offline proof) ✅
+### Phase 2.0.5 — Offline PWA finalization (first-install → offline proof) ✅
 
 Goal: prove the app works fully offline after manual bundle import.
 
@@ -447,7 +321,17 @@ Out of scope:
 - No update orchestration
 
 DoD:
+
 - A learner can install the PWA, import a bundle via file picker, close the browser, reopen offline, and search successfully.
+
+### Memory constraints (import / IndexedDB)
+
+Observed via browser probe on the ~20 MB enriched bundle: **JSON.parse creates large transient heap spikes** even when not retaining parsed objects. To stay safe on mid-range Android, Phase 2.0.3 MUST follow these constraints:
+
+- `records.jsonl` MUST NOT be fully materialized in memory as parsed objects.
+- Import MUST be streaming: read → parse line-by-line → write to IndexedDB → discard.
+- `search_index.jsonl` SHOULD NOT become a giant in-memory Map by default (87k entries can balloon).
+- Prefer storing the search index in IndexedDB too (or a compact on-disk structure) and only reading what’s needed per query.
 
 ---
 
@@ -589,6 +473,8 @@ DoD:
 
 ---
 
+
+
 ## Phase 5 — Search/index quality improvement
 
 Phase 5 covers **indexing rulesets** (`norm_v2`, then **`norm_v3`** as the successor normalizer default for new derived artifacts) and **Phase 5b** — field validation and search-reality calibration. **Directional search** is **fully explicit**: manifests carry **`search_index_directional`**, and the runtime uses a **single** ladder per bundle (directional `src_*` / `tgt_*` **or** legacy undirected keys only — **no hybrid fallback**). That contract alignment shipped as the Phase 5b “Directional contract hardening” subtask.
@@ -629,6 +515,8 @@ builds stamp `norm_version: "norm_v3"` and manifest
 `rule_versions.normalization: "norm_v3"`. Directional `src_*` / `tgt_*` bundles
 behave like `norm_v2` from the runtime’s perspective (unchanged
 `searchQuery` + ladder).
+
+Rollout closure details (featured bundle, manual UI sign-off, precision-shift notes): see [At a glance — Rollout notes](#rollout-notes-norm_v3-featured-bundle).
 
 ### Phase 5b — Field Validation + Search Reality Calibration
 
@@ -886,18 +774,284 @@ Status:
 
 - backlog only; do not implement as part of current Phase 5b execution
 
-### Phase 2 memory constraint (lock-in before IndexedDB)
+---
 
-Observed via browser probe on the ~20 MB enriched bundle: **JSON.parse creates large transient heap spikes** even when not retaining parsed objects. To stay safe on mid-range Android, Phase 2.0.3 MUST follow these constraints:
+## Phase 6 — Consumer product layer
 
-- `records.jsonl` MUST NOT be fully materialized in memory as parsed objects.
-- Import MUST be streaming: read → parse line-by-line → write to IndexedDB → discard.
-- `search_index.jsonl` SHOULD NOT become a giant in-memory Map by default (87k entries can balloon).
-- Prefer storing the search index in IndexedDB too (or a compact on-disk structure) and only reading what’s needed per query.
+### Phase 6B — Consumer Search-First UX + Infrastructure Layering ✅
+
+Completion note:
+
+- consumer search-first UX layering shipped
+- featured dictionary primary install path shipped
+- Manage dictionaries and Advanced diagnostics remain available as secondary infrastructure surfaces
+- no platform capabilities were removed (catalog-driven install, multi-bundle support, manual import, validation diagnostics)
+
+### Phase 6D1 — Localization Architecture + French-first interface pass *(implemented, review pending)*
+
+Rationale:
+
+- the dictionary content is French ↔ Maninka
+- Guinea-facing users are more likely to expect a French interface than an English-first shell
+- the current English-first app shell creates audience mismatch even when dictionary behavior is correct
+- this is UI localization work; it is not Branch C linguistic depth and not a data-model change
+
+Implemented scope:
+
+1. **French UI copy coverage** for:
+   - first-run install flow
+   - search screen
+   - progress/success/failure messages
+   - offline fallback text
+   - Manage dictionaries
+   - Advanced setup
+   - Advanced diagnostics
+   - empty states and action buttons
+
+2. **Lightweight localization architecture**:
+   - keyed UI strings
+   - current locale selection
+   - English and French supported initially
+
+3. **Deployment intent**:
+   - current Guinea-facing/public deployment should likely default to French
+   - English remains available as an optional interface language (or deployment-level configuration)
+
+Implementation notes:
+
+- lightweight keyed string layer introduced for consumer shell copy with `en` and `fr`
+- deployment-configured default locale support added (`VITE_DEFAULT_LOCALE`) with fallback order: configured locale → browser locale → `fr`
+- visible in-app locale selector is now present in the app shell (`Français` / `English`) and persists user preference locally (`siralex.ui_locale`)
+- for Guinea-facing/public Netlify deployment, set `VITE_DEFAULT_LOCALE=fr` to enforce French-first UI regardless of browser locale
+
+Boundaries preserved:
+
+- do not alter dictionary content language coverage
+- do not conflate this phase with Branch C transliteration/morphology work
+
+Sequencing note:
+
+- Phase 6C UX revalidation can proceed on the current build
+- Phase 6D should be considered soon after (or alongside) pilot analysis because it directly affects self-serve audience fit
+
+### Phase 6C feedback carry-forward (implementation follow-up)
+
+Evidence from early Phase 6C user feedback indicates a clear product split:
+
+- ordinary users need stronger first-run guidance and less technical landing copy before first dictionary install
+- advanced/platform capabilities remain required, but should be framed as secondary/optional surfaces
+
+This keeps the existing product philosophy intact:
+
+- primary surface: search + direction toggle + results
+- secondary surfaces: Manage dictionaries, Advanced setup, Advanced diagnostics
+- no platform capability removal
+
+Deferred product finding (not in the immediate patch):
+
+- **Result interpretability / sense differentiation**: users may not know which target form to choose when one source query maps to multiple targets (example reported: `amour` → `jàrabi`, `kànin`, `tin`)
+- treat this as a separate content + presentation track; do not fold it into first-run UX copy changes or phrase-retrieval/search-runtime behavior in the Phase 6C follow-up patch
+- feasibility audit drafted in `docs/RESULT_INTERPRETABILITY_FEASIBILITY_AUDIT.md`; do not implement before Phase 6C confirms priority
+
+Phase 6C revalidation packet and log-analysis support:
+
+- tester packet + structured feedback template: `docs/PHASE_6C_TESTER_PACKET.md`
+- local query-log export analysis workflow: `scripts/analyze_query_logs.py`
+- analysis target: distinguish remaining setup/UX friction from search/content issues before opening the next implementation phase
+- manual miss classifications to preserve during analysis:
+  - `phrase_mismatch`
+  - `missing_entry`
+  - `index_gap`
+  - `language_mismatch`
+  - `spelling_error`
+
+### Phase 7A — Source-side alias/index coverage ✅ *(complete)*
+
+Phase 7A shipped a reviewed source-side alias layer for the enriched `norm_v3` featured bundle without changing runtime search logic, target-side search, or normalization semantics.
+
+Completion notes:
+
+- source-alias table v1 spec and tooling are in place (`shared/specs/source-alias-table-v1.md`, `api/source_aliases/`)
+- reviewed alias data is tracked in `shared/aliases/source_aliases_v1.jsonl`
+- featured bundle `bundle_full_20260602_7052fa3a` is published via root `web/public/catalog.json` as `norm-v3-featured-enriched-source-aliases-1`
+- `records.jsonl` stayed byte-for-byte unchanged; only approved source-side alias keys were added to `search_index.jsonl`
+- production smoke tests passed for `Yeux`, `Grande`, and `jumelle`; `Kun` and `mere` remained unchanged
+
+Still deferred:
+
+- `grand-parents` multi-target alias review
+- `poil`, `oncle`, and `tante` source/content correction review
+- phrase/compositional lookup, ranking changes, plain `Kun` policy, and result interpretability
+
+### Phase 7B Round 1 — Source-index supplement coverage ✅ *(complete)*
+
+Completion notes:
+
+- source-index supplement tooling was added
+- featured bundle `bundle_full_20260603_d0e4f812` was published via catalog version `norm-v3-featured-enriched-source-aliases-1-source-index-supplements-1`
+- `poil`, `poils`, and `tante` were validated in production
+- `tante` returns `nàlaka` first and `tɛ́nɛn` second
+- `oncle` remains candidate/unapplied
+- unrelated behavior remained unchanged for `mere`, target-side `Kun`, `Yeux`, `Grande`, `jumelle`, and phrase misses
+
+Deferred follow-ups:
+
+- `oncle` broad mapping review
+- phrase/compositional lookup
+- `mere` ranking/order investigation
+- plain `Kun` accentless recall policy
+- result interpretability / sense differentiation
+
+### Phase 7D — `oncle` broad source-index supplement ✅ *(complete)*
+
+Completion notes:
+
+- Phase 7D added the broad `oncle` source-index supplement.
+- featured bundle `bundle_full_20260606_6b8b401a` was published via catalog version `norm-v3-featured-enriched-source-aliases-1-source-index-supplements-2`
+- `oncle` now returns the reviewed broad supplement with `bári`, `bárin`, `bárinkɛ`, `bɛ́nɔɔ`, `bɛ́nɔɔba`, and `bɛ́nɔɔnɛn`
+- production smoke tests confirmed unchanged behavior for `poil`, `poils`, `tante`, `Yeux`, `Grande`, `jumelle`, `mere`, target-side `Kun`, phrase misses, and plural/form candidates
+- reproducibility caveat: `source_index_supplements_v1.jsonl` is cumulative and not idempotent against already-supplemented baselines; Phase 7D publication used a scoped `oncle`-only rollout input derived from the cumulative reviewed table
+
+### Phase 7E — Source-index supplement idempotent replay ✅ *(complete)*
+
+Completion notes:
+
+- Phase 7E added idempotent replay for source-index supplements.
+- the cumulative `source_index_supplements_v1.jsonl` table can now be safely replayed against already-supplemented bundles
+- replay outcomes are classified as `applied`, `already_present`, or `conflict`
+- already-present identical generated records are skipped without duplication; conflicting records or source-index states fail hard
+- report-level provenance was added; bundle manifest schema was intentionally not changed
+- validator CLI gained `--defer-index-conflicts` for replay-aware workflows
+- focused tests passed: `21 passed`
+- migration validation passed:
+  - against `bundle_full_20260603_d0e4f812`: `poil`, `poils`, and `tante` were `already_present`; `oncle` was `applied`
+  - against `bundle_full_20260606_6b8b401a`: all four were `already_present`
+
+Deferred follow-ups:
+
+- optional manifest-level supplement provenance
+- plural/form recall alias track
+- result interpretability
+- phrase/compositional lookup
+- `mere`/kinship ranking review
 
 ---
 
-## Definition of Done (Phase 1 — backend pipeline)
+## Phase 1.5 — Corrections (spec + dry-run)
+
+Parts of the feedback loop can be built without a UI. This work is safe and doesn't lock UX decisions.
+
+### 1.5A — Correction record schema/specification ✅ *(complete)*
+
+JSON schema for:
+
+- `correction_id`
+- `target_ir_id`
+- RFC 6902 patch
+- `submitter` (anonymous token)
+- `timestamps`
+- `status`
+
+Formal specification has now been drafted:
+
+- Spec: `shared/specs/correction-record-schema-v1.md`
+- Scope includes:
+  - exact schema fields
+  - allowed correction statuses
+  - `target_ir_id` relationship to IR
+  - RFC 6902 patch constraints
+  - validation rules
+  - provenance/audit metadata
+  - test requirements for validation behavior
+
+This milestone is schema-only and does not change runtime behavior.
+
+### 1.5B — Correction application pipeline (dry-run) ✅ *(complete)*
+
+Tool that:
+
+- Takes IR JSONL
+- Applies approved corrections
+- Produces new IR version
+
+No UI, no moderation yet — just correctness.
+
+Planning/specification artifact drafted:
+
+- Spec: `shared/specs/correction-application-dry-run.md`
+- Scope includes:
+  - correctionset input format and deterministic ordering
+  - input contracts and IR version context
+  - validation stages and approved-status filtering
+  - conflict policy and deterministic apply/reject behavior
+  - apply-on-copy behavior and output artifact contract
+  - failure reason codes and deterministic test matrix
+
+Implementation completion note:
+
+- correctionset manifest contract validation + `corrections.jsonl` integrity checks (`byte_length` + `sha256`)
+- lifecycle resolution, supersession filtering, and same-target conflict handling
+- deterministic apply-on-copy corrected IR output + machine-readable report generation
+- CLI command: `siralex-corrections-dry-run`
+- focused backend test coverage for lifecycle, integrity, conflicts, patch validation, and deterministic replay
+
+Current boundaries (still intentional):
+
+- correction schema/spec is complete
+- dry-run apply pipeline is complete
+- no UI/moderation workflow exists yet
+- no committed correction-release workflow exists yet
+- dry-run does not persist lifecycle transitions to `applied`
+
+DoD:
+- Correction record schema/specification is formalized in `shared/specs/correction-record-schema-v1.md`.
+- Dry-run pipeline specification is formalized in `shared/specs/correction-application-dry-run.md`.
+- Dry-run pipeline implementation is complete with deterministic dry-run outputs and report generation.
+
+## Deferred — Branch C (linguistic depth) *(deferred)*
+
+This includes:
+
+- Transliteration (Latin → N'Ko)
+- Cross-entry variant graph
+- Morphology
+- Sense clustering
+
+> **Do not start this until:**
+>
+> - You have users
+> - You have search logs
+> - You have correction data
+>
+> Otherwise you'll invent rules in a vacuum. Transliteration generation was correctly deferred for this reason.
+
+DoD:
+- Defined per-feature when the prerequisites are met.
+
+---
+
+
+
+## Open backlog & follow-ups
+
+Items intentionally **not** part of the current closure scope:
+
+| Item | Notes |
+|------|--------|
+| **Production deploy verification** | Confirm live `/catalog.json` and `bundle_full_20260518_15605571` manifest after Netlify deploy. |
+| **Plain accentless `Kun`** | Separate search-policy decision; not a `norm_v3` rollout defect. |
+| **Old featured bundle directory** | `web/public/bundle_full_20260418_1dc526df/` retained temporarily for stale URL safety; remove after cache window. |
+| **`real-test-bundles/` mirror** | Unreferenced duplicate tree; deprecate or remove in a hygiene PR. |
+| **Android device validation (Phase 5b)** | iPhone complete; Android pending hardware access. |
+| **Phase 6C UX revalidation** | Re-run user feedback on enriched `norm_v3` featured surface. |
+| **Single-file manual bundle import** | Backlog from device validation (see Phase 5b); keep three-file import as advanced fallback. |
+| **Result interpretability** | Sense disambiguation when one source maps to many targets (6C feedback); separate content/presentation track. |
+
+---
+
+## Definition of Done
+
+### Phase 1 — backend pipeline
 
 The backend pipeline is complete when:
 
@@ -907,7 +1061,7 @@ The backend pipeline is complete when:
 - ✅ Search index materialized
 - ✅ First offline bundle built, verified, and published
 
-## Definition of Done (Phase 2 — minimal dictionary)
+### Phase 2 — minimal dictionary
 
 A learner can:
 
@@ -916,7 +1070,7 @@ A learner can:
 - Use the dictionary offline after initial caching/download
 - Experience acceptable lookup latency on a mid-range Android phone
 
-## Definition of Done (Phase 3 — platform generalization)
+### Phase 3 — platform generalization
 
 SiraLex is no longer just a single-dictionary app when:
 
@@ -926,3 +1080,4 @@ SiraLex is no longer just a single-dictionary app when:
 - The app has a defined path for catalog/download-based bundle installation
 
 Those conditions are now satisfied for the current runtime scope.
+
