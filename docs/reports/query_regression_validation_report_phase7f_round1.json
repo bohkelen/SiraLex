@@ -1,0 +1,208 @@
+{
+  "phase7f_queries": {
+    "mains": {
+      "canonical": "main",
+      "expected_ir_ids": [
+        "e79067fd41b59e85"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "e79067fd41b59e85"
+      ],
+      "candidate_canonical_ir_ids": [
+        "e79067fd41b59e85"
+      ],
+      "matches_canonical": true
+    },
+    "jours": {
+      "canonical": "jour",
+      "expected_ir_ids": [
+        "937683d6c5c5943a"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "937683d6c5c5943a"
+      ],
+      "candidate_canonical_ir_ids": [
+        "937683d6c5c5943a"
+      ],
+      "matches_canonical": true
+    },
+    "pieds": {
+      "canonical": "pied",
+      "expected_ir_ids": [
+        "829790e020eae470"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "829790e020eae470"
+      ],
+      "candidate_canonical_ir_ids": [
+        "829790e020eae470"
+      ],
+      "matches_canonical": true
+    },
+    "hommes": {
+      "canonical": "homme",
+      "expected_ir_ids": [
+        "efbadcd88c9d1083"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "efbadcd88c9d1083"
+      ],
+      "candidate_canonical_ir_ids": [
+        "efbadcd88c9d1083"
+      ],
+      "matches_canonical": true
+    },
+    "femmes": {
+      "canonical": "femme",
+      "expected_ir_ids": [
+        "19d338e7e938acc8"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "19d338e7e938acc8"
+      ],
+      "candidate_canonical_ir_ids": [
+        "19d338e7e938acc8"
+      ],
+      "matches_canonical": true
+    },
+    "oreilles": {
+      "canonical": "oreille",
+      "expected_ir_ids": [
+        "c164e5c74aa6e312"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "c164e5c74aa6e312"
+      ],
+      "candidate_canonical_ir_ids": [
+        "c164e5c74aa6e312"
+      ],
+      "matches_canonical": true
+    },
+    "frères": {
+      "canonical": "frère",
+      "expected_ir_ids": [
+        "591255239aba1624"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "591255239aba1624"
+      ],
+      "candidate_canonical_ir_ids": [
+        "591255239aba1624"
+      ],
+      "matches_canonical": true
+    }
+  },
+  "regressions": {
+    "Yeux": {
+      "baseline_ir_ids": [
+        "51ad9c8e520ea802"
+      ],
+      "candidate_ir_ids": [
+        "51ad9c8e520ea802"
+      ],
+      "unchanged": true
+    },
+    "Grande": {
+      "baseline_ir_ids": [
+        "cb608c65da0fd421"
+      ],
+      "candidate_ir_ids": [
+        "cb608c65da0fd421"
+      ],
+      "unchanged": true
+    },
+    "jumelle": {
+      "baseline_ir_ids": [
+        "82f3c9a4b41662c4"
+      ],
+      "candidate_ir_ids": [
+        "82f3c9a4b41662c4"
+      ],
+      "unchanged": true
+    },
+    "poil": {
+      "baseline_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "candidate_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "unchanged": true
+    },
+    "poils": {
+      "baseline_ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "candidate_ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "unchanged": true
+    },
+    "tante": {
+      "baseline_ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "candidate_ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "unchanged": true
+    },
+    "oncle": {
+      "baseline_ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "candidate_ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "unchanged": true
+    },
+    "mere": {
+      "baseline_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "candidate_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "unchanged": true
+    },
+    "ferme la bouche": {
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "Grand chose": {
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "grande bouche": {
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "target-side Kun": {
+      "baseline_ir_ids": [
+        "b07ae7bd61ff3c85"
+      ],
+      "candidate_ir_ids": [
+        "b07ae7bd61ff3c85"
+      ],
+      "unchanged": true
+    }
+  },
+  "all_phase7f_queries_match": true,
+  "all_regressions_unchanged": true
+}

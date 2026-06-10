@@ -14,9 +14,7 @@ from .generate_supplement_records import (
 )
 from .validate_supplements import (
     APPLICABLE_STATUS,
-    SupplementRow,
     read_supplement_rows,
-    search_keys_for_source_term,
 )
 
 
@@ -101,6 +99,17 @@ def generated_records_by_supplement_id(
     return out
 
 
+def record_outcomes_by_supplement_id(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for item in report.get("supplement_record_outcomes", []):
+        if not isinstance(item, dict):
+            continue
+        supplement_id = item.get("supplement_id")
+        if isinstance(supplement_id, str):
+            out[supplement_id] = item
+    return out
+
+
 def _target_display_entries(record: dict[str, Any]) -> list[dict[str, Any]]:
     display = record.get("display")
     if not isinstance(display, dict):
@@ -178,6 +187,7 @@ def merge_supplements_into_search_index(
         generation_report,
         generated_records,
     )
+    record_outcomes = record_outcomes_by_supplement_id(generation_report)
 
     applied_changes: list[dict[str, Any]] = []
     expected_changed_keys: set[tuple[str, str]] = set()
@@ -196,48 +206,49 @@ def merge_supplements_into_search_index(
             )
             continue
 
+        record_outcome = record_outcomes.get(row.supplement_id)
+        if not record_outcome:
+            raise SupplementMergeError(f"{row.supplement_id}: missing supplement outcome")
+
+        if record_outcome.get("outcome") == "already_present":
+            continue
+        if record_outcome.get("outcome") != "applied":
+            raise SupplementMergeError(
+                f"{row.supplement_id}: unsupported supplement outcome "
+                f"{record_outcome.get('outcome')!r}"
+            )
+
         generated_record = generated_by_supplement_id.get(row.supplement_id)
         if not generated_record:
             raise SupplementMergeError(f"{row.supplement_id}: missing generated record")
-        generated_ir_id = generated_record["ir_id"]
 
-        for key_type, key in search_keys_for_source_term(row.source_term):
+        for operation_item in record_outcome.get("source_key_operations", []):
+            if not isinstance(operation_item, dict):
+                raise SupplementMergeError(f"{row.supplement_id}: invalid source key operation")
+            key_type = operation_item.get("key_type")
+            key = operation_item.get("key")
+            previous_ir_ids = operation_item.get("previous_ir_ids")
+            new_ir_ids = operation_item.get("new_ir_ids")
+            operation = operation_item.get("operation")
+            if (
+                not isinstance(key_type, str)
+                or not isinstance(key, str)
+                or not isinstance(previous_ir_ids, list)
+                or not all(isinstance(ir_id, str) for ir_id in previous_ir_ids)
+                or not isinstance(new_ir_ids, list)
+                or not all(isinstance(ir_id, str) for ir_id in new_ir_ids)
+                or operation not in {"added_key", "appended_posting"}
+            ):
+                raise SupplementMergeError(f"{row.supplement_id}: invalid source key operation")
+
             compound = (key_type, key)
-            previous = merged_index.get(compound)
-            if row.supplement_mode == "new_source_mapping":
-                if previous is not None:
-                    raise SupplementMergeError(
-                        f"{row.supplement_id}: expected absent key {compound}, got {previous}"
-                    )
-                new_ir_ids = [generated_ir_id]
-                merged_index[compound] = new_ir_ids
-                operation = "added_key"
-            elif row.supplement_mode == "additive_source_mapping":
-                if previous is None:
-                    raise SupplementMergeError(
-                        f"{row.supplement_id}: expected existing key {compound}"
-                    )
-                if generated_ir_id in previous:
-                    raise SupplementMergeError(
-                        f"{row.supplement_id}: generated id {generated_ir_id} already present "
-                        f"for {compound}"
-                    )
-                new_ir_ids = [*previous, generated_ir_id]
-                merged_index[compound] = new_ir_ids
-                operation = "appended_posting"
-            elif row.supplement_mode == "broad_umbrella_source_mapping":
-                if previous is not None:
-                    raise SupplementMergeError(
-                        f"{row.supplement_id}: broad umbrella key {compound} already exists"
-                    )
-                new_ir_ids = [generated_ir_id]
-                merged_index[compound] = new_ir_ids
-                operation = "added_key"
-            else:
+            current = merged_index.get(compound, [])
+            if current != previous_ir_ids:
                 raise SupplementMergeError(
-                    f"{row.supplement_id}: unsupported supplement_mode {row.supplement_mode!r}"
+                    f"{row.supplement_id}: source key {compound} changed before merge; "
+                    f"expected {previous_ir_ids}, got {current}"
                 )
-
+            merged_index[compound] = list(new_ir_ids)
             expected_changed_keys.add(compound)
             applied_changes.append(
                 {
@@ -245,7 +256,7 @@ def merge_supplements_into_search_index(
                     "source_term": row.source_term,
                     "key": key,
                     "key_type": key_type,
-                    "previous_ir_ids": previous or [],
+                    "previous_ir_ids": previous_ir_ids,
                     "new_ir_ids": new_ir_ids,
                     "operation": operation,
                 }
@@ -266,11 +277,22 @@ def merge_supplements_into_search_index(
     report = {
         "baseline_bundle_id": baseline_manifest.get("bundle_id"),
         "baseline_content_sha256": baseline_manifest.get("content_sha256"),
+        "supplement_input_path": generation_report.get("supplement_input_path"),
+        "supplement_input_sha256": generation_report.get("supplement_input_sha256"),
         "supplement_table_version": (
             generation_report.get("source_index_supplement_tables", [{}])[0].get(
                 "supplement_table_version"
             )
         ),
+        "applied_supplement_count": generation_report.get("applied_supplement_count", 0),
+        "already_present_supplement_count": generation_report.get(
+            "already_present_supplement_count",
+            0,
+        ),
+        "conflicted_supplement_count": generation_report.get("conflicted_supplement_count", 0),
+        "applied_supplements": generation_report.get("applied_supplements", []),
+        "already_present_supplements": generation_report.get("already_present_supplements", []),
+        "conflicted_supplements": generation_report.get("conflicted_supplements", []),
         "generated_supplement_records": [
             {
                 "supplement_id": item.get("supplement_id"),

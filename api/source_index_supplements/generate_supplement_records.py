@@ -18,9 +18,10 @@ from .validate_supplements import (
     APPLICABLE_STATUS,
     SupplementRow,
     SupplementValidationError,
+    load_search_index,
     load_records_by_id,
-    read_supplement_rows,
     result_to_report,
+    search_keys_for_source_term,
     validate_supplement_table,
 )
 
@@ -40,6 +41,14 @@ def generated_ir_id(row: SupplementRow) -> str:
         ]
     )
     return "ff" + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:14]
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def target_display_text(record: dict[str, Any], fallback: str) -> str:
@@ -149,6 +158,214 @@ def build_generated_record(
     }
 
 
+def target_entries_projection(record: dict[str, Any]) -> list[dict[str, Any]]:
+    display = record.get("display")
+    target_entries = display.get("target_entries") if isinstance(display, dict) else None
+    if not isinstance(target_entries, list):
+        return []
+    return [
+        {
+            "lexicon_url": entry.get("lexicon_url"),
+            "anchor": entry.get("anchor"),
+            "display_text": entry.get("display_text"),
+        }
+        for entry in target_entries
+        if isinstance(entry, dict)
+    ]
+
+
+def generated_record_projection(record: dict[str, Any]) -> dict[str, Any]:
+    display = record.get("display")
+    display = display if isinstance(display, dict) else {}
+    return {
+        "ir_id": record.get("ir_id"),
+        "ir_kind": record.get("ir_kind"),
+        "source_id": record.get("source_id"),
+        "norm_version": record.get("norm_version"),
+        "preferred_form": record.get("preferred_form"),
+        "variant_forms": record.get("variant_forms"),
+        "search_keys": record.get("search_keys"),
+        "display": {
+            "source_term": display.get("source_term"),
+            "source_lang": display.get("source_lang"),
+            "target_entries": target_entries_projection(record),
+        },
+    }
+
+
+def _projection_mismatch_reason(
+    expected: dict[str, Any],
+    existing: dict[str, Any],
+) -> str:
+    expected_projection = generated_record_projection(expected)
+    existing_projection = generated_record_projection(existing)
+    if existing_projection.get("ir_kind") != "index_mapping":
+        return "generated_id_collision_unrelated_record"
+    expected_targets = expected_projection["display"]["target_entries"]
+    existing_targets = existing_projection["display"]["target_entries"]
+    if expected_targets != existing_targets:
+        return "target_entry_metadata_mismatch"
+    return "generated_record_content_mismatch"
+
+
+def _raise_conflict(row: SupplementRow, generated_id: str, reason: str, detail: str) -> None:
+    raise SupplementGenerationError(
+        f"{row.supplement_id}: {reason}; generated_ir_id={generated_id}; {detail}"
+    )
+
+
+def validate_source_key_state(
+    row: SupplementRow,
+    index: dict[tuple[str, str], list[str]],
+    generated_id: str,
+    *,
+    already_present: bool,
+) -> tuple[str, list[dict[str, Any]]]:
+    operations: list[dict[str, Any]] = []
+    for key_type, key in search_keys_for_source_term(row.source_term):
+        compound = (key_type, key)
+        previous = index.get(compound)
+        previous_ids = list(previous) if previous is not None else []
+
+        if len(previous_ids) != len(set(previous_ids)):
+            _raise_conflict(
+                row,
+                generated_id,
+                "source_key_duplicate_posting",
+                f"{compound} has duplicate postings {previous_ids}",
+            )
+
+        if already_present:
+            if previous is None or generated_id not in previous_ids:
+                _raise_conflict(
+                    row,
+                    generated_id,
+                    "source_key_missing_expected_posting",
+                    f"{compound} is missing expected generated posting",
+                )
+            if row.supplement_mode in {"new_source_mapping", "broad_umbrella_source_mapping"}:
+                if previous_ids != [generated_id]:
+                    _raise_conflict(
+                        row,
+                        generated_id,
+                        "source_key_unexpected_postings",
+                        f"{compound} expected [{generated_id!r}], got {previous_ids}",
+                    )
+            elif row.supplement_mode == "additive_source_mapping":
+                if previous_ids[-1] != generated_id:
+                    _raise_conflict(
+                        row,
+                        generated_id,
+                        "source_key_order_mismatch",
+                        f"{compound} expected generated posting last, got {previous_ids}",
+                    )
+                if len(previous_ids) < 2:
+                    _raise_conflict(
+                        row,
+                        generated_id,
+                        "source_key_unexpected_postings",
+                        f"{compound} missing pre-existing additive posting",
+                    )
+            else:
+                _raise_conflict(
+                    row,
+                    generated_id,
+                    "unsupported_supplement_mode",
+                    f"unsupported supplement_mode {row.supplement_mode!r}",
+                )
+            operations.append(
+                {
+                    "key_type": key_type,
+                    "key": key,
+                    "previous_ir_ids": previous_ids,
+                    "new_ir_ids": previous_ids,
+                    "operation": "verified_existing_posting",
+                }
+            )
+            continue
+
+        if row.supplement_mode == "new_source_mapping":
+            if previous is not None:
+                _raise_conflict(
+                    row,
+                    generated_id,
+                    "source_key_unexpected_postings",
+                    f"{compound} expected absent key, got {previous_ids}",
+                )
+            new_ids = [generated_id]
+            operation = "added_key"
+        elif row.supplement_mode == "additive_source_mapping":
+            if previous is None:
+                _raise_conflict(
+                    row,
+                    generated_id,
+                    "source_key_missing_existing_posting",
+                    f"{compound} expected existing source key",
+                )
+            if generated_id in previous_ids:
+                _raise_conflict(
+                    row,
+                    generated_id,
+                    "source_key_unexpected_postings",
+                    f"{compound} contains generated posting without generated record",
+                )
+            new_ids = [*previous_ids, generated_id]
+            operation = "appended_posting"
+        elif row.supplement_mode == "broad_umbrella_source_mapping":
+            if previous is not None:
+                _raise_conflict(
+                    row,
+                    generated_id,
+                    "source_key_unexpected_postings",
+                    f"{compound} expected absent broad umbrella key, got {previous_ids}",
+                )
+            new_ids = [generated_id]
+            operation = "added_key"
+        else:
+            _raise_conflict(
+                row,
+                generated_id,
+                "unsupported_supplement_mode",
+                f"unsupported supplement_mode {row.supplement_mode!r}",
+            )
+        operations.append(
+            {
+                "key_type": key_type,
+                "key": key,
+                "previous_ir_ids": previous_ids,
+                "new_ir_ids": new_ids,
+                "operation": operation,
+            }
+        )
+
+    return ("already_present" if already_present else "valid_for_apply", operations)
+
+
+def supplement_report_item(
+    row: SupplementRow,
+    *,
+    outcome: str,
+    expected_generated_ir_id: str,
+    existing_generated_ir_id: str | None,
+    source_key_status: str,
+    source_key_operations: list[dict[str, Any]],
+    conflict_reason: str | None,
+    target_entries: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "supplement_id": row.supplement_id,
+        "source_term": row.source_term,
+        "target_ir_ids": row.target_ir_ids,
+        "outcome": outcome,
+        "expected_generated_ir_id": expected_generated_ir_id,
+        "existing_generated_ir_id": existing_generated_ir_id,
+        "source_key_status": source_key_status,
+        "source_key_operations": source_key_operations,
+        "conflict_reason": conflict_reason,
+        "target_entries": target_entries,
+    }
+
+
 def read_records(records_path: Path) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     with records_path.open("r", encoding="utf-8") as handle:
@@ -185,41 +402,127 @@ def generate_supplement_records(
             supplement_table_path=supplement_table_path,
             records_path=records_path,
             search_index_path=search_index_path,
+            defer_index_conflicts=True,
         )
     except SupplementValidationError as exc:
         raise SupplementGenerationError(str(exc)) from exc
 
     records_by_id = load_records_by_id(records_path)
+    index = load_search_index(search_index_path)
     rows_by_id = {row.supplement_id: row for row in validation_result.rows}
-    existing_record_ids = set(records_by_id)
     generated_records: list[dict[str, Any]] = []
-    generated_ids: set[str] = set()
-    generated_supplement_ids: list[str] = []
+    expected_generated_ids: set[str] = set()
+    applied_supplements: list[dict[str, Any]] = []
+    already_present_supplements: list[dict[str, Any]] = []
+    conflicted_supplements: list[dict[str, Any]] = []
 
     for outcome in validation_result.outcomes:
         row = rows_by_id[outcome.supplement_id]
         if row.status != APPLICABLE_STATUS:
             continue
         generated_id = generated_ir_id(row)
-        if generated_id in existing_record_ids or generated_id in generated_ids:
+        if generated_id in expected_generated_ids:
             raise SupplementGenerationError(
                 f"{row.supplement_id}: generated ir_id collision {generated_id}"
             )
-        generated_ids.add(generated_id)
-        generated_supplement_ids.append(row.supplement_id)
-        generated_records.append(build_generated_record(row, records_by_id))
+        expected_generated_ids.add(generated_id)
+
+        expected_record = build_generated_record(row, records_by_id)
+        existing_record = records_by_id.get(generated_id)
+        try:
+            if existing_record is not None:
+                mismatch_reason = _projection_mismatch_reason(expected_record, existing_record)
+                if generated_record_projection(expected_record) != generated_record_projection(existing_record):
+                    _raise_conflict(
+                        row,
+                        generated_id,
+                        mismatch_reason,
+                        "existing generated record does not match expected projection",
+                    )
+                source_key_status, source_key_operations = validate_source_key_state(
+                    row,
+                    index,
+                    generated_id,
+                    already_present=True,
+                )
+                already_present_supplements.append(
+                    supplement_report_item(
+                        row,
+                        outcome="already_present",
+                        expected_generated_ir_id=generated_id,
+                        existing_generated_ir_id=generated_id,
+                        source_key_status=source_key_status,
+                        source_key_operations=source_key_operations,
+                        conflict_reason=None,
+                        target_entries=target_entries_projection(expected_record),
+                    )
+                )
+                continue
+
+            source_key_status, source_key_operations = validate_source_key_state(
+                row,
+                index,
+                generated_id,
+                already_present=False,
+            )
+        except SupplementGenerationError as exc:
+            conflicted_supplements.append(
+                supplement_report_item(
+                    row,
+                    outcome="conflict",
+                    expected_generated_ir_id=generated_id,
+                    existing_generated_ir_id=generated_id if existing_record is not None else None,
+                    source_key_status="conflict",
+                    source_key_operations=[],
+                    conflict_reason=str(exc),
+                    target_entries=target_entries_projection(expected_record),
+                )
+            )
+            raise
+
+        generated_records.append(expected_record)
+        applied_supplements.append(
+            supplement_report_item(
+                row,
+                outcome="applied",
+                expected_generated_ir_id=generated_id,
+                existing_generated_ir_id=None,
+                source_key_status=source_key_status,
+                source_key_operations=source_key_operations,
+                conflict_reason=None,
+                target_entries=target_entries_projection(expected_record),
+            )
+        )
 
     report = result_to_report(validation_result)
+    table_summary = report["source_index_supplement_tables"][0]
+    table_summary["applied_supplement_count"] = len(applied_supplements)
+    table_summary["already_present_supplement_count"] = len(already_present_supplements)
+    table_summary["conflicted_supplement_count"] = len(conflicted_supplements)
+    report["supplement_input_path"] = str(supplement_table_path)
+    report["supplement_input_sha256"] = file_sha256(supplement_table_path)
+    report["applied_supplement_count"] = len(applied_supplements)
+    report["already_present_supplement_count"] = len(already_present_supplements)
+    report["conflicted_supplement_count"] = len(conflicted_supplements)
+    report["applied_supplements"] = applied_supplements
+    report["already_present_supplements"] = already_present_supplements
+    report["conflicted_supplements"] = conflicted_supplements
     report["generated_records"] = [
         {
-            "supplement_id": supplement_id,
+            "supplement_id": item["supplement_id"],
             "generated_ir_id": record["ir_id"],
             "source_term": record["preferred_form"],
             "target_display_texts": [
                 target["display_text"] for target in record["display"]["target_entries"]
             ],
+            "target_entries": target_entries_projection(record),
         }
-        for supplement_id, record in zip(generated_supplement_ids, generated_records, strict=True)
+        for item, record in zip(applied_supplements, generated_records, strict=True)
+    ]
+    report["supplement_record_outcomes"] = [
+        *applied_supplements,
+        *already_present_supplements,
+        *conflicted_supplements,
     ]
     return generated_records, report
 
