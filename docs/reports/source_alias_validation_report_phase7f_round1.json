@@ -1,0 +1,205 @@
+{
+  "alias_tables": [
+    {
+      "schema_version": "source_alias_table_v1",
+      "alias_table_version": "phase7a-round1",
+      "approved_alias_count": 10,
+      "candidate_alias_count": 1,
+      "rejected_alias_count": 0,
+      "applied_alias_count": 7,
+      "skipped_alias_count": 3
+    }
+  ],
+  "aliases": [
+    {
+      "alias_id": "src_alias_phase7a_0001",
+      "status": "approved",
+      "alias_source_term": "Yeux",
+      "canonical_source_terms": [
+        "oeil"
+      ],
+      "resolved_ir_ids": [
+        "51ad9c8e520ea802"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7a_0002",
+      "status": "approved",
+      "alias_source_term": "Grande",
+      "canonical_source_terms": [
+        "grand"
+      ],
+      "resolved_ir_ids": [
+        "cb608c65da0fd421"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7a_0003",
+      "status": "approved",
+      "alias_source_term": "jumelle",
+      "canonical_source_terms": [
+        "jumeau"
+      ],
+      "resolved_ir_ids": [
+        "82f3c9a4b41662c4"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0001",
+      "status": "approved",
+      "alias_source_term": "mains",
+      "canonical_source_terms": [
+        "main"
+      ],
+      "resolved_ir_ids": [
+        "e79067fd41b59e85"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved alias can generate absent source keys"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0002",
+      "status": "approved",
+      "alias_source_term": "jours",
+      "canonical_source_terms": [
+        "jour"
+      ],
+      "resolved_ir_ids": [
+        "937683d6c5c5943a"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved alias can generate absent source keys"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0003",
+      "status": "approved",
+      "alias_source_term": "pieds",
+      "canonical_source_terms": [
+        "pied"
+      ],
+      "resolved_ir_ids": [
+        "829790e020eae470"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved alias can generate absent source keys"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0004",
+      "status": "approved",
+      "alias_source_term": "hommes",
+      "canonical_source_terms": [
+        "homme"
+      ],
+      "resolved_ir_ids": [
+        "efbadcd88c9d1083"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved alias can generate absent source keys"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0005",
+      "status": "approved",
+      "alias_source_term": "femmes",
+      "canonical_source_terms": [
+        "femme"
+      ],
+      "resolved_ir_ids": [
+        "19d338e7e938acc8"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved alias can generate absent source keys"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0006",
+      "status": "approved",
+      "alias_source_term": "oreilles",
+      "canonical_source_terms": [
+        "oreille"
+      ],
+      "resolved_ir_ids": [
+        "c164e5c74aa6e312"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved alias can generate absent source keys"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0007",
+      "status": "approved",
+      "alias_source_term": "frères",
+      "canonical_source_terms": [
+        "frère"
+      ],
+      "resolved_ir_ids": [
+        "591255239aba1624"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "approved alias can generate absent source keys"
+    }
+  ]
+}

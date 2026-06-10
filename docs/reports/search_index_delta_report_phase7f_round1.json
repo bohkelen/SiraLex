@@ -1,0 +1,214 @@
+{
+  "baseline_bundle": "web/public/bundle_full_20260606_6b8b401a",
+  "candidate_bundle": "/tmp/phase7f_plural_alias_candidate_20260610T031618Z/bundle_full_20260609_phase7f_alias_candidate",
+  "recommended_catalog_version": "norm-v3-featured-enriched-source-aliases-2-source-index-supplements-2",
+  "added_key_count": 28,
+  "changed_key_count": 0,
+  "removed_key_count": 0,
+  "target_side_changed_key_count": 0,
+  "unexpected_change_count": 0,
+  "added_keys": [
+    {
+      "key_type": "src_casefold",
+      "key": "femmes",
+      "ir_ids": [
+        "19d338e7e938acc8"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "frères",
+      "ir_ids": [
+        "591255239aba1624"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "hommes",
+      "ir_ids": [
+        "efbadcd88c9d1083"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "jours",
+      "ir_ids": [
+        "937683d6c5c5943a"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "mains",
+      "ir_ids": [
+        "e79067fd41b59e85"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "oreilles",
+      "ir_ids": [
+        "c164e5c74aa6e312"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "pieds",
+      "ir_ids": [
+        "829790e020eae470"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "femmes",
+      "ir_ids": [
+        "19d338e7e938acc8"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "freres",
+      "ir_ids": [
+        "591255239aba1624"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "hommes",
+      "ir_ids": [
+        "efbadcd88c9d1083"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "jours",
+      "ir_ids": [
+        "937683d6c5c5943a"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "mains",
+      "ir_ids": [
+        "e79067fd41b59e85"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "oreilles",
+      "ir_ids": [
+        "c164e5c74aa6e312"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "pieds",
+      "ir_ids": [
+        "829790e020eae470"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "femmes",
+      "ir_ids": [
+        "19d338e7e938acc8"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "freres",
+      "ir_ids": [
+        "591255239aba1624"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "hommes",
+      "ir_ids": [
+        "efbadcd88c9d1083"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "jours",
+      "ir_ids": [
+        "937683d6c5c5943a"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "mains",
+      "ir_ids": [
+        "e79067fd41b59e85"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "oreilles",
+      "ir_ids": [
+        "c164e5c74aa6e312"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "pieds",
+      "ir_ids": [
+        "829790e020eae470"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "femmes",
+      "ir_ids": [
+        "19d338e7e938acc8"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "freres",
+      "ir_ids": [
+        "591255239aba1624"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "hommes",
+      "ir_ids": [
+        "efbadcd88c9d1083"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "jours",
+      "ir_ids": [
+        "937683d6c5c5943a"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "mains",
+      "ir_ids": [
+        "e79067fd41b59e85"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "oreilles",
+      "ir_ids": [
+        "c164e5c74aa6e312"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "pieds",
+      "ir_ids": [
+        "829790e020eae470"
+      ]
+    }
+  ],
+  "unexpected_changes": {
+    "unexpected_added": {},
+    "missing_expected_added": {},
+    "changed": {},
+    "removed": {}
+  }
+}
