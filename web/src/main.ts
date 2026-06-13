@@ -388,14 +388,22 @@ function getManifestPayloadBytes(manifest: BundleManifestV1): number | undefined
 }
 
 function getInstalledBundleName(bundle: ActiveBundleMeta): string {
-  return (
-    bundle.display_name ??
-    getBundleDisplayName(
-      bundle.bundle_id,
-      bundle.language_meta,
-      t("language.source"),
-      t("language.target"),
-    )
+  if (bundle.language_meta) {
+    return getLocalizedBundleDisplayName(bundle.bundle_id, bundle.language_meta);
+  }
+  return bundle.display_name ?? getLocalizedBundleDisplayName(bundle.bundle_id, bundle.language_meta);
+}
+
+function getLocalizedBundleDisplayName(
+  bundleId: string,
+  meta?: ActiveBundleMeta["language_meta"],
+): string {
+  return getBundleDisplayName(
+    bundleId,
+    meta,
+    t("language.source"),
+    t("language.target"),
+    getCurrentLocale(),
   );
 }
 
@@ -416,11 +424,11 @@ function getLoadedCatalogEntry(bundleId: string): BundleCatalogEntryV1 | undefin
 }
 
 function getLocalizedSourceLabel(meta?: ActiveBundleMeta["language_meta"]): string {
-  return getSourceLabel(meta, t("language.source"));
+  return getSourceLabel(meta, t("language.source"), getCurrentLocale());
 }
 
 function getLocalizedTargetLabel(meta?: ActiveBundleMeta["language_meta"]): string {
-  return getTargetLabel(meta, t("language.target"));
+  return getTargetLabel(meta, t("language.target"), getCurrentLocale());
 }
 
 function getCatalogEntryRuntimeState(entry: BundleCatalogEntryV1): {
@@ -793,7 +801,9 @@ function renderCatalogList() {
     const titleBlock = document.createElement("div");
     const title = document.createElement("div");
     title.className = "catalog-item-title";
-    title.textContent = entry.name;
+    title.textContent = entry.language_meta
+      ? getLocalizedBundleDisplayName(entry.bundle_id, entry.language_meta)
+      : entry.name;
     const bundleId = document.createElement("div");
     bundleId.className = "catalog-item-subtitle";
     bundleId.textContent = entry.bundle_id;
@@ -1138,6 +1148,7 @@ async function quickImportBundle(fileList: FileList) {
           buildLanguageMetaFromManifest(mfst),
           t("language.source"),
           t("language.target"),
+          getCurrentLocale(),
         ),
         storageBytes: getManifestPayloadBytes(mfst),
       },
@@ -1437,6 +1448,7 @@ async function validateManifestAndFiles() {
     buildLanguageMetaFromManifest(mfst),
     t("language.source"),
     t("language.target"),
+    getCurrentLocale(),
   )}\n`;
   manifestOut.textContent += `normalization: ${mfst.rule_versions.normalization}\n`;
   manifestOut.textContent += `schema: ${mfst.record_schema_id}@${mfst.record_schema_version}\n`;
@@ -1506,6 +1518,7 @@ importBundleBtn.addEventListener("click", () => {
             buildLanguageMetaFromManifest(mfst),
             t("language.source"),
             t("language.target"),
+            getCurrentLocale(),
           ),
           storageBytes: getManifestPayloadBytes(mfst),
         },
@@ -1739,6 +1752,7 @@ function updateLangToggle() {
     currentActiveBundle?.language_meta,
     t("language.source"),
     t("language.target"),
+    getCurrentLocale(),
   );
   langToggle.textContent = directionText;
   searchLabel.textContent = t("search.queryLabel", { direction: directionText });
@@ -1748,6 +1762,7 @@ function updateLangToggle() {
     t("language.source"),
     t("language.target"),
     (label) => t("search.placeholder", { language: label }),
+    getCurrentLocale(),
   );
 }
 
@@ -1888,6 +1903,7 @@ function showEntryDetail(record: EnrichedRecord) {
       currentActiveBundle?.language_meta,
       t("language.target"),
       (label) => t("entry.targetEntries", { label }),
+      getCurrentLocale(),
     ),
   });
   searchResults.appendChild(detail);
