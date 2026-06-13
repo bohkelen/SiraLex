@@ -9,6 +9,25 @@ function normalizeCode(code: string | undefined): string | undefined {
   return trimmed === "" ? undefined : trimmed.toUpperCase();
 }
 
+function titleCaseLanguageName(value: string, locale: string): string {
+  if (value === "") return value;
+  return `${value.slice(0, 1).toLocaleUpperCase(locale)}${value.slice(1)}`;
+}
+
+function getLocaleLanguageName(code: string | undefined, locale: string | undefined): string | undefined {
+  if (!code || !locale || typeof Intl.DisplayNames !== "function") return undefined;
+  const normalizedCode = code.trim().toLowerCase();
+  if (normalizedCode === "") return undefined;
+
+  try {
+    const name = new Intl.DisplayNames([locale], { type: "language" }).of(normalizedCode);
+    if (!name || name.trim().toLowerCase() === normalizedCode) return undefined;
+    return titleCaseLanguageName(name.trim(), locale);
+  } catch {
+    return undefined;
+  }
+}
+
 export function buildLanguageMetaFromManifest(manifest: BundleManifestV1): BundleLanguageMeta | undefined {
   const meta: BundleLanguageMeta = {
     source_lang: manifest.languages?.source_lang,
@@ -21,12 +40,30 @@ export function buildLanguageMetaFromManifest(manifest: BundleManifestV1): Bundl
   return Object.values(meta).some((value) => value !== undefined) ? meta : undefined;
 }
 
-export function getSourceLabel(meta?: BundleLanguageMeta, fallbackLabel = "Source"): string {
-  return meta?.source_label ?? normalizeCode(meta?.source_lang) ?? fallbackLabel;
+export function getSourceLabel(
+  meta?: BundleLanguageMeta,
+  fallbackLabel = "Source",
+  displayLocale?: string,
+): string {
+  return (
+    getLocaleLanguageName(meta?.source_lang, displayLocale) ??
+    meta?.source_label ??
+    normalizeCode(meta?.source_lang) ??
+    fallbackLabel
+  );
 }
 
-export function getTargetLabel(meta?: BundleLanguageMeta, fallbackLabel = "Target"): string {
-  return meta?.target_label ?? normalizeCode(meta?.target_lang) ?? fallbackLabel;
+export function getTargetLabel(
+  meta?: BundleLanguageMeta,
+  fallbackLabel = "Target",
+  displayLocale?: string,
+): string {
+  return (
+    getLocaleLanguageName(meta?.target_lang, displayLocale) ??
+    meta?.target_label ??
+    normalizeCode(meta?.target_lang) ??
+    fallbackLabel
+  );
 }
 
 export function getBundleDisplayName(
@@ -34,9 +71,10 @@ export function getBundleDisplayName(
   meta?: BundleLanguageMeta,
   sourceFallbackLabel = "Source",
   targetFallbackLabel = "Target",
+  displayLocale?: string,
 ): string {
-  const source = getSourceLabel(meta, sourceFallbackLabel);
-  const target = getTargetLabel(meta, targetFallbackLabel);
+  const source = getSourceLabel(meta, sourceFallbackLabel, displayLocale);
+  const target = getTargetLabel(meta, targetFallbackLabel, displayLocale);
   if (source === sourceFallbackLabel && target === targetFallbackLabel) {
     return bundleId;
   }
@@ -48,9 +86,10 @@ export function getSearchDirectionText(
   meta?: BundleLanguageMeta,
   sourceFallbackLabel = "Source",
   targetFallbackLabel = "Target",
+  displayLocale?: string,
 ): string {
-  const source = getSourceLabel(meta, sourceFallbackLabel);
-  const target = getTargetLabel(meta, targetFallbackLabel);
+  const source = getSourceLabel(meta, sourceFallbackLabel, displayLocale);
+  const target = getTargetLabel(meta, targetFallbackLabel, displayLocale);
   return direction === "source_to_target" ? `${source} → ${target}` : `${target} → ${source}`;
 }
 
@@ -60,9 +99,10 @@ export function getSearchPlaceholder(
   sourceFallbackLabel = "Source",
   targetFallbackLabel = "Target",
   formatLabelWord: (label: string) => string = (label) => `Type a ${label} word…`,
+  displayLocale?: string,
 ): string {
-  const source = getSourceLabel(meta, sourceFallbackLabel);
-  const target = getTargetLabel(meta, targetFallbackLabel);
+  const source = getSourceLabel(meta, sourceFallbackLabel, displayLocale);
+  const target = getTargetLabel(meta, targetFallbackLabel, displayLocale);
   return direction === "source_to_target" ? formatLabelWord(source) : formatLabelWord(target);
 }
 
@@ -70,6 +110,7 @@ export function getTargetEntriesLabel(
   meta?: BundleLanguageMeta,
   targetFallbackLabel = "Target",
   formatEntriesLabel: (label: string) => string = (label) => `${label} entries:`,
+  displayLocale?: string,
 ): string {
-  return formatEntriesLabel(getTargetLabel(meta, targetFallbackLabel));
+  return formatEntriesLabel(getTargetLabel(meta, targetFallbackLabel, displayLocale));
 }
