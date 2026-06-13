@@ -70,7 +70,11 @@ import {
 import type { QueryLogEventV1 } from "./query_logging/query_log_types";
 import { searchQuery } from "./search/search_query";
 import { resolveRecords } from "./search/resolve_records";
-import { renderResultsList } from "./render/render_results";
+import {
+  getNoResultMessage,
+  renderResultsList,
+  type ResultDisplayContext,
+} from "./render/render_results";
 import { renderEntryDetail } from "./render/render_entry";
 import type { EnrichedRecord } from "./types/records";
 
@@ -1801,7 +1805,7 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 let queryLoggingSettleTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingSettledLogPayload: SettledQueryLogPayload | undefined;
 let searchSeq = 0;
-let lastSearchRecords: EnrichedRecord[] = [];
+let lastSearchResults: ResultDisplayContext[] = [];
 
 function cancelPendingSettledQueryLog() {
   if (queryLoggingSettleTimer !== undefined) {
@@ -1851,7 +1855,7 @@ searchInput.addEventListener("input", () => {
     searchSeq += 1;
     searchMeta.textContent = "";
     searchResults.innerHTML = "";
-    lastSearchRecords = [];
+    lastSearchResults = [];
     return;
   }
   searchDebounceTimer = setTimeout(() => {
@@ -1861,9 +1865,9 @@ searchInput.addEventListener("input", () => {
 
 function showResultsList() {
   searchResults.innerHTML = "";
-  if (lastSearchRecords.length === 0) return;
+  if (lastSearchResults.length === 0) return;
 
-  const list = renderResultsList(lastSearchRecords, (record) => {
+  const list = renderResultsList(lastSearchResults, (record) => {
     showEntryDetail(record);
   });
   if (list) searchResults.appendChild(list);
@@ -1907,7 +1911,7 @@ async function runSearch(query: string) {
     if (!activeBundleMeta) {
       searchMeta.textContent = t("search.disabledNoActiveBundle");
       searchResults.innerHTML = "";
-      lastSearchRecords = [];
+      lastSearchResults = [];
       return;
     }
     const activeStorageScopeId = getBundleStorageScopeId(activeBundleMeta);
@@ -1922,11 +1926,9 @@ async function runSearch(query: string) {
     if (seq !== searchSeq) return;
 
     if (result.ir_ids.length === 0) {
-      searchMeta.textContent = t("search.noMatch", {
-        query,
-      });
+      searchMeta.textContent = getNoResultMessage(query);
       searchResults.innerHTML = "";
-      lastSearchRecords = [];
+      lastSearchResults = [];
       scheduleSettledQueryLog({
         seq,
         query,
@@ -1946,7 +1948,15 @@ async function runSearch(query: string) {
       count: records.length,
     });
 
-    lastSearchRecords = records;
+    lastSearchResults = records.map((record) => ({
+      rawQuery: query,
+      searchDirection,
+      matched_key_type: result.matched_key_type,
+      matched_key: result.matched_key,
+      sourceLabel: getLocalizedSourceLabel(activeBundleMeta.language_meta),
+      targetLabel: getLocalizedTargetLabel(activeBundleMeta.language_meta),
+      record,
+    }));
     showResultsList();
     scheduleSettledQueryLog({
       seq,
@@ -1960,7 +1970,7 @@ async function runSearch(query: string) {
     if (seq !== searchSeq) return;
     searchMeta.textContent = t("search.error", { error: String(e) });
     searchResults.innerHTML = "";
-    lastSearchRecords = [];
+    lastSearchResults = [];
   } finally {
     db?.close();
   }

@@ -930,10 +930,39 @@ Completion notes:
 Deferred follow-ups:
 
 - optional manifest-level supplement provenance
-- plural/form recall alias track
 - result interpretability
 - phrase/compositional lookup
 - `mere`/kinship ranking review
+
+### Phase 7F — Reviewed plural/form source aliases ✅ *(complete)*
+
+Completion notes:
+
+- Phase 7F added seven reviewed French plural/form source aliases using `source_alias_table_v1`
+- aliases shipped:
+  - `mains → main`
+  - `jours → jour`
+  - `pieds → pied`
+  - `hommes → homme`
+  - `femmes → femme`
+  - `oreilles → oreille`
+  - `frères → frère`
+- alias data commit: `4aabe4c Add reviewed plural form source aliases for Phase 7F`
+- featured bundle publication commit: `b4c3d43 Publish Phase 7F plural form alias featured bundle`
+- new production bundle: `bundle_full_20260609_phase7f_alias_candidate`
+- production catalog version: `norm-v3-featured-enriched-source-aliases-2-source-index-supplements-2`
+- production smoke passed on: `loquacious-piroshki-be432c.netlify.app`
+- search-index delta: `28` `src_*` keys added; `0` changed keys; `0` removed keys; `0` target-side changes
+- `records.jsonl` remained unchanged
+- no runtime search, ranking, morphology, supplement schema, or target-side search changes were required
+
+Deferred follow-ups:
+
+- consolidate or retire the legacy Netlify site: `helpful-rugelach-e310ff.netlify.app`
+- Phase 7F Round 2 alias candidates require a separate evidence-review cycle
+- result interpretability remains deferred
+- phrase/compositional lookup remains deferred
+- `mere`/kinship ranking review remains deferred
 
 ---
 

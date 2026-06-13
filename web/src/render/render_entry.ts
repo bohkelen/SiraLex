@@ -126,14 +126,11 @@ function renderLexiconEntry(record: EnrichedRecord, d: LexiconDisplayFields): HT
     wrap.appendChild(sensesWrap);
   }
 
-  const meta = el("div", "entry-meta");
-  meta.appendChild(el("span", "meta-item", t("entry.meta.irId", { value: record.ir_id })));
-  meta.appendChild(el("span", "meta-item", t("entry.meta.source", { value: record.source_id })));
-  meta.appendChild(el("span", "meta-item", t("entry.meta.norm", { value: record.norm_version })));
   if (d.corpus_count != null) {
+    const meta = el("div", "entry-meta");
     meta.appendChild(el("span", "meta-item", t("entry.meta.corpus", { value: d.corpus_count })));
+    wrap.appendChild(meta);
   }
-  wrap.appendChild(meta);
 
   return wrap;
 }
@@ -148,7 +145,6 @@ function renderIndexMapping(
 
   const header = el("div", "entry-header");
   header.appendChild(el("h3", "entry-headword", d.source_term));
-  header.appendChild(el("span", "entry-pos", d.source_lang));
   wrap.appendChild(header);
 
   if (d.target_entries && d.target_entries.length > 0) {
@@ -160,24 +156,16 @@ function renderIndexMapping(
         btn.className = "target-item target-link";
         btn.type = "button";
         btn.appendChild(el("span", "target-text", t.display_text));
-        btn.appendChild(el("span", "target-ref", ` (${t.anchor})`));
         btn.addEventListener("click", () => onSearch(t.display_text));
         targets.appendChild(btn);
       } else {
         const item = el("div", "target-item");
         item.appendChild(el("span", "target-text", t.display_text));
-        item.appendChild(el("span", "target-ref", ` (${t.anchor})`));
         targets.appendChild(item);
       }
     }
     wrap.appendChild(targets);
   }
-
-  const meta = el("div", "entry-meta");
-  meta.appendChild(el("span", "meta-item", t("entry.meta.irId", { value: record.ir_id })));
-  meta.appendChild(el("span", "meta-item", t("entry.meta.source", { value: record.source_id })));
-  meta.appendChild(el("span", "meta-item", t("entry.meta.norm", { value: record.norm_version })));
-  wrap.appendChild(meta);
 
   return wrap;
 }
@@ -218,7 +206,7 @@ export function renderEntryDetail(
       ),
     );
   } else {
-    container.appendChild(el("div", "entry-error", t("entry.noDisplay", { id: record.ir_id })));
+    container.appendChild(el("div", "entry-error", t("entry.noDisplay")));
   }
 
   return container;
