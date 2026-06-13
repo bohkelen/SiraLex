@@ -244,12 +244,6 @@ a {
 }
 
 .result-item {
-  appearance: none;
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  width: 100%;
-  text-align: left;
   padding: 8px 10px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -257,7 +251,6 @@ a {
   color: var(--text);
   font-family: inherit;
   font-size: 14px;
-  cursor: pointer;
 }
 
 .result-item:hover {
@@ -265,32 +258,68 @@ a {
   border-color: color-mix(in oklab, var(--panel) 60%, white 20%);
 }
 
-.result-headword {
-  font-weight: 600;
-  flex-shrink: 0;
+.result-open {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
-.result-pos {
-  color: var(--accent);
+.result-open:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 55%, white 10%);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.result-line {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.result-label {
+  color: var(--muted);
   font-size: 12px;
   flex-shrink: 0;
 }
 
-.result-kind {
-  font-size: 10px;
-  color: var(--muted);
-  border: 1px solid color-mix(in oklab, var(--muted) 40%, transparent 60%);
-  border-radius: 4px;
-  padding: 1px 5px;
-  flex-shrink: 0;
+.result-value {
+  overflow-wrap: anywhere;
 }
 
-.result-translation {
+.result-found-entry .result-value {
+  font-weight: 600;
+}
+
+.result-query-hint,
+.result-why {
   color: var(--muted);
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 12px;
+}
+
+.result-why {
+  margin-top: 6px;
+}
+
+.result-why summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.result-why-body {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+  padding-left: 16px;
 }
 
 /* --- Entry detail (Phase 2.0.4) --- */

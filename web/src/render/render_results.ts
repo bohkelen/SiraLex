@@ -1,10 +1,11 @@
 /**
  * Phase 2.0.4 — Results list rendering.
  *
- * Builds a clickable list of search results from enriched records.
- * Each item shows a summary line: headword, POS, first translation.
+ * Builds a list of search results from enriched records plus search context.
+ * Cards stay consumer-facing: no internal IDs, search keys, or provenance labels.
  */
 
+import type { SearchDirection } from "../bundle_labels";
 import type {
   EnrichedRecord,
   LexiconDisplayFields,
@@ -13,47 +14,143 @@ import type {
 import { isLexiconDisplay, isIndexMappingDisplay } from "../types/records";
 import { t } from "../i18n";
 
-type Summary = { headword: string; pos: string; translation: string; kind: string };
+type SearchMatchKeyType =
+  | "casefold"
+  | "diacritics_insensitive"
+  | "punct_stripped"
+  | "nospace";
+
+export type ResultDisplayContext = {
+  rawQuery: string;
+  searchDirection: SearchDirection;
+  matched_key_type: SearchMatchKeyType | null;
+  matched_key: string | null;
+  sourceLabel: string;
+  targetLabel: string;
+  record: EnrichedRecord;
+};
+
+type Summary = {
+  foundEntry: string;
+  meaning: string;
+  sourceTerm?: string;
+  isIndexMapping: boolean;
+};
+
+const MAX_VISIBLE_TARGETS = 4;
+
+function el(tag: string, cls?: string, text?: string): HTMLElement {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text) e.textContent = text;
+  return e;
+}
 
 function summarizeLexicon(d: LexiconDisplayFields): Summary {
-  const pos = d.pos_hint ?? d.ps_raw ?? "";
   const firstSense = d.senses?.[0];
   const firstGloss =
     firstSense?.gloss_fr ?? firstSense?.gloss_en ?? firstSense?.gloss_ru ?? "";
   return {
-    headword: d.headword_latin,
-    pos,
-    translation: firstGloss || t("render.noTranslation"),
-    kind: t("render.kindLexicon"),
+    foundEntry: d.headword_latin,
+    meaning: firstGloss || t("render.noTranslation"),
+    sourceTerm: d.headword_latin,
+    isIndexMapping: false,
   };
 }
 
 function summarizeIndexMapping(d: IndexMappingDisplayFields): Summary {
-  const targetText = d.target_entries?.map((t) => t.display_text).join(", ") ?? "";
+  const targets = d.target_entries?.map((target) => target.display_text) ?? [];
+  const visibleTargets = targets.slice(0, MAX_VISIBLE_TARGETS);
+  const remainingCount = targets.length - visibleTargets.length;
+  let targetText = visibleTargets.join(", ");
+  if (remainingCount > 0) {
+    targetText += `, ${t("render.moreTargets", { count: remainingCount })}`;
+  }
   return {
-    headword: d.source_term,
-    pos: d.source_lang,
-    translation: targetText || t("render.noTranslation"),
-    kind: t("render.kindIndex"),
+    foundEntry: d.source_term,
+    meaning: targetText || t("render.noTranslation"),
+    sourceTerm: d.source_term,
+    isIndexMapping: true,
   };
 }
 
 export type OnSelectRecord = (record: EnrichedRecord) => void;
+
+function normalizeForDisplayCompare(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+function getDirectionLabel(context: ResultDisplayContext): string {
+  return context.searchDirection === "source_to_target"
+    ? `${context.sourceLabel} → ${context.targetLabel}`
+    : `${context.targetLabel} → ${context.sourceLabel}`;
+}
+
+function shouldShowQueryHint(context: ResultDisplayContext, summary: Summary): boolean {
+  const query = normalizeForDisplayCompare(context.rawQuery);
+  const sourceTerm = normalizeForDisplayCompare(summary.sourceTerm ?? summary.foundEntry);
+  return query !== "" && sourceTerm !== "" && query !== sourceTerm;
+}
+
+function getMeaningLabel(context: ResultDisplayContext, summary: Summary): string {
+  if (context.searchDirection === "target_to_source") {
+    return t("render.meaningPossible");
+  }
+  return summary.isIndexMapping ? t("render.possibleTranslations") : t("render.meaningPossible");
+}
+
+function renderLabeledLine(label: string, value: string, cls: string): HTMLElement {
+  const line = el("div", `result-line ${cls}`);
+  line.appendChild(el("span", "result-label", label));
+  line.appendChild(el("span", "result-value", value));
+  return line;
+}
+
+function renderWhyDisclosure(context: ResultDisplayContext, summary: Summary): HTMLElement {
+  const details = document.createElement("details");
+  details.className = "result-why";
+
+  const disclosureSummary = document.createElement("summary");
+  disclosureSummary.textContent = t("render.whyThisResult");
+  details.appendChild(disclosureSummary);
+
+  const body = el("div", "result-why-body");
+  body.appendChild(el("div", undefined, t("render.foundForQuery", { query: context.rawQuery })));
+  if (summary.sourceTerm) {
+    body.appendChild(el("div", undefined, t("render.sourceEntry", { sourceTerm: summary.sourceTerm })));
+    if (shouldShowQueryHint(context, summary)) {
+      body.appendChild(el("div", undefined, t("render.sameEntryAs", { sourceTerm: summary.sourceTerm })));
+    }
+  } else {
+    body.appendChild(el("div", undefined, t("render.relatedEntry", { sourceTerm: summary.foundEntry })));
+  }
+  details.appendChild(body);
+
+  return details;
+}
+
+export function getNoResultMessage(query: string): string {
+  if (/\s/.test(query.trim())) {
+    return t("search.noPhraseMatch");
+  }
+  return t("search.noMatchGuidance", { query });
+}
 
 /**
  * Build a DOM element containing the results list.
  * Returns null if no renderable records.
  */
 export function renderResultsList(
-  records: EnrichedRecord[],
+  results: ResultDisplayContext[],
   onSelect: OnSelectRecord,
 ): HTMLElement | null {
-  if (records.length === 0) return null;
+  if (results.length === 0) return null;
 
   const list = document.createElement("div");
   list.className = "results-list";
 
-  for (const record of records) {
+  for (const context of results) {
+    const { record } = context;
     let summary: Summary;
 
     if (isLexiconDisplay(record)) {
@@ -64,28 +161,31 @@ export function renderResultsList(
       continue;
     }
 
-    const item = document.createElement("button");
+    const item = document.createElement("div");
     item.className = "result-item";
-    item.type = "button";
 
-    const hw = document.createElement("span");
-    hw.className = "result-headword";
-    hw.textContent = summary.headword;
+    const openButton = document.createElement("button");
+    openButton.className = "result-open";
+    openButton.type = "button";
+    openButton.addEventListener("click", () => onSelect(record));
 
-    const pos = document.createElement("span");
-    pos.className = "result-pos";
-    pos.textContent = summary.pos;
+    openButton.appendChild(
+      renderLabeledLine(t("render.direction"), getDirectionLabel(context), "result-direction"),
+    );
+    openButton.appendChild(
+      renderLabeledLine(t("render.foundEntry"), summary.foundEntry, "result-found-entry"),
+    );
+    openButton.appendChild(
+      renderLabeledLine(getMeaningLabel(context, summary), summary.meaning, "result-translation"),
+    );
 
-    const tr = document.createElement("span");
-    tr.className = "result-translation";
-    tr.textContent = summary.translation;
+    if (shouldShowQueryHint(context, summary)) {
+      openButton.appendChild(
+        el("div", "result-query-hint", t("render.foundForQuery", { query: context.rawQuery })),
+      );
+    }
 
-    const badge = document.createElement("span");
-    badge.className = "result-kind";
-    badge.textContent = summary.kind;
-
-    item.append(hw, pos, badge, tr);
-    item.addEventListener("click", () => onSelect(record));
+    item.append(openButton, renderWhyDisclosure(context, summary));
     list.appendChild(item);
   }
 
