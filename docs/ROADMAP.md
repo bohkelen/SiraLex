@@ -964,6 +964,47 @@ Deferred follow-ups:
 - phrase/compositional lookup remains deferred
 - `mere`/kinship ranking review remains deferred
 
+### Phase 7G — Result interpretability UI ✅ *(complete)*
+
+Completion notes:
+
+- Phase 7G added compact French-first result-card labels.
+- result cards now show:
+  - direction label
+  - entry found label
+  - translation/sense label
+  - neutral query hint when searched text differs from displayed entry
+  - `Pourquoi ce résultat ?` disclosure
+- the disclosure uses neutral wording only and does not expose alias/supplement claims
+- ordinary detail pages no longer expose internal metadata:
+  - `ir_id`
+  - `source`
+  - `norm`
+  - raw `fr` metadata
+  - target anchor IDs
+- empty states improved:
+  - ordinary no-result guidance
+  - phrase-miss guidance for multi-word misses
+- French UI language labels were fixed:
+  - `Français ↔ Maninka`
+  - `Français → Maninka`
+- English UI still shows:
+  - `French ↔ Maninka`
+  - `French → Maninka`
+- no bundle schema, bundle data, catalog, aliases, supplements, ranking, search algorithm, normalization, or bundle-generation changes were made
+- production smoke passed on: `loquacious-piroshki-be432c.netlify.app`
+- implementation commits:
+  - `599bf70 Add Phase 7G result interpretability UI`
+  - `8f498f9 Localize bundle language labels in UI`
+
+Deferred follow-ups:
+
+- exact alias/supplement provenance remains deferred until display-safe provenance exists
+- result-card copy can be user-tested later with real Guinea-facing users
+- phrase/compositional lookup remains deferred
+- `mere`/kinship ranking review remains deferred
+- Phase 7F Round 2 aliases remain a separate evidence-review cycle
+
 ---
 
 ## Phase 1.5 — Corrections (spec + dry-run)
