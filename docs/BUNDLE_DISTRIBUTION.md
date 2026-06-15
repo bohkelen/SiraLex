@@ -82,6 +82,8 @@ Derived asset paths:
 - `records.jsonl`
 - `search_index.jsonl`
 
+Published **`records.jsonl`** in catalog-delivered bundles is expected to include a **`display`** object per row (from the enrichment step), so offline rendering can show IR-derived fields without re-fetching prose. Pipeline details and CLI examples: **`docs/BUILD_BUNDLE.md`**.
+
 Example:
 
 ```text

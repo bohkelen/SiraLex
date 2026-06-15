@@ -2,18 +2,21 @@
 
 This document describes the Phase 4.5 developer pipeline for producing a distributable SiraLex bundle.
 
-The pipeline is:
+The **production pipeline for consumer / UI-facing bundles** is unambiguous:
 
 ```text
-normalized -> index -> bundle -> catalog
+normalized -> enrich -> index -> bundle -> catalog
 ```
 
 That means:
 
-1. start from normalized JSONL records
-2. build a search index
-3. build a bundle directory
-4. publish that bundle behind a `catalog.json`
+1. start from normalized JSONL records (no `display` field)
+2. **enrich** so every row gains a dict-valued `display` projection from IR `fields_raw` (required for renderable installs)
+3. build the search index from that **enriched** JSONL
+4. assemble the bundle directory (`records.jsonl` carries enriched rows — including `display`)
+5. publish the verified bundle plus root `catalog.json`
+
+Intermediate **normalized-only** builds (skipped enrichment) produce bundles whose `records.jsonl` lacks `display` and **will not render** entry content in the app. Treat those as indexer-only experiments, not shippable consumer bundles.
 
 ## Prerequisite
 
@@ -37,13 +40,45 @@ data/normalized/malipense_normalized_norm_vN.jsonl
 
 Use **`norm_v1`** when reproducing the **frozen v1.0 dataset**. Use the **current successor** artifact — for example **`norm_v3`** — when building the latest search/index bundle from the active normalizer output.
 
-## Step 2: Build the Search Index
+## Step 2: Enrich (required for UI / catalog bundles)
 
-Use `siralex-build-index` to generate `search_index.jsonl` from the normalized records.
+Enrichment joins normalized search metadata with IR `fields_raw` as a read-only **`display`** object per record.
+
+Run `siralex-enrich` after normalization and **before** indexing or bundling:
+
+```bash
+mkdir -p data/enriched
+
+siralex-enrich \
+  --normalized data/normalized/malipense_normalized_norm_vN.jsonl \
+  --ir data/ir/malipense_lexicon_v3.jsonl \
+  --ir data/ir/malipense_index_v1.jsonl \
+  --output data/enriched/malipense_enriched_norm_vN.jsonl \
+  -v
+```
+
+Expect **`Missing display (no IR): 0`** in the printed summary when the IR snapshot is complete.
+
+### Display-only drift gate
+
+Before building the search index from enriched output, confirm enrichment did not change any non-display field (`ir_id` set/count, `ir_kind`, `norm_version`, `preferred_form`, `variant_forms`, `search_keys`, and any other normalized keys):
+
+```bash
+siralex-validate-enrichment-display-only \
+  --baseline data/normalized/malipense_normalized_norm_vN.jsonl \
+  --enriched data/enriched/malipense_enriched_norm_vN.jsonl \
+  -v
+```
+
+If this command fails, **stop** — do not index or bundle until the enrichment output is corrected.
+
+## Step 3: Build the Search Index
+
+Use `siralex-build-index` from the **enriched** JSONL (same key material as normalized; indexer ignores `display`):
 
 ```bash
 siralex-build-index \
-  --input data/normalized/malipense_normalized_norm_vN.jsonl \
+  --input data/enriched/malipense_enriched_norm_vN.jsonl \
   --output build/search_index.jsonl
 ```
 
@@ -51,13 +86,13 @@ Output:
 
 - `build/search_index.jsonl`
 
-## Step 3: Build the Bundle Directory
+## Step 4: Build the Bundle Directory
 
-Use `siralex-build-bundle` to assemble the normalized records and search index into a distributable directory bundle.
+Use `siralex-build-bundle` with the **same enriched JSONL** you indexed:
 
 ```bash
 siralex-build-bundle build \
-  --normalized data/normalized/malipense_normalized_norm_vN.jsonl \
+  --normalized data/enriched/malipense_enriched_norm_vN.jsonl \
   --search-index build/search_index.jsonl \
   --output-dir build/bundles \
   --bundle-type full \
@@ -102,7 +137,7 @@ build/bundles/
     search_index.jsonl
 ```
 
-## Step 4: Verify the Bundle
+## Step 5: Verify the Bundle
 
 Verify the generated bundle before publishing it:
 
@@ -112,7 +147,7 @@ siralex-build-bundle verify build/bundles/<bundle-id>
 
 This checks manifest integrity and the bundle payload hashes.
 
-## Step 5: Publish a Catalog Entry
+## Step 6: Publish a Catalog Entry
 
 The bundle builder creates the bundle directory, but `catalog.json` is the publisher-facing index that tells the app where to find it.
 
@@ -143,14 +178,26 @@ Rules:
 ## End-to-End Example
 
 ```bash
-mkdir -p build/bundles
+mkdir -p build/bundles data/enriched
+
+siralex-enrich \
+  --normalized data/normalized/malipense_normalized_norm_vN.jsonl \
+  --ir data/ir/malipense_lexicon_v3.jsonl \
+  --ir data/ir/malipense_index_v1.jsonl \
+  --output data/enriched/malipense_enriched_norm_vN.jsonl \
+  -v
+
+siralex-validate-enrichment-display-only \
+  --baseline data/normalized/malipense_normalized_norm_vN.jsonl \
+  --enriched data/enriched/malipense_enriched_norm_vN.jsonl \
+  -v
 
 siralex-build-index \
-  --input data/normalized/malipense_normalized_norm_vN.jsonl \
+  --input data/enriched/malipense_enriched_norm_vN.jsonl \
   --output build/search_index.jsonl
 
 siralex-build-bundle build \
-  --normalized data/normalized/malipense_normalized_norm_vN.jsonl \
+  --normalized data/enriched/malipense_enriched_norm_vN.jsonl \
   --search-index build/search_index.jsonl \
   --output-dir build/bundles \
   --bundle-type full \
