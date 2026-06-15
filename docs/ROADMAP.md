@@ -1048,6 +1048,49 @@ Deferred follow-ups:
 - `ferme la bouche → bouche` remains unsafe unless phrase-level evidence is reviewed
 - future approved phrase aliases should use a phrase-specific artifact or explicit schema revision, not silent reuse of `source_alias_table_v1`
 
+### Phase 7I — Source phrase alias spec and review packet ✅ *(complete)*
+
+Completion notes:
+
+- Phase 7I completed planning/specification only.
+- Phase 7I defines the future phrase-alias mechanism but leaves implementation blocked until a named human reviewer approves at least one candidate with rationale.
+- Phase 7I added:
+  - `shared/specs/source-phrase-alias-v1.md`
+  - `docs/PHASE_7I_PHRASE_ALIAS_REVIEW_PACKET.md`
+- Option B was selected: a dedicated phrase-specific artifact.
+- Future artifact path is `shared/phrase_review/source_phrase_aliases_v1.jsonl`.
+- The future artifact was **not created**.
+- Phase 7H evidence dataset (`phrase_miss_review_v1.jsonl`) remains inert and is not a generation input.
+- `source_alias_table_v1` was not silently extended.
+- Runtime search remains unchanged.
+- No phrase aliases were approved.
+- Both candidate rows were marked `deferred`:
+  - `à l'insu de qqns → à l'insu de qqn`
+  - `à la mesure des → à la mesure de`
+- Seven unsafe mappings remain explicitly rejected:
+  - `ferme la bouche → bouche`
+  - `Grand chose → grand + chose`
+  - `grande bouche → grand + bouche`
+  - `à l'intérieurs → à l'intérieur`
+  - `à la vue perçantes → à la vue perçante`
+  - `à parts → part`
+  - `à part ças → à part ça`
+- implementation commits:
+  - `d4154ef Add Phase 7I source phrase alias spec`
+  - `31f768d Record Phase 7I phrase alias review decisions`
+
+Deferred follow-ups:
+
+- human review of both candidate rows
+- creation of `source_phrase_aliases_v1.jsonl` only after approval
+- validator/applier/report implementation only after approval
+- pipeline wiring only after approved rows exist
+- no runtime decomposition
+- no fuzzy correction
+- no typo-like aliases
+- no phrase-to-single-word aliases
+- no compositional phrase aliases
+
 ---
 
 ## Phase 1.5 — Corrections (spec + dry-run)
