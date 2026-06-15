@@ -1005,6 +1005,49 @@ Deferred follow-ups:
 - `mere`/kinship ranking review remains deferred
 - Phase 7F Round 2 aliases remain a separate evidence-review cycle
 
+### Phase 7H — Phrase miss review evidence ✅ *(complete)*
+
+Completion notes:
+
+- Phase 7H completed the review-control layer for phrase/compositional lookup without changing runtime behavior.
+- Phrase lookup remains intentionally unimplemented. Phase 7H created the evidence and validation layer required before any future reviewed phrase-alias mechanism.
+- Phase 7H added:
+  - `shared/phrase_review/phrase_miss_review_v1.jsonl`
+  - `api/phrase_review/validate_phrase_review.py`
+  - `api/phrase_review/tests/test_validate_phrase_review.py`
+- 9 phrase-miss evidence rows were added.
+- No row is marked `approved`.
+- The dataset is inert and not wired into search, alias generation, supplement tooling, bundle generation, catalog, UI, or runtime.
+- The validator is read-only, stdlib-only, strict by default, and direct-script runnable.
+- Validator checks:
+  - JSONL integrity
+  - required fields
+  - enum constraints
+  - duplicate `review_id`
+  - duplicate `query`
+  - review-state safety
+  - related-term object shape
+  - fixed bundle/catalog provenance
+- Validation passed:
+  - `validated 9 phrase review rows`
+  - `approved rows: 0`
+  - `candidate rows: 4`
+  - `deferred rows: 1`
+  - `rejected rows: 4`
+  - `16 passed`
+- implementation commits:
+  - `6094fd6 Add Phase 7H phrase miss review dataset`
+  - `7e11761 Add Phase 7H phrase review validator`
+
+Deferred follow-ups:
+
+- reviewed phrase-alias mechanism remains deferred
+- phrase/compositional lookup remains deferred
+- no runtime decomposition is approved
+- no fuzzy search is approved
+- `ferme la bouche → bouche` remains unsafe unless phrase-level evidence is reviewed
+- future approved phrase aliases should use a phrase-specific artifact or explicit schema revision, not silent reuse of `source_alias_table_v1`
+
 ---
 
 ## Phase 1.5 — Corrections (spec + dry-run)
