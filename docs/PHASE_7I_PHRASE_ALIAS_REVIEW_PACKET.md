@@ -52,12 +52,12 @@ reviewed canonical phrase.
 - If `qqns` were ever a distinct lexical item elsewhere, routing could broaden
   phrase lookup unexpectedly.
 
-| Review field | Placeholder |
+| Review field | Value |
 | --- | --- |
-| Review decision | _pending_ |
-| Reviewer | _pending_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `deferred` |
+| Reviewer | pending human reviewer |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Canonical phrase `à l'insu de qqn` resolves to a single deterministic posting (`ef0667f3fb422851`), and the surface difference is limited to placeholder inflection (`qqns` vs `qqn`). No human reviewer has yet confirmed that `qqns` is a safe plural placeholder variant of `qqn` in this phrase context. Defer until a reviewer verifies meaning equivalence and that placeholder pluralization does not broaden scope beyond the attested canonical entry. |
 
 ---
 
@@ -89,12 +89,12 @@ reviewed canonical phrase.
 - If the canonical entry is glossed or attested only for the singular-complement
   form, aliasing the plural-preposition variant could misroute queries.
 
-| Review field | Placeholder |
+| Review field | Value |
 | --- | --- |
-| Review decision | _pending_ |
-| Reviewer | _pending_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `deferred` |
+| Reviewer | pending human reviewer |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Canonical phrase `à la mesure de` resolves to a single deterministic posting (`ba5714fa586bd031`), but `de → des` may change grammatical scope (singular vs plural complement). No human reviewer has confirmed that the dictionary entry covers both forms with equivalent meaning. Defer with higher caution: reviewer must inspect the attested gloss, examples, and intended scope of `ba5714fa586bd031` before any alias approval. |
 
 ---
 
