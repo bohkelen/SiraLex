@@ -1091,6 +1091,77 @@ Deferred follow-ups:
 - no phrase-to-single-word aliases
 - no compositional phrase aliases
 
+### Phase 7J — Source-index quality audit and alias round 2 publication ✅ *(complete)*
+
+Completion notes:
+
+- Phase 7J completed the full evidence-to-publication path for Alias Round 2:
+  1. Source-index quality audit
+  2. Alias Round 2 review packet
+  3. Human review decision record
+  4. `source_aliases_v1.jsonl` update
+  5. Alias application validation/reports
+  6. New immutable bundle publication
+  7. Featured catalog update
+- 11 Phase 7J source aliases were approved, added, validated, applied, and published:
+  - `fruits → fruit`
+  - `grains → grain`
+  - `griots → griot`
+  - `jambes → jambe`
+  - `mots → mot`
+  - `nuages → nuage`
+  - `parents → parent`
+  - `paroles → parole`
+  - `enfants → enfant`
+  - `feuilles → feuille`
+  - `grand-parents → grand-mère + grand-père`
+- `grand-parents` preserves order:
+  - `grand-mère → 1f6d3a5919110b21`
+  - `grand-père → 957bd76b41fda053`
+- new featured bundle: `bundle_full_20260616_phase7j_alias_round2_candidate`
+- production catalog version: `norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2`
+- `content_sha256`: `sha256:e54b8fdf39558ecb639c0763ea9454f085aded7b48f867affe1f96a44709c2ef`
+- `size_bytes`: `24532394`
+- validation summary:
+  - `11/11` new alias hits
+  - `44` new `src_*` keys
+  - `0` new `tgt_*` keys
+  - `0` removed keys
+  - `0` changed existing keys
+  - `0` control regressions
+  - `records.jsonl` byte-identical to Phase 7F
+  - bundle verification VALID
+  - source_aliases tests: `20 passed`
+  - bundle_builder tests: `40 passed`
+- implementation commits:
+  - `e14f47e Add Phase 7J source-index quality audit`
+  - `03c36a8 Add Phase 7J alias round 2 review packet`
+  - `ca4facb Record Phase 7J alias round 2 review decisions`
+  - `295b88d Add Phase 7J source alias rows`
+  - `d1697b1 Add Phase 7J source alias application reports`
+  - `8151000 Publish Phase 7J alias round 2 bundle`
+
+Boundaries preserved:
+
+- no runtime code changes
+- no ranking changes
+- no normalization changes
+- no UI changes
+- no supplements added
+- no phrase aliases added
+- no fuzzy search
+- no decomposition
+- no typo correction
+- Phase 7F bundle `bundle_full_20260609_phase7f_alias_candidate` remains available as rollback baseline
+- no deployment performed
+
+Deferred follow-ups:
+
+- update phrase-review validator expected bundle ID only if phrase-review tooling should target the new featured bundle
+- optional local smoke: install featured dictionary from `/catalog.json` in dev server
+- push branch / open PR
+- deploy only after merge or explicit deployment approval
+
 ---
 
 ## Phase 1.5 — Corrections (spec + dry-run)
