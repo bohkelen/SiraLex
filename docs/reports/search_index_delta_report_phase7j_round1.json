@@ -1,0 +1,334 @@
+{
+  "baseline_bundle": "web/public/bundle_full_20260609_phase7f_alias_candidate",
+  "candidate_bundle": "/tmp/phase7j_alias_candidate",
+  "recommended_catalog_version": "norm-v3-featured-enriched-source-aliases-2-source-index-supplements-2",
+  "added_key_count": 44,
+  "changed_key_count": 0,
+  "changed_existing_key_count": 0,
+  "removed_key_count": 0,
+  "added_src_key_count": 44,
+  "added_tgt_key_count": 0,
+  "target_side_changed_key_count": 0,
+  "unexpected_change_count": 0,
+  "records_jsonl_changed": false,
+  "added_keys": [
+    {
+      "key_type": "src_casefold",
+      "key": "enfants",
+      "ir_ids": [
+        "99e6cda40390d1fb"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "feuilles",
+      "ir_ids": [
+        "f67a64559d2f6c63"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "fruits",
+      "ir_ids": [
+        "7cdb6070ce427a6d"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "grains",
+      "ir_ids": [
+        "3971b2e32e2dfc1c"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "grand-parents",
+      "ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "griots",
+      "ir_ids": [
+        "025ed3968e2bc6e3"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "jambes",
+      "ir_ids": [
+        "251b2a72627a7ef9"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "mots",
+      "ir_ids": [
+        "1f9cbaa868644b73"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "nuages",
+      "ir_ids": [
+        "9ca98df7409dde23"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "parents",
+      "ir_ids": [
+        "5437cc8267a78303"
+      ]
+    },
+    {
+      "key_type": "src_casefold",
+      "key": "paroles",
+      "ir_ids": [
+        "cf9e314229c86efc"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "enfants",
+      "ir_ids": [
+        "99e6cda40390d1fb"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "feuilles",
+      "ir_ids": [
+        "f67a64559d2f6c63"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "fruits",
+      "ir_ids": [
+        "7cdb6070ce427a6d"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "grains",
+      "ir_ids": [
+        "3971b2e32e2dfc1c"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "grand-parents",
+      "ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "griots",
+      "ir_ids": [
+        "025ed3968e2bc6e3"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "jambes",
+      "ir_ids": [
+        "251b2a72627a7ef9"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "mots",
+      "ir_ids": [
+        "1f9cbaa868644b73"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "nuages",
+      "ir_ids": [
+        "9ca98df7409dde23"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "parents",
+      "ir_ids": [
+        "5437cc8267a78303"
+      ]
+    },
+    {
+      "key_type": "src_diacritics_insensitive",
+      "key": "paroles",
+      "ir_ids": [
+        "cf9e314229c86efc"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "enfants",
+      "ir_ids": [
+        "99e6cda40390d1fb"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "feuilles",
+      "ir_ids": [
+        "f67a64559d2f6c63"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "fruits",
+      "ir_ids": [
+        "7cdb6070ce427a6d"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "grains",
+      "ir_ids": [
+        "3971b2e32e2dfc1c"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "grand-parents",
+      "ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "griots",
+      "ir_ids": [
+        "025ed3968e2bc6e3"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "jambes",
+      "ir_ids": [
+        "251b2a72627a7ef9"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "mots",
+      "ir_ids": [
+        "1f9cbaa868644b73"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "nuages",
+      "ir_ids": [
+        "9ca98df7409dde23"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "parents",
+      "ir_ids": [
+        "5437cc8267a78303"
+      ]
+    },
+    {
+      "key_type": "src_nospace",
+      "key": "paroles",
+      "ir_ids": [
+        "cf9e314229c86efc"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "enfants",
+      "ir_ids": [
+        "99e6cda40390d1fb"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "feuilles",
+      "ir_ids": [
+        "f67a64559d2f6c63"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "fruits",
+      "ir_ids": [
+        "7cdb6070ce427a6d"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "grains",
+      "ir_ids": [
+        "3971b2e32e2dfc1c"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "grandparents",
+      "ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "griots",
+      "ir_ids": [
+        "025ed3968e2bc6e3"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "jambes",
+      "ir_ids": [
+        "251b2a72627a7ef9"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "mots",
+      "ir_ids": [
+        "1f9cbaa868644b73"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "nuages",
+      "ir_ids": [
+        "9ca98df7409dde23"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "parents",
+      "ir_ids": [
+        "5437cc8267a78303"
+      ]
+    },
+    {
+      "key_type": "src_punct_stripped",
+      "key": "paroles",
+      "ir_ids": [
+        "cf9e314229c86efc"
+      ]
+    }
+  ],
+  "unexpected_changes": {
+    "unexpected_added": {},
+    "missing_expected_added": {},
+    "changed": {},
+    "removed": {}
+  }
+}

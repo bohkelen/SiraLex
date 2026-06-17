@@ -1,0 +1,416 @@
+{
+  "alias_tables": [
+    {
+      "schema_version": "source_alias_table_v1",
+      "alias_table_version": "phase7a-round1",
+      "approved_alias_count": 21,
+      "candidate_alias_count": 0,
+      "rejected_alias_count": 1,
+      "applied_alias_count": 11,
+      "skipped_alias_count": 10
+    }
+  ],
+  "aliases": [
+    {
+      "alias_id": "src_alias_phase7a_0001",
+      "status": "approved",
+      "alias_source_term": "Yeux",
+      "canonical_source_terms": [
+        "oeil"
+      ],
+      "resolved_ir_ids": [
+        "51ad9c8e520ea802"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7a_0002",
+      "status": "approved",
+      "alias_source_term": "Grande",
+      "canonical_source_terms": [
+        "grand"
+      ],
+      "resolved_ir_ids": [
+        "cb608c65da0fd421"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7a_0003",
+      "status": "approved",
+      "alias_source_term": "jumelle",
+      "canonical_source_terms": [
+        "jumeau"
+      ],
+      "resolved_ir_ids": [
+        "82f3c9a4b41662c4"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0001",
+      "status": "approved",
+      "alias_source_term": "mains",
+      "canonical_source_terms": [
+        "main"
+      ],
+      "resolved_ir_ids": [
+        "e79067fd41b59e85"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0002",
+      "status": "approved",
+      "alias_source_term": "jours",
+      "canonical_source_terms": [
+        "jour"
+      ],
+      "resolved_ir_ids": [
+        "937683d6c5c5943a"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0003",
+      "status": "approved",
+      "alias_source_term": "pieds",
+      "canonical_source_terms": [
+        "pied"
+      ],
+      "resolved_ir_ids": [
+        "829790e020eae470"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0004",
+      "status": "approved",
+      "alias_source_term": "hommes",
+      "canonical_source_terms": [
+        "homme"
+      ],
+      "resolved_ir_ids": [
+        "efbadcd88c9d1083"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0005",
+      "status": "approved",
+      "alias_source_term": "femmes",
+      "canonical_source_terms": [
+        "femme"
+      ],
+      "resolved_ir_ids": [
+        "19d338e7e938acc8"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0006",
+      "status": "approved",
+      "alias_source_term": "oreilles",
+      "canonical_source_terms": [
+        "oreille"
+      ],
+      "resolved_ir_ids": [
+        "c164e5c74aa6e312"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7f_0007",
+      "status": "approved",
+      "alias_source_term": "frères",
+      "canonical_source_terms": [
+        "frère"
+      ],
+      "resolved_ir_ids": [
+        "591255239aba1624"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "skipped",
+      "reason": "alias-derived source keys already exist with identical postings"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0001",
+      "status": "approved",
+      "alias_source_term": "fruits",
+      "canonical_source_terms": [
+        "fruit"
+      ],
+      "resolved_ir_ids": [
+        "7cdb6070ce427a6d"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0002",
+      "status": "approved",
+      "alias_source_term": "grains",
+      "canonical_source_terms": [
+        "grain"
+      ],
+      "resolved_ir_ids": [
+        "3971b2e32e2dfc1c"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0003",
+      "status": "approved",
+      "alias_source_term": "griots",
+      "canonical_source_terms": [
+        "griot"
+      ],
+      "resolved_ir_ids": [
+        "025ed3968e2bc6e3"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0004",
+      "status": "approved",
+      "alias_source_term": "jambes",
+      "canonical_source_terms": [
+        "jambe"
+      ],
+      "resolved_ir_ids": [
+        "251b2a72627a7ef9"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0005",
+      "status": "approved",
+      "alias_source_term": "mots",
+      "canonical_source_terms": [
+        "mot"
+      ],
+      "resolved_ir_ids": [
+        "1f9cbaa868644b73"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0006",
+      "status": "approved",
+      "alias_source_term": "nuages",
+      "canonical_source_terms": [
+        "nuage"
+      ],
+      "resolved_ir_ids": [
+        "9ca98df7409dde23"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0007",
+      "status": "approved",
+      "alias_source_term": "parents",
+      "canonical_source_terms": [
+        "parent"
+      ],
+      "resolved_ir_ids": [
+        "5437cc8267a78303"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0008",
+      "status": "approved",
+      "alias_source_term": "paroles",
+      "canonical_source_terms": [
+        "parole"
+      ],
+      "resolved_ir_ids": [
+        "cf9e314229c86efc"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0009",
+      "status": "approved",
+      "alias_source_term": "enfants",
+      "canonical_source_terms": [
+        "enfant"
+      ],
+      "resolved_ir_ids": [
+        "99e6cda40390d1fb"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0010",
+      "status": "approved",
+      "alias_source_term": "feuilles",
+      "canonical_source_terms": [
+        "feuille"
+      ],
+      "resolved_ir_ids": [
+        "f67a64559d2f6c63"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    },
+    {
+      "alias_id": "src_alias_phase7j_0011",
+      "status": "approved",
+      "alias_source_term": "grand-parents",
+      "canonical_source_terms": [
+        "grand-mère",
+        "grand-père"
+      ],
+      "resolved_ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ],
+      "generated_key_types": [
+        "src_casefold",
+        "src_diacritics_insensitive",
+        "src_nospace",
+        "src_punct_stripped"
+      ],
+      "outcome": "applied",
+      "reason": "generated 4 alias-derived source key(s)"
+    }
+  ]
+}

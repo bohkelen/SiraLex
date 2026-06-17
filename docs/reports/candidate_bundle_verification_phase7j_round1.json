@@ -1,0 +1,396 @@
+{
+  "candidate_bundle": "web/public/bundle_full_20260616_phase7j_alias_round2_candidate",
+  "recommended_catalog_version": "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2",
+  "records_byte_for_byte_unchanged": true,
+  "baseline_records_sha256": "14353c66ce92b87aba108349b4f5d831961da740469d5295d54d8034ef4cf376",
+  "candidate_records_sha256": "14353c66ce92b87aba108349b4f5d831961da740469d5295d54d8034ef4cf376",
+  "manifest_file_hashes_match_candidate_files": true,
+  "catalog_points_to_new_bundle": true,
+  "old_phase7f_bundle_still_present": true,
+  "candidate_manifest": {
+    "manifest_schema_version": "bundle_manifest_v1",
+    "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
+    "bundle_type": "full",
+    "bundle_format": "directory",
+    "compression": "none",
+    "record_schema_id": "normalized_v1",
+    "record_schema_version": "1",
+    "rule_versions": {
+      "normalization": "norm_v3"
+    },
+    "search_index_directional": true,
+    "sources": {
+      "included": [
+        "src_malipense"
+      ],
+      "excluded": []
+    },
+    "reconciliation_action": "REPLACE_ALL",
+    "update_mode": "REPLACE_ALL",
+    "build": {
+      "ir_parser_versions": [
+        "malipense_index_v1",
+        "malipense_lexicon_v3"
+      ],
+      "git_commit": "d1697b18a92b71ecad8336c6b1148f4299b95262",
+      "record_counts": {
+        "lexicon_entries": 8823,
+        "index_mappings": 10505
+      }
+    },
+    "files": [
+      {
+        "path": "records.jsonl",
+        "byte_length": 14325313,
+        "sha256": "sha256:14353c66ce92b87aba108349b4f5d831961da740469d5295d54d8034ef4cf376"
+      },
+      {
+        "path": "search_index.jsonl",
+        "byte_length": 10207081,
+        "sha256": "sha256:4326bc4c9c7d51229b4afa44048751ff122a451dce3d52c2d20d56ac8281418e"
+      }
+    ],
+    "content_sha256": "sha256:e54b8fdf39558ecb639c0763ea9454f085aded7b48f867affe1f96a44709c2ef",
+    "languages": {
+      "source_lang": "fr",
+      "target_lang": "mnk"
+    },
+    "language_labels": {
+      "source": "French",
+      "target": "Maninka"
+    },
+    "scripts": {
+      "target_supported": [
+        "latin",
+        "nko"
+      ]
+    }
+  },
+  "delta_summary": {
+    "added_key_count": 44,
+    "removed_key_count": 0,
+    "changed_existing_key_count": 0,
+    "added_src_key_count": 44,
+    "added_tgt_key_count": 0,
+    "target_side_changed_key_count": 0,
+    "unexpected_change_count": 0
+  },
+  "query_summary": {
+    "new_alias_hits": 11,
+    "new_alias_expected_count": 11,
+    "all_phase7j_queries_match": true,
+    "control_regressions": 0,
+    "all_regressions_unchanged": true,
+    "phrase_negatives_remain_misses": true,
+    "target_side_kun_unchanged": true,
+    "mere_mere_unchanged": true
+  },
+  "phase7j_queries": {
+    "fruits": {
+      "expected_ir_ids": [
+        "7cdb6070ce427a6d"
+      ],
+      "candidate_ir_ids": [
+        "7cdb6070ce427a6d"
+      ],
+      "matches_expected": true
+    },
+    "grains": {
+      "expected_ir_ids": [
+        "3971b2e32e2dfc1c"
+      ],
+      "candidate_ir_ids": [
+        "3971b2e32e2dfc1c"
+      ],
+      "matches_expected": true
+    },
+    "griots": {
+      "expected_ir_ids": [
+        "025ed3968e2bc6e3"
+      ],
+      "candidate_ir_ids": [
+        "025ed3968e2bc6e3"
+      ],
+      "matches_expected": true
+    },
+    "jambes": {
+      "expected_ir_ids": [
+        "251b2a72627a7ef9"
+      ],
+      "candidate_ir_ids": [
+        "251b2a72627a7ef9"
+      ],
+      "matches_expected": true
+    },
+    "mots": {
+      "expected_ir_ids": [
+        "1f9cbaa868644b73"
+      ],
+      "candidate_ir_ids": [
+        "1f9cbaa868644b73"
+      ],
+      "matches_expected": true
+    },
+    "nuages": {
+      "expected_ir_ids": [
+        "9ca98df7409dde23"
+      ],
+      "candidate_ir_ids": [
+        "9ca98df7409dde23"
+      ],
+      "matches_expected": true
+    },
+    "parents": {
+      "expected_ir_ids": [
+        "5437cc8267a78303"
+      ],
+      "candidate_ir_ids": [
+        "5437cc8267a78303"
+      ],
+      "matches_expected": true
+    },
+    "paroles": {
+      "expected_ir_ids": [
+        "cf9e314229c86efc"
+      ],
+      "candidate_ir_ids": [
+        "cf9e314229c86efc"
+      ],
+      "matches_expected": true
+    },
+    "enfants": {
+      "expected_ir_ids": [
+        "99e6cda40390d1fb"
+      ],
+      "candidate_ir_ids": [
+        "99e6cda40390d1fb"
+      ],
+      "matches_expected": true
+    },
+    "feuilles": {
+      "expected_ir_ids": [
+        "f67a64559d2f6c63"
+      ],
+      "candidate_ir_ids": [
+        "f67a64559d2f6c63"
+      ],
+      "matches_expected": true
+    },
+    "grand-parents": {
+      "expected_ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ],
+      "candidate_ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ],
+      "matches_expected": true
+    }
+  },
+  "regressions": {
+    "mains": {
+      "baseline_ir_ids": [
+        "e79067fd41b59e85"
+      ],
+      "candidate_ir_ids": [
+        "e79067fd41b59e85"
+      ],
+      "unchanged": true
+    },
+    "jours": {
+      "baseline_ir_ids": [
+        "937683d6c5c5943a"
+      ],
+      "candidate_ir_ids": [
+        "937683d6c5c5943a"
+      ],
+      "unchanged": true
+    },
+    "pieds": {
+      "baseline_ir_ids": [
+        "829790e020eae470"
+      ],
+      "candidate_ir_ids": [
+        "829790e020eae470"
+      ],
+      "unchanged": true
+    },
+    "hommes": {
+      "baseline_ir_ids": [
+        "efbadcd88c9d1083"
+      ],
+      "candidate_ir_ids": [
+        "efbadcd88c9d1083"
+      ],
+      "unchanged": true
+    },
+    "femmes": {
+      "baseline_ir_ids": [
+        "19d338e7e938acc8"
+      ],
+      "candidate_ir_ids": [
+        "19d338e7e938acc8"
+      ],
+      "unchanged": true
+    },
+    "oreilles": {
+      "baseline_ir_ids": [
+        "c164e5c74aa6e312"
+      ],
+      "candidate_ir_ids": [
+        "c164e5c74aa6e312"
+      ],
+      "unchanged": true
+    },
+    "frères": {
+      "baseline_ir_ids": [
+        "591255239aba1624"
+      ],
+      "candidate_ir_ids": [
+        "591255239aba1624"
+      ],
+      "unchanged": true
+    },
+    "Yeux": {
+      "baseline_ir_ids": [
+        "51ad9c8e520ea802"
+      ],
+      "candidate_ir_ids": [
+        "51ad9c8e520ea802"
+      ],
+      "unchanged": true
+    },
+    "Grande": {
+      "baseline_ir_ids": [
+        "cb608c65da0fd421"
+      ],
+      "candidate_ir_ids": [
+        "cb608c65da0fd421"
+      ],
+      "unchanged": true
+    },
+    "jumelle": {
+      "baseline_ir_ids": [
+        "82f3c9a4b41662c4"
+      ],
+      "candidate_ir_ids": [
+        "82f3c9a4b41662c4"
+      ],
+      "unchanged": true
+    },
+    "poil": {
+      "baseline_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "candidate_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "unchanged": true
+    },
+    "poils": {
+      "baseline_ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "candidate_ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "unchanged": true
+    },
+    "tante": {
+      "baseline_ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "candidate_ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "unchanged": true
+    },
+    "oncle": {
+      "baseline_ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "candidate_ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "unchanged": true
+    },
+    "mere": {
+      "baseline_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "candidate_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "unchanged": true
+    },
+    "mère": {
+      "baseline_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "candidate_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "unchanged": true
+    },
+    "ferme la bouche": {
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "Grand chose": {
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "grande bouche": {
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "à l'insu de qqns": {
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "à la mesure des": {
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "à parts": {
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "à part ças": {
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "target-side Kun": {
+      "baseline_ir_ids": [
+        "b07ae7bd61ff3c85"
+      ],
+      "candidate_ir_ids": [
+        "b07ae7bd61ff3c85"
+      ],
+      "unchanged": true
+    }
+  },
+  "bundle_verify": {
+    "valid": true,
+    "errors": [],
+    "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate"
+  }
+}

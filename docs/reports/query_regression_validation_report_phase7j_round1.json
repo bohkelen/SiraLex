@@ -1,0 +1,407 @@
+{
+  "phase7j_queries": {
+    "fruits": {
+      "canonical": "fruit",
+      "expected_ir_ids": [
+        "7cdb6070ce427a6d"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "7cdb6070ce427a6d"
+      ],
+      "candidate_canonical_ir_ids": [
+        "7cdb6070ce427a6d"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    },
+    "grains": {
+      "canonical": "grain",
+      "expected_ir_ids": [
+        "3971b2e32e2dfc1c"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "3971b2e32e2dfc1c"
+      ],
+      "candidate_canonical_ir_ids": [
+        "3971b2e32e2dfc1c"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    },
+    "griots": {
+      "canonical": "griot",
+      "expected_ir_ids": [
+        "025ed3968e2bc6e3"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "025ed3968e2bc6e3"
+      ],
+      "candidate_canonical_ir_ids": [
+        "025ed3968e2bc6e3"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    },
+    "jambes": {
+      "canonical": "jambe",
+      "expected_ir_ids": [
+        "251b2a72627a7ef9"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "251b2a72627a7ef9"
+      ],
+      "candidate_canonical_ir_ids": [
+        "251b2a72627a7ef9"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    },
+    "mots": {
+      "canonical": "mot",
+      "expected_ir_ids": [
+        "1f9cbaa868644b73"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "1f9cbaa868644b73"
+      ],
+      "candidate_canonical_ir_ids": [
+        "1f9cbaa868644b73"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    },
+    "nuages": {
+      "canonical": "nuage",
+      "expected_ir_ids": [
+        "9ca98df7409dde23"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "9ca98df7409dde23"
+      ],
+      "candidate_canonical_ir_ids": [
+        "9ca98df7409dde23"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    },
+    "parents": {
+      "canonical": "parent",
+      "expected_ir_ids": [
+        "5437cc8267a78303"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "5437cc8267a78303"
+      ],
+      "candidate_canonical_ir_ids": [
+        "5437cc8267a78303"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    },
+    "paroles": {
+      "canonical": "parole",
+      "expected_ir_ids": [
+        "cf9e314229c86efc"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "cf9e314229c86efc"
+      ],
+      "candidate_canonical_ir_ids": [
+        "cf9e314229c86efc"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    },
+    "enfants": {
+      "canonical": "enfant",
+      "expected_ir_ids": [
+        "99e6cda40390d1fb"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "99e6cda40390d1fb"
+      ],
+      "candidate_canonical_ir_ids": [
+        "99e6cda40390d1fb"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    },
+    "feuilles": {
+      "canonical": "feuille",
+      "expected_ir_ids": [
+        "f67a64559d2f6c63"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "f67a64559d2f6c63"
+      ],
+      "candidate_canonical_ir_ids": [
+        "f67a64559d2f6c63"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    },
+    "grand-parents": {
+      "canonical": [
+        "grand-mère",
+        "grand-père"
+      ],
+      "expected_ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ],
+      "baseline_alias_ir_ids": [],
+      "candidate_alias_ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ],
+      "candidate_canonical_ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ],
+      "matches_expected": true,
+      "matches_canonical": true
+    }
+  },
+  "regressions": {
+    "mains": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "e79067fd41b59e85"
+      ],
+      "candidate_ir_ids": [
+        "e79067fd41b59e85"
+      ],
+      "unchanged": true
+    },
+    "jours": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "937683d6c5c5943a"
+      ],
+      "candidate_ir_ids": [
+        "937683d6c5c5943a"
+      ],
+      "unchanged": true
+    },
+    "pieds": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "829790e020eae470"
+      ],
+      "candidate_ir_ids": [
+        "829790e020eae470"
+      ],
+      "unchanged": true
+    },
+    "hommes": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "efbadcd88c9d1083"
+      ],
+      "candidate_ir_ids": [
+        "efbadcd88c9d1083"
+      ],
+      "unchanged": true
+    },
+    "femmes": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "19d338e7e938acc8"
+      ],
+      "candidate_ir_ids": [
+        "19d338e7e938acc8"
+      ],
+      "unchanged": true
+    },
+    "oreilles": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "c164e5c74aa6e312"
+      ],
+      "candidate_ir_ids": [
+        "c164e5c74aa6e312"
+      ],
+      "unchanged": true
+    },
+    "frères": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "591255239aba1624"
+      ],
+      "candidate_ir_ids": [
+        "591255239aba1624"
+      ],
+      "unchanged": true
+    },
+    "Yeux": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "51ad9c8e520ea802"
+      ],
+      "candidate_ir_ids": [
+        "51ad9c8e520ea802"
+      ],
+      "unchanged": true
+    },
+    "Grande": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "cb608c65da0fd421"
+      ],
+      "candidate_ir_ids": [
+        "cb608c65da0fd421"
+      ],
+      "unchanged": true
+    },
+    "jumelle": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "82f3c9a4b41662c4"
+      ],
+      "candidate_ir_ids": [
+        "82f3c9a4b41662c4"
+      ],
+      "unchanged": true
+    },
+    "poil": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "candidate_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "unchanged": true
+    },
+    "poils": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "candidate_ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "unchanged": true
+    },
+    "tante": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "candidate_ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "unchanged": true
+    },
+    "oncle": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "candidate_ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "unchanged": true
+    },
+    "mere": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "candidate_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "unchanged": true
+    },
+    "mère": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "candidate_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "unchanged": true
+    },
+    "ferme la bouche": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "Grand chose": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "grande bouche": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "à l'insu de qqns": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "à la mesure des": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "à parts": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "à part ças": {
+      "direction": "source_to_target",
+      "baseline_ir_ids": [],
+      "candidate_ir_ids": [],
+      "unchanged": true
+    },
+    "target-side Kun": {
+      "direction": "target_to_source",
+      "baseline_ir_ids": [
+        "b07ae7bd61ff3c85"
+      ],
+      "candidate_ir_ids": [
+        "b07ae7bd61ff3c85"
+      ],
+      "unchanged": true
+    }
+  },
+  "all_phase7j_queries_match": true,
+  "all_regressions_unchanged": true,
+  "phrase_negatives_remain_misses": true,
+  "target_side_kun_unchanged": true,
+  "mere_mere_unchanged": true,
+  "new_alias_hit_count": 11,
+  "new_alias_expected_count": 11,
+  "regression_count": 0
+}
