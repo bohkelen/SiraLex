@@ -55,20 +55,21 @@ decision with rationale.
 
 | Phase 7J `review_id` | Query | Likely canonical entry | Candidate `ir_ids` | Risk | Priority | Recommended decision |
 |---|---|---|---|---|---|---|
-| `phase7j_gap_0015` | `fruits` | `fruit` | `7cdb6070ce427a6d` | low | 65 (P2) | _review pending_ |
-| `phase7j_gap_0016` | `grains` | `grain` | `3971b2e32e2dfc1c` | low | 65 (P2) | _review pending_ |
-| `phase7j_gap_0017` | `griots` | `griot` | `025ed3968e2bc6e3` | low | 65 (P2) | _review pending_ |
-| `phase7j_gap_0018` | `jambes` | `jambe` | `251b2a72627a7ef9` | low | 65 (P2) | _review pending_ |
-| `phase7j_gap_0019` | `mots` | `mot` | `1f9cbaa868644b73` | low | 65 (P2) | _review pending_ |
-| `phase7j_gap_0020` | `nuages` | `nuage` | `9ca98df7409dde23` | low | 65 (P2) | _review pending_ |
-| `phase7j_gap_0021` | `parents` | `parent` | `5437cc8267a78303` | low | 65 (P2) | _review pending_ |
-| `phase7j_gap_0022` | `paroles` | `parole` | `cf9e314229c86efc` | low | 65 (P2) | _review pending_ |
-| `phase7j_gap_0023` | `enfants` | `enfant` | `99e6cda40390d1fb` | low | 65 (P2) | _review pending_ |
-| `phase7j_gap_0024` | `feuilles` | `feuille` | `f67a64559d2f6c63` | low | 65 (P2) | _review pending_ |
-| `phase7j_gap_0001` | `grand-parents` | `grand-mère`, `grand-père` | `1f6d3a5919110b21`, `957bd76b41fda053` | medium | 55 (P2) | _review pending_ |
+| `phase7j_gap_0015` | `fruits` | `fruit` | `7cdb6070ce427a6d` | low | 65 (P2) | `approved` |
+| `phase7j_gap_0016` | `grains` | `grain` | `3971b2e32e2dfc1c` | low | 65 (P2) | `approved` |
+| `phase7j_gap_0017` | `griots` | `griot` | `025ed3968e2bc6e3` | low | 65 (P2) | `approved` |
+| `phase7j_gap_0018` | `jambes` | `jambe` | `251b2a72627a7ef9` | low | 65 (P2) | `approved` |
+| `phase7j_gap_0019` | `mots` | `mot` | `1f9cbaa868644b73` | low | 65 (P2) | `approved` |
+| `phase7j_gap_0020` | `nuages` | `nuage` | `9ca98df7409dde23` | low | 65 (P2) | `approved` |
+| `phase7j_gap_0021` | `parents` | `parent` | `5437cc8267a78303` | low | 65 (P2) | `approved` |
+| `phase7j_gap_0022` | `paroles` | `parole` | `cf9e314229c86efc` | low | 65 (P2) | `approved` |
+| `phase7j_gap_0023` | `enfants` | `enfant` | `99e6cda40390d1fb` | low | 65 (P2) | `approved` |
+| `phase7j_gap_0024` | `feuilles` | `feuille` | `f67a64559d2f6c63` | low | 65 (P2) | `approved` |
+| `phase7j_gap_0001` | `grand-parents` | `grand-mère`, `grand-père` | `1f6d3a5919110b21`, `957bd76b41fda053` | medium | 55 (P2) | `approved` |
 
-All candidates start as **review pending** / **deferred**. None are approved in
-this packet.
+Human review completed 2026-06-15: **11 approved**, **0 deferred**, **0 rejected** in this
+packet. Decisions are recorded below; they do **not** by themselves modify
+`source_aliases_v1.jsonl` or any bundle.
 
 ## 4. Candidate detail sections
 
@@ -107,10 +108,10 @@ this packet.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved based on French grammar. `fruits` is the regular plural of `fruit`; alias may route to canonical `fruit` posting `7cdb6070ce427a6d` exactly, following Phase 7F plural precedent without broadening targets. |
 
 ---
 
@@ -147,10 +148,10 @@ this packet.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved based on French grammar. `grains` is the regular plural of `grain`; alias may copy canonical `grain` posting `3971b2e32e2dfc1c` exactly per Phase 7F plural precedent. |
 
 ---
 
@@ -187,10 +188,10 @@ this packet.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved based on French grammar. `griots` is the regular plural of `griot`; alias may copy canonical `griot` posting `025ed3968e2bc6e3` exactly. |
 
 ---
 
@@ -227,10 +228,10 @@ this packet.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved based on French grammar. `jambes` is the regular plural of `jambe`; alias may copy canonical `jambe` posting `251b2a72627a7ef9` exactly, matching Phase 7F body-part plural precedent (`pieds → pied`, `mains → main`). |
 
 ---
 
@@ -267,10 +268,10 @@ this packet.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved based on French grammar. `mots` is the regular plural of `mot`; alias may copy canonical `mot` posting `1f9cbaa868644b73` exactly. This is single-term plural routing only, not phrase-level decomposition. |
 
 ---
 
@@ -307,10 +308,10 @@ this packet.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved based on French grammar. `nuages` is the regular plural of `nuage`; alias may copy canonical `nuage` posting `9ca98df7409dde23` exactly. |
 
 ---
 
@@ -348,10 +349,10 @@ this packet.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved based on French grammar with moderate-attention kinship review. `parents` is the regular plural of `parent`; alias may copy canonical `parent` posting `5437cc8267a78303` exactly without broadening beyond the singular entry scope. |
 
 ---
 
@@ -388,10 +389,10 @@ this packet.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved based on French grammar. `paroles` is the regular plural of `parole`; alias may copy canonical `parole` posting `cf9e314229c86efc` exactly. |
 
 ---
 
@@ -428,10 +429,10 @@ this packet.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved based on French grammar with moderate-attention kinship review. `enfants` is the regular plural of `enfant`; alias may copy canonical `enfant` posting `99e6cda40390d1fb` exactly without introducing a broader target set. |
 
 ---
 
@@ -468,10 +469,10 @@ this packet.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved based on French grammar. `feuilles` is the regular plural of `feuille`; alias may copy canonical `feuille` posting `f67a64559d2f6c63` exactly per Phase 7F plural precedent. |
 
 ---
 
@@ -514,16 +515,14 @@ this packet.
 - **Possible mapping to multiple existing entries**: alias must define exact
   combined `resolved_ir_ids` order; not automatic union behavior.
 - **Prior 7A deferred alias**: explicitly deferred for multi-target confirmation;
-  must not be approved without fresh human rationale.
-
-Do **not** mark approved in this packet.
+  human reviewer has now confirmed combined posting order and scope.
 
 | Review field | Value |
 | --- | --- |
-| Review decision | `deferred` |
-| Reviewer | _pending human reviewer_ |
-| Reviewed_at | _pending_ |
-| Rationale | _pending_ |
+| Review decision | `approved` |
+| Reviewer | `phase7j_alias_round2_human_review` |
+| Reviewed_at | `2026-06-15` |
+| Rationale | Human reviewer approved this **multi-target alias** based on French grammar and conventional kinship usage. The hyphenated kinship term `grand-parents` denotes grandparents collectively. Combined posting order is accepted as `grand-mère` (`1f6d3a5919110b21`) then `grand-père` (`957bd76b41fda053`). Both `grand-mère` and `grand-père` scopes are included exactly; no broader target set is introduced. User-facing interpretability of two grandparent entries is explicitly accepted for this compound lookup. |
 
 ## 5. Explicit rejects / out of scope
 
@@ -550,9 +549,10 @@ already-addressed controls, or explicit non-action rows.
 
 ## 6. Hard rules
 
-- Do not approve any candidate unless a human reviewer has actually reviewed it.
-- All candidates in this packet start as `deferred` / _review pending_.
-- Approved alias rows must follow `source_alias_table_v1` and copy canonical
+- Human review decisions are recorded in this packet for all 11 candidates.
+- Packet approval does **not** by itself write rows to `source_aliases_v1.jsonl` or
+  publish bundles.
+- Future approved alias rows must follow `source_alias_table_v1` and copy canonical
   posting sets exactly.
 - No runtime fuzzy search, decomposition, typo correction, or ranking changes.
 - No bundle publication from this review packet alone.
@@ -570,4 +570,5 @@ Before changing any row in `source_aliases_v1.jsonl` to `approved`, confirm:
 
 ---
 
-*Generated from Phase 7J audit evidence. Planning/review only — no implementation.*
+*Generated from Phase 7J audit evidence. Human review recorded 2026-06-15.
+Planning/review only in packet form — no `source_aliases_v1.jsonl` implementation yet.*
