@@ -1005,6 +1005,92 @@ Deferred follow-ups:
 - `mere`/kinship ranking review remains deferred
 - Phase 7F Round 2 aliases remain a separate evidence-review cycle
 
+### Phase 7H — Phrase miss review evidence ✅ *(complete)*
+
+Completion notes:
+
+- Phase 7H completed the review-control layer for phrase/compositional lookup without changing runtime behavior.
+- Phrase lookup remains intentionally unimplemented. Phase 7H created the evidence and validation layer required before any future reviewed phrase-alias mechanism.
+- Phase 7H added:
+  - `shared/phrase_review/phrase_miss_review_v1.jsonl`
+  - `api/phrase_review/validate_phrase_review.py`
+  - `api/phrase_review/tests/test_validate_phrase_review.py`
+- 9 phrase-miss evidence rows were added.
+- No row is marked `approved`.
+- The dataset is inert and not wired into search, alias generation, supplement tooling, bundle generation, catalog, UI, or runtime.
+- The validator is read-only, stdlib-only, strict by default, and direct-script runnable.
+- Validator checks:
+  - JSONL integrity
+  - required fields
+  - enum constraints
+  - duplicate `review_id`
+  - duplicate `query`
+  - review-state safety
+  - related-term object shape
+  - fixed bundle/catalog provenance
+- Validation passed:
+  - `validated 9 phrase review rows`
+  - `approved rows: 0`
+  - `candidate rows: 4`
+  - `deferred rows: 1`
+  - `rejected rows: 4`
+  - `16 passed`
+- implementation commits:
+  - `6094fd6 Add Phase 7H phrase miss review dataset`
+  - `7e11761 Add Phase 7H phrase review validator`
+
+Deferred follow-ups:
+
+- reviewed phrase-alias mechanism remains deferred
+- phrase/compositional lookup remains deferred
+- no runtime decomposition is approved
+- no fuzzy search is approved
+- `ferme la bouche → bouche` remains unsafe unless phrase-level evidence is reviewed
+- future approved phrase aliases should use a phrase-specific artifact or explicit schema revision, not silent reuse of `source_alias_table_v1`
+
+### Phase 7I — Source phrase alias spec and review packet ✅ *(complete)*
+
+Completion notes:
+
+- Phase 7I completed planning/specification only.
+- Phase 7I defines the future phrase-alias mechanism but leaves implementation blocked until a named human reviewer approves at least one candidate with rationale.
+- Phase 7I added:
+  - `shared/specs/source-phrase-alias-v1.md`
+  - `docs/PHASE_7I_PHRASE_ALIAS_REVIEW_PACKET.md`
+- Option B was selected: a dedicated phrase-specific artifact.
+- Future artifact path is `shared/phrase_review/source_phrase_aliases_v1.jsonl`.
+- The future artifact was **not created**.
+- Phase 7H evidence dataset (`phrase_miss_review_v1.jsonl`) remains inert and is not a generation input.
+- `source_alias_table_v1` was not silently extended.
+- Runtime search remains unchanged.
+- No phrase aliases were approved.
+- Both candidate rows were marked `deferred`:
+  - `à l'insu de qqns → à l'insu de qqn`
+  - `à la mesure des → à la mesure de`
+- Seven unsafe mappings remain explicitly rejected:
+  - `ferme la bouche → bouche`
+  - `Grand chose → grand + chose`
+  - `grande bouche → grand + bouche`
+  - `à l'intérieurs → à l'intérieur`
+  - `à la vue perçantes → à la vue perçante`
+  - `à parts → part`
+  - `à part ças → à part ça`
+- implementation commits:
+  - `d4154ef Add Phase 7I source phrase alias spec`
+  - `31f768d Record Phase 7I phrase alias review decisions`
+
+Deferred follow-ups:
+
+- human review of both candidate rows
+- creation of `source_phrase_aliases_v1.jsonl` only after approval
+- validator/applier/report implementation only after approval
+- pipeline wiring only after approved rows exist
+- no runtime decomposition
+- no fuzzy correction
+- no typo-like aliases
+- no phrase-to-single-word aliases
+- no compositional phrase aliases
+
 ---
 
 ## Phase 1.5 — Corrections (spec + dry-run)

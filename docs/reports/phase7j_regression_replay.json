@@ -1,0 +1,274 @@
+{
+  "schema_version": "phase7j_regression_replay_v1",
+  "source_bundle_id": "bundle_full_20260609_phase7f_alias_candidate",
+  "source_catalog_version": "norm-v3-featured-enriched-source-aliases-2-source-index-supplements-2",
+  "content_sha256": "sha256:0e5918bd9a1fc3f0cb6c88871542129a568371b2fabaaadccee8d9d27f9d18b0",
+  "baseline_phase": "post-7i",
+  "replay_date": "2026-06-16",
+  "queries": {
+    "mains": {
+      "query": "mains",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "e79067fd41b59e85"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "mains",
+      "ir_id_count": 1
+    },
+    "jours": {
+      "query": "jours",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "937683d6c5c5943a"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "jours",
+      "ir_id_count": 1
+    },
+    "pieds": {
+      "query": "pieds",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "829790e020eae470"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "pieds",
+      "ir_id_count": 1
+    },
+    "hommes": {
+      "query": "hommes",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "efbadcd88c9d1083"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "hommes",
+      "ir_id_count": 1
+    },
+    "femmes": {
+      "query": "femmes",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "19d338e7e938acc8"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "femmes",
+      "ir_id_count": 1
+    },
+    "oreilles": {
+      "query": "oreilles",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "c164e5c74aa6e312"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "oreilles",
+      "ir_id_count": 1
+    },
+    "frères": {
+      "query": "frères",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "591255239aba1624"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "frères",
+      "ir_id_count": 1
+    },
+    "Yeux": {
+      "query": "Yeux",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "51ad9c8e520ea802"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "yeux",
+      "ir_id_count": 1
+    },
+    "Grande": {
+      "query": "Grande",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "cb608c65da0fd421"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "grande",
+      "ir_id_count": 1
+    },
+    "jumelle": {
+      "query": "jumelle",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "82f3c9a4b41662c4"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "jumelle",
+      "ir_id_count": 1
+    },
+    "poil": {
+      "query": "poil",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "poil",
+      "ir_id_count": 1
+    },
+    "poils": {
+      "query": "poils",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "ffdd559032fa4284"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "poils",
+      "ir_id_count": 1
+    },
+    "tante": {
+      "query": "tante",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "b7f41967e5cfda99",
+        "ff3cec2ec5f139e3"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "tante",
+      "ir_id_count": 2
+    },
+    "oncle": {
+      "query": "oncle",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "ff7f0815f52b363b"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "oncle",
+      "ir_id_count": 1
+    },
+    "mere": {
+      "query": "mere",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "ladder_level": "diacritics_insensitive",
+      "matched_key": "mere",
+      "ir_id_count": 3
+    },
+    "mère": {
+      "query": "mère",
+      "direction": "source_to_target",
+      "hit": true,
+      "ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "mère",
+      "ir_id_count": 3
+    },
+    "grand-parents": {
+      "query": "grand-parents",
+      "direction": "source_to_target",
+      "hit": false,
+      "ir_ids": [],
+      "ladder_level": null,
+      "matched_key": null,
+      "ir_id_count": 0
+    },
+    "ferme la bouche": {
+      "query": "ferme la bouche",
+      "direction": "source_to_target",
+      "hit": false,
+      "ir_ids": [],
+      "ladder_level": null,
+      "matched_key": null,
+      "ir_id_count": 0
+    },
+    "Grand chose": {
+      "query": "Grand chose",
+      "direction": "source_to_target",
+      "hit": false,
+      "ir_ids": [],
+      "ladder_level": null,
+      "matched_key": null,
+      "ir_id_count": 0
+    },
+    "grande bouche": {
+      "query": "grande bouche",
+      "direction": "source_to_target",
+      "hit": false,
+      "ir_ids": [],
+      "ladder_level": null,
+      "matched_key": null,
+      "ir_id_count": 0
+    },
+    "à l'insu de qqns": {
+      "query": "à l'insu de qqns",
+      "direction": "source_to_target",
+      "hit": false,
+      "ir_ids": [],
+      "ladder_level": null,
+      "matched_key": null,
+      "ir_id_count": 0
+    },
+    "à la mesure des": {
+      "query": "à la mesure des",
+      "direction": "source_to_target",
+      "hit": false,
+      "ir_ids": [],
+      "ladder_level": null,
+      "matched_key": null,
+      "ir_id_count": 0
+    },
+    "à parts": {
+      "query": "à parts",
+      "direction": "source_to_target",
+      "hit": false,
+      "ir_ids": [],
+      "ladder_level": null,
+      "matched_key": null,
+      "ir_id_count": 0
+    },
+    "à part ças": {
+      "query": "à part ças",
+      "direction": "source_to_target",
+      "hit": false,
+      "ir_ids": [],
+      "ladder_level": null,
+      "matched_key": null,
+      "ir_id_count": 0
+    },
+    "target-side Kun": {
+      "query": "Kun",
+      "direction": "target_to_source",
+      "hit": true,
+      "ir_ids": [
+        "b07ae7bd61ff3c85"
+      ],
+      "ladder_level": "casefold",
+      "matched_key": "kun",
+      "ir_id_count": 1
+    }
+  }
+}
