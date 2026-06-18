@@ -415,7 +415,7 @@ export async function listQueryLogs(
 export async function listRecentQueryLogs(
   db: IDBDatabase,
   options: ListRecentQueryLogsOptions,
-): Promise<QueryLogEventV1[]> {
+): Promise<QueryLogEvent[]> {
   const limit = Math.max(0, Math.floor(options.limit));
   if (limit === 0) {
     return [];
@@ -472,7 +472,7 @@ export async function listRecentQueryLogs(
   });
 
   await txDone(tx);
-  return rows.map(cloneEvent) as QueryLogEventV1[];
+  return rows.map(cloneEvent);
 }
 
 export async function countQueryLogs(

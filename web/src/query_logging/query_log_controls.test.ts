@@ -2,11 +2,15 @@ import "fake-indexeddb/auto";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { deleteSiralexDb, openSiralexDb } from "../idb/siralex_db";
+import { deleteSiralexDb, openSiralexDb, setCachedBundleCatalog } from "../idb/siralex_db";
 import {
+  buildQueryLogDiagnosticsContext,
+  buildQueryLogDiagnosticsText,
   clearQueryLogsFromUi,
+  copyQueryLogDiagnosticsFromUi,
   exportQueryLogsFromUi,
   formatQueryLogExportFilename,
+  formatQueryLogStatsLine,
   getQueryLogCountFromDb,
   getQueryLogStatsFromDb,
 } from "./query_log_controls";
@@ -293,6 +297,143 @@ describe("query log controls", () => {
     expect(result.stats.count).toBe(2);
     expect(result.stats.oldest_timestamp_iso).toBe("2026-06-01T00:00:00.000Z");
     expect(result.message).toBe("2 logs");
+  });
+
+  it("formats localized stats line with oldest timestamp or dash", () => {
+    const translate = (key: string, vars?: Record<string, string | number>) => {
+      if (key === "logging.statsOldestNone") {
+        return "—";
+      }
+      return `${key}:${vars?.count}:${vars?.oldest}`;
+    };
+
+    expect(
+      formatQueryLogStatsLine({ count: 4, oldest_timestamp_iso: "2026-06-01T00:00:00.000Z" }, { translate }),
+    ).toBe("logging.statsLine:4:2026-06-01T00:00:00.000Z");
+
+    expect(formatQueryLogStatsLine({ count: 0, oldest_timestamp_iso: null }, { translate })).toBe(
+      "logging.statsLine:0:—",
+    );
+  });
+
+  it("builds copy diagnostics text with app/bundle/norm/log stats", async () => {
+    const db = await openSiralexDb();
+    try {
+      await appendQueryLogV2(db, {
+        event_id: "evt-copy-1",
+        timestamp_iso: "2026-06-01T00:00:00.000Z",
+        app_version: "test",
+        bundle_id: "bundle-a",
+        storage_scope_id: "bundle-a::sha256:1",
+        norm_version: "norm_v3",
+        query_raw: "secret-query",
+        query_normalized_primary: "secret-query",
+        query_normalized_keys: {
+          casefold: ["secret-query"],
+          diacritics_insensitive: ["secret-query"],
+          punct_stripped: ["secret-query"],
+          nospace: ["secret-query"],
+        },
+        direction: "source_to_target",
+        ui_language: "fr",
+        result_status: "hit_single",
+        result_count: 1,
+        top_ir_ids: ["ir-1"],
+        matched_key_type: "casefold",
+        matched_key: "secret-query",
+        matched_deep_ladder: false,
+        latency_ms: 10,
+        offline_or_online: true,
+        session_bucket_id: "1234567890abcdef",
+        logging_enabled: true,
+        consent_version: QUERY_LOG_CONSENT_VERSION,
+      });
+      await setCachedBundleCatalog(db, {
+        request_url: "/catalog.json",
+        response_url: "/catalog.json",
+        fetched_at_iso: "2026-06-18T00:00:00.000Z",
+        warnings: [],
+        catalog: {
+          catalog_schema_version: "bundle_catalog_v1",
+          bundles: [
+            {
+              bundle_id: "bundle-a",
+              name: "Bundle A",
+              version: "norm-v3-featured",
+              size_bytes: 1,
+              url_base: "/bundle-a",
+              content_sha256: "sha256:abc",
+            },
+          ],
+        },
+      });
+    } finally {
+      db.close();
+    }
+
+    vi.stubGlobal("localStorage", {
+      getItem(key: string) {
+        if (key === "siralex.query_logging.consent_version") {
+          return QUERY_LOG_CONSENT_VERSION;
+        }
+        if (key === "siralex.query_logging.consent_at_iso") {
+          return "2026-06-18T12:00:00.000Z";
+        }
+        if (key === "siralex.query_logging.session_bucket_id") {
+          return "1234567890abcdef";
+        }
+        return null;
+      },
+      setItem() {},
+      removeItem() {},
+      clear() {},
+    });
+
+    const context = await buildQueryLogDiagnosticsContext({
+      appVersion: "1.2.3",
+      bundleId: "bundle-a",
+      normVersion: "norm_v3",
+      uiLanguage: "fr",
+      loggingEnabled: true,
+    });
+
+    const text = buildQueryLogDiagnosticsText(context);
+    expect(text).toContain("app_version: 1.2.3");
+    expect(text).toContain("bundle_id: bundle-a");
+    expect(text).toContain("catalog_version: norm-v3-featured");
+    expect(text).toContain("norm_version: norm_v3");
+    expect(text).toContain("ui_language: fr");
+    expect(text).toContain("query_log_count: 1");
+    expect(text).toContain("query_log_oldest: 2026-06-01T00:00:00.000Z");
+    expect(text).toContain("logging_enabled: true");
+    expect(text).toContain(`consent_version: ${QUERY_LOG_CONSENT_VERSION}`);
+    expect(text).toContain("session_bucket_prefix: 12345678…");
+    expect(text).not.toContain("secret-query");
+    expect(text).not.toContain("1234567890abcdef");
+  });
+
+  it("copy diagnostics handles clipboard failure", async () => {
+    const result = await copyQueryLogDiagnosticsFromUi(
+      {
+        appVersion: "1.2.3",
+        bundleId: "bundle-a",
+        catalogVersion: undefined,
+        normVersion: "norm_v3",
+        uiLanguage: "en",
+        stats: { count: 0, oldest_timestamp_iso: null },
+        loggingEnabled: false,
+        consentVersion: undefined,
+        sessionBucketPrefix: undefined,
+      },
+      {
+        writeClipboard: async () => {
+          throw new Error("clipboard unavailable");
+        },
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/Could not copy diagnostic info/);
   });
 });
 

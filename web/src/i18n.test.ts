@@ -80,5 +80,27 @@ describe("i18n translations", () => {
     expect(t("search.queryLabel", { direction: "FR → Mnk" })).toBe("Search (FR → Mnk)");
     setCurrentLocale(previous);
   });
+
+  it("resolves new consent and diagnostics keys in English and French", () => {
+    const previous = getCurrentLocale();
+
+    setCurrentLocale("en");
+    expect(t("logging.consentPrompt")).toMatch(/locally on this device/i);
+    expect(t("logging.consentPrompt")).toMatch(/not uploaded automatically/i);
+    expect(t("logging.consentStatusNotRecorded")).toBe("Consent: not recorded");
+    expect(t("logging.copyDiagnostics")).toBe("Copy diagnostic info");
+    expect(t("logging.statsLine", { count: 3, oldest: "2026-06-01" })).toContain("3 logs");
+    expect(t("logging.recentColStatus")).toBe("status");
+
+    setCurrentLocale("fr");
+    expect(t("logging.consentPrompt")).toMatch(/localement/i);
+    expect(t("logging.consentPrompt")).toMatch(/pas envoyés automatiquement/i);
+    expect(t("logging.consentStatusNotRecorded")).toBe("Consentement : non enregistré");
+    expect(t("logging.copyDiagnostics")).toBe("Copier les infos de diagnostic");
+    expect(t("logging.statsLine", { count: 3, oldest: "2026-06-01" })).toContain("3 journaux");
+    expect(t("logging.recentColStatus")).toBe("statut");
+
+    setCurrentLocale(previous);
+  });
 });
 

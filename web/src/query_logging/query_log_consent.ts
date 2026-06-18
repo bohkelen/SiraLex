@@ -64,6 +64,26 @@ export function recordQueryLoggingConsent(now: () => Date = () => new Date()): v
   }
 }
 
+export function getSessionBucketPrefixForDiagnostics(): string | undefined {
+  try {
+    const storage = getConsentStorage();
+    if (!storage) {
+      return undefined;
+    }
+    const full = storage.getItem(QUERY_LOGGING_SESSION_BUCKET_ID_KEY);
+    if (!full || full.trim() === "") {
+      return undefined;
+    }
+    const trimmed = full.trim();
+    if (trimmed.length <= 8) {
+      return trimmed;
+    }
+    return `${trimmed.slice(0, 8)}…`;
+  } catch {
+    return undefined;
+  }
+}
+
 export function getOrCreateSessionBucketId(): string {
   try {
     const storage = getConsentStorage();

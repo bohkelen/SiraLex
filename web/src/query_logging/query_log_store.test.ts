@@ -667,6 +667,24 @@ describe("query log store v2", () => {
     }
   });
 
+  it("listRecentQueryLogs returns mixed v1 and v2 rows as QueryLogEvent[]", async () => {
+    const db = await openSiralexDb();
+    try {
+      await appendQueryLog(db, makeAppendInput({ query_raw: "legacy", timestamp_iso: "2026-06-01T00:00:00.000Z" }));
+      await appendQueryLogV2(
+        db,
+        makeAppendV2Input({ query_raw: "modern", event_id: "evt-modern", timestamp_iso: "2026-06-18T00:00:00.000Z" }),
+      );
+
+      const recent = await listRecentQueryLogs(db, { limit: 10 });
+      expect(recent.map((row) => row.query_raw)).toEqual(["modern", "legacy"]);
+      expect(recent[0]?.schema_version).toBe(QUERY_LOG_EVENT_V2);
+      expect(recent[1]?.schema_version).toBe("query_log_event_v1");
+    } finally {
+      db.close();
+    }
+  });
+
   it("evicts the oldest row when the 2001st append exceeds QUERY_LOG_MAX_ROWS", async () => {
     const db = await openSiralexDb();
     try {

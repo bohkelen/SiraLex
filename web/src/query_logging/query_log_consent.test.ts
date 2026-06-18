@@ -4,6 +4,7 @@ import {
   clearQueryLoggingConsentForTests,
   getOrCreateSessionBucketId,
   getQueryLoggingConsentStatus,
+  getSessionBucketPrefixForDiagnostics,
   hasValidQueryLoggingConsent,
   recordQueryLoggingConsent,
 } from "./query_log_consent";
@@ -82,6 +83,25 @@ describe("query log consent", () => {
     const bucket = localStorage.getItem("siralex.query_logging.session_bucket_id");
     expect(bucket).toBeTruthy();
     expect(getOrCreateSessionBucketId()).toBe(bucket);
+  });
+
+  it("exposes only a session bucket prefix for diagnostics", () => {
+    localStorage.setItem("siralex.query_logging.session_bucket_id", "1234567890abcdef");
+    expect(getSessionBucketPrefixForDiagnostics()).toBe("12345678…");
+    expect(getSessionBucketPrefixForDiagnostics()).not.toBe("1234567890abcdef");
+  });
+
+  it("returns undefined prefix when session bucket is absent", () => {
+    expect(getSessionBucketPrefixForDiagnostics()).toBeUndefined();
+  });
+
+  it("status helper provides recorded display inputs", () => {
+    recordQueryLoggingConsent(() => new Date("2026-06-18T12:00:00.000Z"));
+    expect(getQueryLoggingConsentStatus()).toEqual({
+      version: QUERY_LOG_CONSENT_VERSION,
+      atIso: "2026-06-18T12:00:00.000Z",
+    });
+    expect(hasValidQueryLoggingConsent()).toBe(true);
   });
 
   it("clearQueryLoggingConsentForTests clears consent and session state", () => {
