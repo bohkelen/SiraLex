@@ -1,8 +1,15 @@
 import { openSiralexDb } from "../idb/siralex_db";
-import { clearAllQueryLogs, countQueryLogs, exportQueryLogsJsonl } from "./query_log_store";
+import { clearAllQueryLogs, countQueryLogs, exportQueryLogsJsonl, getQueryLogStats } from "./query_log_store";
+import type { QueryLogStats } from "./query_log_types";
 
 export type QueryLogUiResult = {
   count: number;
+  message: string;
+  ok: boolean;
+};
+
+export type QueryLogStatsResult = {
+  stats: QueryLogStats;
   message: string;
   ok: boolean;
 };
@@ -11,6 +18,7 @@ type QueryLogControlsDeps = {
   clearLogs?: typeof clearAllQueryLogs;
   confirmFn?: (message: string) => boolean;
   countLogs?: typeof countQueryLogs;
+  statsLogs?: typeof getQueryLogStats;
   createObjectUrl?: (blob: Blob) => string;
   documentRef?: Document;
   exportLogs?: typeof exportQueryLogsJsonl;
@@ -110,6 +118,34 @@ export async function getQueryLogCountFromDb(
   } catch (error) {
     return {
       count: 0,
+      message: t(deps, "queryLogs.countError", { error: String(error) }),
+      ok: false,
+    };
+  } finally {
+    db?.close();
+  }
+}
+
+export async function getQueryLogStatsFromDb(
+  deps: QueryLogControlsDeps = {},
+): Promise<QueryLogStatsResult> {
+  const openDbFn = deps.openDb ?? openSiralexDb;
+  const statsFn = deps.statsLogs ?? getQueryLogStats;
+  let db: IDBDatabase | undefined;
+  try {
+    db = await openDbFn();
+    const stats = await statsFn(db);
+    return {
+      stats,
+      message:
+        stats.count === 1
+          ? t(deps, "queryLogs.count.one")
+          : t(deps, "queryLogs.count.many", { count: stats.count }),
+      ok: true,
+    };
+  } catch (error) {
+    return {
+      stats: { count: 0, oldest_timestamp_iso: null },
       message: t(deps, "queryLogs.countError", { error: String(error) }),
       ok: false,
     };

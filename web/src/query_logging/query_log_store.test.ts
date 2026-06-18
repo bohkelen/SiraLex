@@ -19,14 +19,23 @@ import {
 } from "../idb/siralex_db";
 import {
   appendQueryLog,
+  appendQueryLogV2,
   clearAllQueryLogs,
   clearQueryLogsForStorageScope,
   countQueryLogs,
   exportQueryLogsJsonl,
+  getQueryLogStats,
   listQueryLogs,
   listRecentQueryLogs,
 } from "./query_log_store";
-import type { AppendQueryLogInput } from "./query_log_types";
+import type { AppendQueryLogInput, AppendQueryLogV2Input } from "./query_log_types";
+import {
+  QUERY_LOG_CONSENT_VERSION,
+  QUERY_LOG_EVENT_V2,
+  QUERY_LOG_MAX_AGE_MS,
+  QUERY_LOG_MAX_ROWS,
+  QUERY_LOG_TOP_IR_IDS_LIMIT,
+} from "./query_log_types";
 
 function makeAppendInput(overrides: Partial<AppendQueryLogInput> = {}): AppendQueryLogInput {
   return {
@@ -47,6 +56,46 @@ function makeAppendInput(overrides: Partial<AppendQueryLogInput> = {}): AppendQu
     app_version: "dev-test",
     timestamp_iso: "2026-05-06T00:00:00.000Z",
     logging_enabled: true,
+    ...overrides,
+  };
+}
+
+function makeAppendV2Input(overrides: Partial<AppendQueryLogV2Input> = {}): AppendQueryLogV2Input {
+  const resultCount = overrides.result_count ?? 1;
+  const matchedKeyType = overrides.matched_key_type ?? "casefold";
+
+  return {
+    event_id: "evt-test-1",
+    timestamp_iso: "2026-06-18T00:00:00.000Z",
+    app_version: "dev-test",
+    bundle_id: "bundle_full_test_aaaaaaaa",
+    storage_scope_id: "bundle_full_test_aaaaaaaa::sha256:111",
+    norm_version: "norm_v3",
+    query_raw: "bonjour",
+    query_normalized_primary: "bonjour",
+    query_normalized_keys: {
+      casefold: ["bonjour"],
+      diacritics_insensitive: ["bonjour"],
+      punct_stripped: ["bonjour"],
+      nospace: ["bonjour"],
+    },
+    direction: "source_to_target",
+    ui_language: "fr",
+    result_count: resultCount,
+    top_ir_ids: ["ir-1"],
+    matched_key_type: matchedKeyType,
+    matched_key: "bonjour",
+    latency_ms: 12,
+    offline_or_online: true,
+    session_bucket_id: "session-test-1",
+    logging_enabled: true,
+    consent_version: QUERY_LOG_CONSENT_VERSION,
+    result_status:
+      overrides.result_status ??
+      (resultCount === 0 ? "miss" : resultCount === 1 ? "hit_single" : "hit_multi"),
+    matched_deep_ladder:
+      overrides.matched_deep_ladder ??
+      (matchedKeyType === "punct_stripped" || matchedKeyType === "nospace"),
     ...overrides,
   };
 }
@@ -409,6 +458,295 @@ describe("query log store", () => {
           }),
         ),
       ).rejects.toThrow(/query_normalized_keys\.nospace/);
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe("query log store v2", () => {
+  beforeEach(async () => {
+    try {
+      await deleteSiralexDb();
+    } catch {
+      // fine if db does not exist yet
+    }
+  });
+
+  it("appends a v2 row with schema_version query_log_event_v2", async () => {
+    const db = await openSiralexDb();
+    try {
+      const logId = await appendQueryLogV2(db, makeAppendV2Input());
+      expect(logId).toBe(1);
+
+      const rows = await listQueryLogs(db);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.schema_version).toBe(QUERY_LOG_EVENT_V2);
+      expect(rows[0]).toMatchObject({
+        event_id: "evt-test-1",
+        result_status: "hit_single",
+        result_count: 1,
+        matched_deep_ladder: false,
+        consent_version: QUERY_LOG_CONSENT_VERSION,
+        logging_enabled: true,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("preserves all required v2 fields on read", async () => {
+    const db = await openSiralexDb();
+    try {
+      await appendQueryLogV2(
+        db,
+        makeAppendV2Input({
+          event_id: "evt-full",
+          catalog_version: "norm-v3-featured",
+          bundle_version: "2026.06.18",
+          query_normalized_primary: null,
+          matched_key: null,
+          top_ir_ids: ["ir-a", "ir-b"],
+          ui_language: "en",
+          offline_or_online: false,
+          latency_ms: 99,
+        }),
+      );
+
+      const row = (await listQueryLogs(db))[0];
+      expect(row).toMatchObject({
+        schema_version: QUERY_LOG_EVENT_V2,
+        event_id: "evt-full",
+        catalog_version: "norm-v3-featured",
+        bundle_version: "2026.06.18",
+        query_normalized_primary: null,
+        matched_key: null,
+        top_ir_ids: ["ir-a", "ir-b"],
+        ui_language: "en",
+        offline_or_online: false,
+        latency_ms: 99,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rejects invalid v2 result_status", async () => {
+    const db = await openSiralexDb();
+    try {
+      await expect(
+        appendQueryLogV2(
+          db,
+          makeAppendV2Input({
+            result_count: 1,
+            result_status: "hit_multi",
+          }),
+        ),
+      ).rejects.toThrow(/result_status must equal deriveResultStatus/);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rejects negative result_count", async () => {
+    const db = await openSiralexDb();
+    try {
+      await expect(
+        appendQueryLogV2(
+          db,
+          makeAppendV2Input({
+            result_count: -1,
+            result_status: "miss",
+            top_ir_ids: [],
+            matched_key: null,
+            matched_key_type: "none",
+            matched_deep_ladder: false,
+          }),
+        ),
+      ).rejects.toThrow(/result_count must be an integer >= 0/);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rejects non-integer result_count", async () => {
+    const db = await openSiralexDb();
+    try {
+      await expect(
+        appendQueryLogV2(
+          db,
+          makeAppendV2Input({
+            result_count: 1.5 as unknown as number,
+          }),
+        ),
+      ).rejects.toThrow(/result_count must be an integer >= 0/);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rejects negative latency_ms", async () => {
+    const db = await openSiralexDb();
+    try {
+      await expect(
+        appendQueryLogV2(
+          db,
+          makeAppendV2Input({
+            latency_ms: -1,
+          }),
+        ),
+      ).rejects.toThrow(/latency_ms must be an integer >= 0/);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rejects top_ir_ids longer than QUERY_LOG_TOP_IR_IDS_LIMIT", async () => {
+    const db = await openSiralexDb();
+    try {
+      await expect(
+        appendQueryLogV2(
+          db,
+          makeAppendV2Input({
+            top_ir_ids: ["a", "b", "c", "d", "e", "f"],
+          }),
+        ),
+      ).rejects.toThrow(new RegExp(`at most ${QUERY_LOG_TOP_IR_IDS_LIMIT}`));
+    } finally {
+      db.close();
+    }
+  });
+
+  it("enforces matched_deep_ladder consistency", async () => {
+    const db = await openSiralexDb();
+    try {
+      await expect(
+        appendQueryLogV2(
+          db,
+          makeAppendV2Input({
+            matched_key_type: "nospace",
+            matched_deep_ladder: false,
+          }),
+        ),
+      ).rejects.toThrow(/matched_deep_ladder must equal deriveMatchedDeepLadder/);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("exports mixed v1 and v2 rows with distinct schema versions", async () => {
+    const db = await openSiralexDb();
+    try {
+      await appendQueryLog(db, makeAppendInput({ query_raw: "v1-row" }));
+      await appendQueryLogV2(db, makeAppendV2Input({ query_raw: "v2-row", event_id: "evt-v2" }));
+
+      const lines = (await (await exportQueryLogsJsonl(db)).text()).trimEnd().split("\n").map((line) => JSON.parse(line));
+      expect(lines).toHaveLength(2);
+      expect(lines[0]?.schema_version).toBe("query_log_event_v1");
+      expect(lines[1]?.schema_version).toBe(QUERY_LOG_EVENT_V2);
+      expect(lines[0]?.query_raw).toBe("v1-row");
+      expect(lines[1]?.query_raw).toBe("v2-row");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("reads mixed v1 and v2 rows without changing stored shapes", async () => {
+    const db = await openSiralexDb();
+    try {
+      await appendQueryLog(db, makeAppendInput({ query_raw: "legacy" }));
+      await appendQueryLogV2(db, makeAppendV2Input({ query_raw: "modern", event_id: "evt-modern" }));
+
+      const rows = await listQueryLogs(db);
+      expect(rows[0]?.schema_version).toBe("query_log_event_v1");
+      expect(rows[1]?.schema_version).toBe(QUERY_LOG_EVENT_V2);
+      expect(rows[0]).toHaveProperty("ir_ids_count");
+      expect(rows[1]).toHaveProperty("result_count");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("evicts the oldest row when the 2001st append exceeds QUERY_LOG_MAX_ROWS", async () => {
+    const db = await openSiralexDb();
+    try {
+      for (let i = 0; i < QUERY_LOG_MAX_ROWS + 1; i += 1) {
+        await appendQueryLogV2(
+          db,
+          makeAppendV2Input({
+            query_raw: `q-${i}`,
+            event_id: `evt-${i}`,
+            timestamp_iso: `2026-06-18T00:00:${String(i % 60).padStart(2, "0")}.000Z`,
+          }),
+        );
+      }
+
+      expect(await countQueryLogs(db)).toBe(QUERY_LOG_MAX_ROWS);
+      const rows = await listQueryLogs(db);
+      expect(rows[0]?.query_raw).toBe("q-1");
+      expect(rows[rows.length - 1]?.query_raw).toBe(`q-${QUERY_LOG_MAX_ROWS}`);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("prunes rows older than QUERY_LOG_MAX_AGE_MS on append", async () => {
+    const db = await openSiralexDb();
+    try {
+      const staleIso = new Date(Date.now() - QUERY_LOG_MAX_AGE_MS - 24 * 60 * 60 * 1000).toISOString();
+      await appendQueryLogV2(
+        db,
+        makeAppendV2Input({
+          query_raw: "stale",
+          event_id: "evt-stale",
+          timestamp_iso: staleIso,
+        }),
+      );
+      await appendQueryLogV2(
+        db,
+        makeAppendV2Input({
+          query_raw: "fresh",
+          event_id: "evt-fresh",
+          timestamp_iso: new Date().toISOString(),
+        }),
+      );
+
+      const rows = await listQueryLogs(db);
+      expect(rows.map((row) => row.query_raw)).toEqual(["fresh"]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("returns count and oldest timestamp from getQueryLogStats", async () => {
+    const db = await openSiralexDb();
+    try {
+      expect(await getQueryLogStats(db)).toEqual({
+        count: 0,
+        oldest_timestamp_iso: null,
+      });
+
+      await appendQueryLogV2(
+        db,
+        makeAppendV2Input({
+          query_raw: "older",
+          event_id: "evt-older",
+          timestamp_iso: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      await appendQueryLogV2(
+        db,
+        makeAppendV2Input({
+          query_raw: "newer",
+          event_id: "evt-newer",
+          timestamp_iso: "2026-06-18T00:00:00.000Z",
+        }),
+      );
+
+      expect(await getQueryLogStats(db)).toEqual({
+        count: 2,
+        oldest_timestamp_iso: "2026-06-01T00:00:00.000Z",
+      });
     } finally {
       db.close();
     }

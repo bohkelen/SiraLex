@@ -3,13 +3,15 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { deleteSiralexDb, openSiralexDb } from "../idb/siralex_db";
-import { appendQueryLog, countQueryLogs } from "./query_log_store";
 import {
   clearQueryLogsFromUi,
   exportQueryLogsFromUi,
   formatQueryLogExportFilename,
   getQueryLogCountFromDb,
+  getQueryLogStatsFromDb,
 } from "./query_log_controls";
+import { appendQueryLog, appendQueryLogV2, countQueryLogs } from "./query_log_store";
+import { QUERY_LOG_CONSENT_VERSION } from "./query_log_types";
 
 describe("query log controls", () => {
   beforeEach(async () => {
@@ -219,6 +221,78 @@ describe("query log controls", () => {
 
     expect(result.ok).toBe(false);
     expect(result.message).toMatch(/Export failed/);
+  });
+
+  it("getQueryLogStatsFromDb reports count and oldest timestamp", async () => {
+    const db = await openSiralexDb();
+    try {
+      await appendQueryLogV2(db, {
+        event_id: "evt-stats-1",
+        timestamp_iso: "2026-06-01T00:00:00.000Z",
+        app_version: "test",
+        bundle_id: "bundle-a",
+        storage_scope_id: "bundle-a::sha256:1",
+        norm_version: "norm_v3",
+        query_raw: "older",
+        query_normalized_primary: "older",
+        query_normalized_keys: {
+          casefold: ["older"],
+          diacritics_insensitive: ["older"],
+          punct_stripped: ["older"],
+          nospace: ["older"],
+        },
+        direction: "source_to_target",
+        ui_language: "fr",
+        result_status: "hit_single",
+        result_count: 1,
+        top_ir_ids: ["ir-1"],
+        matched_key_type: "casefold",
+        matched_key: "older",
+        matched_deep_ladder: false,
+        latency_ms: 10,
+        offline_or_online: true,
+        session_bucket_id: "session-1",
+        logging_enabled: true,
+        consent_version: QUERY_LOG_CONSENT_VERSION,
+      });
+      await appendQueryLogV2(db, {
+        event_id: "evt-stats-2",
+        timestamp_iso: "2026-06-18T00:00:00.000Z",
+        app_version: "test",
+        bundle_id: "bundle-a",
+        storage_scope_id: "bundle-a::sha256:1",
+        norm_version: "norm_v3",
+        query_raw: "newer",
+        query_normalized_primary: "newer",
+        query_normalized_keys: {
+          casefold: ["newer"],
+          diacritics_insensitive: ["newer"],
+          punct_stripped: ["newer"],
+          nospace: ["newer"],
+        },
+        direction: "source_to_target",
+        ui_language: "fr",
+        result_status: "hit_single",
+        result_count: 1,
+        top_ir_ids: ["ir-2"],
+        matched_key_type: "casefold",
+        matched_key: "newer",
+        matched_deep_ladder: false,
+        latency_ms: 11,
+        offline_or_online: true,
+        session_bucket_id: "session-1",
+        logging_enabled: true,
+        consent_version: QUERY_LOG_CONSENT_VERSION,
+      });
+    } finally {
+      db.close();
+    }
+
+    const result = await getQueryLogStatsFromDb();
+    expect(result.ok).toBe(true);
+    expect(result.stats.count).toBe(2);
+    expect(result.stats.oldest_timestamp_iso).toBe("2026-06-01T00:00:00.000Z");
+    expect(result.message).toBe("2 logs");
   });
 });
 

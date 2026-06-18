@@ -91,3 +91,8 @@ export type ListRecentQueryLogsOptions = QueryLogScopeFilter & {
 };
 
 export type ExportQueryLogsOptions = QueryLogScopeFilter;
+
+export type QueryLogStats = {
+  count: number;
+  oldest_timestamp_iso: string | null;
+};
