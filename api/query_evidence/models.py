@@ -14,6 +14,20 @@ VALID_RESULT_STATUSES = frozenset({"miss", "hit_single", "hit_multi"})
 
 
 @dataclass(frozen=True)
+class ReplayResult:
+    query: str
+    direction: str
+    result_count: int
+    resolved_ir_ids: list[str]
+    matched_key_type: str
+    matched_key: str | None
+    current_result: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class UnifiedQueryEvent:
     event_id: str
     schema_version: str

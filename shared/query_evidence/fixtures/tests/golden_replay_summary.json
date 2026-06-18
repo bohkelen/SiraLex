@@ -1,0 +1,73 @@
+{
+  "schema_version": "phase7k_replay_summary_v1",
+  "search_index_path": "web/public/bundle_full_20260616_phase7j_alias_round2_candidate/search_index.jsonl",
+  "replays": [
+    {
+      "query": "fruit",
+      "direction": "source_to_target",
+      "result_count": 1,
+      "resolved_ir_ids": [
+        "7cdb6070ce427a6d"
+      ],
+      "matched_key_type": "casefold",
+      "matched_key": "fruit",
+      "current_result": "hit (1)"
+    },
+    {
+      "query": "mère",
+      "direction": "source_to_target",
+      "result_count": 3,
+      "resolved_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "matched_key_type": "casefold",
+      "matched_key": "mère",
+      "current_result": "hit (3)"
+    },
+    {
+      "query": "fruits",
+      "direction": "source_to_target",
+      "result_count": 1,
+      "resolved_ir_ids": [
+        "7cdb6070ce427a6d"
+      ],
+      "matched_key_type": "casefold",
+      "matched_key": "fruits",
+      "current_result": "hit (1)"
+    },
+    {
+      "query": "grand-parents",
+      "direction": "source_to_target",
+      "result_count": 2,
+      "resolved_ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ],
+      "matched_key_type": "casefold",
+      "matched_key": "grand-parents",
+      "current_result": "hit (2)"
+    },
+    {
+      "query": "zzzz-nohit-test",
+      "direction": "source_to_target",
+      "result_count": 0,
+      "resolved_ir_ids": [],
+      "matched_key_type": "none",
+      "matched_key": null,
+      "current_result": "miss"
+    },
+    {
+      "query": "Kun",
+      "direction": "target_to_source",
+      "result_count": 1,
+      "resolved_ir_ids": [
+        "b07ae7bd61ff3c85"
+      ],
+      "matched_key_type": "casefold",
+      "matched_key": "kun",
+      "current_result": "hit (1)"
+    }
+  ]
+}
