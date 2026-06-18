@@ -18,6 +18,7 @@ from query_evidence.emit import (  # noqa: E402
     ANALYZER_VERSION,
     CandidateOutputError,
     build_summary_report,
+    ensure_candidates_valid,
     is_synthetic_fixture_run,
     resolve_catalog_version,
     write_audit_markdown,
@@ -170,6 +171,7 @@ def run_full_pipeline(
     )
 
     try:
+        ensure_candidates_valid(candidates)
         write_summary_json(output_summary, summary)
         write_candidates_jsonl(output_candidates, candidates)
         write_audit_markdown(

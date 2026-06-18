@@ -26,6 +26,12 @@ class CandidateOutputError(Exception):
     """Raised when candidate validation fails before writing output."""
 
 
+def ensure_candidates_valid(candidates: list[QueryEvidenceCandidate]) -> None:
+    errors = validate_candidates(candidates)
+    if errors:
+        raise CandidateOutputError("; ".join(errors))
+
+
 def priority_band(score: int) -> str:
     if score >= 70:
         return "P1"
@@ -47,11 +53,24 @@ def is_synthetic_fixture_run(input_paths: list[Path], repo_root: Path) -> bool:
 def resolve_catalog_version(catalog_path: Path | None, bundle_id: str) -> str | None:
     if catalog_path is None or not catalog_path.exists():
         return None
-    payload = json.loads(catalog_path.read_text(encoding="utf-8"))
-    for bundle in payload.get("bundles", []):
-        if isinstance(bundle, dict) and bundle.get("bundle_id") == bundle_id:
-            version = bundle.get("version")
-            return version if isinstance(version, str) and version else None
+    try:
+        payload = json.loads(catalog_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    bundles = payload.get("bundles")
+    if not isinstance(bundles, list):
+        return None
+    for bundle in bundles:
+        if not isinstance(bundle, dict):
+            continue
+        if bundle.get("bundle_id") != bundle_id:
+            continue
+        version = bundle.get("version")
+        if isinstance(version, str) and version.strip():
+            return version.strip()
+        return None
     return None
 
 

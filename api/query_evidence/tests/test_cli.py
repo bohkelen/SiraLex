@@ -203,6 +203,61 @@ def test_candidate_validation_failure_exits_nonzero(tmp_path: Path):
         write_candidates_jsonl(tmp_path / "bad.jsonl", [candidate])
 
 
+def test_candidate_validation_failure_does_not_write_full_pipeline_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    summary = tmp_path / "summary.json"
+    candidates_path = tmp_path / "candidates.jsonl"
+    audit = tmp_path / "audit.md"
+
+    def _bad_candidates(groups, replay_results):
+        return [
+            QueryEvidenceCandidate(
+                review_id="phase7k_evidence_0001",
+                schema_version=QUERY_EVIDENCE_SCHEMA,
+                query="fruit",
+                search_direction="source_to_target",
+                occurrence_count=1,
+                first_seen="2026-06-01T00:00:00.000Z",
+                last_seen="2026-06-02T00:00:00.000Z",
+                current_result="hit (1)",
+                gap_class="already_addressed",
+                priority_score=0,
+                priority_reasons=["monitor_only:no_action_required"],
+                resolved_ir_ids=["7cdb6070ce427a6d"],
+                evidence_sources=["query_log_export", "search_index_replay"],
+                recommended_destination_artifact=None,
+                review_status="approved",
+                reason_not_to_apply_automatically="bad row",
+                source_bundle_id="bundle-a",
+                source_catalog_version=None,
+                related_log_event_ids=["evt-1"],
+            )
+        ]
+
+    monkeypatch.setattr(analyze_query_evidence, "build_candidates", _bad_candidates)
+
+    exit_code = analyze_query_evidence.run_full_pipeline(
+        input_paths=[
+            _fixture("sample_export_v2.jsonl"),
+            _fixture("sample_export_mixed_v1_v2.jsonl"),
+        ],
+        bundle_path=BUNDLE,
+        catalog_path=CATALOG,
+        output_summary=summary,
+        output_candidates=candidates_path,
+        output_report=audit,
+        generated_at_iso=FIXED_GENERATED_AT,
+        repo_root=REPO_ROOT,
+    )
+
+    assert exit_code == 1
+    assert not summary.exists()
+    assert not candidates_path.exists()
+    assert not audit.exists()
+
+
 def test_production_named_output_paths_are_not_created_by_tests(tmp_path: Path):
     summary = tmp_path / "summary.json"
     candidates = tmp_path / "candidates.jsonl"

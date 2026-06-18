@@ -20,6 +20,7 @@ from query_evidence.classify import build_candidates  # noqa: E402
 from query_evidence.emit import (  # noqa: E402
     CandidateOutputError,
     build_summary_report,
+    resolve_catalog_version,
     write_audit_markdown,
     write_candidates_jsonl,
     write_summary_json,
@@ -162,3 +163,23 @@ def test_write_summary_json_round_trip(tmp_path: Path):
     write_summary_json(output, summary)
     loaded = json.loads(output.read_text(encoding="utf-8"))
     assert loaded == summary
+
+
+def test_resolve_catalog_version_returns_none_for_malformed_catalog_json(tmp_path: Path):
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text("{not json", encoding="utf-8")
+
+    assert resolve_catalog_version(catalog, "bundle-a") is None
+
+
+def test_resolve_catalog_version_returns_none_for_unexpected_catalog_shape(tmp_path: Path):
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text(json.dumps({"bundles": "not-a-list"}), encoding="utf-8")
+
+    assert resolve_catalog_version(catalog, "bundle-a") is None
+
+    catalog.write_text(json.dumps({"bundles": [{"bundle_id": "bundle-a"}]}), encoding="utf-8")
+    assert resolve_catalog_version(catalog, "bundle-a") is None
+
+    catalog.write_text(json.dumps({"bundles": [{"bundle_id": "other", "version": "v1"}]}), encoding="utf-8")
+    assert resolve_catalog_version(catalog, "bundle-a") is None
