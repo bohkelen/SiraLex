@@ -1,0 +1,144 @@
+{
+  "schema_version": "phase7k_ingest_summary_v1",
+  "ingest": {
+    "total_events": 8,
+    "v1_events": 1,
+    "v2_events": 7,
+    "issue_count": 0,
+    "duplicate_event_ids_dropped": 0,
+    "distinct_queries": 6,
+    "distinct_session_bucket_hashes": 1
+  },
+  "issues": [],
+  "dedupe_group_count": 6,
+  "dedupe_groups": [
+    {
+      "query": "bon-jour",
+      "query_casefold": "bon-jour",
+      "direction": "source_to_target",
+      "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
+      "occurrence_count": 1,
+      "first_seen": "2026-06-18T19:18:36.000Z",
+      "last_seen": "2026-06-18T19:18:36.000Z",
+      "result_status_counts": {
+        "hit_single": 1
+      },
+      "distinct_session_bucket_hashes": [
+        "5bfe1fbf"
+      ],
+      "event_ids": [
+        "evt-fixture-deep-1"
+      ],
+      "catalog_versions": [
+        "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2"
+      ]
+    },
+    {
+      "query": "bonjour",
+      "query_casefold": "bonjour",
+      "direction": "source_to_target",
+      "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
+      "occurrence_count": 2,
+      "first_seen": "2026-06-01T00:00:00.000Z",
+      "last_seen": "2026-06-02T00:00:00.000Z",
+      "result_status_counts": {
+        "hit_single": 2
+      },
+      "distinct_session_bucket_hashes": [
+        "5bfe1fbf"
+      ],
+      "event_ids": [
+        "v1:sample_export_mixed_v1_v2.jsonl:1:101",
+        "evt-fixture-bonjour-v2"
+      ],
+      "catalog_versions": [
+        "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2"
+      ]
+    },
+    {
+      "query": "fruit",
+      "query_casefold": "fruit",
+      "direction": "source_to_target",
+      "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
+      "occurrence_count": 2,
+      "first_seen": "2026-06-18T19:18:32.738Z",
+      "last_seen": "2026-06-18T19:18:37.000Z",
+      "result_status_counts": {
+        "hit_single": 2
+      },
+      "distinct_session_bucket_hashes": [
+        "5bfe1fbf"
+      ],
+      "event_ids": [
+        "evt-fixture-fruit-1",
+        "evt-fixture-fruit-dup"
+      ],
+      "catalog_versions": [
+        "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2"
+      ]
+    },
+    {
+      "query": "mère",
+      "query_casefold": "mère",
+      "direction": "source_to_target",
+      "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
+      "occurrence_count": 1,
+      "first_seen": "2026-06-18T19:18:34.222Z",
+      "last_seen": "2026-06-18T19:18:34.222Z",
+      "result_status_counts": {
+        "hit_multi": 1
+      },
+      "distinct_session_bucket_hashes": [
+        "5bfe1fbf"
+      ],
+      "event_ids": [
+        "evt-fixture-mere-1"
+      ],
+      "catalog_versions": [
+        "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2"
+      ]
+    },
+    {
+      "query": "salut",
+      "query_casefold": "salut",
+      "direction": "source_to_target",
+      "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
+      "occurrence_count": 1,
+      "first_seen": "2026-06-03T00:00:00.000Z",
+      "last_seen": "2026-06-03T00:00:00.000Z",
+      "result_status_counts": {
+        "hit_single": 1
+      },
+      "distinct_session_bucket_hashes": [
+        "5bfe1fbf"
+      ],
+      "event_ids": [
+        "evt-fixture-salut-v2"
+      ],
+      "catalog_versions": [
+        "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2"
+      ]
+    },
+    {
+      "query": "zzzz-nohit-test",
+      "query_casefold": "zzzz-nohit-test",
+      "direction": "source_to_target",
+      "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
+      "occurrence_count": 1,
+      "first_seen": "2026-06-18T19:18:35.698Z",
+      "last_seen": "2026-06-18T19:18:35.698Z",
+      "result_status_counts": {
+        "miss": 1
+      },
+      "distinct_session_bucket_hashes": [
+        "5bfe1fbf"
+      ],
+      "event_ids": [
+        "evt-fixture-miss-1"
+      ],
+      "catalog_versions": [
+        "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2"
+      ]
+    }
+  ]
+}
