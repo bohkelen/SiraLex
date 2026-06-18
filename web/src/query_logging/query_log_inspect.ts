@@ -1,5 +1,8 @@
-import type { QueryLogEventV1 } from "./query_log_types";
+import { getQueryLogResultCount } from "./query_log_derive";
+import type { QueryLogEventV1, QueryLogEventV2 } from "./query_log_types";
 
-export function queryLogHitMiss(row: Pick<QueryLogEventV1, "ir_ids_count">): "hit" | "miss" {
-  return row.ir_ids_count > 0 ? "hit" : "miss";
+export function queryLogHitMiss(
+  row: Pick<QueryLogEventV1, "ir_ids_count"> | QueryLogEventV1 | QueryLogEventV2,
+): "hit" | "miss" {
+  return getQueryLogResultCount(row as QueryLogEventV1 | QueryLogEventV2) > 0 ? "hit" : "miss";
 }
