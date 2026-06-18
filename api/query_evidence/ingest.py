@@ -96,7 +96,9 @@ def _synthetic_v1_event_id(source_path: str, line_number: int, payload: dict[str
     log_id = payload.get("log_id")
     if isinstance(log_id, int):
         return f"v1:{label}:{line_number}:{log_id}"
-    return f"v1:{label}:{line_number}:{hash(json.dumps(payload, sort_keys=True)) & 0xFFFFFFFF:08x}"
+    payload_json = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    digest = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()[:12]
+    return f"v1:{label}:{line_number}:{digest}"
 
 
 def _parse_v1_row(

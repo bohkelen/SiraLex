@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -252,6 +253,41 @@ def test_v1_row_has_null_matched_key_and_derived_deep_ladder(tmp_path: Path):
     assert event.matched_key is None
     assert event.matched_deep_ladder is True
     assert event.matched_key_type == "nospace"
+
+
+def test_v1_synthetic_event_id_without_log_id_is_deterministic(tmp_path: Path):
+    export = tmp_path / "no_log_id.jsonl"
+    payload = {
+        "schema_version": "query_log_event_v1",
+        "query_raw": "stable-id-test",
+        "query_normalized_keys": {
+            "casefold": ["stable-id-test"],
+            "diacritics_insensitive": ["stable-id-test"],
+            "punct_stripped": ["stable-id-test"],
+            "nospace": ["stableidtest"],
+        },
+        "direction": "source_to_target",
+        "ladder_level_hit": "casefold",
+        "ir_ids_count": 0,
+        "bundle_id": "bundle-a",
+        "norm_version": "norm_v3",
+        "timestamp_iso": "2026-06-01T00:00:00.000Z",
+        "logging_enabled": True,
+    }
+    export.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    first_id = load_query_log_exports([export])[0][0].event_id
+    second_id = load_query_log_exports([export])[0][0].event_id
+
+    assert first_id == second_id
+    assert first_id.startswith("v1:no_log_id.jsonl:1:")
+
+    payload_json = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    expected_suffix = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()[:12]
+    suffix = first_id.rsplit(":", 1)[-1]
+    assert len(suffix) == 12
+    assert suffix == expected_suffix
+    assert first_id == f"v1:no_log_id.jsonl:1:{expected_suffix}"
 
 
 def test_cli_writes_ingest_summary_json(tmp_path: Path):
