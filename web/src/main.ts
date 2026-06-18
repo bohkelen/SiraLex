@@ -1814,6 +1814,8 @@ type SettledQueryLogPayload = {
   result: Awaited<ReturnType<typeof searchQuery>>;
   activeBundleMeta: ActiveBundleMeta;
   storageScopeId: string;
+  latencyMs: number;
+  uiLanguage: Locale;
 };
 
 let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1855,6 +1857,8 @@ function scheduleSettledQueryLog(payload: SettledQueryLogPayload) {
       result: pending.result,
       activeBundleMeta: pending.activeBundleMeta,
       storageScopeId: pending.storageScopeId,
+      latencyMs: pending.latencyMs,
+      uiLanguage: pending.uiLanguage,
     }).then(async () => {
       await refreshQueryLoggingCount();
       await updateRecentQueryLogsView();
@@ -1952,6 +1956,8 @@ async function runSearch(query: string) {
         result,
         activeBundleMeta,
         storageScopeId: activeStorageScopeId,
+        latencyMs: Math.round(performance.now() - t0),
+        uiLanguage: getCurrentLocale(),
       });
       return;
     }
@@ -1981,6 +1987,8 @@ async function runSearch(query: string) {
       result,
       activeBundleMeta,
       storageScopeId: activeStorageScopeId,
+      latencyMs: Math.round(performance.now() - t0),
+      uiLanguage: getCurrentLocale(),
     });
   } catch (e) {
     if (seq !== searchSeq) return;
