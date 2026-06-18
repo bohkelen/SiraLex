@@ -1,0 +1,58 @@
+{
+  "schema_version": "phase7k_query_summary_v1",
+  "generated_at_iso": "2026-06-18T20:00:00.000Z",
+  "analyzer_version": "0.1.0",
+  "inputs": [
+    {
+      "path": "shared/query_evidence/fixtures/sample_export_v2.jsonl",
+      "row_count": 5,
+      "parse_errors": 0
+    },
+    {
+      "path": "shared/query_evidence/fixtures/sample_export_mixed_v1_v2.jsonl",
+      "row_count": 3,
+      "parse_errors": 0
+    }
+  ],
+  "replay": {
+    "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
+    "bundle_path": "web/public/bundle_full_20260616_phase7j_alias_round2_candidate",
+    "catalog_version": "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2",
+    "norm_version": "norm_v3",
+    "search_index_directional": true
+  },
+  "ingest": {
+    "total_events": 8,
+    "v1_events": 1,
+    "v2_events": 7,
+    "parse_errors": 0,
+    "duplicate_event_ids_dropped": 0,
+    "distinct_queries": 6,
+    "distinct_tester_buckets_hashed": 1
+  },
+  "outcomes": {
+    "miss": 1,
+    "hit_single": 6,
+    "hit_multi": 1,
+    "deep_ladder_hits": 1
+  },
+  "candidates": {
+    "total": 6,
+    "by_gap_class": {
+      "already_addressed": 2,
+      "ranking_ambiguity_issue": 1,
+      "true_dictionary_entry_gap": 3
+    },
+    "by_priority_band": {
+      "P1": 0,
+      "P2": 1,
+      "P3": 3,
+      "monitor": 2
+    }
+  },
+  "privacy": {
+    "raw_exports_committed": false,
+    "session_bucket_handling": "sha256_prefix_8",
+    "synthetic_fixture_run": true
+  }
+}
