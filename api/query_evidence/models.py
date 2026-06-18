@@ -9,8 +9,25 @@ from typing import Any
 QUERY_LOG_EVENT_V1 = "query_log_event_v1"
 QUERY_LOG_EVENT_V2 = "query_log_event_v2"
 
+QUERY_EVIDENCE_SCHEMA = "phase7k_query_evidence_v1"
+REVIEW_STATUS_CANDIDATE = "candidate"
+
 VALID_DIRECTIONS = frozenset({"source_to_target", "target_to_source"})
 VALID_RESULT_STATUSES = frozenset({"miss", "hit_single", "hit_multi"})
+VALID_GAP_CLASSES = frozenset(
+    {
+        "reviewed_source_alias_candidate",
+        "reviewed_source_index_supplement_candidate",
+        "phrase_miss_candidate",
+        "true_dictionary_entry_gap",
+        "ranking_ambiguity_issue",
+        "target_side_issue",
+        "typo_noise",
+        "should_remain_no_hit",
+        "ui_copy_issue",
+        "already_addressed",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -102,3 +119,29 @@ class IngestStrictError(Exception):
     def __init__(self, issues: list[IngestIssue]) -> None:
         self.issues = issues
         super().__init__(f"ingest strict mode failed with {len(issues)} issue(s)")
+
+
+@dataclass
+class QueryEvidenceCandidate:
+    review_id: str
+    schema_version: str
+    query: str
+    search_direction: str
+    occurrence_count: int
+    first_seen: str | None
+    last_seen: str | None
+    current_result: str
+    gap_class: str
+    priority_score: int
+    priority_reasons: list[str]
+    resolved_ir_ids: list[str]
+    evidence_sources: list[str]
+    recommended_destination_artifact: str | None
+    review_status: str
+    reason_not_to_apply_automatically: str
+    source_bundle_id: str
+    source_catalog_version: str | None
+    related_log_event_ids: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
