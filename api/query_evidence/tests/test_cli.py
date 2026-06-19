@@ -63,6 +63,29 @@ def test_ingest_only_mode_still_writes_phase7k_ingest_summary_v1(tmp_path: Path)
     assert payload["schema_version"] == "phase7k_ingest_summary_v1"
 
 
+def test_ingest_only_redacts_outside_repo_issue_source_paths(tmp_path: Path):
+    export = tmp_path / "private-export.jsonl"
+    valid_line = _fixture("sample_export_v2.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    export.write_text("not valid json\n" + valid_line + "\n", encoding="utf-8")
+    output = tmp_path / "ingest_summary.json"
+
+    result = _run_cli(
+        [
+            "--input",
+            str(export),
+            "--output-ingest-summary",
+            str(output),
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["issues"][0]["source_path"] == "private-export.jsonl"
+    dumped = output.read_text(encoding="utf-8")
+    assert str(export) not in dumped
+    assert str(tmp_path) not in dumped
+
+
 def test_full_pipeline_writes_summary_candidates_audit_to_temp_paths(tmp_path: Path):
     summary = tmp_path / "summary.json"
     candidates = tmp_path / "candidates.jsonl"

@@ -18,6 +18,7 @@ from query_evidence.emit import (  # noqa: E402
     ANALYZER_VERSION,
     CandidateOutputError,
     build_summary_report,
+    display_input_path,
     ensure_candidates_valid,
     is_synthetic_fixture_run,
     resolve_catalog_version,
@@ -36,11 +37,23 @@ from query_evidence.replay import load_search_index, replay_query_groups  # noqa
 INGEST_SUMMARY_SCHEMA = "phase7k_ingest_summary_v1"
 
 
-def build_ingest_report(events, issues, groups) -> dict:
+def _issue_to_dict(issue, repo_root: Path | None) -> dict:
+    data = issue.to_dict()
+    data["source_path"] = display_input_path(issue.source_path, repo_root)
+    return data
+
+
+def build_ingest_report(
+    events,
+    issues,
+    groups,
+    repo_root: Path | None = None,
+) -> dict:
+    repo_root = repo_root or REPO_ROOT
     return {
         "schema_version": INGEST_SUMMARY_SCHEMA,
         "ingest": summarize_ingest(events, issues).to_dict(),
-        "issues": [issue.to_dict() for issue in issues],
+        "issues": [_issue_to_dict(issue, repo_root) for issue in issues],
         "dedupe_group_count": len(groups),
         "dedupe_groups": [group.to_dict() for group in groups],
     }
@@ -208,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     groups = dedupe_query_events(events)
 
     if args.output_ingest_summary is not None:
-        report = build_ingest_report(events, issues, groups)
+        report = build_ingest_report(events, issues, groups, repo_root=REPO_ROOT)
         args.output_ingest_summary.parent.mkdir(parents=True, exist_ok=True)
         args.output_ingest_summary.write_text(
             json.dumps(report, indent=2, ensure_ascii=False) + "\n",

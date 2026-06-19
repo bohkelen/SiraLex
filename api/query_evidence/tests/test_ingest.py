@@ -341,7 +341,7 @@ def test_golden_ingest_summary_matches_fixture_output():
         ]
     )
     groups = dedupe_query_events(events)
-    report = analyze_query_evidence.build_ingest_report(events, issues, groups)
+    report = analyze_query_evidence.build_ingest_report(events, issues, groups, repo_root=REPO_ROOT)
     golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
 
     assert report == golden
@@ -364,3 +364,24 @@ def test_summarize_ingest_counts_distinct_queries():
     assert summary.v2_events == 7
     assert summary.distinct_queries == 6
     assert summary.distinct_session_bucket_hashes == 1
+
+
+def test_build_ingest_report_redacts_outside_repo_issue_source_paths(tmp_path: Path):
+    export = tmp_path / "private-export.jsonl"
+    valid_line = _fixture("sample_export_v2.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    export.write_text("not valid json\n" + valid_line + "\n", encoding="utf-8")
+
+    events, issues = load_query_log_exports([export])
+    groups = dedupe_query_events(events)
+    report = analyze_query_evidence.build_ingest_report(
+        events,
+        issues,
+        groups,
+        repo_root=REPO_ROOT,
+    )
+
+    assert report["issues"]
+    assert report["issues"][0]["source_path"] == "private-export.jsonl"
+    dumped = json.dumps(report)
+    assert str(export) not in dumped
+    assert str(tmp_path) not in dumped
