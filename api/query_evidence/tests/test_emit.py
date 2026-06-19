@@ -27,7 +27,7 @@ from query_evidence.emit import (  # noqa: E402
     write_summary_json,
 )
 from query_evidence.ingest import dedupe_query_events, load_query_log_exports, summarize_ingest  # noqa: E402
-from query_evidence.models import QUERY_EVIDENCE_SCHEMA, QueryEvidenceCandidate, REVIEW_STATUS_CANDIDATE  # noqa: E402
+from query_evidence.models import IngestIssue, QueryEvidenceCandidate, REVIEW_STATUS_CANDIDATE  # noqa: E402
 from query_evidence.replay import load_search_index, replay_query_groups  # noqa: E402
 
 
@@ -245,3 +245,32 @@ def test_golden_fixture_summary_input_paths_remain_repo_relative():
             "parse_errors": 0,
         },
     ]
+
+
+def test_write_audit_markdown_redacts_outside_repo_issue_paths(tmp_path: Path):
+    _, _, _, groups, candidates, summary = _pipeline_data()
+    outside_export = tmp_path / "private-export.jsonl"
+    outside_export.write_text("{}\n", encoding="utf-8")
+    issues = [
+        IngestIssue(
+            code="malformed_json",
+            message="Expecting value: line 1 column 1 (char 0)",
+            source_path=str(outside_export.resolve()),
+            line_number=1,
+        )
+    ]
+
+    output = tmp_path / "audit.md"
+    write_audit_markdown(
+        output,
+        summary=summary,
+        candidates=candidates,
+        issues=issues,
+        groups=groups,
+        repo_root=REPO_ROOT,
+    )
+    text = output.read_text(encoding="utf-8")
+
+    assert "in `private-export.jsonl`:" in text
+    assert str(outside_export) not in text
+    assert str(tmp_path) not in text

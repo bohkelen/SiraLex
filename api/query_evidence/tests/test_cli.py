@@ -311,3 +311,29 @@ def test_full_pipeline_summary_uses_basename_for_outside_repo_input(tmp_path: Pa
     payload = json.loads(summary.read_text(encoding="utf-8"))
     assert payload["inputs"][0]["path"] == "siralex-query-logs-20260618T191837Z.jsonl"
     assert "/tmp/" not in summary.read_text(encoding="utf-8")
+
+
+def test_full_pipeline_audit_redacts_outside_repo_parse_issue_paths(tmp_path: Path):
+    export = tmp_path / "private-export.jsonl"
+    valid_line = _fixture("sample_export_v2.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    export.write_text("not valid json\n" + valid_line + "\n", encoding="utf-8")
+
+    summary = tmp_path / "summary.json"
+    candidates = tmp_path / "candidates.jsonl"
+    audit = tmp_path / "audit.md"
+    exit_code = analyze_query_evidence.run_full_pipeline(
+        input_paths=[export],
+        bundle_path=BUNDLE,
+        catalog_path=CATALOG,
+        output_summary=summary,
+        output_candidates=candidates,
+        output_report=audit,
+        generated_at_iso=FIXED_GENERATED_AT,
+        repo_root=REPO_ROOT,
+    )
+
+    assert exit_code == 0
+    audit_text = audit.read_text(encoding="utf-8")
+    assert "in `private-export.jsonl`:" in audit_text
+    assert str(export) not in audit_text
+    assert str(tmp_path) not in audit_text

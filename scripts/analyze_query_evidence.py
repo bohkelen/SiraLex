@@ -180,6 +180,7 @@ def run_full_pipeline(
             candidates=candidates,
             issues=issues,
             groups=groups,
+            repo_root=repo_root,
         )
     except CandidateOutputError:
         return 1
