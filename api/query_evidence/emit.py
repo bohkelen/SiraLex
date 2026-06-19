@@ -90,6 +90,18 @@ def resolve_bundle_metadata(bundle_path: Path) -> dict[str, Any]:
     }
 
 
+def display_input_path(path: Path | str, repo_root: Path | None = None) -> str:
+    resolved = Path(path).resolve()
+    if repo_root is not None:
+        try:
+            return str(resolved.relative_to(repo_root.resolve()))
+        except ValueError:
+            return resolved.name
+    if resolved.is_absolute():
+        return resolved.name
+    return str(path)
+
+
 def _input_stats(
     input_paths: list[Path],
     issues: list[IngestIssue],
@@ -98,12 +110,6 @@ def _input_stats(
     stats: list[dict[str, Any]] = []
     for path in input_paths:
         resolved = path.resolve()
-        source_path = str(resolved)
-        if repo_root is not None:
-            try:
-                source_path = str(resolved.relative_to(repo_root.resolve()))
-            except ValueError:
-                source_path = str(resolved)
         row_count = 0
         with resolved.open("r", encoding="utf-8") as handle:
             for line in handle:
@@ -114,7 +120,7 @@ def _input_stats(
         )
         stats.append(
             {
-                "path": source_path,
+                "path": display_input_path(resolved, repo_root),
                 "row_count": row_count,
                 "parse_errors": parse_errors,
             }
@@ -241,6 +247,7 @@ def write_audit_markdown(
     candidates: list[QueryEvidenceCandidate],
     issues: list[IngestIssue],
     groups: list[DedupedQueryGroup],
+    repo_root: Path | None = None,
 ) -> None:
     synthetic = summary["privacy"].get("synthetic_fixture_run", False)
     sorted_candidates = _sorted_candidates(candidates)
@@ -327,8 +334,9 @@ def write_audit_markdown(
         lines.append("_None._")
     else:
         for issue in issues:
+            issue_path = display_input_path(issue.source_path, repo_root)
             lines.append(
-                f"- `{issue.code}` line {issue.line_number} in `{issue.source_path}`: {issue.message}"
+                f"- `{issue.code}` line {issue.line_number} in `{issue_path}`: {issue.message}"
             )
     lines.append("")
 

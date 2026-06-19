@@ -20,6 +20,7 @@ from query_evidence.classify import build_candidates  # noqa: E402
 from query_evidence.emit import (  # noqa: E402
     CandidateOutputError,
     build_summary_report,
+    display_input_path,
     resolve_catalog_version,
     write_audit_markdown,
     write_candidates_jsonl,
@@ -183,3 +184,64 @@ def test_resolve_catalog_version_returns_none_for_unexpected_catalog_shape(tmp_p
 
     catalog.write_text(json.dumps({"bundles": [{"bundle_id": "other", "version": "v1"}]}), encoding="utf-8")
     assert resolve_catalog_version(catalog, "bundle-a") is None
+
+
+def test_display_input_path_outside_repo_emits_basename_only(tmp_path: Path):
+    export = tmp_path / "private-export.jsonl"
+    export.write_text("{}\n", encoding="utf-8")
+
+    assert display_input_path(export, REPO_ROOT) == "private-export.jsonl"
+
+
+def test_display_input_path_inside_repo_fixture_remains_repo_relative():
+    fixture = FIXTURES / "sample_export_v2.jsonl"
+
+    assert display_input_path(fixture, REPO_ROOT) == (
+        "shared/query_evidence/fixtures/sample_export_v2.jsonl"
+    )
+
+
+def test_summary_json_contains_no_absolute_tmp_path_for_outside_repo_input(tmp_path: Path):
+    export = tmp_path / "siralex-query-logs-real.jsonl"
+    export.write_text(
+        FIXTURES.joinpath("sample_export_v2.jsonl").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    events, issues = load_query_log_exports([export])
+    groups = dedupe_query_events(events)
+    search_index = load_search_index(BUNDLE / "search_index.jsonl")
+    candidates = build_candidates(groups, replay_query_groups(search_index, groups))
+    summary = build_summary_report(
+        input_paths=[export],
+        events=events,
+        issues=issues,
+        ingest_summary=summarize_ingest(events, issues),
+        bundle_path=BUNDLE,
+        catalog_version="norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2",
+        candidates=candidates,
+        synthetic_fixture_run=False,
+        generated_at_iso=FIXED_GENERATED_AT,
+        repo_root=REPO_ROOT,
+    )
+
+    dumped = json.dumps(summary)
+    assert summary["inputs"][0]["path"] == "siralex-query-logs-real.jsonl"
+    assert "/tmp/" not in dumped
+    assert str(tmp_path) not in dumped
+
+
+def test_golden_fixture_summary_input_paths_remain_repo_relative():
+    _, _, _, _, _, summary = _pipeline_data()
+
+    assert summary["inputs"] == [
+        {
+            "path": "shared/query_evidence/fixtures/sample_export_v2.jsonl",
+            "row_count": 5,
+            "parse_errors": 0,
+        },
+        {
+            "path": "shared/query_evidence/fixtures/sample_export_mixed_v1_v2.jsonl",
+            "row_count": 3,
+            "parse_errors": 0,
+        },
+    ]

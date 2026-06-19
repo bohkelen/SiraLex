@@ -285,3 +285,29 @@ def test_production_named_output_paths_are_not_created_by_tests(tmp_path: Path):
     assert not PRODUCTION_SUMMARY.exists()
     assert not PRODUCTION_CANDIDATES.exists()
     assert not PRODUCTION_AUDIT.exists()
+
+
+def test_full_pipeline_summary_uses_basename_for_outside_repo_input(tmp_path: Path):
+    export = tmp_path / "siralex-query-logs-20260618T191837Z.jsonl"
+    export.write_text(
+        _fixture("sample_export_v2.jsonl").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    summary = tmp_path / "summary.json"
+    candidates = tmp_path / "candidates.jsonl"
+    audit = tmp_path / "audit.md"
+    exit_code = analyze_query_evidence.run_full_pipeline(
+        input_paths=[export],
+        bundle_path=BUNDLE,
+        catalog_path=CATALOG,
+        output_summary=summary,
+        output_candidates=candidates,
+        output_report=audit,
+        generated_at_iso=FIXED_GENERATED_AT,
+        repo_root=REPO_ROOT,
+    )
+
+    assert exit_code == 0
+    payload = json.loads(summary.read_text(encoding="utf-8"))
+    assert payload["inputs"][0]["path"] == "siralex-query-logs-20260618T191837Z.jsonl"
+    assert "/tmp/" not in summary.read_text(encoding="utf-8")
