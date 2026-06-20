@@ -58,6 +58,72 @@ class MatrixLoadError(Exception):
     """Raised when matrix JSONL or manifest cannot be loaded."""
 
 
+def _load_error(line_number: int, field: str, message: str) -> MatrixLoadError:
+    return MatrixLoadError(f"line {line_number}: {field} {message}")
+
+
+def _require_string(raw: dict[str, Any], field: str, *, line_number: int) -> str:
+    value = raw[field]
+    if not isinstance(value, str):
+        raise _load_error(line_number, field, "must be a string")
+    return value
+
+
+def _require_int_not_bool(raw: dict[str, Any], field: str, *, line_number: int) -> int:
+    value = raw[field]
+    if isinstance(value, bool):
+        raise _load_error(line_number, field, "must not be a boolean")
+    if not isinstance(value, int):
+        raise _load_error(line_number, field, "must be an integer")
+    return value
+
+
+def _require_bool(raw: dict[str, Any], field: str, *, line_number: int) -> bool:
+    value = raw[field]
+    if type(value) is not bool:
+        raise _load_error(line_number, field, "must be a boolean")
+    return value
+
+
+def _require_string_list(raw: dict[str, Any], field: str, *, line_number: int) -> list[str]:
+    value = raw[field]
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise _load_error(line_number, field, "must be a string list")
+    return list(value)
+
+
+def _optional_string_list(
+    raw: dict[str, Any],
+    field: str,
+    *,
+    line_number: int,
+) -> list[str] | None:
+    if field not in raw or raw[field] is None:
+        return None
+    value = raw[field]
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise _load_error(line_number, field, "must be a string array")
+    return list(value)
+
+
+def _optional_string(raw: dict[str, Any], field: str, *, line_number: int) -> str | None:
+    if field not in raw or raw[field] is None:
+        return None
+    value = raw[field]
+    if not isinstance(value, str):
+        raise _load_error(line_number, field, "must be a string")
+    return value
+
+
+def _require_string_or_null(raw: dict[str, Any], field: str, *, line_number: int) -> str | None:
+    value = raw[field]
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise _load_error(line_number, field, "must be string or null")
+    return value
+
+
 @dataclass(frozen=True)
 class SearchRegressionCase:
     case_id: str
@@ -89,54 +155,57 @@ class SearchRegressionCase:
                 f"line {line_number}: missing required fields: {', '.join(missing)}"
             )
 
-        query = raw["query"]
-        if not isinstance(query, str):
-            raise MatrixLoadError(f"line {line_number}: query must be a string")
-
-        expected_ir_ids = raw["expected_ir_ids"]
-        if not isinstance(expected_ir_ids, list) or not all(
-            isinstance(item, str) for item in expected_ir_ids
-        ):
-            raise MatrixLoadError(f"line {line_number}: expected_ir_ids must be a string list")
-
-        case_tags = raw.get("case_tags")
-        if case_tags is not None:
-            if not isinstance(case_tags, list) or not all(
-                isinstance(item, str) for item in case_tags
-            ):
-                raise MatrixLoadError(f"line {line_number}: case_tags must be a string array")
-
-        notes = raw.get("notes")
-        if notes is not None and not isinstance(notes, str):
-            raise MatrixLoadError(f"line {line_number}: notes must be a string")
-
-        expected_matched_key = raw["expected_matched_key"]
-        if expected_matched_key is not None and not isinstance(expected_matched_key, str):
-            raise MatrixLoadError(f"line {line_number}: expected_matched_key must be string or null")
-
-        if not isinstance(raw["expected_result_count"], int):
-            raise MatrixLoadError(f"line {line_number}: expected_result_count must be an integer")
-
-        if not isinstance(raw["expected_deep_ladder"], bool):
-            raise MatrixLoadError(f"line {line_number}: expected_deep_ladder must be a boolean")
+        case_id = _require_string(raw, "case_id", line_number=line_number)
+        query = _require_string(raw, "query", line_number=line_number)
+        query_unicode_form = _require_string(
+            raw, "query_unicode_form", line_number=line_number
+        )
+        direction = _require_string(raw, "direction", line_number=line_number)
+        expected_result_status = _require_string(
+            raw, "expected_result_status", line_number=line_number
+        )
+        expected_result_count = _require_int_not_bool(
+            raw, "expected_result_count", line_number=line_number
+        )
+        expected_ir_ids = _require_string_list(
+            raw, "expected_ir_ids", line_number=line_number
+        )
+        expected_matched_key_type = _require_string(
+            raw, "expected_matched_key_type", line_number=line_number
+        )
+        expected_matched_key = _require_string_or_null(
+            raw, "expected_matched_key", line_number=line_number
+        )
+        expected_deep_ladder = _require_bool(
+            raw, "expected_deep_ladder", line_number=line_number
+        )
+        case_family = _require_string(raw, "case_family", line_number=line_number)
+        source_of_expectation = _require_string(
+            raw, "source_of_expectation", line_number=line_number
+        )
+        bundle_id = _require_string(raw, "bundle_id", line_number=line_number)
+        norm_version = _require_string(raw, "norm_version", line_number=line_number)
+        review_status = _require_string(raw, "review_status", line_number=line_number)
+        case_tags = _optional_string_list(raw, "case_tags", line_number=line_number)
+        notes = _optional_string(raw, "notes", line_number=line_number)
 
         return cls(
-            case_id=str(raw["case_id"]),
+            case_id=case_id,
             query=query,
-            query_unicode_form=str(raw["query_unicode_form"]),
-            direction=str(raw["direction"]),
-            expected_result_status=str(raw["expected_result_status"]),
-            expected_result_count=raw["expected_result_count"],
-            expected_ir_ids=list(expected_ir_ids),
-            expected_matched_key_type=str(raw["expected_matched_key_type"]),
+            query_unicode_form=query_unicode_form,
+            direction=direction,
+            expected_result_status=expected_result_status,
+            expected_result_count=expected_result_count,
+            expected_ir_ids=expected_ir_ids,
+            expected_matched_key_type=expected_matched_key_type,
             expected_matched_key=expected_matched_key,
-            expected_deep_ladder=raw["expected_deep_ladder"],
-            case_family=str(raw["case_family"]),
-            source_of_expectation=str(raw["source_of_expectation"]),
-            bundle_id=str(raw["bundle_id"]),
-            norm_version=str(raw["norm_version"]),
-            review_status=str(raw["review_status"]),
-            case_tags=list(case_tags) if case_tags is not None else None,
+            expected_deep_ladder=expected_deep_ladder,
+            case_family=case_family,
+            source_of_expectation=source_of_expectation,
+            bundle_id=bundle_id,
+            norm_version=norm_version,
+            review_status=review_status,
+            case_tags=case_tags,
             notes=notes,
         )
 

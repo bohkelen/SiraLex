@@ -17,6 +17,7 @@ if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
 from search_regression.schema import (  # noqa: E402
+    MatrixLoadError,
     SearchRegressionCase,
     load_matrix_jsonl,
     load_matrix_manifest,
@@ -30,6 +31,39 @@ from search_regression.validate_matrix import (  # noqa: E402
 
 BUNDLE_ID = "bundle_full_20260616_phase7j_alias_round2_candidate"
 NORM_VERSION = "norm_v3"
+
+
+def _valid_loader_row(**overrides) -> dict:
+    row = {
+        "case_id": "tmp",
+        "query": "fruit",
+        "query_unicode_form": "nfc",
+        "direction": "source_to_target",
+        "expected_result_status": "hit_single",
+        "expected_result_count": 1,
+        "expected_ir_ids": ["7cdb6070ce427a6d"],
+        "expected_matched_key_type": "casefold",
+        "expected_matched_key": "fruit",
+        "expected_deep_ladder": False,
+        "case_family": "source_exact_hit",
+        "source_of_expectation": "test",
+        "bundle_id": BUNDLE_ID,
+        "norm_version": NORM_VERSION,
+        "review_status": "approved",
+    }
+    row.update(overrides)
+    return row
+
+
+def _write_loader_jsonl(path: Path, row: dict) -> None:
+    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+
+def _assert_loader_rejects(tmp_path: Path, row: dict, field: str) -> None:
+    path = tmp_path / f"bad_{field}.jsonl"
+    _write_loader_jsonl(path, row)
+    with pytest.raises(MatrixLoadError, match=rf"line 1: {field}"):
+        load_matrix_jsonl(path)
 
 
 @pytest.fixture(scope="module")
@@ -56,6 +90,94 @@ def _case_by_query(cases: list[SearchRegressionCase], query: str) -> SearchRegre
         if case.query == query:
             return case
     raise AssertionError(f"missing query {query!r}")
+
+
+def test_committed_matrix_loads_without_error():
+    loaded = load_matrix_jsonl(MATRIX_PATH)
+    assert len(loaded) == 13
+
+
+def test_committed_kun_nfd_literal_code_points():
+    loaded = load_matrix_jsonl(MATRIX_PATH)
+    case = _case_by_query(loaded, KUN_NFD)
+    assert list(case.query) == ["k", "u", "\u0300", "n"]
+    assert unicodedata.normalize("NFD", case.query) == case.query
+
+
+def test_loader_rejects_integer_case_id(tmp_path):
+    _assert_loader_rejects(tmp_path, _valid_loader_row(case_id=1), "case_id")
+
+
+def test_loader_rejects_integer_direction(tmp_path):
+    _assert_loader_rejects(tmp_path, _valid_loader_row(direction=1), "direction")
+
+
+def test_loader_rejects_boolean_expected_result_status(tmp_path):
+    _assert_loader_rejects(
+        tmp_path,
+        _valid_loader_row(expected_result_status=True),
+        "expected_result_status",
+    )
+
+
+def test_loader_rejects_boolean_expected_result_count(tmp_path):
+    _assert_loader_rejects(
+        tmp_path,
+        _valid_loader_row(expected_result_count=True),
+        "expected_result_count",
+    )
+
+
+def test_loader_rejects_list_expected_matched_key_type(tmp_path):
+    _assert_loader_rejects(
+        tmp_path,
+        _valid_loader_row(expected_matched_key_type=["casefold"]),
+        "expected_matched_key_type",
+    )
+
+
+def test_loader_rejects_object_case_family(tmp_path):
+    _assert_loader_rejects(
+        tmp_path,
+        _valid_loader_row(case_family={"family": "source_exact_hit"}),
+        "case_family",
+    )
+
+
+def test_loader_rejects_integer_source_of_expectation(tmp_path):
+    _assert_loader_rejects(
+        tmp_path,
+        _valid_loader_row(source_of_expectation=7),
+        "source_of_expectation",
+    )
+
+
+def test_loader_rejects_null_bundle_id(tmp_path):
+    _assert_loader_rejects(tmp_path, _valid_loader_row(bundle_id=None), "bundle_id")
+
+
+def test_loader_rejects_list_norm_version(tmp_path):
+    _assert_loader_rejects(
+        tmp_path,
+        _valid_loader_row(norm_version=["norm_v3"]),
+        "norm_version",
+    )
+
+
+def test_loader_rejects_boolean_review_status(tmp_path):
+    _assert_loader_rejects(
+        tmp_path,
+        _valid_loader_row(review_status=True),
+        "review_status",
+    )
+
+
+def test_loader_rejects_integer_expected_deep_ladder(tmp_path):
+    _assert_loader_rejects(
+        tmp_path,
+        _valid_loader_row(expected_deep_ladder=1),
+        "expected_deep_ladder",
+    )
 
 
 def test_committed_matrix_and_manifest_pass_validation(cases, manifest):
