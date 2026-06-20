@@ -38,8 +38,8 @@ Query-evidence exports (Phase 7K) may **inform** which cases to add during maint
 
 ### In scope
 
-- Schema for curated regression cases (JSONL)
-- Case families covering hit/miss, alias, supplement, normalization, target-side, and historical controls
+- Schema for curated regression cases (JSONL) with one primary `case_family` and optional `case_tags` per row
+- Thirteen case families including `unicode_canonicalization`
 - Expected-result contract (status, count, ordered IDs, ladder metadata)
 - Dual execution: Python replay + TypeScript runtime
 - Bundle-version pinning, checksum metadata, and human-governed golden updates
@@ -86,12 +86,24 @@ One JSON object per line (`search_regression_case_v1`). All cases are hand-autho
 | `expected_matched_key_type` | string | yes | Ladder rung: `casefold`, `diacritics_insensitive`, `punct_stripped`, `nospace`, or `none` |
 | `expected_matched_key` | string \| null | yes | Normalized key that matched; `null` on miss |
 | `expected_deep_ladder` | boolean | yes | `true` iff matched rung ∈ `{punct_stripped, nospace}` |
-| `case_family` | enum | yes | See § Case families |
+| `case_family` | enum | yes | **One required primary family** for coverage accounting — see § Case families |
+| `case_tags` | string[] | no | Optional secondary behavioral labels — see below |
 | `source_of_expectation` | string | yes | Provenance tag, e.g. `phase7j_golden_replay`, `roadmap_ui_signoff`, `alias_table_src_alias_phase7j_0001`, `maintainer_review_YYYY-MM-DD` |
 | `bundle_id` | string | yes | Bundle the expectation was reviewed against |
 | `norm_version` | string | yes | e.g. `norm_v3` |
 | `review_status` | enum | yes | `approved` for matrix rows (contrast with 7K analyzer `candidate`) |
 | `notes` | string | no | Human rationale, policy context, ordering rationale |
+
+### `case_tags` (optional)
+
+```text
+case_tags: string[]
+Optional secondary behavioral labels.
+Examples: ["multi_hit", "alias_expanded"], ["unicode_nfc"], ["historical_phase7j"].
+case_family remains the one required primary family used for coverage accounting.
+```
+
+Tags describe cross-cutting behavior; they do **not** replace the primary `case_family`. Multi-hit behavior is independently enforced by `expected_result_status`, `expected_result_count`, and `expected_ir_ids` — not by assigning multiple primary families.
 
 Optional metadata (recommended on matrix manifest, may duplicate per row):
 
@@ -120,26 +132,33 @@ Optional metadata (recommended on matrix manifest, may duplicate per row):
 }
 ```
 
+**Exact-outcome rule:** A regression matrix row may not contain alternative expected outcomes. Every field in the expected-result contract must be a single approved value — no “single or multi-hit”, no optional ID lists, no runner-specific branches.
+
 ---
 
 ## Case families
 
+Thirteen primary families. Each row has exactly **one** `case_family`. Use `case_tags` for secondary labels.
+
 | Family | Protects | Typical signals |
 |--------|----------|-----------------|
 | `source_exact_hit` | Canonical source→target lookup | `hit_single`, `casefold`, alias-free |
-| `source_multi_hit` | Multi-posting source queries | `hit_multi`, ordered `ir_ids` contractual |
+| `source_multi_hit` | Multi-posting source queries (primary family when multi-hit is the main coverage goal) | `hit_multi`, ordered `ir_ids` contractual |
 | `target_exact_hit` | Target→source lookup | `tgt_*` ladder, often `casefold` |
 | `source_alias_hit` | Approved alias table resolution | Hits via alias-expanded index keys |
 | `source_supplement_hit` | Approved supplement mappings | Hits via supplement-expanded keys |
 | `punctuation_normalization` | Punct/dot/hyphen variants | May use `punct_stripped` |
 | `diacritic_normalization` | Accent-stripped or alternate spellings | `diacritics_insensitive` |
 | `spacing_normalization` | Nospace / collapsed spacing | `nospace` or `punct_stripped` |
+| `unicode_canonicalization` | NFC/NFD-equivalent query handling | Expected behavior may still resolve at `casefold` after canonical normalization; must **not** be assumed to mean `diacritics_insensitive` ladder matching |
 | `deep_ladder_hit` | Fallback rung behavior | `expected_deep_ladder: true` |
 | `intentional_no_hit` | Controlled miss probes | `miss`, empty `ir_ids` |
-| `target_side_ambiguity` | Target-side policy / homograph precision | Documented single-posting vs multi-posting policy |
+| `target_side_ambiguity` | Target-side policy / homograph precision | Exact posting contract per reviewed policy |
 | `historical_regression` | Behavior that changed across bundle milestones | Captures before/after with review note |
 
-Families are orthogonal to priority: every required seed query maps to at least one family.
+**Coverage model:** `case_family` = one required primary family per row. `case_tags` = optional secondary labels. **`unicode_canonicalization` is required family coverage** (seed: `kùn`). The plan defines **13** primary families.
+
+Every required seed query maps to exactly one primary `case_family`. Optional `case_tags` annotate cross-cutting behavior (e.g. `multi_hit` on an alias-primary row). Do not use compound family strings such as `source_multi_hit + source_alias_hit`.
 
 ---
 
@@ -147,20 +166,38 @@ Families are orthogonal to priority: every required seed query maps to at least 
 
 The matrix **must** include the following named queries as approved seed rows against the featured bundle. IR IDs below are taken **only** from existing reviewed artifacts (`shared/query_evidence/fixtures/tests/golden_replay_summary.json`, Phase 7J alias approvals, ROADMAP manual sign-off, Phase 7J regression reports). Cases without a cited ID block are pinned during Slice A via one-time featured-bundle replay plus maintainer review — not invented in this plan.
 
-| Query | Direction | Family | Reviewed expectation (featured bundle baseline) | Cited IDs / sources |
-|-------|-----------|--------|--------------------------------------------------|---------------------|
-| `fruit` | `source_to_target` | `source_exact_hit` | `hit_single`, `casefold`, key `fruit` | `7cdb6070ce427a6d` — golden replay |
-| `fruits` | `source_to_target` | `source_alias_hit` | `hit_single`, alias `fruits`→`fruit` | `7cdb6070ce427a6d` — golden replay; `src_alias_phase7j_0001` |
-| `grand-parents` | `source_to_target` | `source_multi_hit` + `source_alias_hit` | `hit_multi` (2), ordered grand-mère then grand-père | `1f6d3a5919110b21`, `957bd76b41fda053` — golden replay; `src_alias_phase7j_0011` |
-| `mère` | `source_to_target` | `source_multi_hit` | `hit_multi` (3), `casefold` | `0f517a71c373f51d`, `d540716db9321a83`, `e5164efcdf5e6ca4` — golden replay |
-| `Kun` | `target_to_source` | `target_exact_hit` | `hit_single`, `casefold`, matched key `kun` | `b07ae7bd61ff3c85` — golden replay, Phase 7J regression |
-| `Kùn` | `target_to_source` | `target_side_ambiguity` | `hit_single` or documented multi-hit per reviewed target-side policy | ROADMAP UI sign-off; compare to plain `Kun` posting set in review note |
-| `kùn` | `target_to_source` | `diacritic_normalization` | Decomposed Unicode spelling; equivalent search-key material to NFC `Kùn` per norm_v3 | ROADMAP sign-off; NFC canonicalization note |
-| `bras` | `source_to_target` | `source_exact_hit` | `hit_single`, `casefold` | Pin `ir_ids` in Slice A golden from featured replay |
-| `manger` | `source_to_target` | `source_exact_hit` | `hit_single`, `casefold` | Pin `ir_ids` in Slice A golden from featured replay |
-| `mou` | `source_to_target` | `source_exact_hit` | `hit_single`, `casefold` | Pin `ir_ids` in Slice A golden from featured replay |
-| `tête` | `source_to_target` | `source_exact_hit` | `hit_single`; ROADMAP sign-off documents `tête`→`kùn` display path | ROADMAP UI sign-off; pin `ir_ids` in Slice A |
-| `zzzz-nohit-test` | `source_to_target` | `intentional_no_hit` | `miss`, ladder `none` | golden replay |
+| Query | Direction | Primary `case_family` | `case_tags` | Reviewed expectation (featured bundle baseline) | Cited IDs / sources |
+|-------|-----------|------------------------|--------------|--------------------------------------------------|---------------------|
+| `fruit` | `source_to_target` | `source_exact_hit` | — | `hit_single`, `casefold`, key `fruit` | `7cdb6070ce427a6d` — golden replay |
+| `fruits` | `source_to_target` | `source_alias_hit` | — | `hit_single`, alias `fruits`→`fruit` | `7cdb6070ce427a6d` — golden replay; `src_alias_phase7j_0001` |
+| `grand-parents` | `source_to_target` | `source_alias_hit` | `["multi_hit", "historical_phase7j"]` | `hit_multi` (2), ordered grand-mère then grand-père | `1f6d3a5919110b21`, `957bd76b41fda053` — golden replay; `src_alias_phase7j_0011` |
+| `mère` | `source_to_target` | `source_multi_hit` | — | `hit_multi` (3), `casefold` | `0f517a71c373f51d`, `d540716db9321a83`, `e5164efcdf5e6ca4` — golden replay |
+| `Kun` | `target_to_source` | `target_exact_hit` | — | `hit_single`, `casefold`, matched key `kun` | `b07ae7bd61ff3c85` — golden replay, Phase 7J regression |
+| `Kùn` | `target_to_source` | `target_side_ambiguity` | — | Exact contract pinned in Slice A (see below) | ROADMAP UI sign-off; compare to plain `Kun` in review note |
+| `kùn` | `target_to_source` | `unicode_canonicalization` | `["target_side", "decomposed_unicode"]` | Exact contract pinned in Slice A; canonical-equivalent to `Kùn` after norm_v3 | ROADMAP sign-off |
+| `bras` | `source_to_target` | `source_exact_hit` | — | `hit_single`, `casefold` | Pin `ir_ids` in Slice A golden from featured replay |
+| `manger` | `source_to_target` | `source_exact_hit` | — | `hit_single`, `casefold` | Pin `ir_ids` in Slice A golden from featured replay |
+| `mou` | `source_to_target` | `source_exact_hit` | — | `hit_single`, `casefold` | Pin `ir_ids` in Slice A golden from featured replay |
+| `tête` | `source_to_target` | `source_exact_hit` | — | `hit_single`; ROADMAP sign-off documents `tête`→`kùn` display path | ROADMAP UI sign-off; pin `ir_ids` in Slice A |
+| `zzzz-nohit-test` | `source_to_target` | `intentional_no_hit` | — | `miss`, ladder `none` | golden replay |
+
+**Exact contract for `Kùn` and `kùn` (Slice A):**
+
+Slice A must replay `Kùn` and `kùn` once against the pinned featured bundle, then a maintainer must approve **one exact contract per row**:
+
+- `expected_result_status`
+- `expected_result_count`
+- exact ordered `expected_ir_ids`
+- `expected_matched_key_type`
+- `expected_matched_key`
+- `expected_deep_ladder`
+
+```text
+A regression matrix row may not contain alternative expected outcomes.
+No “single or multi-hit” expectation is valid.
+```
+
+`Kùn` remains the target-side ambiguity/policy case (primary `case_family: target_side_ambiguity`). `kùn` is the unicode canonicalization case (primary `case_family: unicode_canonicalization`, `case_tags: ["target_side", "decomposed_unicode"]`). `Kùn` and `kùn` need not have different matched ladder rungs; the test verifies **canonical-equivalent behavior after norm_v3 normalization** — not that decomposed input must match on `diacritics_insensitive`.
 
 **`zzzz-nohit-test` clarification:**
 
@@ -171,7 +208,7 @@ It is not user-demand evidence or a candidate dictionary gap.
 
 **Supplement-family gap in seed set:** The twelve named seeds do not include a dedicated supplement-only query. Slice A must add at least one reviewed supplement case from approved tables (recommended: `poil` / `src_supp_phase7b_0001`) in the same matrix file, with `case_family: source_supplement_hit`.
 
-**Historical note:** `grand-parents` was a miss on pre-7J bundle `bundle_full_20260609_phase7f_alias_candidate` (`docs/reports/phase7j_regression_replay.json`) and a hit after alias round 2 — preserve as `historical_regression` documentation in `notes`, not as a second contradictory row for the same bundle.
+**Historical note:** `grand-parents` was a miss on pre-7J bundle `bundle_full_20260609_phase7f_alias_candidate` (`docs/reports/phase7j_regression_replay.json`) and a hit after alias round 2 — the `historical_phase7j` tag and `notes` capture this; do not add a second contradictory row for the same bundle.
 
 ---
 
@@ -189,7 +226,9 @@ Each case verifies, where applicable:
 | Deep-ladder boolean | `expected_deep_ladder` true iff rung ∈ `{punct_stripped, nospace}` |
 | Direction | Runner must honor `direction`; no cross-direction fallback |
 
-**Ordering rule:** For `source_multi_hit` cases (`mère`, `grand-parents`), tie-break order follows search-index first-seen posting order for the matched key — same doctrine as runtime `searchQuery()`. Any intentional ranking change requires a human review note and simultaneous Python + TS golden update.
+**Ordering rule:** For multi-hit cases (`mère`, `grand-parents` via `case_tags: ["multi_hit"]`), tie-break order follows search-index first-seen posting order for the matched key — same doctrine as runtime `searchQuery()`. Any intentional ranking change requires a human review note and simultaneous Python + TS golden update.
+
+**No alternative outcomes:** Every row asserts exactly one outcome bundle (status, count, ordered IDs, ladder fields). Runners must fail on any deviation; there is no valid “expected A or expected B” form.
 
 **Miss contract:** On `intentional_no_hit`, assert empty `ir_ids`, `matched_key_type: none`, `matched_key: null`, `expected_deep_ladder: false`.
 
@@ -308,16 +347,18 @@ Phase 7L implementation is complete when:
 
 | # | Criterion |
 |---|-----------|
-| 1 | Matrix schema validator rejects missing fields, bad enums, count/IR mismatches |
-| 2 | All twelve named seed cases exist with `review_status: approved` |
+| 1 | Matrix schema validator rejects missing fields, bad enums, count/IR mismatches, and compound/ambiguous expectations |
+| 2 | All twelve named seed cases exist with `review_status: approved` and exactly one primary `case_family` each |
 | 3 | At least one `source_supplement_hit` case exists (e.g. `poil`) |
-| 4 | Python runner passes golden on featured bundle with manifest checksum recorded |
-| 5 | TypeScript runner passes runtime golden on same bundle |
-| 6 | Parity test passes for seed subset (or documented exceptions with expiry) |
-| 7 | CI runs Python matrix on PRs touching search, norm, bundle import, or index build |
-| 8 | Documentation describes update procedure and telemetry separation |
-| 9 | No matrix row sourced directly from raw query logs without `source_of_expectation` review tag |
-| 10 | `zzzz-nohit-test` remains `intentional_no_hit` in all bundle versions unless deliberately retired |
+| 4 | At least one `unicode_canonicalization` case exists (`kùn` seed) with exact approved contract fields |
+| 5 | `Kùn` and `kùn` rows each specify one exact outcome (no single-or-multi-hit wording) |
+| 6 | Python runner passes golden on featured bundle with manifest checksum recorded |
+| 7 | TypeScript runner passes runtime golden on same bundle |
+| 8 | Parity test passes for seed subset (or documented exceptions with expiry) |
+| 9 | CI runs Python matrix on PRs touching search, norm, bundle import, or index build |
+| 10 | Documentation describes update procedure, telemetry separation, and `case_family` / `case_tags` model |
+| 11 | No matrix row sourced directly from raw query logs without `source_of_expectation` review tag |
+| 12 | `zzzz-nohit-test` remains `intentional_no_hit` in all bundle versions unless deliberately retired |
 
 ---
 
@@ -329,7 +370,7 @@ Phase 7L implementation is complete when:
 | Bundle rotation breaks goldens | Manifest hash gate; changelog-driven updates |
 | Matrix confused with 7K evidence | Separate paths, doc banners, no shared JSONL files |
 | Over-large matrix slows CI | Keep curated core ≤ ~40 cases in default CI; optional extended profile locally |
-| Unicode normalization (`Kùn` vs `kùn`) | Explicit diacritic-family cases + ROADMAP policy notes |
+| Unicode normalization (`Kùn` vs `kùn`) | `unicode_canonicalization` primary family for `kùn`; exact per-row contracts; ROADMAP policy notes on `Kùn` |
 | Multi-hit order disputes | Document first-seen index order doctrine in `notes` per case |
 | Featured bundle not in CI checkout size | CI uses pinned subset or LFS policy already used for bundles |
 
@@ -350,8 +391,8 @@ No more than four small commits. Each slice is independently reviewable.
 | Item | Detail |
 |------|--------|
 | **Allowed files** | `shared/search_regression/search_regression_matrix_v1.jsonl`, `shared/search_regression/matrix_manifest_v1.json`, `api/search_regression/schema.py`, `api/search_regression/validate_matrix.py`, `api/search_regression/tests/test_validate_matrix.py`, `docs/PHASE_7L_SEARCH_REGRESSION_MATRIX_PLAN.md` (cross-link only if needed) |
-| **Tests** | Validator unit tests: required fields, enum guards, count/IR consistency, seed query presence, `zzzz-nohit-test` no-hit shape |
-| **Artifact boundaries** | Matrix rows only; pin Slice A `ir_ids` for bras/manger/mou/tête via one maintainer replay pass — no log imports |
+| **Tests** | Validator unit tests: required fields, enum guards, count/IR consistency, single primary `case_family`, optional `case_tags`, seed query presence, `zzzz-nohit-test` no-hit shape, `unicode_canonicalization` coverage, no ambiguous Kùn/kùn expectations |
+| **Artifact boundaries** | Matrix rows only; pin Slice A exact contracts for bras/manger/mou/tête/Kùn/kùn via one maintainer replay pass — no log imports |
 | **Commit message** | `Add Phase 7L search regression matrix schema and seed fixture` |
 
 ### Slice B — Python replay runner + golden results
