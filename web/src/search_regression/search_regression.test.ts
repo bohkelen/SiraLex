@@ -1,6 +1,7 @@
 import "fake-indexeddb/auto";
 
-import { readFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -10,6 +11,7 @@ import {
   findCaseById,
   KUN_NFD_CODE_POINTS,
   loadMatrixJsonl,
+  loadMatrixManifest,
   type SearchRegressionCase,
 } from "./matrix_loader";
 import {
@@ -19,6 +21,9 @@ import {
   replayCase,
   runMatrixRegression,
   populateSearchIndexFromBundle,
+  RuntimeBundleMetadataError,
+  RuntimeSearchIndexChecksumError,
+  verifyRuntimeFixtureIdentity,
   type CaseReplayResult,
 } from "./run_matrix";
 
@@ -86,6 +91,28 @@ async function assertSearchIndexEmpty(): Promise<void> {
   }
 }
 
+function copyPinnedBundle(parentDir: string, bundleBasename = BUNDLE_ID): string {
+  const bundleCopy = join(parentDir, bundleBasename);
+  cpSync(BUNDLE_DIR, bundleCopy, { recursive: true });
+  return bundleCopy;
+}
+
+async function expectFixtureGateFailure(
+  run: () => Promise<unknown>,
+  errorClass: typeof RuntimeBundleMetadataError | typeof RuntimeSearchIndexChecksumError,
+  messagePattern: RegExp,
+): Promise<void> {
+  await assertSearchIndexEmpty();
+  try {
+    await run();
+    throw new Error("expected fixture gate failure");
+  } catch (error) {
+    expect(error).toBeInstanceOf(errorClass);
+    expect((error as Error).message).toMatch(messagePattern);
+  }
+  await assertSearchIndexEmpty();
+}
+
 describe("Phase 7L runtime search regression", () => {
   beforeEach(async () => {
     await deleteSiralexDb().catch(() => undefined);
@@ -102,6 +129,104 @@ describe("Phase 7L runtime search regression", () => {
     const kunCase = findCaseById(cases, "sr7l_013_kun_decomposed_unicode");
     expect(kunCase).toBeDefined();
     expect(Array.from(kunCase!.query)).toEqual([...KUN_NFD_CODE_POINTS]);
+  });
+
+  it("pinned bundle passes fixture identity gates", () => {
+    const manifest = loadMatrixManifest(MANIFEST_PATH);
+    const verifiedChecksum = verifyRuntimeFixtureIdentity(BUNDLE_DIR, manifest);
+    expect(verifiedChecksum).toBe(manifest.search_index_sha256);
+  });
+
+  it("wrong bundle basename fails before database mutation", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "siralex-runtime-gate-"));
+    try {
+      const wrongBundleDir = copyPinnedBundle(tempRoot, "wrong_bundle_name");
+      await expectFixtureGateFailure(
+        () =>
+          runMatrixRegression({
+            matrixPath: MATRIX_PATH,
+            manifestPath: MANIFEST_PATH,
+            bundleDir: wrongBundleDir,
+            catalogPath: CATALOG_PATH,
+          }),
+        RuntimeBundleMetadataError,
+        /basename must match manifest\.bundle_id/,
+      );
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("modified copied search_index.jsonl fails checksum verification before database mutation", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "siralex-runtime-gate-"));
+    try {
+      const bundleCopy = copyPinnedBundle(tempRoot);
+      const indexPath = join(bundleCopy, "search_index.jsonl");
+      writeFileSync(indexPath, `${readFileSync(indexPath, "utf-8")}\n`, "utf-8");
+
+      await expectFixtureGateFailure(
+        () =>
+          runMatrixRegression({
+            matrixPath: MATRIX_PATH,
+            manifestPath: MANIFEST_PATH,
+            bundleDir: bundleCopy,
+            catalogPath: CATALOG_PATH,
+          }),
+        RuntimeSearchIndexChecksumError,
+        /checksum mismatch/,
+      );
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("mismatched normalization version fails before database mutation", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "siralex-runtime-gate-"));
+    try {
+      const bundleCopy = copyPinnedBundle(tempRoot);
+      const manifestPath = join(bundleCopy, "bundle.manifest.json");
+      const bundleManifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as {
+        rule_versions: { normalization: string };
+      };
+      bundleManifest.rule_versions.normalization = "norm_v2";
+      writeFileSync(manifestPath, `${JSON.stringify(bundleManifest, null, 2)}\n`, "utf-8");
+
+      await expectFixtureGateFailure(
+        () =>
+          runMatrixRegression({
+            matrixPath: MATRIX_PATH,
+            manifestPath: MANIFEST_PATH,
+            bundleDir: bundleCopy,
+            catalogPath: CATALOG_PATH,
+          }),
+        RuntimeBundleMetadataError,
+        /norm version must match matrix manifest norm_version/,
+      );
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("missing bundle.manifest.json fails before database mutation", async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "siralex-runtime-gate-"));
+    try {
+      const bundleCopy = copyPinnedBundle(tempRoot);
+      rmSync(join(bundleCopy, "bundle.manifest.json"));
+
+      await expectFixtureGateFailure(
+        () =>
+          runMatrixRegression({
+            matrixPath: MATRIX_PATH,
+            manifestPath: MANIFEST_PATH,
+            bundleDir: bundleCopy,
+            catalogPath: CATALOG_PATH,
+          }),
+        RuntimeBundleMetadataError,
+        /bundle\.manifest\.json is missing/,
+      );
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it(
@@ -252,7 +377,9 @@ describe("Phase 7L runtime search regression", () => {
         catalogPath: CATALOG_PATH,
       });
       const runtimeGolden = loadGolden(RUNTIME_GOLDEN_PATH);
+      const manifest = loadMatrixManifest(MANIFEST_PATH);
       expect(runtime.schema_version).toBe("search_regression_runtime_run_v1");
+      expect(runtime.search_index_sha256).toBe(manifest.search_index_sha256);
       expect(runtime.matrix_case_count).toBe(runtimeGolden.matrix_case_count);
       expect(runtime.passed_case_count).toBe(runtimeGolden.passed_case_count);
       expect(runtime.failed_case_count).toBe(runtimeGolden.failed_case_count);

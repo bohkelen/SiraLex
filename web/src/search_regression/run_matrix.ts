@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, join } from "node:path";
 
 import type { SearchDirection } from "../bundle_labels";
 import { deleteSiralexDb, openSiralexDb } from "../idb/siralex_db";
@@ -13,6 +14,14 @@ import {
 } from "./matrix_loader";
 
 export const RUN_SCHEMA_VERSION = "search_regression_runtime_run_v1";
+
+export class RuntimeBundleMetadataError extends Error {
+  override name = "RuntimeBundleMetadataError";
+}
+
+export class RuntimeSearchIndexChecksumError extends Error {
+  override name = "RuntimeSearchIndexChecksumError";
+}
 
 export type CaseReplayResult = {
   case_id: string;
@@ -179,6 +188,63 @@ export function resolveCatalogVersion(catalogPath: string | undefined, bundleId:
   return null;
 }
 
+export function sha256File(path: string): string {
+  const digest = createHash("sha256").update(readFileSync(path)).digest("hex");
+  return `sha256:${digest}`;
+}
+
+export function verifyRuntimeFixtureIdentity(
+  bundleDir: string,
+  manifest: MatrixManifest,
+): string {
+  const bundleBasename = basename(bundleDir);
+  if (bundleBasename !== manifest.bundle_id) {
+    throw new RuntimeBundleMetadataError(
+      "bundle directory basename must match manifest.bundle_id: " +
+        `expected ${JSON.stringify(manifest.bundle_id)}, got ${JSON.stringify(bundleBasename)}`,
+    );
+  }
+
+  const bundleManifestPath = join(bundleDir, "bundle.manifest.json");
+  if (!existsSync(bundleManifestPath)) {
+    throw new RuntimeBundleMetadataError("bundle.manifest.json is missing");
+  }
+
+  const searchIndexPath = join(bundleDir, "search_index.jsonl");
+  if (!existsSync(searchIndexPath)) {
+    throw new RuntimeBundleMetadataError("search_index.jsonl is missing");
+  }
+
+  let bundleManifest: Record<string, unknown>;
+  try {
+    bundleManifest = JSON.parse(readFileSync(bundleManifestPath, "utf-8")) as Record<string, unknown>;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new RuntimeBundleMetadataError(`bundle.manifest.json is invalid: ${message}`);
+  }
+
+  const ruleVersions = bundleManifest.rule_versions;
+  if (typeof ruleVersions === "object" && ruleVersions !== null) {
+    const normalization = (ruleVersions as Record<string, unknown>).normalization;
+    if (typeof normalization === "string" && normalization !== manifest.norm_version) {
+      throw new RuntimeBundleMetadataError(
+        "bundle manifest norm version must match matrix manifest norm_version: " +
+          `expected ${JSON.stringify(manifest.norm_version)}, got ${JSON.stringify(normalization)}`,
+      );
+    }
+  }
+
+  const verifiedChecksum = sha256File(searchIndexPath);
+  if (verifiedChecksum !== manifest.search_index_sha256) {
+    throw new RuntimeSearchIndexChecksumError(
+      "search_index.jsonl checksum mismatch: " +
+        `expected ${JSON.stringify(manifest.search_index_sha256)}, got ${JSON.stringify(verifiedChecksum)}`,
+    );
+  }
+
+  return verifiedChecksum;
+}
+
 export async function populateSearchIndexFromBundle(
   db: IDBDatabase,
   bundleDir: string,
@@ -212,6 +278,7 @@ export async function replayCase(
 export async function runMatrixRegression(options: RunMatrixOptions): Promise<RegressionRunResult> {
   const cases = loadMatrixJsonl(options.matrixPath);
   const manifest = loadMatrixManifest(options.manifestPath);
+  const verifiedChecksum = verifyRuntimeFixtureIdentity(options.bundleDir, manifest);
 
   await deleteSiralexDb().catch(() => undefined);
   const db = await openSiralexDb();
@@ -232,7 +299,7 @@ export async function runMatrixRegression(options: RunMatrixOptions): Promise<Re
       bundle_id: manifest.bundle_id,
       catalog_version: catalogVersion,
       norm_version: manifest.norm_version,
-      search_index_sha256: manifest.search_index_sha256,
+      search_index_sha256: verifiedChecksum,
       matrix_case_count: caseResults.length,
       passed_case_count: passedCaseCount,
       failed_case_count: caseResults.length - passedCaseCount,
