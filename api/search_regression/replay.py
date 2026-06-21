@@ -112,15 +112,14 @@ def get_search_keys_fn() -> SearchKeysFn:
 
 
 def compute_search_keys_for_query(query: str) -> dict[str, list[str]]:
-    trimmed = query.strip()
-    if trimmed == "":
+    if query == "":
         return {
             "casefold": [],
             "diacritics_insensitive": [],
             "punct_stripped": [],
             "nospace": [],
         }
-    return _search_keys_fn([trimmed])
+    return _search_keys_fn([query])
 
 
 def sha256_file(path: Path) -> str:

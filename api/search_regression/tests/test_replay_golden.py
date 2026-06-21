@@ -24,12 +24,18 @@ if str(API_ROOT) not in sys.path:
 from search_regression.replay import (  # noqa: E402
     BundleMetadataError,
     SearchIndexChecksumError,
-    get_search_keys_fn,
     run_search_regression,
     set_search_keys_fn,
 )
-from search_regression.schema import load_matrix_jsonl, load_matrix_manifest  # noqa: E402
+from search_regression.schema import SearchRegressionCase, load_matrix_jsonl, load_matrix_manifest  # noqa: E402
 from search_regression.validate_matrix import KUN_NFD  # noqa: E402
+
+EMPTY_LADDER_KEYS = {
+    "casefold": [],
+    "diacritics_insensitive": [],
+    "punct_stripped": [],
+    "nospace": [],
+}
 
 
 def _run_regression(**overrides):
@@ -107,30 +113,63 @@ def test_kun_nfc_and_nfd_produce_same_actual_result_fields(committed_result):
     assert _actual_fields(nfc) == _actual_fields(nfd)
 
 
-def test_nfd_kun_literal_reaches_normalization_unchanged():
-    cases = load_matrix_jsonl(MATRIX_PATH)
-    nfd_case = next(case for case in cases if case.case_id == "sr7l_013_kun_decomposed_unicode")
-    assert nfd_case.query == KUN_NFD
-    assert unicodedata.normalize("NFD", nfd_case.query) == nfd_case.query
-
+def _replay_with_search_key_spy(case: SearchRegressionCase) -> list[str]:
     observed: list[str] = []
-    underlying = get_search_keys_fn()
 
     def capture_search_keys(queries: list[str]) -> dict[str, list[str]]:
         observed.extend(queries)
-        return underlying(queries)
+        return dict(EMPTY_LADDER_KEYS)
 
     from search_regression.replay import load_search_index, replay_case  # noqa: E402
 
     set_search_keys_fn(capture_search_keys)
     try:
         index = load_search_index(BUNDLE_PATH / "search_index.jsonl")
-        replay_case(index, nfd_case)
+        replay_case(index, case)
     finally:
         set_search_keys_fn(None)
 
-    assert KUN_NFD in observed
-    assert observed[observed.index(KUN_NFD)] == nfd_case.query
+    return observed
+
+
+def test_nfd_kun_literal_reaches_normalization_unchanged():
+    cases = load_matrix_jsonl(MATRIX_PATH)
+    nfd_case = next(case for case in cases if case.case_id == "sr7l_013_kun_decomposed_unicode")
+    assert nfd_case.query == KUN_NFD
+    assert unicodedata.normalize("NFD", nfd_case.query) == nfd_case.query
+
+    observed = _replay_with_search_key_spy(nfd_case)
+
+    assert observed == [KUN_NFD]
+    assert observed[0] == nfd_case.query
+
+
+def test_query_with_leading_and_trailing_whitespace_reaches_hook_unchanged():
+    fruit = next(
+        case
+        for case in load_matrix_jsonl(MATRIX_PATH)
+        if case.case_id == "sr7l_001_fruit_exact"
+    )
+    query = "  fruit  "
+    case = replace(fruit, query=query)
+
+    observed = _replay_with_search_key_spy(case)
+
+    assert observed == [query]
+
+
+def test_whitespace_only_query_reaches_hook_unchanged():
+    fruit = next(
+        case
+        for case in load_matrix_jsonl(MATRIX_PATH)
+        if case.case_id == "sr7l_001_fruit_exact"
+    )
+    query = "   "
+    case = replace(fruit, query=query)
+
+    observed = _replay_with_search_key_spy(case)
+
+    assert observed == [query]
 
 
 def test_poil_returns_mapping_ir_not_lexicon_ir(committed_result):
