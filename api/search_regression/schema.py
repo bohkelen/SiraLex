@@ -124,6 +124,35 @@ def _require_string_or_null(raw: dict[str, Any], field: str, *, line_number: int
     return value
 
 
+def _manifest_error(field: str, message: str) -> MatrixLoadError:
+    return MatrixLoadError(f"manifest {field} {message}")
+
+
+def _manifest_require_string(raw: dict[str, Any], field: str) -> str:
+    value = raw[field]
+    if not isinstance(value, str):
+        raise _manifest_error(field, "must be a string")
+    return value
+
+
+def _manifest_require_int_not_bool(raw: dict[str, Any], field: str) -> int:
+    value = raw[field]
+    if isinstance(value, bool):
+        raise _manifest_error(field, "must not be a boolean")
+    if not isinstance(value, int):
+        raise _manifest_error(field, "must be an integer")
+    return value
+
+
+def _manifest_optional_string(raw: dict[str, Any], field: str) -> str | None:
+    if field not in raw or raw[field] is None:
+        return None
+    value = raw[field]
+    if not isinstance(value, str):
+        raise _manifest_error(field, "must be a string")
+    return value
+
+
 @dataclass(frozen=True)
 class SearchRegressionCase:
     case_id: str
@@ -241,22 +270,25 @@ class MatrixManifest:
         if missing:
             raise MatrixLoadError(f"manifest missing required fields: {', '.join(missing)}")
 
-        purpose = raw.get("purpose")
-        if purpose is not None and not isinstance(purpose, str):
-            raise MatrixLoadError("manifest purpose must be a string")
-
-        if not isinstance(raw["case_count"], int):
-            raise MatrixLoadError("manifest case_count must be an integer")
+        schema_version = _manifest_require_string(raw, "schema_version")
+        matrix_schema_version = _manifest_require_string(raw, "matrix_schema_version")
+        bundle_id = _manifest_require_string(raw, "bundle_id")
+        catalog_version = _manifest_require_string(raw, "catalog_version")
+        norm_version = _manifest_require_string(raw, "norm_version")
+        search_index_sha256 = _manifest_require_string(raw, "search_index_sha256")
+        bundle_content_sha256 = _manifest_require_string(raw, "bundle_content_sha256")
+        case_count = _manifest_require_int_not_bool(raw, "case_count")
+        purpose = _manifest_optional_string(raw, "purpose")
 
         return cls(
-            schema_version=str(raw["schema_version"]),
-            matrix_schema_version=str(raw["matrix_schema_version"]),
-            bundle_id=str(raw["bundle_id"]),
-            catalog_version=str(raw["catalog_version"]),
-            norm_version=str(raw["norm_version"]),
-            search_index_sha256=str(raw["search_index_sha256"]),
-            bundle_content_sha256=str(raw["bundle_content_sha256"]),
-            case_count=raw["case_count"],
+            schema_version=schema_version,
+            matrix_schema_version=matrix_schema_version,
+            bundle_id=bundle_id,
+            catalog_version=catalog_version,
+            norm_version=norm_version,
+            search_index_sha256=search_index_sha256,
+            bundle_content_sha256=bundle_content_sha256,
+            case_count=case_count,
             purpose=purpose,
         )
 

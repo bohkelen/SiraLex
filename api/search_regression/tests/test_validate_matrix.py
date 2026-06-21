@@ -31,6 +31,13 @@ from search_regression.validate_matrix import (  # noqa: E402
 
 BUNDLE_ID = "bundle_full_20260616_phase7j_alias_round2_candidate"
 NORM_VERSION = "norm_v3"
+CATALOG_VERSION = "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2"
+SEARCH_INDEX_SHA256 = (
+    "sha256:4326bc4c9c7d51229b4afa44048751ff122a451dce3d52c2d20d56ac8281418e"
+)
+BUNDLE_CONTENT_SHA256 = (
+    "sha256:e54b8fdf39558ecb639c0763ea9454f085aded7b48f867affe1f96a44709c2ef"
+)
 
 
 def _valid_loader_row(**overrides) -> dict:
@@ -64,6 +71,33 @@ def _assert_loader_rejects(tmp_path: Path, row: dict, field: str) -> None:
     _write_loader_jsonl(path, row)
     with pytest.raises(MatrixLoadError, match=rf"line 1: {field}"):
         load_matrix_jsonl(path)
+
+
+def _valid_manifest(**overrides) -> dict:
+    manifest = {
+        "schema_version": "search_regression_matrix_manifest_v1",
+        "matrix_schema_version": "search_regression_case_v1",
+        "bundle_id": BUNDLE_ID,
+        "catalog_version": CATALOG_VERSION,
+        "norm_version": NORM_VERSION,
+        "search_index_sha256": SEARCH_INDEX_SHA256,
+        "bundle_content_sha256": BUNDLE_CONTENT_SHA256,
+        "case_count": 13,
+        "purpose": "Curated search regression QC.",
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def _write_manifest_json(path: Path, manifest: dict) -> None:
+    path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+
+
+def _assert_manifest_rejects(tmp_path: Path, manifest: dict, field: str) -> None:
+    path = tmp_path / f"bad_manifest_{field}.json"
+    _write_manifest_json(path, manifest)
+    with pytest.raises(MatrixLoadError, match=rf"manifest {field}"):
+        load_matrix_manifest(path)
 
 
 @pytest.fixture(scope="module")
@@ -177,6 +211,80 @@ def test_loader_rejects_integer_expected_deep_ladder(tmp_path):
         tmp_path,
         _valid_loader_row(expected_deep_ladder=1),
         "expected_deep_ladder",
+    )
+
+
+def test_committed_manifest_loads_without_error():
+    manifest = load_matrix_manifest(MANIFEST_PATH)
+    assert manifest.case_count == 13
+
+
+def test_committed_manifest_pinned_metadata():
+    manifest = load_matrix_manifest(MANIFEST_PATH)
+    assert manifest.bundle_id == BUNDLE_ID
+    assert manifest.norm_version == NORM_VERSION
+    assert manifest.case_count == 13
+    assert manifest.search_index_sha256 == SEARCH_INDEX_SHA256
+    assert manifest.bundle_content_sha256 == BUNDLE_CONTENT_SHA256
+
+
+def test_manifest_loader_rejects_integer_schema_version(tmp_path):
+    _assert_manifest_rejects(tmp_path, _valid_manifest(schema_version=1), "schema_version")
+
+
+def test_manifest_loader_rejects_boolean_matrix_schema_version(tmp_path):
+    _assert_manifest_rejects(
+        tmp_path,
+        _valid_manifest(matrix_schema_version=True),
+        "matrix_schema_version",
+    )
+
+
+def test_manifest_loader_rejects_null_bundle_id(tmp_path):
+    _assert_manifest_rejects(tmp_path, _valid_manifest(bundle_id=None), "bundle_id")
+
+
+def test_manifest_loader_rejects_list_catalog_version(tmp_path):
+    _assert_manifest_rejects(
+        tmp_path,
+        _valid_manifest(catalog_version=[CATALOG_VERSION]),
+        "catalog_version",
+    )
+
+
+def test_manifest_loader_rejects_object_norm_version(tmp_path):
+    _assert_manifest_rejects(
+        tmp_path,
+        _valid_manifest(norm_version={"version": NORM_VERSION}),
+        "norm_version",
+    )
+
+
+def test_manifest_loader_rejects_integer_search_index_sha256(tmp_path):
+    _assert_manifest_rejects(
+        tmp_path,
+        _valid_manifest(search_index_sha256=123),
+        "search_index_sha256",
+    )
+
+
+def test_manifest_loader_rejects_boolean_bundle_content_sha256(tmp_path):
+    _assert_manifest_rejects(
+        tmp_path,
+        _valid_manifest(bundle_content_sha256=False),
+        "bundle_content_sha256",
+    )
+
+
+def test_manifest_loader_rejects_boolean_case_count(tmp_path):
+    _assert_manifest_rejects(tmp_path, _valid_manifest(case_count=True), "case_count")
+
+
+def test_manifest_loader_rejects_list_purpose(tmp_path):
+    _assert_manifest_rejects(
+        tmp_path,
+        _valid_manifest(purpose=["Curated search regression QC."]),
+        "purpose",
     )
 
 
