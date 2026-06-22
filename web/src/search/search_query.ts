@@ -25,6 +25,13 @@ const KEY_TYPE_ORDER: (keyof SearchKeys)[] = [
   "nospace",
 ];
 
+const EMPTY_SEARCH_KEYS: SearchKeys = {
+  casefold: [],
+  diacritics_insensitive: [],
+  punct_stripped: [],
+  nospace: [],
+};
+
 function toDirectionalKeyType(direction: SearchDirection, keyType: keyof SearchKeys): string {
   return `${direction === "source_to_target" ? "src" : "tgt"}_${keyType}`;
 }
@@ -33,6 +40,8 @@ export type SearchResult = {
   ir_ids: string[];
   matched_key_type: keyof SearchKeys | null;
   matched_key: string | null;
+  query_normalized_keys: SearchKeys;
+  last_tried_normalized_key: string | null;
 };
 
 function idbGet<T>(store: IDBObjectStore, key: IDBValidKey): Promise<T | undefined> {
@@ -63,13 +72,21 @@ export async function searchQuery(
 ): Promise<SearchResult> {
   const trimmed = query.trim();
   if (activeBundleId.trim() === "" || trimmed === "") {
-    return { ir_ids: [], matched_key_type: null, matched_key: null };
+    return {
+      ir_ids: [],
+      matched_key_type: null,
+      matched_key: null,
+      query_normalized_keys: EMPTY_SEARCH_KEYS,
+      last_tried_normalized_key: null,
+    };
   }
 
   const keys = computeSearchKeys([normalizeNfc(trimmed)]);
 
   const tx = db.transaction(STORE_SEARCH_INDEX, "readonly");
   const store = tx.objectStore(STORE_SEARCH_INDEX);
+
+  let lastTriedNormalizedKey: string | null = null;
 
   // Exactly one ladder is used, selected by bundle contract.
   for (const keyType of KEY_TYPE_ORDER) {
@@ -78,16 +95,25 @@ export async function searchQuery(
     const storageKeyType = searchIndexDirectional ? toDirectionalKeyType(direction, keyType) : keyType;
 
     for (const normalizedKey of normalizedKeys) {
+      lastTriedNormalizedKey = normalizedKey;
       const entry = await idbGet<{ ir_ids: string[] }>(store, [activeBundleId, storageKeyType, normalizedKey]);
       if (entry && Array.isArray(entry.ir_ids) && entry.ir_ids.length > 0) {
         return {
           ir_ids: entry.ir_ids,
           matched_key_type: keyType,
           matched_key: normalizedKey,
+          query_normalized_keys: keys,
+          last_tried_normalized_key: normalizedKey,
         };
       }
     }
   }
 
-  return { ir_ids: [], matched_key_type: null, matched_key: null };
+  return {
+    ir_ids: [],
+    matched_key_type: null,
+    matched_key: null,
+    query_normalized_keys: keys,
+    last_tried_normalized_key: lastTriedNormalizedKey,
+  };
 }

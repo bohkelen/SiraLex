@@ -1,5 +1,6 @@
 import "./style.css";
 import { registerSW } from "virtual:pwa-register";
+import appPackage from "../package.json";
 
 import { probeJsonlFile } from "./bundle_probe";
 import {
@@ -48,10 +49,18 @@ import {
   type InstallProgressMode,
 } from "./install/bundle_install";
 import {
+  buildQueryLogDiagnosticsContext,
   clearQueryLogsFromUi,
+  copyQueryLogDiagnosticsFromUi,
   exportQueryLogsFromUi,
-  getQueryLogCountFromDb,
+  formatQueryLogStatsLine,
+  getQueryLogStatsFromDb,
 } from "./query_logging/query_log_controls";
+import {
+  getQueryLoggingConsentStatus,
+  hasValidQueryLoggingConsent,
+  recordQueryLoggingConsent,
+} from "./query_logging/query_log_consent";
 import {
   getCurrentLocale,
   type Locale,
@@ -60,14 +69,19 @@ import {
   setCurrentLocaleWithPersistence,
   t,
 } from "./i18n";
-import { queryLogHitMiss } from "./query_logging/query_log_inspect";
+import {
+  recentLogMatchedKeyDisplay,
+  recentLogMatchedKeyTypeDisplay,
+  recentLogResultCount,
+  recentLogStatusLabel,
+} from "./query_logging/query_log_inspect";
 import { listRecentQueryLogs } from "./query_logging/query_log_store";
 import {
   appendSearchQueryLogIfEnabled,
   getQueryLoggingEnabled,
   setQueryLoggingEnabled,
 } from "./query_logging/query_log_runtime";
-import type { QueryLogEventV1 } from "./query_logging/query_log_types";
+import type { QueryLogEvent } from "./query_logging/query_log_types";
 import { searchQuery } from "./search/search_query";
 import { resolveRecords } from "./search/resolve_records";
 import {
@@ -197,13 +211,15 @@ app.innerHTML = `
           <div>
             <div class="label">${t("logging.label")}</div>
             <div id="queryLoggingStatus" class="mono">${t("logging.off")}</div>
-            <div id="queryLoggingCount" class="mono" style="margin-top: 4px">${t("queryLogs.count.many", { count: 0 })}</div>
+            <div id="queryLoggingStats" class="mono" style="margin-top: 4px">${t("logging.statsLine", { count: 0, oldest: t("logging.statsOldestNone") })}</div>
+            <div id="queryLoggingConsentStatus" class="mono" style="margin-top: 4px">${t("logging.consentStatusNotRecorded")}</div>
           </div>
           <button id="queryLoggingToggle" class="btn" type="button">${t("logging.turnOn")}</button>
         </div>
         <div class="row" style="margin-top: 8px; gap: 8px">
           <button id="queryLogExport" class="btn" type="button">${t("logging.export")}</button>
           <button id="queryLogClear" class="btn" type="button">${t("logging.clear")}</button>
+          <button id="queryLogCopyDiagnostics" class="btn" type="button">${t("logging.copyDiagnostics")}</button>
         </div>
         <p class="subtitle" style="margin: 8px 0 0 0">
           ${t("logging.localOnly")}
@@ -276,6 +292,8 @@ app.innerHTML = `
   </div>
 `;
 
+const APP_VERSION = typeof appPackage.version === "string" ? appPackage.version : "0.0.0";
+
 function mustGetEl<T extends Element>(selector: string): T {
   const el = document.querySelector(selector);
   if (!el) throw new Error(`Missing element: ${selector}`);
@@ -311,10 +329,12 @@ const searchResults = mustGetEl<HTMLDivElement>("#searchResults");
 const searchControlsRow = mustGetEl<HTMLDivElement>("#searchControlsRow");
 const langToggle = mustGetEl<HTMLButtonElement>("#langToggle");
 const queryLoggingStatus = mustGetEl<HTMLDivElement>("#queryLoggingStatus");
-const queryLoggingCount = mustGetEl<HTMLDivElement>("#queryLoggingCount");
+const queryLoggingStats = mustGetEl<HTMLDivElement>("#queryLoggingStats");
+const queryLoggingConsentStatus = mustGetEl<HTMLDivElement>("#queryLoggingConsentStatus");
 const queryLoggingToggleBtn = mustGetEl<HTMLButtonElement>("#queryLoggingToggle");
 const queryLogExportBtn = mustGetEl<HTMLButtonElement>("#queryLogExport");
 const queryLogClearBtn = mustGetEl<HTMLButtonElement>("#queryLogClear");
+const queryLogCopyDiagnosticsBtn = mustGetEl<HTMLButtonElement>("#queryLogCopyDiagnostics");
 const queryLogMessage = mustGetEl<HTMLDivElement>("#queryLogMessage");
 const recentQueryLogsOffNote = mustGetEl<HTMLParagraphElement>("#recentQueryLogsOffNote");
 const recentQueryLogsActive = mustGetEl<HTMLDivElement>("#recentQueryLogsActive");
@@ -1632,7 +1652,7 @@ let searchDirection: SearchDirection = "source_to_target";
 
 const RECENT_QUERY_LOGS_LIMIT = 50;
 
-async function fetchRecentQueryLogs(limit: number): Promise<QueryLogEventV1[]> {
+async function fetchRecentQueryLogs(limit: number): Promise<QueryLogEvent[]> {
   let db: IDBDatabase | undefined;
   try {
     db = await openSiralexDb();
@@ -1649,7 +1669,7 @@ function styleInspectCell(el: HTMLElement): void {
   el.style.verticalAlign = "top";
 }
 
-function renderRecentQueryLogs(rows: QueryLogEventV1[]): DocumentFragment {
+function renderRecentQueryLogs(rows: QueryLogEvent[]): DocumentFragment {
   const frag = document.createDocumentFragment();
   if (rows.length === 0) {
     const empty = document.createElement("p");
@@ -1666,7 +1686,14 @@ function renderRecentQueryLogs(rows: QueryLogEventV1[]): DocumentFragment {
 
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
-  for (const label of ["query_raw", "hit/miss", "ladder_level_hit", "timestamp_iso"]) {
+  for (const label of [
+    t("logging.recentColQuery"),
+    t("logging.recentColStatus"),
+    t("logging.recentColCount"),
+    t("logging.recentColMatchedKey"),
+    t("logging.recentColMatchedKeyType"),
+    t("logging.recentColTimestamp"),
+  ]) {
     const th = document.createElement("th");
     th.textContent = label;
     styleInspectCell(th);
@@ -1681,16 +1708,22 @@ function renderRecentQueryLogs(rows: QueryLogEventV1[]): DocumentFragment {
     const tdRaw = document.createElement("td");
     tdRaw.textContent = row.query_raw;
     styleInspectCell(tdRaw);
-    const tdHit = document.createElement("td");
-    tdHit.textContent = queryLogHitMiss(row);
-    styleInspectCell(tdHit);
-    const tdLadder = document.createElement("td");
-    tdLadder.textContent = row.ladder_level_hit;
-    styleInspectCell(tdLadder);
+    const tdStatus = document.createElement("td");
+    tdStatus.textContent = recentLogStatusLabel(row);
+    styleInspectCell(tdStatus);
+    const tdCount = document.createElement("td");
+    tdCount.textContent = String(recentLogResultCount(row));
+    styleInspectCell(tdCount);
+    const tdMatchedKey = document.createElement("td");
+    tdMatchedKey.textContent = recentLogMatchedKeyDisplay(row) ?? "—";
+    styleInspectCell(tdMatchedKey);
+    const tdMatchedKeyType = document.createElement("td");
+    tdMatchedKeyType.textContent = recentLogMatchedKeyTypeDisplay(row);
+    styleInspectCell(tdMatchedKeyType);
     const tdTs = document.createElement("td");
     tdTs.textContent = row.timestamp_iso;
     styleInspectCell(tdTs);
-    tr.append(tdRaw, tdHit, tdLadder, tdTs);
+    tr.append(tdRaw, tdStatus, tdCount, tdMatchedKey, tdMatchedKeyType, tdTs);
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
@@ -1724,12 +1757,27 @@ async function updateRecentQueryLogsView() {
   }
 }
 
-async function refreshQueryLoggingCount() {
-  const result = await getQueryLogCountFromDb({ translate: t });
-  queryLoggingCount.textContent = result.message;
-  if (!result.ok) {
-    queryLogMessage.textContent = result.message;
+function updateQueryLoggingConsentDisplay() {
+  if (hasValidQueryLoggingConsent()) {
+    const status = getQueryLoggingConsentStatus();
+    queryLoggingConsentStatus.textContent = t("logging.consentStatusRecorded", {
+      version: status.version ?? "unknown",
+      date: status.atIso ?? "unknown",
+    });
+  } else {
+    queryLoggingConsentStatus.textContent = t("logging.consentStatusNotRecorded");
   }
+}
+
+async function refreshQueryLoggingDiagnostics() {
+  const statsResult = await getQueryLogStatsFromDb({ translate: t });
+  queryLoggingStats.textContent = statsResult.ok
+    ? formatQueryLogStatsLine(statsResult.stats, { translate: t })
+    : statsResult.message;
+  if (!statsResult.ok) {
+    queryLogMessage.textContent = statsResult.message;
+  }
+  updateQueryLoggingConsentDisplay();
 }
 
 function updateQueryLoggingToggleState() {
@@ -1742,7 +1790,7 @@ function updateQueryLoggingToggleState() {
 async function renderQueryLoggingToggle() {
   updateQueryLoggingToggleState();
   queryLogMessage.textContent = "";
-  await refreshQueryLoggingCount();
+  await refreshQueryLoggingDiagnostics();
   await updateRecentQueryLogsView();
 }
 
@@ -1767,12 +1815,31 @@ function updateLangToggle() {
 }
 
 queryLoggingToggleBtn.addEventListener("click", () => {
-  const nextEnabled = !getQueryLoggingEnabled();
-  setQueryLoggingEnabled(nextEnabled);
-  if (!nextEnabled) {
+  const currentlyEnabled = getQueryLoggingEnabled();
+  if (currentlyEnabled) {
+    setQueryLoggingEnabled(false);
     cancelPendingSettledQueryLog();
+    updateQueryLoggingToggleState();
+    updateQueryLoggingConsentDisplay();
+    queryLogMessage.textContent = "";
+    void updateRecentQueryLogsView();
+    return;
   }
+
+  if (!hasValidQueryLoggingConsent()) {
+    const agreed = window.confirm(t("logging.consentPrompt"));
+    if (!agreed) {
+      setQueryLoggingEnabled(false);
+      updateQueryLoggingToggleState();
+      updateQueryLoggingConsentDisplay();
+      return;
+    }
+    recordQueryLoggingConsent();
+  }
+
+  setQueryLoggingEnabled(true);
   updateQueryLoggingToggleState();
+  updateQueryLoggingConsentDisplay();
   queryLogMessage.textContent = "";
   void updateRecentQueryLogsView();
 });
@@ -1781,7 +1848,7 @@ queryLogExportBtn.addEventListener("click", () => {
   void (async () => {
     const result = await exportQueryLogsFromUi({ translate: t });
     queryLogMessage.textContent = result.message;
-    await refreshQueryLoggingCount();
+    await refreshQueryLoggingDiagnostics();
   })();
 });
 
@@ -1789,8 +1856,25 @@ queryLogClearBtn.addEventListener("click", () => {
   void (async () => {
     const result = await clearQueryLogsFromUi({ translate: t });
     queryLogMessage.textContent = result.message;
-    await refreshQueryLoggingCount();
+    await refreshQueryLoggingDiagnostics();
     await updateRecentQueryLogsView();
+  })();
+});
+
+queryLogCopyDiagnosticsBtn.addEventListener("click", () => {
+  void (async () => {
+    const context = await buildQueryLogDiagnosticsContext(
+      {
+        appVersion: APP_VERSION,
+        bundleId: currentActiveBundle?.bundle_id,
+        normVersion: currentActiveBundle?.normalization_ruleset,
+        uiLanguage: getCurrentLocale(),
+        loggingEnabled: getQueryLoggingEnabled(),
+      },
+      { translate: t },
+    );
+    const result = await copyQueryLogDiagnosticsFromUi(context, { translate: t });
+    queryLogMessage.textContent = result.message;
   })();
 });
 
@@ -1814,6 +1898,8 @@ type SettledQueryLogPayload = {
   result: Awaited<ReturnType<typeof searchQuery>>;
   activeBundleMeta: ActiveBundleMeta;
   storageScopeId: string;
+  latencyMs: number;
+  uiLanguage: Locale;
 };
 
 let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1855,8 +1941,10 @@ function scheduleSettledQueryLog(payload: SettledQueryLogPayload) {
       result: pending.result,
       activeBundleMeta: pending.activeBundleMeta,
       storageScopeId: pending.storageScopeId,
+      latencyMs: pending.latencyMs,
+      uiLanguage: pending.uiLanguage,
     }).then(async () => {
-      await refreshQueryLoggingCount();
+      await refreshQueryLoggingDiagnostics();
       await updateRecentQueryLogsView();
     });
   }, QUERY_LOGGING_SETTLE_DELAY_MS);
@@ -1952,6 +2040,8 @@ async function runSearch(query: string) {
         result,
         activeBundleMeta,
         storageScopeId: activeStorageScopeId,
+        latencyMs: Math.round(performance.now() - t0),
+        uiLanguage: getCurrentLocale(),
       });
       return;
     }
@@ -1981,6 +2071,8 @@ async function runSearch(query: string) {
       result,
       activeBundleMeta,
       storageScopeId: activeStorageScopeId,
+      latencyMs: Math.round(performance.now() - t0),
+      uiLanguage: getCurrentLocale(),
     });
   } catch (e) {
     if (seq !== searchSeq) return;

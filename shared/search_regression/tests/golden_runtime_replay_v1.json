@@ -1,0 +1,223 @@
+{
+  "schema_version": "search_regression_runtime_run_v1",
+  "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
+  "catalog_version": "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2",
+  "norm_version": "norm_v3",
+  "search_index_sha256": "sha256:4326bc4c9c7d51229b4afa44048751ff122a451dce3d52c2d20d56ac8281418e",
+  "matrix_case_count": 13,
+  "passed_case_count": 13,
+  "failed_case_count": 0,
+  "cases": [
+    {
+      "case_id": "sr7l_001_fruit_exact",
+      "query": "fruit",
+      "query_unicode_form": "nfc",
+      "direction": "source_to_target",
+      "actual_result_status": "hit_single",
+      "actual_result_count": 1,
+      "actual_ir_ids": [
+        "7cdb6070ce427a6d"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "fruit",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_002_fruits_alias",
+      "query": "fruits",
+      "query_unicode_form": "nfc",
+      "direction": "source_to_target",
+      "actual_result_status": "hit_single",
+      "actual_result_count": 1,
+      "actual_ir_ids": [
+        "7cdb6070ce427a6d"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "fruits",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_003_grand_parents_alias",
+      "query": "grand-parents",
+      "query_unicode_form": "nfc",
+      "direction": "source_to_target",
+      "actual_result_status": "hit_multi",
+      "actual_result_count": 2,
+      "actual_ir_ids": [
+        "1f6d3a5919110b21",
+        "957bd76b41fda053"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "grand-parents",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_004_mere_multi",
+      "query": "mère",
+      "query_unicode_form": "nfc",
+      "direction": "source_to_target",
+      "actual_result_status": "hit_multi",
+      "actual_result_count": 3,
+      "actual_ir_ids": [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "mère",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_005_bras_exact",
+      "query": "bras",
+      "query_unicode_form": "nfc",
+      "direction": "source_to_target",
+      "actual_result_status": "hit_single",
+      "actual_result_count": 1,
+      "actual_ir_ids": [
+        "5e6b826159dd25dc"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "bras",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_006_manger_exact",
+      "query": "manger",
+      "query_unicode_form": "nfc",
+      "direction": "source_to_target",
+      "actual_result_status": "hit_single",
+      "actual_result_count": 1,
+      "actual_ir_ids": [
+        "1b004d594877bc7d"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "manger",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_007_mou_exact",
+      "query": "mou",
+      "query_unicode_form": "nfc",
+      "direction": "source_to_target",
+      "actual_result_status": "hit_single",
+      "actual_result_count": 1,
+      "actual_ir_ids": [
+        "af0d2910b163c6d8"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "mou",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_008_tete_exact",
+      "query": "tête",
+      "query_unicode_form": "nfc",
+      "direction": "source_to_target",
+      "actual_result_status": "hit_single",
+      "actual_result_count": 1,
+      "actual_ir_ids": [
+        "0e9810774c22bcbf"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "tête",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_009_poil_supplement",
+      "query": "poil",
+      "query_unicode_form": "nfc",
+      "direction": "source_to_target",
+      "actual_result_status": "hit_single",
+      "actual_result_count": 1,
+      "actual_ir_ids": [
+        "ff499fdee22b2b86"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "poil",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_010_zzzz_nohit_probe",
+      "query": "zzzz-nohit-test",
+      "query_unicode_form": "not_applicable",
+      "direction": "source_to_target",
+      "actual_result_status": "miss",
+      "actual_result_count": 0,
+      "actual_ir_ids": [],
+      "actual_matched_key_type": "none",
+      "actual_matched_key": null,
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_011_kun_target_exact",
+      "query": "Kun",
+      "query_unicode_form": "nfc",
+      "direction": "target_to_source",
+      "actual_result_status": "hit_single",
+      "actual_result_count": 1,
+      "actual_ir_ids": [
+        "b07ae7bd61ff3c85"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "kun",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_012_kun_accent_ambiguity",
+      "query": "Kùn",
+      "query_unicode_form": "nfc",
+      "direction": "target_to_source",
+      "actual_result_status": "hit_multi",
+      "actual_result_count": 2,
+      "actual_ir_ids": [
+        "753fa18e0a6df4ab",
+        "e28e149f57ab616b"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "kùn",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    },
+    {
+      "case_id": "sr7l_013_kun_decomposed_unicode",
+      "query": "kùn",
+      "query_unicode_form": "nfd",
+      "direction": "target_to_source",
+      "actual_result_status": "hit_multi",
+      "actual_result_count": 2,
+      "actual_ir_ids": [
+        "753fa18e0a6df4ab",
+        "e28e149f57ab616b"
+      ],
+      "actual_matched_key_type": "casefold",
+      "actual_matched_key": "kùn",
+      "actual_deep_ladder": false,
+      "expected_match": true,
+      "mismatches": []
+    }
+  ]
+}

@@ -1162,6 +1162,14 @@ Deferred follow-ups:
 - push branch / open PR
 - deploy only after merge or explicit deployment approval
 
+### Phase 7L — Curated search regression gate ✅ *(complete)*
+
+Phase 7L adds a curated Python/runtime search-regression gate for approved lookup contracts against the pinned featured bundle. It is engineering QC only — not telemetry.
+
+- CI workflow: `.github/workflows/phase7l_search_regression.yml`
+- Operating procedure and human-authored changelog: `docs/reports/search_regression_changelog.md`
+- Matrix and goldens live under `shared/search_regression/`; Python runner under `api/search_regression/`; runtime adapter under `web/src/search_regression/`
+
 ---
 
 ## Phase 1.5 — Corrections (spec + dry-run)
