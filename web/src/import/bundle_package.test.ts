@@ -20,11 +20,22 @@ function fixtureFile(name: string): File {
 
 async function readBlobBytes(blob: Blob): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
+  const reader = blob.stream().getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+      chunks.push(bytes);
+    }
+  } finally {
+    reader.releaseLock();
+  }
   let total = 0;
-  for await (const chunk of blob.stream()) {
-    const bytes = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
-    chunks.push(bytes);
-    total += bytes.byteLength;
+  for (const chunk of chunks) {
+    total += chunk.byteLength;
   }
   const out = new Uint8Array(total);
   let offset = 0;
@@ -68,8 +79,17 @@ describe("openStoredBundlePackage", () => {
     expect(opened.searchIndexBlob.size).toBe(opened.packageMetadata.entryByteLengths["search_index.jsonl"]);
 
     const streamParts: Uint8Array[] = [];
-    for await (const chunk of opened.recordsBlob.stream()) {
-      streamParts.push(chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk));
+    const recordsReader = opened.recordsBlob.stream().getReader();
+    try {
+      while (true) {
+        const { done, value } = await recordsReader.read();
+        if (done) {
+          break;
+        }
+        streamParts.push(value instanceof Uint8Array ? value : new Uint8Array(value));
+      }
+    } finally {
+      recordsReader.releaseLock();
     }
     const recordsFromStream = Buffer.concat(streamParts.map((part) => Buffer.from(part)));
     const recordsFromSlice = Buffer.from(await opened.recordsBlob.arrayBuffer());

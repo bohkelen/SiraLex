@@ -97,8 +97,8 @@ function readUint32LE(view: DataView, offset: number): number {
 }
 
 function decodeAsciiFileName(bytes: Uint8Array): string {
-  for (let i = 0; i < bytes.length; i += 1) {
-    if (bytes[i] > 0x7f) {
+  for (const byte of bytes) {
+    if (byte > 0x7f) {
       throw new BundlePackageError("invalid_entry_name", "ZIP entry name must be ASCII");
     }
   }
