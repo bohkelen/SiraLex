@@ -25,16 +25,23 @@ const REQUIRED_PAYLOAD_PATHS = {
 } as const;
 
 export type VerifiedBundlePackage = {
-  manifest: BundleManifestV1;
-  manifestBlob: Blob;
-  recordsBlob: Blob;
-  searchIndexBlob: Blob;
-  packageMetadata: BundlePackageMetadata;
-  observedIntegrity: {
-    recordsSha256: string;
-    searchIndexSha256: string;
-    contentSha256: string;
+  readonly manifest: BundleManifestV1;
+  readonly manifestBlob: Blob;
+  readonly recordsBlob: Blob;
+  readonly searchIndexBlob: Blob;
+  readonly packageMetadata: BundlePackageMetadata;
+  readonly observedIntegrity: {
+    readonly recordsSha256: string;
+    readonly searchIndexSha256: string;
+    readonly contentSha256: string;
   };
+};
+
+export type InstallEligibleSnapshot = {
+  readonly manifest: BundleManifestV1;
+  readonly recordsBlob: Blob;
+  readonly searchIndexBlob: Blob;
+  readonly storageBytes: number;
 };
 
 export class BundlePackageIntegrityError extends Error {
@@ -45,6 +52,69 @@ export class BundlePackageIntegrityError extends Error {
     this.name = "BundlePackageIntegrityError";
     this.code = code;
   }
+}
+
+const installEligibleSnapshots = new WeakMap<object, InstallEligibleSnapshot>();
+
+export function getInstallEligibleVerifiedPackageSnapshot(value: VerifiedBundlePackage): InstallEligibleSnapshot {
+  const snapshot = installEligibleSnapshots.get(value);
+  if (!snapshot) {
+    throw new BundlePackageIntegrityError(
+      "package_not_verified",
+      "Package must be prepared through prepareVerifiedBundlePackage() before installation",
+    );
+  }
+  return snapshot;
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  if (Object.isFrozen(value)) {
+    return value;
+  }
+
+  Object.freeze(value);
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      deepFreeze(item);
+    }
+    return value;
+  }
+
+  for (const key of Object.keys(value as Record<string, unknown>)) {
+    deepFreeze((value as Record<string, unknown>)[key]);
+  }
+
+  return value;
+}
+
+function cloneAndFreezeManifest(manifest: BundleManifestV1): BundleManifestV1 {
+  return deepFreeze(structuredClone(manifest));
+}
+
+function freezeVerifiedPackageSurface(value: VerifiedBundlePackage): VerifiedBundlePackage {
+  deepFreeze(value.observedIntegrity);
+  deepFreeze(value.packageMetadata.entryByteLengths);
+  Object.freeze(value.packageMetadata);
+  Object.freeze(value);
+  return value;
+}
+
+function createInstallEligibleSnapshot(
+  manifest: BundleManifestV1,
+  recordsBlob: Blob,
+  searchIndexBlob: Blob,
+  storageBytes: number,
+): InstallEligibleSnapshot {
+  return Object.freeze({
+    manifest: cloneAndFreezeManifest(manifest),
+    recordsBlob,
+    searchIndexBlob,
+    storageBytes,
+  });
 }
 
 export async function prepareVerifiedBundlePackage(file: File): Promise<VerifiedBundlePackage> {
@@ -104,8 +174,9 @@ export async function prepareVerifiedBundlePackage(file: File): Promise<Verified
     );
   }
 
-  return {
-    manifest,
+  const frozenManifest = cloneAndFreezeManifest(manifest);
+  const verified = freezeVerifiedPackageSurface({
+    manifest: frozenManifest,
     manifestBlob: opened.manifestBlob,
     recordsBlob: opened.recordsBlob,
     searchIndexBlob: opened.searchIndexBlob,
@@ -115,7 +186,17 @@ export async function prepareVerifiedBundlePackage(file: File): Promise<Verified
       searchIndexSha256: searchIndexObserved.digest,
       contentSha256: computedContentSha256,
     },
-  };
+  });
+  installEligibleSnapshots.set(
+    verified,
+    createInstallEligibleSnapshot(
+      manifest,
+      opened.recordsBlob,
+      opened.searchIndexBlob,
+      opened.packageMetadata.totalUncompressedBytes,
+    ),
+  );
+  return verified;
 }
 
 async function decodeManifestText(manifestBlob: Blob): Promise<string> {
