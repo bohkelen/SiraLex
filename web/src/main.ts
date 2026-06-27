@@ -24,6 +24,12 @@ import {
   validateSelectedFilesAgainstManifest,
   type BundleManifestV1,
 } from "./bundle_manifest";
+import { prepareVerifiedBundlePackage } from "./import/bundle_package_integrity";
+import { installVerifiedBundlePackage } from "./import/bundle_package_install";
+import {
+  wireManualPackageImportControls,
+  type ManualPackageImportDeps,
+} from "./import/manual_package_import_flow";
 import {
   deleteBundleData,
   deleteSiralexDb,
@@ -176,6 +182,15 @@ app.innerHTML = `
         <div id="installedBundleStatus" class="mono" style="margin-top: 12px"></div>
         <div id="installedBundleList" style="margin-top: 12px"></div>
 
+        <div style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
+          <div class="label">${t("import.packageTitle")}</div>
+          <p class="subtitle" style="margin: 6px 0 0 0">${t("import.packageChooseHint")}</p>
+          <div class="row" style="margin-top: 10px; gap: 8px">
+            <button id="packageImport" class="btn" type="button">${t("import.packageChooseButton")}</button>
+            <input id="packageImportFile" type="file" accept=".siralex.zip,application/zip" style="display: none" />
+          </div>
+        </div>
+
         <details style="margin-top: 12px">
           <summary style="color: var(--muted); font-size: 13px; cursor: pointer">${t("advancedSetup.summary")}</summary>
           <p class="subtitle" style="margin: 8px 0 0 0">${t("advancedSetup.surfaceHint")}</p>
@@ -188,8 +203,12 @@ app.innerHTML = `
           </div>
           <div id="catalogStatus" class="mono" style="margin-top: 12px"></div>
           <div id="catalogList" style="margin-top: 12px"></div>
-          <div class="row" style="margin-top: 12px">
-            <button id="quickImport" class="btn">${t("import.installFiles")}</button>
+          <div style="margin-top: 12px">
+            <div class="label">${t("import.legacyThreeFileLabel")}</div>
+            <p class="subtitle" style="margin: 4px 0 0 0">${t("import.legacyThreeFileHint")}</p>
+          </div>
+          <div class="row" style="margin-top: 8px">
+            <button id="quickImport" class="btn">${t("import.legacyThreeFileButton")}</button>
             <input id="quickImportFiles" type="file" multiple style="display: none" />
             <button id="cancelInstall" class="btn" style="display: none">${t("import.cancel")}</button>
           </div>
@@ -319,6 +338,8 @@ const catalogList = mustGetEl<HTMLDivElement>("#catalogList");
 const firstRun = mustGetEl<HTMLDivElement>("#firstRun");
 const quickImportBtn = mustGetEl<HTMLButtonElement>("#quickImport");
 const quickImportFiles = mustGetEl<HTMLInputElement>("#quickImportFiles");
+const packageImportBtn = mustGetEl<HTMLButtonElement>("#packageImport");
+const packageImportFile = mustGetEl<HTMLInputElement>("#packageImportFile");
 const cancelInstallBtn = mustGetEl<HTMLButtonElement>("#cancelInstall");
 const importProgress = mustGetEl<HTMLDivElement>("#importProgress");
 const clearDbBtn = mustGetEl<HTMLButtonElement>("#clearDb");
@@ -368,6 +389,7 @@ let remoteInstallAbortController: AbortController | undefined;
 let remoteInstallBundleId: string | undefined;
 let currentStorageEstimate: { usage?: number; quota?: number } | undefined;
 let featuredInstallInProgress = false;
+let packageImportInProgress = false;
 
 function formatErrorDetails(e: unknown): string {
   const details = [`String(e): ${String(e)}`];
@@ -627,6 +649,64 @@ function renderInstalledBundleManager() {
   }
 
   installedBundleList.appendChild(list);
+}
+
+function updatePackageImportControls() {
+  packageImportBtn.disabled = busy || packageImportInProgress;
+  packageImportFile.disabled = busy || packageImportInProgress;
+}
+
+function buildManualPackageImportDeps(): ManualPackageImportDeps {
+  return {
+    prepareVerifiedBundlePackage,
+    installVerifiedBundlePackage,
+    withSingleWriterLock,
+    messages: {
+      preparing: t("import.packagePreparing"),
+      verifying: t("import.packageVerifying"),
+      installing: t("import.packageInstalling"),
+      installed: t("import.packageInstalled"),
+      tooManyFiles: t("import.packageTooManyFiles"),
+      invalidStructure: t("import.packageErrorInvalidStructure"),
+      invalidManifest: t("import.packageErrorInvalidManifest"),
+      verificationFailed: t("import.packageErrorVerificationFailed"),
+      contentsMismatch: t("import.packageErrorContentsMismatch"),
+      installationFailed: t("import.packageErrorInstallationFailed"),
+      partialRemovedReimport: t("import.partialRemovedReimport"),
+      writerBusy: t("import.packageWriterBusy"),
+    },
+    formatErrorDetails,
+    setImportProgress: (visible, text) => {
+      importProgress.style.display = visible ? "" : "none";
+      importProgress.textContent = text;
+    },
+    appendImportProgress: (text) => {
+      importProgress.textContent += text;
+    },
+    setDbOutDiagnostic: (text) => {
+      dbOut.textContent = text;
+    },
+    hideFirstRun: () => {
+      firstRun.style.display = "none";
+    },
+    clearPackageInput: () => {
+      packageImportFile.value = "";
+    },
+    setPackageControlsEnabled: (enabled) => {
+      if (!enabled) {
+        packageImportBtn.disabled = true;
+        packageImportFile.disabled = true;
+        return;
+      }
+      updatePackageImportControls();
+    },
+    getPackageImportInProgress: () => packageImportInProgress,
+    setPackageImportInProgress: (value) => {
+      packageImportInProgress = value;
+      updatePackageImportControls();
+    },
+    getBusy: () => busy,
+  };
 }
 
 function updateButtons() {
@@ -1021,6 +1101,7 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
     probeIndex: probeIndexBtn.disabled,
     probeAll: probeAllBtn.disabled,
     quickImport: quickImportBtn.disabled,
+    packageImport: packageImportBtn.disabled,
     bundleSelect: bundleSelect.disabled,
     loadCatalog: loadCatalogBtn.disabled,
     catalogUrl: catalogUrlInput.disabled,
@@ -1032,6 +1113,8 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
   probeIndexBtn.disabled = true;
   probeAllBtn.disabled = true;
   quickImportBtn.disabled = true;
+  packageImportBtn.disabled = true;
+  packageImportFile.disabled = true;
   bundleSelect.disabled = true;
   loadCatalogBtn.disabled = true;
   catalogUrlInput.disabled = true;
@@ -1048,14 +1131,25 @@ async function withSingleWriterLock(label: string, fn: () => Promise<void>) {
     probeIndexBtn.disabled = prev.probeIndex;
     probeAllBtn.disabled = prev.probeAll;
     quickImportBtn.disabled = prev.quickImport;
+    packageImportBtn.disabled = prev.packageImport;
+    packageImportFile.disabled = prev.packageImport || packageImportInProgress;
     bundleSelect.disabled = prev.bundleSelect;
     loadCatalogBtn.disabled = prev.loadCatalog;
     catalogUrlInput.disabled = prev.catalogUrl;
     updateButtons();
     updateCatalogControls();
+    updatePackageImportControls();
     await refreshDbStatus();
   }
 }
+
+// --- Package import (single .siralex.zip) ---
+
+wireManualPackageImportControls({
+  button: packageImportBtn,
+  input: packageImportFile,
+  buildDeps: buildManualPackageImportDeps,
+});
 
 // --- Quick import (single-action file picker) ---
 
@@ -2100,6 +2194,7 @@ async function initializeAppState() {
     importProgress.textContent = `${recoveryMessage}\n`;
   }
   await refreshDbStatus();
+  updatePackageImportControls();
 }
 
 void initializeAppState();
