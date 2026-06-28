@@ -23,7 +23,7 @@ rejected
 
 **Current status:** `not_ready_for_validation`
 
-**Why:** Slice 5A establishes protocol and evidence templates only. No candidate package identity is recorded and no real-device evidence rows are `passed`. Documentation work alone cannot advance this gate.
+**Why:** A reproducible candidate package has been built and recorded from the exact currently featured logical bundle. No human tester has begun the real-device matrix. Release status remains `not_ready_for_validation`.
 
 Advance to `in_device_validation` only after a reproducible candidate is built, recorded in the evidence file, and a human tester begins the device matrix.
 
@@ -33,13 +33,14 @@ Advance to `in_device_validation` only after a reproducible candidate is built, 
 
 | Field | Value |
 |---|---|
-| Recorded? | no |
-| Primary `bundle_id` | |
-| Primary `content_sha256` | |
-| Package filename | |
-| Package SHA-256 | |
-| git commit at build | |
+| Recorded? | yes |
+| Primary `bundle_id` | `bundle_full_20260616_phase7j_alias_round2_candidate` |
+| Primary `content_sha256` | `sha256:e54b8fdf39558ecb639c0763ea9454f085aded7b48f867affe1f96a44709c2ef` |
+| Package filename | `bundle_full_20260616_phase7j_alias_round2_candidate.siralex.zip` |
+| Package SHA-256 | `sha256:d8273a18b739b8f0c165335dd104f944cb4079ed826a54f43b28d77ba26f7903` |
+| git commit at build | `befccc6ddec2a06dba5f609cfd20df067764f646` |
 | Evidence record link | `docs/reports/phase7n1_slice5_device_evidence_record.md` |
+| Provenance | Package constructed as a deterministic STORED-ZIP transport envelope around the exact currently featured logical bundle. Records, index, manifest identity, and content hash were not regenerated or altered. |
 
 ---
 
@@ -121,8 +122,8 @@ All boxes remain unchecked.
 | Decision status | `not_ready_for_validation` |
 | Decision owner | |
 | Decision date | |
-| Decision rationale | Protocol and evidence templates created in Slice 5A; device matrix not executed. |
-| Follow-up items | Build recorded candidate; execute device matrix; attach evidence; review blockers. |
+| Decision rationale | A reproducible candidate package has been built and recorded from the exact currently featured logical bundle. No human tester has begun the real-device matrix. Release status remains not_ready_for_validation. |
+| Follow-up items | Transfer the recorded featured-bundle package to real devices; execute Android and iPhone matrix; attach evidence; review blockers. |
 | Rollback / recovery note | No package release authorized. Existing catalog and featured bundle paths unchanged. Invalid package attempts must leave prior active dictionary intact per Slice 4 behavior. |
 
 ---

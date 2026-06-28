@@ -11,10 +11,10 @@
 
 | Field | Value |
 |---|---|
-| Evidence record ID | `phase7n1_slice5_evidence_YYYYMMDD_NNN` |
+| Evidence record ID | `phase7n1_slice5_evidence_20260628_001` |
 | Protocol version | Slice 5A (package manual-install route) |
-| Record opened | |
-| Last updated | |
+| Record opened | 2026-06-28 |
+| Last updated | 2026-06-28 |
 | Maintainer | |
 | Overall matrix status | `not_run` |
 
@@ -24,47 +24,61 @@
 
 | Field | Primary candidate | Replacement candidate (scenario B) |
 |---|---|---|
-| Status | `not_run` | `not_run` / `not_applicable` |
-| git commit | | |
-| branch | | |
-| build date (local) | | |
-| builder environment | | |
-| bundle-builder command | | |
-| package-builder command | | |
-| input bundle directory | | |
-| package filename | | |
-| package SHA-256 | | |
-| package byte length | | |
-| `bundle_id` | | |
-| `content_sha256` | | |
-| records SHA-256 | | |
-| search-index SHA-256 | | |
-| package format version | | |
-| Published to catalog? | no (transport artifact only) | no |
+| Status | `recorded` | `not_run` |
+| Provenance | Package constructed as a deterministic STORED-ZIP transport envelope around the exact currently featured logical bundle. Records, index, manifest identity, and content hash were not regenerated or altered. | |
+| Featured catalog `bundle_id` | `bundle_full_20260616_phase7j_alias_round2_candidate` | |
+| Featured catalog `content_sha256` | `sha256:e54b8fdf39558ecb639c0763ea9454f085aded7b48f867affe1f96a44709c2ef` | |
+| Featured catalog version | `norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2` | |
+| git commit | `befccc6ddec2a06dba5f609cfd20df067764f646` | |
+| branch | `feat/phase-2.0.5-offline-pwa` | |
+| build date (local) | 2026-06-28 18:55:44 EDT | |
+| builder environment | Linux 6.8.0-117-generic; Python 3.10.12; `siralex-api` 0.1.0 | |
+| candidate output root | `build/phase7n1_featured_candidate_20260628_185536` | |
+| featured bundle directory | `web/public/bundle_full_20260616_phase7j_alias_round2_candidate` | |
+| verify command | `siralex-build-bundle verify web/public/bundle_full_20260616_phase7j_alias_round2_candidate` | |
+| package-builder command | `siralex-build-bundle package --bundle-dir web/public/bundle_full_20260616_phase7j_alias_round2_candidate --output build/phase7n1_featured_candidate_20260628_185536/packages/bundle_full_20260616_phase7j_alias_round2_candidate.siralex.zip` | |
+| package filename | `bundle_full_20260616_phase7j_alias_round2_candidate.siralex.zip` | |
+| package path (local, untracked) | `build/phase7n1_featured_candidate_20260628_185536/packages/bundle_full_20260616_phase7j_alias_round2_candidate.siralex.zip` | |
+| package SHA-256 | `sha256:d8273a18b739b8f0c165335dd104f944cb4079ed826a54f43b28d77ba26f7903` | |
+| package byte length | 24534212 | |
+| `bundle_id` | `bundle_full_20260616_phase7j_alias_round2_candidate` | |
+| `content_sha256` | `sha256:e54b8fdf39558ecb639c0763ea9454f085aded7b48f867affe1f96a44709c2ef` | |
+| records SHA-256 | `sha256:14353c66ce92b87aba108349b4f5d831961da740469d5295d54d8034ef4cf376` | |
+| search-index SHA-256 | `sha256:4326bc4c9c7d51229b4afa44048751ff122a451dce3d52c2d20d56ac8281418e` | |
+| package format version | `siralex_bundle_package_v1` | |
+| package reproducibility check | `cmp` byte-identical rebuild PASS (2026-06-28) | |
+| Published to catalog? | no (transport artifact only; wraps existing featured bundle) | no |
 
-**Build command reference (exact):**
+**Build command reference (exact — official primary candidate):**
 
 ```bash
 pip install -e ./api
 
-siralex-build-bundle build \
-  --normalized <path-to-enriched.jsonl> \
-  --search-index <path-to-search_index.jsonl> \
-  --output-dir build/bundles \
-  --bundle-type full \
-  --source-lang fr \
-  --target-lang mnk \
-  --source-label French \
-  --target-label Maninka \
-  --target-script latin \
-  --target-script nko
+CANDIDATE_ROOT="build/phase7n1_featured_candidate_20260628_185536"
+FEATURED_BUNDLE_DIR="web/public/bundle_full_20260616_phase7j_alias_round2_candidate"
 
-siralex-build-bundle verify build/bundles/<bundle-id>
+siralex-build-bundle verify "$FEATURED_BUNDLE_DIR"
 
 siralex-build-bundle package \
-  --bundle-dir build/bundles/<bundle-id> \
-  --output build/packages/<bundle-id>.siralex.zip
+  --bundle-dir "$FEATURED_BUNDLE_DIR" \
+  --output "$CANDIDATE_ROOT/packages/bundle_full_20260616_phase7j_alias_round2_candidate.siralex.zip"
 ```
+
+Deterministic rebuild check (required):
+
+```bash
+siralex-build-bundle package \
+  --bundle-dir "$FEATURED_BUNDLE_DIR" \
+  --output "$CANDIDATE_ROOT/packages/bundle_full_20260616_phase7j_alias_round2_candidate.rebuild.siralex.zip"
+
+cmp -s \
+  "$CANDIDATE_ROOT/packages/bundle_full_20260616_phase7j_alias_round2_candidate.siralex.zip" \
+  "$CANDIDATE_ROOT/packages/bundle_full_20260616_phase7j_alias_round2_candidate.rebuild.siralex.zip"
+```
+
+**Engineering-only transport-smoke artifact (not the official primary candidate):**
+
+An earlier Slice 5B build from base `data/enriched/malipense_enriched_norm_v3.jsonl` produced `bundle_full_20260628_5098763f` under `build/phase7n1_slice5_20260628_185252/`. That artifact is deterministic and internally valid, but it is **not** product-equivalent to the current featured dictionary because it omits Phase 7J alias and source-index supplement layers. Do not use it for official Android/iPhone device evidence.
 
 ---
 
