@@ -266,4 +266,7 @@ Use only for engineering verification. **Never** merge into product triage.
 | `docs/PHASE_7K_QUERY_EVIDENCE_GOVERNANCE.md` | Production-artifact gate |
 | `docs/PHASE_6C_TESTER_PACKET.md` | Consumer tester messaging |
 | `docs/PHASE_7N_INTERVENTION_REVIEW_PACKET.md` | Escalate one bounded intervention |
+| `docs/PHASE_7N1_DEVICE_ACCEPTANCE_PROTOCOL.md` | Phase 7N1 `.siralex.zip` manual-install device matrix |
+| `docs/PHASE_7N1_RELEASE_DECISION.md` | Phase 7N1 package-import release gate |
+| `docs/reports/phase7n1_slice5_device_evidence_record.md` | Phase 7N1 device evidence tables |
 | `shared/specs/phase7n_candidate_decision_v1.md` | Record human disposition |
