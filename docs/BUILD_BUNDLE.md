@@ -147,6 +147,32 @@ siralex-build-bundle verify build/bundles/<bundle-id>
 
 This checks manifest integrity and the bundle payload hashes.
 
+## Step 5b: Package the Verified Bundle (transport only)
+
+After verification succeeds, wrap the same verified bundle directory in a
+deterministic `.siralex.zip` transport package. This step does **not** change
+the inner bundle contract, manifest schema, or `content_sha256`.
+
+```bash
+siralex-build-bundle package \
+  --bundle-dir build/bundles/<bundle-id> \
+  --output build/packages/<bundle-id>.siralex.zip
+```
+
+Rules:
+
+- `--bundle-dir` must point to a bundle that already passes `verify`.
+- `--output` is required; the command fails if the output path already exists.
+- The command fails if the output path is inside the source bundle directory.
+- The output parent directory must already exist.
+- The package contains exactly these root entries, in order:
+  `bundle.manifest.json`, `records.jsonl`, `search_index.jsonl`
+- The emitted archive uses STORED ZIP entries only and is byte-deterministic
+  for identical verified inputs.
+
+The command prints a concise report including bundle ID, output path, package
+byte length, package SHA-256, entry list, and package format version.
+
 ## Step 6: Publish a Catalog Entry
 
 The bundle builder creates the bundle directory, but `catalog.json` is the publisher-facing index that tells the app where to find it.
@@ -213,6 +239,7 @@ After that:
 
 1. inspect the generated bundle directory
 2. run `siralex-build-bundle verify`
-3. publish the bundle directory plus `catalog.json`
+3. optionally run `siralex-build-bundle package` to produce a `.siralex.zip` transport artifact
+4. publish the bundle directory plus `catalog.json`
 
 For hosting and catalog layout, see `docs/BUNDLE_DISTRIBUTION.md`.

@@ -11,42 +11,13 @@ Execution path: real runtime `searchQuery(...)` with IndexedDB import via `impor
 - miss count: **48**
 - hit rate: **69.2%**
 - miss rate: **30.8%**
-- directional check status (Task 6 strict path assertions): **39 pass / 0 contract failures**, plus **1 invalid control query** (Q088; normalization collision case, not leakage)
+- directional check pass/fail (Task 6 strict path assertions): **39 pass / 1 fail**
 - ladder-level distribution:
   - casefold: 79
   - diacritics_insensitive: 10
   - punct_stripped: 12
   - nospace: 7
   - none: 48
-
-## Interpretation pass: control misses vs actionable misses
-
-### A) Expected-control misses (not retrieval failures)
-
-- Directional opposite-path controls (expected miss, got miss): **19**
-- Deliberate language-mismatch probes (expected miss, got miss): **6**
-- Deliberate nonsense/missing-entry probes (expected miss, got miss): **6**
-
-Total expected-control misses: **31**
-
-### B) Actionable retrieval misses
-
-Actionable misses here are controlled probes that point to potential indexing/coverage gaps rather than contract controls:
-
-- spelling probes missed: **6**
-- partial phrase probes missed: **5**
-- inflection-like probes missed: **6**
-
-Total actionable retrieval misses: **17**
-
-### C) Probe-category outcomes
-
-- directional controls: 40 total -> 39 as expected, 1 reclassified invalid control (Q088)
-- spelling probes: 8 total -> 6 misses, 2 hits
-- partial phrase probes: 6 total -> 5 misses, 1 hit
-- inflection-like probes: 6 total -> 6 misses
-- language mismatch probes: 6 total -> 6 misses (expected)
-- missing-entry probes: 6 total -> 6 misses (expected)
 
 ## Query set methodology
 
@@ -223,12 +194,11 @@ This round is a **controlled calibration exercise**, not real-user behavior anal
 
 ## Recurring failure patterns
 
-Failure class distribution among misses (raw):
-
-- language_mismatch: 25 (primarily control/probe behavior)
+Failure class distribution among misses:
+- language_mismatch: 25
 - spelling_error: 6
 - index_gap: 6
-- missing_entry: 6 (deliberate nonsense/missing-entry probes)
+- missing_entry: 6
 - phrase_mismatch: 5
 
 Notable unexpected misses (expected hit but missed):
@@ -240,33 +210,10 @@ Observed recurring themes from controlled probes:
 - partial phrase attempts often miss when only longer extracted phrase units are indexed
 - opposite-direction queries reliably miss (expected under strict directional behavior)
 
-### Q088 investigation (`-ma` in `source_to_target`)
-
-- Query id: `Q088`
-- Scenario label: `directional_tgt_expected_miss`
-- Expected: miss
-- Actual: hit at `punct_stripped`
-
-Observed match details:
-
-- normalized lookup key at `punct_stripped`: **`ma`**
-- matched index family: **`src_punct_stripped`** (source-side, directional path)
-- matched source-side index entry:
-  - key_type: `src_punct_stripped`
-  - key: `ma`
-  - ir_id: `e1417929926cd93a`
-  - record kind: `index_mapping`
-  - source term/preferred form: `ma`
-
-Conclusion:
-
-- This is a **legitimate source-side match** after punctuation stripping (`-ma` -> `ma`), not a directional leakage bug.
-- Reclassification: `Q088` is an **invalid directional-control query** (normalization-collision case), not a Task 6 contract failure.
-
 ## Improvement candidates (grounded in this round)
 
-- Candidate A (softened): run a narrower follow-up probe focused on plausible high-frequency French morphological variants before proposing inflection-coverage expansion; current controlled examples mix realistic and synthetic forms.
-- Candidate B (primary): review phrase extraction granularity for source-side multiword entries where partial phrase probes repeatedly miss, and evaluate whether additional deterministic subphrase keys are warranted in a future versioned ruleset.
+- Candidate A: add controlled source-side inflection/derivational variant coverage for French terms that repeatedly miss (examples: `à l'insu de qqns`, `à l’intérieurs`, `à la mesure des`, `à la vue perçantes`, `à parts`, `à part ças`), while preserving deterministic ruleset/versioning and avoiding ranking changes.
+- Candidate B: review phrase extraction granularity for source-side multiword entries where partial phrase probes repeatedly miss, and evaluate whether additional deterministic subphrase keys are warranted in a future versioned ruleset.
 
 ## Honest limitations
 

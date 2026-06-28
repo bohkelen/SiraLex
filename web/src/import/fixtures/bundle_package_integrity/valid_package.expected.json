@@ -1,0 +1,9 @@
+{
+  "bundle_id": "bundle_full_20260625_1370567f",
+  "records_sha256": "sha256:df5382afa7c91694b6e101a22cc48065237554a95bac764948b3807f38a5d6ae",
+  "search_index_sha256": "sha256:eba3a7f8bc15f5670d18eaffd3065c237d6c9c8b8f788c91f49b33d64a74711b",
+  "content_sha256": "sha256:1370567f2135ea9964359943c1be2960207edbfb2e1ee5189386cf30730a4c3c",
+  "manifest_content_sha256": "sha256:1370567f2135ea9964359943c1be2960207edbfb2e1ee5189386cf30730a4c3c",
+  "records_byte_length": 292,
+  "search_index_byte_length": 72
+}
