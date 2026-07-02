@@ -35,6 +35,8 @@ pnpm-debug.log*
 web/dist/
 web/.vite/
 web/dist/stats.html
+web/playwright-report/
+web/test-results/
 
 
 # Snapshot data (raw captures - do not commit to git)

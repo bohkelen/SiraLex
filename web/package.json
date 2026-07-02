@@ -9,9 +9,12 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:e2e:usage": "npm run build && playwright test -c playwright.config.ts",
+    "test:e2e:usage:headed": "npm run build && playwright test -c playwright.config.ts --headed",
     "build:report": "REPORT=true npm run build"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^25.2.3",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
