@@ -291,19 +291,29 @@ def validate_overlay_against_ir(
 
         canonical_ir_id = overlay_row.canonical_ir_id
         matches = all_by_ir_id.get(canonical_ir_id, [])
-        matching_targets = [
-            ir_unit
-            for ir_unit in matches
-            if ir_unit.get("ir_kind") == "lexicon_entry"
-            and ir_unit.get("source_id") == MALIPENSE_SOURCE_ID
-        ]
-        if len(matching_targets) != 1:
+        total_resolved = len(matches)
+        if total_resolved != 1:
             raise TargetVariantOverlayError(
                 f"line {overlay_row.line_number}: canonical_ir_id {canonical_ir_id!r} "
-                "must resolve to exactly one frozen Mali-Pense lexicon entry "
-                "(ir_kind=lexicon_entry, source_id=src_malipense); "
-                f"resolved {len(matching_targets)} matching targets "
-                f"from {len(matches)} loaded record(s)"
+                f"resolved {total_resolved} loaded record(s); "
+                "reviewed target-variant overlay v1 requires exactly one "
+                "unambiguous loaded IR identity"
+            )
+
+        resolved = matches[0]
+        if resolved.get("ir_kind") != "lexicon_entry":
+            raise TargetVariantOverlayError(
+                f"line {overlay_row.line_number}: canonical_ir_id {canonical_ir_id!r} "
+                f"resolved {total_resolved} loaded record(s); rejected because "
+                f"ir_kind={resolved.get('ir_kind')!r} (expected 'lexicon_entry') "
+                "for frozen Mali-Pense lexicon scope"
+            )
+        if resolved.get("source_id") != MALIPENSE_SOURCE_ID:
+            raise TargetVariantOverlayError(
+                f"line {overlay_row.line_number}: canonical_ir_id {canonical_ir_id!r} "
+                f"resolved {total_resolved} loaded record(s); rejected because "
+                f"source_id={resolved.get('source_id')!r} "
+                "(expected 'src_malipense') for frozen Mali-Pense lexicon scope"
             )
 
 

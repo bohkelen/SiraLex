@@ -168,6 +168,13 @@ def write_overlay(path: Path, rows: list[dict]) -> Path:
     return write_jsonl(path, rows)
 
 
+def assert_target_resolution_error(exc: TargetVariantOverlayError, canonical_ir_id: str) -> None:
+    message = str(exc)
+    assert "line 1" in message
+    assert canonical_ir_id in message
+    assert "resolved" in message
+
+
 def registry_for(*ir_units: dict) -> LexiconVariantRegistry:
     registry = LexiconVariantRegistry()
     for ir_unit in ir_units:
@@ -305,8 +312,9 @@ def test_pending_and_rejected_rows_are_not_applied(tmp_path: Path):
 def test_overlay_row_targeting_missing_canonical_record_fails(tmp_path: Path):
     overlay_path = write_overlay(tmp_path / "orphan.jsonl", [overlay_row()])
     overlay = load_reviewed_target_variant_overlay(overlay_path)
-    with pytest.raises(TargetVariantOverlayError, match="frozen Mali-Pense lexicon entry"):
+    with pytest.raises(TargetVariantOverlayError) as exc_info:
         validate_overlay_against_ir(overlay, [])
+    assert_target_resolution_error(exc_info.value, SYNTHETIC_CANONICAL_IR_ID)
 
 
 def test_overlay_row_targeting_non_lexicon_record_fails(tmp_path: Path):
@@ -315,8 +323,9 @@ def test_overlay_row_targeting_non_lexicon_record_fails(tmp_path: Path):
         [overlay_row(canonical_ir_id=INDEX_IR_ID)],
     )
     overlay = load_reviewed_target_variant_overlay(overlay_path)
-    with pytest.raises(TargetVariantOverlayError, match="lexicon_entry"):
+    with pytest.raises(TargetVariantOverlayError) as exc_info:
         validate_overlay_against_ir(overlay, [synthetic_index_ir()])
+    assert_target_resolution_error(exc_info.value, INDEX_IR_ID)
 
 
 def test_overlay_row_targeting_owner_lexicon_entry_fails(tmp_path: Path):
@@ -330,8 +339,9 @@ def test_overlay_row_targeting_owner_lexicon_entry_fails(tmp_path: Path):
         source_id="src_siralex_lexical_review",
         headword_latin="ownerheadword",
     )
-    with pytest.raises(TargetVariantOverlayError, match="frozen Mali-Pense lexicon entry"):
+    with pytest.raises(TargetVariantOverlayError) as exc_info:
         validate_overlay_against_ir(overlay, [owner_row])
+    assert_target_resolution_error(exc_info.value, OWNER_LEXICON_IR_ID)
 
 
 def test_overlay_row_targeting_non_malipense_lexicon_source_fails(tmp_path: Path):
@@ -345,8 +355,86 @@ def test_overlay_row_targeting_non_malipense_lexicon_source_fails(tmp_path: Path
         source_id="src_other_lexicon",
         headword_latin="otherheadword",
     )
-    with pytest.raises(TargetVariantOverlayError, match="frozen Mali-Pense lexicon entry"):
+    with pytest.raises(TargetVariantOverlayError) as exc_info:
         validate_overlay_against_ir(overlay, [other_row])
+    assert_target_resolution_error(exc_info.value, NON_MALIPENSE_LEXICON_IR_ID)
+
+
+def test_single_frozen_malipense_lexicon_target_passes(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "single_malipense_target.jsonl",
+        [overlay_row(canonical_ir_id=SYNTHETIC_CANONICAL_IR_ID)],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    validate_overlay_against_ir(overlay, [synthetic_lexicon_ir(ir_id=SYNTHETIC_CANONICAL_IR_ID)])
+
+
+def test_duplicate_frozen_malipense_ids_fail(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "duplicate_malipense_ids.jsonl",
+        [overlay_row(canonical_ir_id=SYNTHETIC_CANONICAL_IR_ID)],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    ir_rows = [
+        synthetic_lexicon_ir(ir_id=SYNTHETIC_CANONICAL_IR_ID, headword_latin="alpha"),
+        synthetic_lexicon_ir(ir_id=SYNTHETIC_CANONICAL_IR_ID, headword_latin="beta"),
+    ]
+    with pytest.raises(TargetVariantOverlayError) as exc_info:
+        validate_overlay_against_ir(overlay, ir_rows)
+    assert_target_resolution_error(exc_info.value, SYNTHETIC_CANONICAL_IR_ID)
+
+
+def test_malipense_plus_index_same_id_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "malipense_plus_index.jsonl",
+        [overlay_row(canonical_ir_id=SYNTHETIC_CANONICAL_IR_ID)],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    ir_rows = [
+        synthetic_lexicon_ir(ir_id=SYNTHETIC_CANONICAL_IR_ID),
+        synthetic_index_ir(ir_id=SYNTHETIC_CANONICAL_IR_ID),
+    ]
+    with pytest.raises(TargetVariantOverlayError) as exc_info:
+        validate_overlay_against_ir(overlay, ir_rows)
+    assert_target_resolution_error(exc_info.value, SYNTHETIC_CANONICAL_IR_ID)
+
+
+def test_malipense_plus_owner_same_id_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "malipense_plus_owner.jsonl",
+        [overlay_row(canonical_ir_id=SYNTHETIC_CANONICAL_IR_ID)],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    ir_rows = [
+        synthetic_lexicon_ir(ir_id=SYNTHETIC_CANONICAL_IR_ID),
+        synthetic_lexicon_ir_with_source(
+            ir_id=SYNTHETIC_CANONICAL_IR_ID,
+            source_id="src_siralex_lexical_review",
+            headword_latin="ownerdup",
+        ),
+    ]
+    with pytest.raises(TargetVariantOverlayError) as exc_info:
+        validate_overlay_against_ir(overlay, ir_rows)
+    assert_target_resolution_error(exc_info.value, SYNTHETIC_CANONICAL_IR_ID)
+
+
+def test_malipense_plus_other_source_same_id_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "malipense_plus_other_source.jsonl",
+        [overlay_row(canonical_ir_id=SYNTHETIC_CANONICAL_IR_ID)],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    ir_rows = [
+        synthetic_lexicon_ir(ir_id=SYNTHETIC_CANONICAL_IR_ID),
+        synthetic_lexicon_ir_with_source(
+            ir_id=SYNTHETIC_CANONICAL_IR_ID,
+            source_id="src_other_lexicon",
+            headword_latin="otherdup",
+        ),
+    ]
+    with pytest.raises(TargetVariantOverlayError) as exc_info:
+        validate_overlay_against_ir(overlay, ir_rows)
+    assert_target_resolution_error(exc_info.value, SYNTHETIC_CANONICAL_IR_ID)
 
 
 def test_overlay_row_conflicting_with_canonical_headword_fails(tmp_path: Path):
