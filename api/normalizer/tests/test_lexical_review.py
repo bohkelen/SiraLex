@@ -1,5 +1,6 @@
 """Tests for Phase 7N2A manual lexical-review and reviewed target variant support."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -19,7 +20,26 @@ from ir.lexical_review import (  # noqa: E402
     validate_manual_lexical_review_evidence,
     validate_manual_lexical_review_provenance,
 )
+from ir.models import compute_ir_id  # noqa: E402
+from normalization.norm_v3 import normalize_nfc  # noqa: E402
 from normalizer.normalize import normalize_lexicon_entry  # noqa: E402
+
+REPO_ROOT = Path(__file__).parent.parent.parent.parent
+OWNER_LEXICAL_IR_PATH = REPO_ROOT / "data" / "ir" / "siralex_owner_lexical_v1.jsonl"
+EXPECTED_OWNER_RECORDS = {
+    "ndándayoro": {
+        "source_record_id": "7n2a_ndandayoro_v1",
+        "url_canonical": "siralex://lexical-review/7n2a/ndandayoro",
+        "ir_id": "a9c7d82decee9191",
+        "review_document": "docs/reviews/phase7n2a_ndandayoro_lexical_review.md",
+    },
+    "ndándadiya": {
+        "source_record_id": "7n2a_ndandadiya_v1",
+        "url_canonical": "siralex://lexical-review/7n2a/ndandadiya",
+        "ir_id": "fefe9b063e05ed11",
+        "review_document": "docs/reviews/phase7n2a_ndandadiya_lexical_review.md",
+    },
+}
 
 
 def manual_provenance_derivation_blocks(
@@ -534,3 +554,48 @@ def test_malipense_fixture_output_unchanged_without_manual_provenance():
     assert result_without_registry.to_dict() == result_with_registry.to_dict()
     assert "provenance" not in result_without_registry.to_dict()
     assert "derivation" not in result_without_registry.to_dict()
+
+
+def _load_owner_lexical_ir_records() -> list[dict]:
+    records = []
+    with OWNER_LEXICAL_IR_PATH.open(encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip():
+                records.append(json.loads(line))
+    return records
+
+
+def test_tracked_owner_lexical_ir_records_validate_and_have_distinct_ir_ids():
+    records = _load_owner_lexical_ir_records()
+    assert len(records) == 2
+
+    seen_ir_ids: set[str] = set()
+    for record in records:
+        headword = record["fields_raw"]["headword_latin"]
+        expected = EXPECTED_OWNER_RECORDS[headword]
+        locator = record["record_locator"]
+
+        assert normalize_nfc(headword) == headword
+        assert locator["source_record_id"] == expected["source_record_id"]
+        assert locator["url_canonical"] == expected["url_canonical"]
+        assert record["evidence"][0]["review_reference"]["document_path"] == expected["review_document"]
+
+        computed_ir_id = compute_ir_id(
+            SIRALEX_LEXICAL_REVIEW_SOURCE_ID,
+            locator["url_canonical"],
+            locator["source_record_id"],
+            SIRALEX_OWNER_LEXICAL_PARSER_VERSION,
+        )
+        assert record["ir_id"] == computed_ir_id == expected["ir_id"]
+        assert record["ir_id"] not in seen_ir_ids
+        seen_ir_ids.add(record["ir_id"])
+
+        validate_lexicon_entry_evidence(record)
+        validate_manual_lexical_review_provenance(record)
+
+        registry = LexiconVariantRegistry()
+        registry.register_source_attested(record)
+        normalized = normalize_lexicon_entry(record, variant_registry=registry)
+        projected = project_manual_provenance_derivation(record)
+        assert normalized.provenance == projected["provenance"]
+        assert normalized.derivation == projected["derivation"]
