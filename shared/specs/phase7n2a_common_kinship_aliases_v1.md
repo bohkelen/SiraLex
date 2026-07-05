@@ -37,7 +37,7 @@ Owner approval establishes semantic intent for the approved candidates. It does 
 ```text
 maman
 móbaa
-ndándajoro
+ndándayoro
 ndándadiya
 French retrieval terms: hôpital, clinique, centre de santé
 ```
@@ -143,12 +143,12 @@ Implementation constraints:
 - Do not create a separate unrelated lexical concept.
 - Do not generalize this approval into a broad target-side deletion or contraction rule.
 
-### `ndándajoro` and `ndándadiya`
+### `ndándayoro` and `ndándadiya`
 
 The project owner has given lexical intent:
 
 ```text
-ndándajoro
+ndándayoro
 ndándadiya
 -> hospital / clinic / health centre
 -> locations where health-related service is received
@@ -170,11 +170,11 @@ centre de santé
 
 Implementation constraints:
 
-- Do not create a general relationship `joro -> place`.
+- Do not create a general relationship `yoro -> place`.
 - Do not add these under broad French lookup `place` or `location`.
 - Do not add speculative English labels.
 - Do not add broad geographic/place labels.
-- Do not add additional compounds beyond `ndándajoro` and `ndándadiya`.
+- Do not add additional compounds beyond `ndándayoro` and `ndándadiya`.
 - Audit source records before deciding whether the future intervention belongs in aliases, source-index supplements, or another approved artifact type.
 
 ---
@@ -191,10 +191,10 @@ The matrix is a future validation contract for a separately authorized 7N2A impl
 | `phase7n2a_pere_existing_hit_guard` | source query `père` | Existing `père` result with `fà` remains valid | Existing hit remains available | Must not create a "my father" result or route `père` to `n fa` / `n'fa` | NFC source query |
 | `phase7n2a_mobaa_variant_to_moyibaa` | target query `móbaa` | Same canonical lexical concept currently represented by `móyibaa` | Retrieve the audited canonical `móyibaa` concept; no separate unrelated concept | Must not create broad contraction or deletion rules; must not affect unrelated target words | NFC target query; source audit must record canonical `móyibaa` spelling, tones, and record ID |
 | `phase7n2a_moyibaa_existing_guard` | target query `móyibaa` | Existing canonical `móyibaa` concept | Existing target retrieval remains available | Must not demote or duplicate the canonical concept because `móbaa` is added | NFC target query; preserve canonical normalization |
-| `phase7n2a_ndandajoro_hopital` | source query `hôpital` | Audited health-institution target coverage including `ndándajoro` if source audit supports it | Existing hit remains; approved compound may appear only if audited as the same health-institution retrieval path | Must not add generic `joro -> place`; must not add broad `place` / `location` expansion | NFC source query; audited target normalization required |
+| `phase7n2a_ndandayoro_hopital` | source query `hôpital` | Audited health-institution target coverage including `ndándayoro` if source audit supports it | Existing hit remains; approved compound may appear only if audited as the same health-institution retrieval path | Must not add generic `yoro -> place`; must not add broad `place` / `location` expansion | NFC source query; audited target normalization required |
 | `phase7n2a_ndandadiya_clinique` | source query `clinique` | Audited health-institution target coverage including `ndándadiya` if source audit supports it | Query retrieves only reviewed health-institution coverage | Must not add speculative English labels or broad geographic labels | NFC source query; audited target normalization required |
 | `phase7n2a_centre_de_sante` | source query `centre de santé` | Audited health-institution target coverage for approved compounds if source audit supports it | Multi-word French retrieval term is allowed only for this health-institution path | Must not authorize general phrase translation or other phrase-like searches | NFC source query; preserve accents and spacing |
-| `phase7n2a_place_location_false_positive` | source query `place` / `location` | No new result caused by `ndándajoro` or `ndándadiya` | No 7N2A-added result | Must not route broad place/location queries to health-institution compounds | NFC source query |
+| `phase7n2a_place_location_false_positive` | source query `place` / `location` | No new result caused by `ndándayoro` or `ndándadiya` | No 7N2A-added result | Must not route broad place/location queries to health-institution compounds | NFC source query |
 | `phase7n2a_nfa_false_positive` | source query `père` and target query `n fa` / `n'fa` | `père` remains father lemma; `n fa` / `n'fa` remains separate possessive phrase if otherwise supported | No synonym collapse | Must not create a "my father" result from `père`; must not add `n fa` under `papa` | NFC target/source query; apostrophe normalization must be audited if ever in scope |
 
 ---

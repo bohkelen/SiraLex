@@ -19,7 +19,7 @@ This packet authorizes a **staged** 7N2A implementation plan only. It does not a
 ```text
 1. maman
 2. móbaa
-3. ndándajoro
+3. ndándayoro
 4. ndándadiya
 5. French lookup paths: clinique and centre de santé
 ```
@@ -40,7 +40,7 @@ The existing French index mapping `61843e6630c1fbae` → lexicon `71e323e2dafa59
 | --- | --- | --- | --- |
 | `maman` | Existing generic mother concept | `source_alias` plus constrained result-ranking behavior | Must target only generic mother record `e5164efcdf5e6ca4` |
 | `móbaa` | Existing canonical `móyibaa` concept | `target_alias` | Must point to canonical concept `c5f78c8ac66eac6b` |
-| `ndándajoro` | Missing canonical Maninka lexical content | `canonical_source_record_addition` | Requires reviewed lexical record and provenance |
+| `ndándayoro` | Missing canonical Maninka lexical content | `canonical_source_record_addition` | Requires reviewed lexical record and provenance |
 | `ndándadiya` | Missing canonical Maninka lexical content | `canonical_source_record_addition` | Requires reviewed lexical record and provenance |
 | `clinique` | Missing French retrieval path | `source_index_supplement` only after approved canonical record exists | Depends on reviewed target record |
 | `centre de santé` | Missing French retrieval path | `source_index_supplement` only after approved canonical record exists | Depends on reviewed target record |
@@ -52,7 +52,7 @@ The existing French index mapping `61843e6630c1fbae` → lexicon `71e323e2dafa59
 | --- | --- | --- |
 | French source alias | `maman` | Missing French common form routed to an audited existing source posting |
 | Target-side alias | `móbaa` | Approved spelling variant of an existing canonical Maninka concept |
-| Canonical lexical addition | `ndándajoro`, `ndándadiya` | New reviewed Maninka lexical records not presently in source data |
+| Canonical lexical addition | `ndándayoro`, `ndándadiya` | New reviewed Maninka lexical records not presently in source data |
 | French retrieval supplement | `clinique`, `centre de santé` | Reviewed French index mappings after canonical target records exist |
 | Preserved existing path | `hôpital` | Current `hôpital → dándaso` mapping remains valid |
 
@@ -62,7 +62,7 @@ French retrieval labels are index mappings, not lexical records.
 
 ## Lexical-Review Gate
 
-Source-record additions for `ndándajoro` and `ndándadiya` are **blocked** until a lexical review sheet exists for each form.
+Source-record additions for `ndándayoro` and `ndándadiya` are **blocked** until a lexical review sheet exists for each form.
 
 No canonical lexical record may be added, normalized, enriched, indexed, aliased, or bundled until the corresponding review sheet is approved.
 
@@ -75,7 +75,7 @@ tone marks
 part of speech
 French gloss or glosses
 definition / usage note
-relation between ndándajoro and ndándadiya
+relation between ndándayoro and ndándadiya
 whether each is hospital, clinic, health centre, or a broader health-service location
 source/provenance
 owner linguistic approval
@@ -88,14 +88,14 @@ The implementation must not infer these fields from string components such as:
 
 ```text
 danda
-joro
+yoro
 diya
 ```
 
 The following generic relations are prohibited:
 
 ```text
-joro → place
+yoro → place
 diya → place
 ```
 
@@ -138,7 +138,7 @@ No general deletion rule, contraction rule, vowel-folding rule, or tone-folding 
 ### Health-institution terms
 
 ```text
-ndándajoro
+ndándayoro
 ndándadiya
 → future reviewed canonical lexical records only
 → may later support hôpital, clinique, centre de santé
@@ -184,7 +184,7 @@ release-status change
 No step may be skipped or merged.
 
 ```text
-1. Lexical review sheet approval for ndándajoro and ndándadiya
+1. Lexical review sheet approval for ndándayoro and ndándadiya
 2. Exact authorized source-record changes
 3. Normalize/enrich through existing pipeline
 4. Add only approved aliases and source-index mappings
@@ -212,12 +212,12 @@ The following regression case identifiers are required for future 7N2A validatio
 | `phase7n2a_hopital_existing_dandaso_guard` | `hôpital` | Existing `dándaso` mapping remains valid |
 | `phase7n2a_clinique_reviewed_health_term` | `clinique` | `BLOCKED_PENDING_LEXICAL_REVIEW` |
 | `phase7n2a_centre_de_sante_reviewed_health_term` | `centre de santé` | `BLOCKED_PENDING_LEXICAL_REVIEW` |
-| `phase7n2a_ndandajoro_no_place_false_positive` | `ndándajoro` | `BLOCKED_PENDING_LEXICAL_REVIEW`; must not route broad place/location queries |
+| `phase7n2a_ndandayoro_no_place_false_positive` | `ndándayoro` | `BLOCKED_PENDING_LEXICAL_REVIEW`; must not route broad place/location queries |
 | `phase7n2a_ndandadiya_no_place_false_positive` | `ndándadiya` | `BLOCKED_PENDING_LEXICAL_REVIEW`; must not route broad place/location queries |
 | `phase7n2a_kun_unchanged_guard` | `Kun` / `kùn` / `kún` | No 7N2A side effects |
 | `phase7n2a_sen_unchanged_guard` | `sɛn` / `sen` | No 7N2A side effects |
 
-Do not invent expected translations for `clinique`, `centre de santé`, `ndándajoro`, or `ndándadiya` before lexical-review sheets exist.
+Do not invent expected translations for `clinique`, `centre de santé`, `ndándayoro`, or `ndándadiya` before lexical-review sheets exist.
 
 ---
 

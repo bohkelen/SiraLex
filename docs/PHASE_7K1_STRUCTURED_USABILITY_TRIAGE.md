@@ -51,7 +51,7 @@ Each row below is structured-only evidence from the authoritative run. "Actual i
 | `Sen` | JSON lines 553, 2176 / MD lines 31, 66 | `target_to_source` | `hit_single`, 1 result; N2 row found `sèn`; meaning `pied, jambe` | target-side orthographic/phonemic distinction | yes | do not aggregate with `sɛn`; specify discovery behavior | 7N2B | Maintains distinct meanings; no dictionary-alias change. |
 | `sen` | No lowercase exact row; reviewed through `Sen` rows and owner-provided distinction | `target_to_source` | Evidence uses `Sen`; current interpreted form is `sèn` with meaning `pied, jambe` | target-side orthographic/phonemic distinction | yes | do not aggregate with `sɛn`; specify discovery behavior | 7N2B | Treats lowercase `sen` as the conceptual probe for plain Latin `Sen`, not as separate demand evidence. |
 | `parent` | JSON line 2919 / MD line 82 | `source_to_target` | `hit_single`, 1 result; translations `dònko`, `móyibaa` | existing hit; target variant candidate context | yes | `móbaa` approved by owner as target-side variant of `móyibaa` | 7N2A | Variant work is limited to the canonical `móyibaa` concept after source-record audit. |
-| `hôpital` | JSON line 3011 / MD line 84 | `source_to_target` | `hit_single`, 1 result; translation `dándaso` | existing health-institution hit; coverage context for approved compounds | yes | `ndándajoro` / `ndándadiya` approved for specification | 7N2A | Limited to health-institution retrieval terms; no broad place/location expansion. |
+| `hôpital` | JSON line 3011 / MD line 84 | `source_to_target` | `hit_single`, 1 result; translation `dándaso` | existing health-institution hit; coverage context for approved compounds | yes | `ndándayoro` / `ndándadiya` approved for specification | 7N2A | Limited to health-institution retrieval terms; no broad place/location expansion. |
 | `moto` | JSON line 1620 / MD line 54 | `source_to_target` | `miss` after successful offline reopen; no results for `moto`; `offline_reopen_checked: true` | missing lexical content or source-index gap; not offline-install reliability | yes | pending linguistic/product review | backlog | Reclassified only; no content addition or offline-runtime fix authorized. |
 | `bonjour` | JSON line 2872 / MD line 81 | `source_to_target` | `miss` after successful offline reopen; no results for `bonjour`; `offline_reopen_checked: true` | missing lexical content or source-index gap; not offline-install reliability | yes | pending linguistic/product review | backlog | Reclassified only; no greeting content addition or offline-runtime fix authorized. |
 | `how do you say thank you` | JSON line 2826 / MD line 80 | `source_to_target` | automation `error`; last meta already said "No exact result for this expression. Try one word at a time." | `automation_harness_observability_defect`; secondary product-copy/onboarding observation; not a failed lookup engine result | yes | separate from product dictionary behavior | harness backlog | Bounded to harness observability and later copy review; no runtime lookup change. |
@@ -114,7 +114,7 @@ No runtime code change is authorized in this task.
 | `maman` | French source alias + ranking | approved | 7N2A | ready for source audit |
 | `papa` / `père` / `n fa` | grammar boundary | no change | none | resolved |
 | `móbaa` | target-side variant | approved | 7N2A | ready for source audit |
-| `ndándajoro` | health-institution coverage | approved | 7N2A | ready for source audit |
+| `ndándayoro` | health-institution coverage | approved | 7N2A | ready for source audit |
 | `ndándadiya` | health-institution coverage | approved | 7N2A | ready for source audit |
 | `Kun` / `kùn` / `kún` | tonal ambiguity | do not merge | 7N2B | specified, deferred |
 | `sɛn` / `sen` | orthographic distinction | do not merge | 7N2B | specified, deferred |
@@ -194,12 +194,12 @@ target query: móbaa
 
 Before any future implementation, audit the exact canonical spelling, Unicode normalization, tones, and relevant record ID from the source data. Owner approval establishes semantic equivalence; source audit establishes the precise technical representation.
 
-### `ndándajoro` and `ndándadiya`
+### `ndándayoro` and `ndándadiya`
 
 The project owner has given lexical intent:
 
 ```text
-ndándajoro
+ndándayoro
 ndándadiya
 -> hospital / clinic / health centre
 -> locations where health-related service is received
@@ -224,7 +224,7 @@ centre de santé
 Do not create a general relationship:
 
 ```text
-joro -> place
+yoro -> place
 ```
 
 Do not add these under broad French lookup `place` or `location` merely because a component can carry a place-related meaning. Do not add speculative English labels, broad geographic/place labels, or additional compounds.
@@ -337,7 +337,7 @@ Allowed scope:
 ```text
 maman
 móbaa
-ndándajoro
+ndándayoro
 ndándadiya
 French retrieval terms: hôpital, clinique, centre de santé
 ```

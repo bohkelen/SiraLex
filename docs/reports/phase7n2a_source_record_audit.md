@@ -58,8 +58,8 @@ that every intervention is French-source-only.
 | `maman` | No | None for `maman`; generic-mother targets under `mère`: `1079f8a9b2c15c7d`, `37cf4df5f441f7d1`, `bded2c40ba5bf5be`; index pointer `e8826` for `` `ná `` | French query `maman` → audited generic mother Maninka concept(s) linked to `mère` | `source_to_target` | `source_alias` | medium | Which audited generic-mother lexicon record(s) are primary for ranking among `bá`, `dénba`, `ná`, and the `` `ná `` pointer at `e8826`? |
 | `móbaa` | No | Canonical concept: `c5f78c8ac66eac6b` (`móyibaa`) | Target query `móbaa` → same concept as `móyibaa` | `target_to_source` | `target_alias` | high | Confirm exact owner-approved spelling, tones, and NFC/NFD representation of `móbaa` before alias row authoring. |
 | `móyibaa` | Yes | `c5f78c8ac66eac6b` | `móyibaa` | `target_to_source` | `no_change` | high | None for record existence; `móbaa` variant work must not create a separate concept. |
-| `ndándajoro` | No | None | Approved owner form `ndándajoro` | French health-institution retrieval after record addition | `canonical_source_record_addition` | high | Confirm exact orthography, tones, glosses, literal decomposition, and provenance before any lexical addition. |
-| `ndándadiya` | No | None | Approved owner form `ndándadiya` | French health-institution retrieval after record addition | `canonical_source_record_addition` | high | Same as `ndándajoro`; do not infer from unrelated `díya` place senses. |
+| `ndándayoro` | No | None | Approved owner form `ndándayoro` | French health-institution retrieval after record addition | `canonical_source_record_addition` | high | Confirm exact orthography, tones, glosses, literal decomposition, and provenance before any lexical addition. |
+| `ndándadiya` | No | None | Approved owner form `ndándadiya` | French health-institution retrieval after record addition | `canonical_source_record_addition` | high | Same as `ndándayoro`; do not infer from unrelated `díya` place senses. |
 | `hôpital` | Yes | Index `61843e6630c1fbae` → lexicon `71e323e2dafa590f` (`dándaso`) | French `hôpital` → `dándaso` | `source_to_target` | `no_change` | high | After approved compounds exist, should `hôpital` use `additive_source_mapping` only, without replacing `dándaso`? |
 | `clinique` | No | None for French term; no approved Maninka compound yet | French `clinique` → reviewed health-institution target(s) | `source_to_target` | `canonical_source_record_addition` then `source_index_supplement` | medium | Record addition must precede index support; confirm whether `ndándadiya` alone is the intended target. |
 | `centre de santé` | No | None | French `centre de santé` → reviewed health-institution target(s) | `source_to_target` | `canonical_source_record_addition` then `source_index_supplement` | medium | Multi-word French retrieval is allowed only for this health-institution path; confirm exact target mapping after source-record addition. |
@@ -138,7 +138,7 @@ Recommended bounded path: `no_change`.
 
 ---
 
-### `ndándajoro`
+### `ndándayoro`
 
 | Field | Audit result |
 | --- | --- |
@@ -163,7 +163,7 @@ Related but not semantically substitutable forms found:
 | Lexicon `ir_id` | Form | Gloss | Why not a substitute |
 | --- | --- | --- | --- |
 | `7cee636745c067f2` | `jɔ́rɔ` | fish-gig | unrelated meaning |
-| `de6fb406453616e3` | `díya` | place, endroit | broad place sense; must not become `joro → place` expansion |
+| `de6fb406453616e3` | `díya` | place, endroit | broad place sense; must not become `yoro → place` expansion |
 
 Recommended bounded path: `canonical_source_record_addition`. Do not disguise absence with alias or supplement rows.
 
@@ -183,7 +183,7 @@ Recommended bounded path: `canonical_source_record_addition`. Do not disguise ab
 | Already exists? | No |
 | Classification | Missing lexical content requiring a reviewed source-record addition |
 
-Recommended bounded path: `canonical_source_record_addition`. Same constraints as `ndándajoro`.
+Recommended bounded path: `canonical_source_record_addition`. Same constraints as `ndándayoro`.
 
 ---
 
@@ -207,7 +207,7 @@ Current posting copies exactly:
 hôpital -> dándaso
 ```
 
-Approved compounds `ndándajoro` and `ndándadiya` are absent and therefore not semantically attachable yet. Future work, if owner-approved after record addition, should use `additive_source_mapping` only.
+Approved compounds `ndándayoro` and `ndándadiya` are absent and therefore not semantically attachable yet. Future work, if owner-approved after record addition, should use `additive_source_mapping` only.
 
 Recommended bounded path: `no_change` now.
 
