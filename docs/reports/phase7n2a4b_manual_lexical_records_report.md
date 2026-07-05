@@ -1,6 +1,19 @@
 # Phase 7N2A4B Manual Lexical Records Report
 
-**Status:** implementation complete  
+**Status:** superseded — not accepted as canonical record insertion
+
+This report records a local implementation attempt from commit ce055dc.
+The attempt is not accepted because:
+- authoritative owner lexical IR was ignored and not version-controlled;
+- full combined-input normalization had not succeeded at the time;
+- required machine-readable provenance and derivation fields were absent.
+
+See:
+- docs/reports/phase7n2a4b_recovery_audit.md
+- docs/reports/phase7n2a4b_normalization_collision_analysis.md
+- docs/reports/phase7n2a4b_r1_registry_repair_report.md
+- docs/reports/phase7n2a4b_r1a_variant_guard_report.md
+
 **Slice:** Phase 7N2A4B — Approved Canonical Health-Institution Lexical Records  
 **Schema basis:** commit `ff269c1dcae534ec45daeee3efcc8c658441e421`
 
