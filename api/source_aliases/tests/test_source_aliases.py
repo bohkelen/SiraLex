@@ -13,6 +13,12 @@ from source_aliases.validate_alias_table import (
     validate_alias_table,
 )
 
+REPO_ROOT = Path(__file__).parent.parent.parent.parent
+TRACKED_ALIAS_TABLE_PATH = REPO_ROOT / "shared/aliases/source_aliases_v1.jsonl"
+GENERIC_MERE_IR_ID = "e5164efcdf5e6ca4"
+VOCATIVE_MOTHER_IR_ID = "0f517a71c373f51d"
+RESPECTFUL_MOTHER_IR_ID = "d540716db9321a83"
+
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -26,6 +32,10 @@ def read_jsonl(path: Path) -> list[dict]:
         return [json.loads(line) for line in handle if line.strip()]
 
 
+def tracked_alias_rows() -> list[dict]:
+    return read_jsonl(TRACKED_ALIAS_TABLE_PATH)
+
+
 def records_rows() -> list[dict]:
     return [
         {"ir_id": "id-oeil", "ir_kind": "index_mapping"},
@@ -36,6 +46,9 @@ def records_rows() -> list[dict]:
         {"ir_id": "id-kun", "ir_kind": "lexicon_entry"},
         {"ir_id": "id-mere-direct", "ir_kind": "index_mapping"},
         {"ir_id": "id-mere-other", "ir_kind": "index_mapping"},
+        {"ir_id": GENERIC_MERE_IR_ID, "ir_kind": "index_mapping"},
+        {"ir_id": VOCATIVE_MOTHER_IR_ID, "ir_kind": "index_mapping"},
+        {"ir_id": RESPECTFUL_MOTHER_IR_ID, "ir_kind": "index_mapping"},
         {"ir_id": "id-a", "ir_kind": "index_mapping"},
         {"ir_id": "id-b", "ir_kind": "index_mapping"},
         {"ir_id": "id-c", "ir_kind": "index_mapping"},
@@ -56,6 +69,12 @@ def base_index_rows() -> list[dict]:
         {"key": "mere", "key_type": "src_diacritics_insensitive", "ir_ids": ["id-z", "id-a"]},
         {"key": "multi-alpha", "key_type": "src_casefold", "ir_ids": ["id-z", "id-a"]},
         {"key": "multi-beta", "key_type": "src_casefold", "ir_ids": ["id-b", "id-z", "id-c"]},
+        {"key": "mère", "key_type": "src_casefold", "ir_ids": [GENERIC_MERE_IR_ID]},
+        {"key": "mère", "key_type": "src_diacritics_insensitive", "ir_ids": [GENERIC_MERE_IR_ID]},
+        {"key": "mère", "key_type": "src_punct_stripped", "ir_ids": [GENERIC_MERE_IR_ID]},
+        {"key": "mère", "key_type": "src_nospace", "ir_ids": [GENERIC_MERE_IR_ID]},
+        {"key": "wóyì", "key_type": "src_casefold", "ir_ids": [VOCATIVE_MOTHER_IR_ID]},
+        {"key": "tɔ́ɔma", "key_type": "src_casefold", "ir_ids": [RESPECTFUL_MOTHER_IR_ID]},
         {"key": "kun", "key_type": "tgt_casefold", "ir_ids": ["id-kun"]},
     ]
 
@@ -167,23 +186,128 @@ def test_french_common_form_alias_validates(tmp_path: Path):
         alias_id="alias-maman",
         alias_source_term="maman",
         canonical_source_terms=["mère"],
-        resolved_ir_ids=["id-mere-direct"],
+        resolved_ir_ids=[GENERIC_MERE_IR_ID],
     )
     row["candidate_type"] = "french_common_form_alias"
-    row["evidence_ir_ids"] = ["id-mere-direct"]
-
-    index_rows = base_index_rows() + [
-        {"key": "mère", "key_type": "src_casefold", "ir_ids": ["id-mere-direct"]},
-        {"key": "mère", "key_type": "src_diacritics_insensitive", "ir_ids": ["id-mere-direct"]},
-        {"key": "mère", "key_type": "src_punct_stripped", "ir_ids": ["id-mere-direct"]},
-        {"key": "mère", "key_type": "src_nospace", "ir_ids": ["id-mere-direct"]},
-    ]
-    records_path, index_path, aliases_path = make_fixture(tmp_path, [row], index_rows)
+    row["evidence_ir_ids"] = [GENERIC_MERE_IR_ID]
+    records_path, index_path, aliases_path = make_fixture(tmp_path, [row])
 
     result = validate_alias_table(aliases_path, records_path, index_path)
 
     assert result.summary["approved_alias_count"] == 1
     assert result.summary["applied_alias_count"] == 1
+
+
+def test_tracked_maman_alias_row_matches_approved_contract():
+    rows = tracked_alias_rows()
+    maman_rows = [row for row in rows if row.get("alias_source_term") == "maman"]
+    assert len(maman_rows) == 1
+    row = maman_rows[0]
+    assert row["alias_id"] == "src_alias_phase7n2a_0001"
+    assert row["candidate_type"] == "french_common_form_alias"
+    assert row["canonical_source_terms"] == ["mère"]
+    assert row["resolved_ir_ids"] == [GENERIC_MERE_IR_ID]
+    assert row["resolved_ir_ids"] == [GENERIC_MERE_IR_ID]
+    assert VOCATIVE_MOTHER_IR_ID not in row["resolved_ir_ids"]
+    assert RESPECTFUL_MOTHER_IR_ID not in row["resolved_ir_ids"]
+
+
+def test_maman_routes_exactly_to_generic_mere_posting(tmp_path: Path):
+    row = approved_alias(
+        alias_id="alias-maman-generic",
+        alias_source_term="maman",
+        canonical_source_terms=["mère"],
+        resolved_ir_ids=[GENERIC_MERE_IR_ID],
+        candidate_type="french_common_form_alias",
+    )
+    row["evidence_ir_ids"] = [GENERIC_MERE_IR_ID]
+    records_path, index_path, aliases_path = make_fixture(tmp_path, [row])
+    output_index = tmp_path / "out.jsonl"
+
+    validate_alias_table(aliases_path, records_path, index_path)
+    apply_approved_aliases(
+        aliases_path,
+        records_path,
+        index_path,
+        output_index,
+        tmp_path / "report.json",
+    )
+
+    maman_posting = lookup(output_index, "source_to_target", "maman")
+    mere_posting = lookup(output_index, "source_to_target", "mère")
+    assert maman_posting == [GENERIC_MERE_IR_ID]
+    assert maman_posting == mere_posting
+    assert VOCATIVE_MOTHER_IR_ID not in maman_posting
+    assert RESPECTFUL_MOTHER_IR_ID not in maman_posting
+
+
+def test_maman_posting_order_matches_canonical_mere_exactly(tmp_path: Path):
+    row = approved_alias(
+        alias_id="alias-maman-order",
+        alias_source_term="maman",
+        canonical_source_terms=["mère"],
+        resolved_ir_ids=[GENERIC_MERE_IR_ID],
+        candidate_type="french_common_form_alias",
+    )
+    row["evidence_ir_ids"] = [GENERIC_MERE_IR_ID]
+    records_path, index_path, aliases_path = make_fixture(tmp_path, [row])
+    output_index = tmp_path / "out.jsonl"
+
+    apply_approved_aliases(
+        aliases_path,
+        records_path,
+        index_path,
+        output_index,
+        tmp_path / "report.json",
+    )
+
+    assert lookup(output_index, "source_to_target", "maman") == lookup(
+        output_index, "source_to_target", "mère"
+    )
+
+
+def test_french_common_form_alias_custom_resolved_ids_mismatch_rejected(tmp_path: Path):
+    row = approved_alias(
+        alias_id="alias-maman-bad",
+        alias_source_term="maman",
+        canonical_source_terms=["mère"],
+        resolved_ir_ids=[VOCATIVE_MOTHER_IR_ID],
+        candidate_type="french_common_form_alias",
+    )
+    row["evidence_ir_ids"] = [VOCATIVE_MOTHER_IR_ID]
+    records_path, index_path, aliases_path = make_fixture(tmp_path, [row])
+
+    with pytest.raises(AliasValidationError, match="resolved_ir_ids mismatch"):
+        validate_alias_table(aliases_path, records_path, index_path)
+
+
+def test_duplicate_alias_source_term_under_same_normalized_form_fails(tmp_path: Path):
+    row_a = approved_alias(
+        alias_id="alias-maman-a",
+        alias_source_term="maman",
+        canonical_source_terms=["mère"],
+        resolved_ir_ids=[GENERIC_MERE_IR_ID],
+        candidate_type="french_common_form_alias",
+    )
+    row_a["evidence_ir_ids"] = [GENERIC_MERE_IR_ID]
+    row_b = approved_alias(
+        alias_id="alias-maman-b",
+        alias_source_term="Maman",
+        canonical_source_terms=["oeil"],
+        resolved_ir_ids=["id-oeil"],
+        candidate_type="french_common_form_alias",
+    )
+    row_b["evidence_ir_ids"] = ["id-oeil"]
+    records_path, index_path, aliases_path = make_fixture(tmp_path, [row_a, row_b])
+
+    with pytest.raises(AliasApplicationError, match="conflicts with existing postings"):
+        apply_approved_aliases(
+            aliases_path,
+            records_path,
+            index_path,
+            tmp_path / "out.jsonl",
+            tmp_path / "report.json",
+        )
 
 
 def test_existing_alias_candidate_types_remain_valid(tmp_path: Path):
