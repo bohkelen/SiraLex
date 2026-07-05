@@ -24,6 +24,7 @@ Output schema (one JSON object per line):
 }
 """
 
+import copy
 import json
 import logging
 import sys
@@ -44,10 +45,18 @@ from normalization.norm_v3 import (
 from ir.lexical_review import (
     LexicalReviewValidationError,
     LexiconVariantRegistry,
+    ReviewedTargetVariant,
     SIRALEX_LEXICAL_REVIEW_SOURCE_ID,
     parse_reviewed_target_variants,
     project_manual_provenance_derivation,
     validate_lexicon_entry_evidence,
+)
+
+from target_variants.overlay import (
+    TargetVariantOverlayError,
+    load_reviewed_target_variant_overlay,
+    overlay_variants_by_ir_id,
+    validate_overlay_against_ir,
 )
 
 logger = logging.getLogger(__name__)
@@ -231,11 +240,33 @@ def _load_ir_units(input_paths: list[Path]) -> list[tuple[Path, int, dict[str, A
     return units
 
 
+def _attach_overlay_variants(
+    ir_unit: dict[str, Any],
+    overlay_variants: list[ReviewedTargetVariant],
+) -> dict[str, Any]:
+    """Deep-copy IR and attach overlay reviewed variants without mutating source."""
+    ir_copy = copy.deepcopy(ir_unit)
+    merged: list[dict[str, Any]] = list(ir_copy.get("reviewed_target_variants") or [])
+    for variant in overlay_variants:
+        merged.append(
+            {
+                "form": variant.form,
+                "review_document": variant.review_document,
+                "reviewer": variant.reviewer,
+                "reviewed_at": variant.reviewed_at,
+                "rationale": variant.rationale,
+            }
+        )
+    ir_copy["reviewed_target_variants"] = merged
+    return ir_copy
+
+
 def process_ir_files(
     input_paths: list[Path],
     output_path: Path,
     verbose: bool = False,
-) -> dict[str, int]:
+    target_variant_overlay: Path | None = None,
+) -> dict[str, Any]:
     """
     Read IR JSONL file(s), normalize all units, write normalized JSONL.
 
@@ -247,12 +278,16 @@ def process_ir_files(
     Returns:
         Stats dict with counts
     """
-    stats = {
+    stats: dict[str, Any] = {
         "ir_units_read": 0,
         "lexicon_entries_normalized": 0,
         "index_mappings_normalized": 0,
         "skipped": 0,
         "errors": 0,
+        "target_variant_overlay_path": None,
+        "target_variant_overlay_sha256": None,
+        "target_variant_overlay_row_count": 0,
+        "target_variant_overlay_applied_row_count": 0,
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -267,6 +302,24 @@ def process_ir_files(
         logger.warning(f"Invalid JSON while loading IR units: {exc}")
         stats["errors"] += 1
         return stats
+
+    overlay_map: dict[str, list[ReviewedTargetVariant]] = {}
+    if target_variant_overlay is not None:
+        try:
+            overlay = load_reviewed_target_variant_overlay(target_variant_overlay)
+            validate_overlay_against_ir(
+                overlay,
+                [ir_unit for _input_path, _line_num, ir_unit in loaded_units],
+            )
+            overlay_map = overlay_variants_by_ir_id(overlay)
+            stats["target_variant_overlay_path"] = str(target_variant_overlay)
+            stats["target_variant_overlay_sha256"] = overlay.file_sha256
+            stats["target_variant_overlay_row_count"] = overlay.row_count
+            stats["target_variant_overlay_applied_row_count"] = overlay.approved_row_count
+        except TargetVariantOverlayError as exc:
+            logger.warning(f"Error loading target-variant overlay: {exc}")
+            stats["errors"] += 1
+            return stats
 
     variant_registry = LexiconVariantRegistry()
     for _input_path, _line_num, ir_unit in loaded_units:
@@ -284,7 +337,18 @@ def process_ir_files(
             try:
                 stats["ir_units_read"] += 1
 
-                normalized = normalize_ir_unit(ir_unit, variant_registry=variant_registry)
+                unit_to_normalize = ir_unit
+                ir_id = str(ir_unit.get("ir_id", ""))
+                if overlay_map and ir_id in overlay_map:
+                    unit_to_normalize = _attach_overlay_variants(
+                        ir_unit,
+                        overlay_map[ir_id],
+                    )
+
+                normalized = normalize_ir_unit(
+                    unit_to_normalize,
+                    variant_registry=variant_registry,
+                )
                 if normalized is None:
                     stats["skipped"] += 1
                     continue

@@ -1,0 +1,380 @@
+"""Tests for reviewed target-variant overlay tables and normalizer integration."""
+
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(REPO_ROOT / "shared"))
+sys.path.insert(0, str(REPO_ROOT / "api"))
+
+from ir.lexical_review import LexicalReviewValidationError, LexiconVariantRegistry  # noqa: E402
+from normalizer.normalize import normalize_lexicon_entry, process_ir_files  # noqa: E402
+from target_variants.overlay import (  # noqa: E402
+    TargetVariantOverlayError,
+    load_reviewed_target_variant_overlay,
+    validate_overlay_against_ir,
+)
+
+EMPTY_OVERLAY_PATH = REPO_ROOT / "shared/target_variants/reviewed_target_variants_v1.jsonl"
+SYNTHETIC_CANONICAL_IR_ID = "aaaa000000000001"
+OTHER_LEXICON_IR_ID = "aaaa000000000002"
+INDEX_IR_ID = "bbbb000000000001"
+
+
+def overlay_row(
+    *,
+    variant_id: str = "rtv_test_0001",
+    status: str = "approved",
+    canonical_ir_id: str = SYNTHETIC_CANONICAL_IR_ID,
+    form: str = "synthvariant",
+    review_document: str = "docs/reviews/phase7n2a_ndandayoro_lexical_review.md",
+    reviewer: str = "overlay test reviewer",
+    reviewed_at: str = "2026-07-05",
+    rationale: str = "synthetic approved target-side variant",
+    schema_version: str = "reviewed_target_variant_table_v1",
+    source_norm_version: str = "norm_v3",
+    target_variant_table_version: str = "phase7n2a4c1-test",
+    target_script: str = "latin",
+) -> dict:
+    return {
+        "schema_version": schema_version,
+        "target_variant_table_version": target_variant_table_version,
+        "variant_id": variant_id,
+        "status": status,
+        "canonical_ir_id": canonical_ir_id,
+        "form": form,
+        "target_script": target_script,
+        "review_document": review_document,
+        "reviewer": reviewer,
+        "reviewed_at": reviewed_at,
+        "rationale": rationale,
+        "source_norm_version": source_norm_version,
+    }
+
+
+def synthetic_lexicon_ir(
+    *,
+    ir_id: str = SYNTHETIC_CANONICAL_IR_ID,
+    headword_latin: str = "synthcanonical",
+    anchor_names: list[str] | None = None,
+) -> dict:
+    if anchor_names is None:
+        anchor_names = [headword_latin, "synthalt"]
+    return {
+        "ir_id": ir_id,
+        "ir_kind": "lexicon_entry",
+        "source_id": "src_malipense",
+        "parser_version": "malipense_lexicon_v1",
+        "evidence": [
+            {
+                "source_id": "src_malipense",
+                "snapshot_id": "20f263ef15dc6ae1",
+                "entry_block": {
+                    "start_selector": f"span#{ir_id}",
+                    "end_selector": f"span#{ir_id}-next",
+                },
+                "text_quote": headword_latin,
+            }
+        ],
+        "record_locator": {
+            "kind": "source_record_id",
+            "url_canonical": "https://www.mali-pense.net/emk/lexicon/s.htm",
+            "source_record_id": f"e-{ir_id[:8]}",
+            "anchor_names": anchor_names,
+        },
+        "fields_raw": {
+            "headword_latin": headword_latin,
+            "senses": [{"gloss_en": "synthetic"}],
+        },
+    }
+
+
+def synthetic_index_ir(ir_id: str = INDEX_IR_ID) -> dict:
+    return {
+        "ir_id": ir_id,
+        "ir_kind": "index_mapping",
+        "source_id": "src_malipense",
+        "parser_version": "malipense_index_v1",
+        "evidence": [
+            {
+                "source_id": "src_malipense",
+                "snapshot_id": "20f263ef15dc6ae1",
+                "css_selector": "p.idx",
+                "text_quote": "synthetic",
+            }
+        ],
+        "record_locator": {
+            "kind": "url_canonical+entry_index",
+            "url_canonical": "https://www.mali-pense.net/emk/index/s.htm",
+            "entry_index": 1,
+        },
+        "fields_raw": {"source_term": "synthetic"},
+    }
+
+
+def write_jsonl(path: Path, rows: list[dict]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return path
+
+
+def write_overlay(path: Path, rows: list[dict]) -> Path:
+    return write_jsonl(path, rows)
+
+
+def registry_for(*ir_units: dict) -> LexiconVariantRegistry:
+    registry = LexiconVariantRegistry()
+    for ir_unit in ir_units:
+        registry.register_source_attested(ir_unit)
+    return registry
+
+
+def test_empty_overlay_validates_and_produces_no_changes():
+    overlay = load_reviewed_target_variant_overlay(EMPTY_OVERLAY_PATH)
+    assert overlay.row_count == 0
+    assert overlay.approved_row_count == 0
+
+
+def test_normalization_without_overlay_flag_does_not_load_overlay(tmp_path: Path):
+    ir_path = write_jsonl(tmp_path / "lexicon.jsonl", [synthetic_lexicon_ir()])
+    out_path = tmp_path / "raw.jsonl"
+    stats = process_ir_files([ir_path], out_path)
+    assert stats["errors"] == 0
+    assert stats["target_variant_overlay_path"] is None
+    assert stats["target_variant_overlay_row_count"] == 0
+
+
+def test_normalization_with_explicit_empty_overlay_matches_raw(tmp_path: Path):
+    ir_path = write_jsonl(tmp_path / "lexicon.jsonl", [synthetic_lexicon_ir()])
+    raw_out = tmp_path / "raw.jsonl"
+    overlay_out = tmp_path / "overlay.jsonl"
+    raw_stats = process_ir_files([ir_path], raw_out)
+    overlay_stats = process_ir_files(
+        [ir_path],
+        overlay_out,
+        target_variant_overlay=EMPTY_OVERLAY_PATH,
+    )
+    assert raw_stats["errors"] == 0
+    assert overlay_stats["errors"] == 0
+    assert raw_out.read_text(encoding="utf-8") == overlay_out.read_text(encoding="utf-8")
+
+
+def test_missing_overlay_path_fails_clearly(tmp_path: Path):
+    ir_path = write_jsonl(tmp_path / "lexicon.jsonl", [synthetic_lexicon_ir()])
+    missing = tmp_path / "missing_overlay.jsonl"
+    stats = process_ir_files(
+        [ir_path],
+        tmp_path / "out.jsonl",
+        target_variant_overlay=missing,
+    )
+    assert stats["errors"] == 1
+
+
+def test_unknown_overlay_schema_version_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "bad_schema.jsonl",
+        [overlay_row(schema_version="reviewed_target_variant_table_v9")],
+    )
+    with pytest.raises(TargetVariantOverlayError, match="schema_version"):
+        load_reviewed_target_variant_overlay(overlay_path)
+
+
+def test_invalid_canonical_ir_id_format_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "bad_ir_id.jsonl",
+        [overlay_row(canonical_ir_id="not-a-valid-ir-id")],
+    )
+    with pytest.raises(TargetVariantOverlayError, match="canonical_ir_id"):
+        load_reviewed_target_variant_overlay(overlay_path)
+
+
+def test_duplicate_variant_id_fails(tmp_path: Path):
+    row = overlay_row()
+    overlay_path = write_overlay(tmp_path / "dup_id.jsonl", [row, row])
+    with pytest.raises(TargetVariantOverlayError, match="duplicate variant_id"):
+        load_reviewed_target_variant_overlay(overlay_path)
+
+
+def test_nfc_equivalent_duplicate_approved_forms_fail(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "dup_form.jsonl",
+        [
+            overlay_row(variant_id="rtv_test_0001", form="synthvariant"),
+            overlay_row(variant_id="rtv_test_0002", form="synthvariant"),
+        ],
+    )
+    with pytest.raises(TargetVariantOverlayError, match="duplicate approved form"):
+        load_reviewed_target_variant_overlay(overlay_path)
+
+
+def test_pending_and_rejected_rows_are_not_applied(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "mixed_status.jsonl",
+        [
+            overlay_row(status="pending", variant_id="rtv_test_pending"),
+            overlay_row(status="rejected", variant_id="rtv_test_rejected"),
+        ],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    assert overlay.approved_row_count == 0
+    ir_path = write_jsonl(tmp_path / "lexicon.jsonl", [synthetic_lexicon_ir()])
+    stats = process_ir_files(
+        [ir_path],
+        tmp_path / "out.jsonl",
+        target_variant_overlay=overlay_path,
+    )
+    assert stats["errors"] == 0
+    record = json.loads((tmp_path / "out.jsonl").read_text(encoding="utf-8").strip())
+    assert record["variant_forms"] == ["synthcanonical", "synthalt"]
+
+
+def test_overlay_row_targeting_missing_canonical_record_fails(tmp_path: Path):
+    overlay_path = write_overlay(tmp_path / "orphan.jsonl", [overlay_row()])
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    with pytest.raises(TargetVariantOverlayError, match="not found"):
+        validate_overlay_against_ir(overlay, [])
+
+
+def test_overlay_row_targeting_non_lexicon_record_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "index_target.jsonl",
+        [overlay_row(canonical_ir_id=INDEX_IR_ID)],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    with pytest.raises(TargetVariantOverlayError, match="lexicon_entry"):
+        validate_overlay_against_ir(overlay, [synthetic_index_ir()])
+
+
+def test_overlay_row_conflicting_with_canonical_headword_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "headword_conflict.jsonl",
+        [overlay_row(form="synthcanonical")],
+    )
+    ir_path = write_jsonl(tmp_path / "lexicon.jsonl", [synthetic_lexicon_ir()])
+    stats = process_ir_files(
+        [ir_path],
+        tmp_path / "out.jsonl",
+        target_variant_overlay=overlay_path,
+    )
+    assert stats["errors"] == 1
+
+
+def test_overlay_row_conflicting_with_frozen_attested_latin_form_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "attested_conflict.jsonl",
+        [overlay_row(form="otherattested")],
+    )
+    ir_units = [
+        synthetic_lexicon_ir(),
+        synthetic_lexicon_ir(
+            ir_id=OTHER_LEXICON_IR_ID,
+            headword_latin="otherhead",
+            anchor_names=["otherhead", "otherattested"],
+        ),
+    ]
+    ir_path = write_jsonl(tmp_path / "lexicon.jsonl", ir_units)
+    stats = process_ir_files(
+        [ir_path],
+        tmp_path / "out.jsonl",
+        target_variant_overlay=overlay_path,
+    )
+    assert stats["errors"] == 1
+
+
+def test_overlay_row_conflicting_with_another_approved_overlay_form_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "overlay_form_conflict.jsonl",
+        [
+            overlay_row(
+                variant_id="rtv_test_0001",
+                canonical_ir_id=SYNTHETIC_CANONICAL_IR_ID,
+                form="sharedform",
+            ),
+            overlay_row(
+                variant_id="rtv_test_0002",
+                canonical_ir_id=OTHER_LEXICON_IR_ID,
+                form="sharedform",
+            ),
+        ],
+    )
+    with pytest.raises(TargetVariantOverlayError, match="duplicate approved form"):
+        load_reviewed_target_variant_overlay(overlay_path)
+
+
+def test_valid_approved_overlay_adds_variant_without_mutating_source_fields(tmp_path: Path):
+    source_ir = synthetic_lexicon_ir()
+    source_snapshot = json.loads(json.dumps(source_ir))
+    overlay_path = write_overlay(
+        tmp_path / "approved.jsonl",
+        [overlay_row(form="synthvariant")],
+    )
+    ir_path = write_jsonl(tmp_path / "lexicon.jsonl", [source_ir])
+    out_path = tmp_path / "out.jsonl"
+    stats = process_ir_files(
+        [ir_path],
+        out_path,
+        target_variant_overlay=overlay_path,
+    )
+    assert stats["errors"] == 0
+    assert stats["target_variant_overlay_applied_row_count"] == 1
+    assert source_ir == source_snapshot
+    record = json.loads(out_path.read_text(encoding="utf-8").strip())
+    assert record["ir_id"] == SYNTHETIC_CANONICAL_IR_ID
+    assert record["preferred_form"] == "synthcanonical"
+    assert "synthvariant" in record["variant_forms"]
+    assert "synthvariant" in record["search_keys"]["casefold"]
+    assert "provenance" not in record
+    assert "derivation" not in record
+
+
+def test_existing_r1_r1a_guards_still_pass():
+    holder = synthetic_lexicon_ir(headword_latin="móyibaa", anchor_names=["moyibaa"])
+    registry = registry_for(holder)
+    with pytest.raises(LexicalReviewValidationError, match="duplicates canonical headword_latin"):
+        normalize_lexicon_entry(
+            {
+                **holder,
+                "reviewed_target_variants": [
+                    {
+                        "form": "móyibaa",
+                        "review_document": "docs/reviews/phase7n2a_ndandayoro_lexical_review.md",
+                        "reviewer": "test",
+                        "reviewed_at": "2026-07-05",
+                        "rationale": "duplicate headword guard",
+                    }
+                ],
+            },
+            variant_registry=registry,
+        )
+
+    with pytest.raises(LexicalReviewValidationError, match="duplicate form"):
+        normalize_lexicon_entry(
+            {
+                **holder,
+                "reviewed_target_variants": [
+                    {
+                        "form": "extraform",
+                        "review_document": "docs/reviews/phase7n2a_ndandayoro_lexical_review.md",
+                        "reviewer": "test",
+                        "reviewed_at": "2026-07-05",
+                        "rationale": "first",
+                    },
+                    {
+                        "form": "extraform",
+                        "review_document": "docs/reviews/phase7n2a_ndandayoro_lexical_review.md",
+                        "reviewer": "test",
+                        "reviewed_at": "2026-07-05",
+                        "rationale": "duplicate",
+                    },
+                ],
+            },
+            variant_registry=registry,
+        )
