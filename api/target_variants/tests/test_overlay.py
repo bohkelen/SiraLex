@@ -15,6 +15,7 @@ sys.path.insert(0, str(REPO_ROOT / "shared"))
 sys.path.insert(0, str(REPO_ROOT / "api"))
 
 from ir.lexical_review import LexicalReviewValidationError, LexiconVariantRegistry  # noqa: E402
+from normalization.norm_v3 import normalize_nfc  # noqa: E402
 from normalizer.normalize import normalize_lexicon_entry, process_ir_files  # noqa: E402
 from target_variants.overlay import (  # noqa: E402
     TargetVariantOverlayError,
@@ -22,7 +23,7 @@ from target_variants.overlay import (  # noqa: E402
     validate_overlay_against_ir,
 )
 
-EMPTY_OVERLAY_PATH = REPO_ROOT / "shared/target_variants/reviewed_target_variants_v1.jsonl"
+TRACKED_OVERLAY_PATH = REPO_ROOT / "shared/target_variants/reviewed_target_variants_v1.jsonl"
 SYNTHETIC_CANONICAL_IR_ID = "aaaa000000000001"
 OTHER_LEXICON_IR_ID = "aaaa000000000002"
 INDEX_IR_ID = "bbbb000000000001"
@@ -182,10 +183,19 @@ def registry_for(*ir_units: dict) -> LexiconVariantRegistry:
     return registry
 
 
-def test_empty_overlay_validates_and_produces_no_changes():
-    overlay = load_reviewed_target_variant_overlay(EMPTY_OVERLAY_PATH)
-    assert overlay.row_count == 0
-    assert overlay.approved_row_count == 0
+def test_tracked_overlay_contains_approved_mobaa_row():
+    overlay = load_reviewed_target_variant_overlay(TRACKED_OVERLAY_PATH)
+    assert overlay.row_count == 1
+    assert overlay.approved_row_count == 1
+
+    row = overlay.rows[0].row
+    assert row["variant_id"] == "rtv_phase7n2a_0001"
+    assert row["canonical_ir_id"] == "c5f78c8ac66eac6b"
+    assert row["form"] == "móbaa"
+    assert normalize_nfc(row["form"]) == "móbaa"
+    assert row["target_script"] == "latin"
+    assert row["review_document"] == "docs/PHASE_7K1_STRUCTURED_USABILITY_TRIAGE.md"
+    assert row["source_norm_version"] == "norm_v3"
 
 
 def test_normalization_without_overlay_flag_does_not_load_overlay(tmp_path: Path):
@@ -199,13 +209,15 @@ def test_normalization_without_overlay_flag_does_not_load_overlay(tmp_path: Path
 
 def test_normalization_with_explicit_empty_overlay_matches_raw(tmp_path: Path):
     ir_path = write_jsonl(tmp_path / "lexicon.jsonl", [synthetic_lexicon_ir()])
+    empty_overlay_path = tmp_path / "empty_overlay.jsonl"
+    empty_overlay_path.write_text("", encoding="utf-8")
     raw_out = tmp_path / "raw.jsonl"
     overlay_out = tmp_path / "overlay.jsonl"
     raw_stats = process_ir_files([ir_path], raw_out)
     overlay_stats = process_ir_files(
         [ir_path],
         overlay_out,
-        target_variant_overlay=EMPTY_OVERLAY_PATH,
+        target_variant_overlay=empty_overlay_path,
     )
     assert raw_stats["errors"] == 0
     assert overlay_stats["errors"] == 0
