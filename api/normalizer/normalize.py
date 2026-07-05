@@ -27,7 +27,9 @@ Output schema (one JSON object per line):
 import copy
 import json
 import logging
+import os
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
@@ -332,19 +334,52 @@ def process_ir_files(
             stats["errors"] += 1
             return stats
 
-    with open(output_path, "w", encoding="utf-8") as out_f:
-        for input_path, line_num, ir_unit in loaded_units:
-            try:
+    def _candidate_unit(ir_unit: dict[str, Any]) -> dict[str, Any]:
+        ir_id = str(ir_unit.get("ir_id", ""))
+        if overlay_map and ir_id in overlay_map:
+            return _attach_overlay_variants(ir_unit, overlay_map[ir_id])
+        return ir_unit
+
+    # Preflight all units before opening output: fail closed on overlay collisions.
+    preflight_registry = LexiconVariantRegistry()
+    for _input_path, _line_num, ir_unit in loaded_units:
+        if ir_unit.get("ir_kind") != "lexicon_entry":
+            continue
+        try:
+            preflight_registry.register_source_attested(ir_unit)
+        except LexicalReviewValidationError as exc:
+            logger.warning(f"Error registering source-attested forms: {exc}")
+            stats["errors"] += 1
+            return stats
+
+    for input_path, line_num, ir_unit in loaded_units:
+        try:
+            unit_to_preflight = _candidate_unit(ir_unit)
+            _ = normalize_ir_unit(unit_to_preflight, variant_registry=preflight_registry)
+        except LexicalReviewValidationError as exc:
+            logger.warning(f"Error preflighting {input_path}:{line_num}: {exc}")
+            stats["errors"] += 1
+            return stats
+        except Exception as exc:
+            logger.warning(f"Error preflighting {input_path}:{line_num}: {exc}")
+            stats["errors"] += 1
+            return stats
+
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            delete=False,
+            dir=output_path.parent,
+            prefix=f".{output_path.name}.",
+            suffix=".tmp",
+        ) as tmp_file:
+            temp_path = Path(tmp_file.name)
+            for input_path, line_num, ir_unit in loaded_units:
                 stats["ir_units_read"] += 1
 
-                unit_to_normalize = ir_unit
-                ir_id = str(ir_unit.get("ir_id", ""))
-                if overlay_map and ir_id in overlay_map:
-                    unit_to_normalize = _attach_overlay_variants(
-                        ir_unit,
-                        overlay_map[ir_id],
-                    )
-
+                unit_to_normalize = _candidate_unit(ir_unit)
                 normalized = normalize_ir_unit(
                     unit_to_normalize,
                     variant_registry=variant_registry,
@@ -353,24 +388,29 @@ def process_ir_files(
                     stats["skipped"] += 1
                     continue
 
-                out_f.write(
-                    json.dumps(normalized.to_dict(), ensure_ascii=False) + "\n"
-                )
+                tmp_file.write(json.dumps(normalized.to_dict(), ensure_ascii=False) + "\n")
 
                 if normalized.ir_kind == "lexicon_entry":
                     stats["lexicon_entries_normalized"] += 1
                 elif normalized.ir_kind == "index_mapping":
                     stats["index_mappings_normalized"] += 1
 
-            except LexicalReviewValidationError as exc:
-                logger.warning(
-                    f"Error normalizing {input_path}:{line_num}: {exc}"
-                )
-                stats["errors"] += 1
-            except Exception as exc:
-                logger.warning(
-                    f"Error normalizing {input_path}:{line_num}: {exc}"
-                )
-                stats["errors"] += 1
+        if stats["errors"] > 0:
+            if temp_path is not None and temp_path.exists():
+                temp_path.unlink()
+            return stats
+
+        os.replace(temp_path, output_path)
+        temp_path = None
+    except LexicalReviewValidationError as exc:
+        logger.warning(f"Error normalizing with fail-closed output: {exc}")
+        stats["errors"] += 1
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
+    except Exception as exc:
+        logger.warning(f"Error normalizing with fail-closed output: {exc}")
+        stats["errors"] += 1
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
 
     return stats

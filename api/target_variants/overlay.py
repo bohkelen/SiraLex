@@ -7,6 +7,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ ALLOWED_STATUSES = frozenset({"approved", "pending", "rejected"})
 APPROVED_STATUS = "approved"
 ALLOWED_TARGET_SCRIPTS = frozenset({"latin"})
 CANONICAL_IR_ID_RE = re.compile(r"^[0-9a-f]{16}$")
+MALIPENSE_SOURCE_ID = "src_malipense"
 
 REQUIRED_FIELDS = frozenset(
     {
@@ -105,6 +107,24 @@ def _nfc_key(value: str) -> str:
     return normalize_nfc(value.strip())
 
 
+def _is_valid_iso8601(value: str) -> bool:
+    """Accept ISO date and datetime forms used in repository contracts."""
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+        return True
+    except ValueError:
+        pass
+
+    candidate = value
+    if candidate.endswith("Z"):
+        candidate = candidate[:-1] + "+00:00"
+    try:
+        datetime.fromisoformat(candidate)
+        return True
+    except ValueError:
+        return False
+
+
 def _validate_row_schema(row: dict[str, Any], *, line_number: int) -> None:
     if not isinstance(row, dict):
         raise TargetVariantOverlayError(f"line {line_number}: row must be a JSON object")
@@ -176,6 +196,10 @@ def _validate_row_schema(row: dict[str, Any], *, line_number: int) -> None:
         raise TargetVariantOverlayError(
             f"line {line_number}: reviewed_at must be a non-empty string"
         )
+    if not _is_valid_iso8601(reviewed_at):
+        raise TargetVariantOverlayError(
+            f"line {line_number}: reviewed_at must be an ISO-8601 date or datetime"
+        )
 
     if row["source_norm_version"] != RULESET_ID:
         raise TargetVariantOverlayError(
@@ -242,19 +266,16 @@ def load_reviewed_target_variant_overlay(path: Path) -> TargetVariantOverlay:
     )
 
 
-def _lexicon_index(
+def _ir_index(
     ir_units: list[dict[str, Any]],
-) -> tuple[dict[str, dict[str, Any]], dict[str, list[dict[str, Any]]]]:
-    by_ir_id: dict[str, dict[str, Any]] = {}
+) -> dict[str, list[dict[str, Any]]]:
     all_by_ir_id: dict[str, list[dict[str, Any]]] = {}
 
     for ir_unit in ir_units:
         ir_id = str(ir_unit.get("ir_id", ""))
         all_by_ir_id.setdefault(ir_id, []).append(ir_unit)
-        if ir_unit.get("ir_kind") == "lexicon_entry":
-            by_ir_id[ir_id] = ir_unit
 
-    return by_ir_id, all_by_ir_id
+    return all_by_ir_id
 
 
 def validate_overlay_against_ir(
@@ -262,7 +283,7 @@ def validate_overlay_against_ir(
     ir_units: list[dict[str, Any]],
 ) -> None:
     """Validate approved overlay rows against supplied IR lexicon entries."""
-    lexicon_by_ir_id, all_by_ir_id = _lexicon_index(ir_units)
+    all_by_ir_id = _ir_index(ir_units)
 
     for overlay_row in overlay.rows:
         if overlay_row.status != APPROVED_STATUS:
@@ -270,25 +291,19 @@ def validate_overlay_against_ir(
 
         canonical_ir_id = overlay_row.canonical_ir_id
         matches = all_by_ir_id.get(canonical_ir_id, [])
-        if not matches:
+        matching_targets = [
+            ir_unit
+            for ir_unit in matches
+            if ir_unit.get("ir_kind") == "lexicon_entry"
+            and ir_unit.get("source_id") == MALIPENSE_SOURCE_ID
+        ]
+        if len(matching_targets) != 1:
             raise TargetVariantOverlayError(
                 f"line {overlay_row.line_number}: canonical_ir_id {canonical_ir_id!r} "
-                "not found in supplied IR inputs"
-            )
-        if len(matches) > 1:
-            raise TargetVariantOverlayError(
-                f"line {overlay_row.line_number}: canonical_ir_id {canonical_ir_id!r} "
-                "resolves to multiple IR records"
-            )
-        if matches[0].get("ir_kind") != "lexicon_entry":
-            raise TargetVariantOverlayError(
-                f"line {overlay_row.line_number}: canonical_ir_id {canonical_ir_id!r} "
-                "does not reference a lexicon_entry"
-            )
-        if canonical_ir_id not in lexicon_by_ir_id:
-            raise TargetVariantOverlayError(
-                f"line {overlay_row.line_number}: canonical_ir_id {canonical_ir_id!r} "
-                "is not a lexicon_entry"
+                "must resolve to exactly one frozen Mali-Pense lexicon entry "
+                "(ir_kind=lexicon_entry, source_id=src_malipense); "
+                f"resolved {len(matching_targets)} matching targets "
+                f"from {len(matches)} loaded record(s)"
             )
 
 

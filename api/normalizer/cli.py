@@ -95,6 +95,9 @@ def main():
     print(f"Output: {args.output}")
     print("=" * 50)
 
+    if stats["errors"] > 0:
+        raise SystemExit(1)
+
 
 if __name__ == "__main__":
     main()

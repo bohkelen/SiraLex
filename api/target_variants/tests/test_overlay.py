@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,8 @@ EMPTY_OVERLAY_PATH = REPO_ROOT / "shared/target_variants/reviewed_target_variant
 SYNTHETIC_CANONICAL_IR_ID = "aaaa000000000001"
 OTHER_LEXICON_IR_ID = "aaaa000000000002"
 INDEX_IR_ID = "bbbb000000000001"
+OWNER_LEXICON_IR_ID = "cccc000000000001"
+NON_MALIPENSE_LEXICON_IR_ID = "dddd000000000001"
 
 
 def overlay_row(
@@ -87,6 +90,41 @@ def synthetic_lexicon_ir(
             "url_canonical": "https://www.mali-pense.net/emk/lexicon/s.htm",
             "source_record_id": f"e-{ir_id[:8]}",
             "anchor_names": anchor_names,
+        },
+        "fields_raw": {
+            "headword_latin": headword_latin,
+            "senses": [{"gloss_en": "synthetic"}],
+        },
+    }
+
+
+def synthetic_lexicon_ir_with_source(
+    *,
+    ir_id: str,
+    source_id: str,
+    headword_latin: str,
+) -> dict:
+    return {
+        "ir_id": ir_id,
+        "ir_kind": "lexicon_entry",
+        "source_id": source_id,
+        "parser_version": "synthetic_lexicon_v1",
+        "evidence": [
+            {
+                "source_id": source_id,
+                "snapshot_id": "synthetic",
+                "entry_block": {
+                    "start_selector": f"span#{ir_id}",
+                    "end_selector": f"span#{ir_id}-next",
+                },
+                "text_quote": headword_latin,
+            }
+        ],
+        "record_locator": {
+            "kind": "source_record_id",
+            "url_canonical": f"https://example.invalid/{ir_id}",
+            "source_record_id": f"e-{ir_id[:8]}",
+            "anchor_names": [headword_latin],
         },
         "fields_raw": {
             "headword_latin": headword_latin,
@@ -196,6 +234,34 @@ def test_invalid_canonical_ir_id_format_fails(tmp_path: Path):
         load_reviewed_target_variant_overlay(overlay_path)
 
 
+def test_valid_iso_date_passes(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "iso_date.jsonl",
+        [overlay_row(reviewed_at="2026-07-05")],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    assert overlay.row_count == 1
+
+
+def test_valid_iso_utc_datetime_passes(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "iso_datetime.jsonl",
+        [overlay_row(reviewed_at="2026-07-05T14:04:34Z")],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    assert overlay.row_count == 1
+
+
+@pytest.mark.parametrize("reviewed_at", ["later", "2026/07/05", "July 5 2026"])
+def test_malformed_reviewed_at_fails(tmp_path: Path, reviewed_at: str):
+    overlay_path = write_overlay(
+        tmp_path / "bad_reviewed_at.jsonl",
+        [overlay_row(reviewed_at=reviewed_at)],
+    )
+    with pytest.raises(TargetVariantOverlayError, match="reviewed_at must be an ISO-8601"):
+        load_reviewed_target_variant_overlay(overlay_path)
+
+
 def test_duplicate_variant_id_fails(tmp_path: Path):
     row = overlay_row()
     overlay_path = write_overlay(tmp_path / "dup_id.jsonl", [row, row])
@@ -239,7 +305,7 @@ def test_pending_and_rejected_rows_are_not_applied(tmp_path: Path):
 def test_overlay_row_targeting_missing_canonical_record_fails(tmp_path: Path):
     overlay_path = write_overlay(tmp_path / "orphan.jsonl", [overlay_row()])
     overlay = load_reviewed_target_variant_overlay(overlay_path)
-    with pytest.raises(TargetVariantOverlayError, match="not found"):
+    with pytest.raises(TargetVariantOverlayError, match="frozen Mali-Pense lexicon entry"):
         validate_overlay_against_ir(overlay, [])
 
 
@@ -251,6 +317,36 @@ def test_overlay_row_targeting_non_lexicon_record_fails(tmp_path: Path):
     overlay = load_reviewed_target_variant_overlay(overlay_path)
     with pytest.raises(TargetVariantOverlayError, match="lexicon_entry"):
         validate_overlay_against_ir(overlay, [synthetic_index_ir()])
+
+
+def test_overlay_row_targeting_owner_lexicon_entry_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "owner_target.jsonl",
+        [overlay_row(canonical_ir_id=OWNER_LEXICON_IR_ID)],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    owner_row = synthetic_lexicon_ir_with_source(
+        ir_id=OWNER_LEXICON_IR_ID,
+        source_id="src_siralex_lexical_review",
+        headword_latin="ownerheadword",
+    )
+    with pytest.raises(TargetVariantOverlayError, match="frozen Mali-Pense lexicon entry"):
+        validate_overlay_against_ir(overlay, [owner_row])
+
+
+def test_overlay_row_targeting_non_malipense_lexicon_source_fails(tmp_path: Path):
+    overlay_path = write_overlay(
+        tmp_path / "other_source_target.jsonl",
+        [overlay_row(canonical_ir_id=NON_MALIPENSE_LEXICON_IR_ID)],
+    )
+    overlay = load_reviewed_target_variant_overlay(overlay_path)
+    other_row = synthetic_lexicon_ir_with_source(
+        ir_id=NON_MALIPENSE_LEXICON_IR_ID,
+        source_id="src_other_lexicon",
+        headword_latin="otherheadword",
+    )
+    with pytest.raises(TargetVariantOverlayError, match="frozen Mali-Pense lexicon entry"):
+        validate_overlay_against_ir(overlay, [other_row])
 
 
 def test_overlay_row_conflicting_with_canonical_headword_fails(tmp_path: Path):
@@ -287,6 +383,7 @@ def test_overlay_row_conflicting_with_frozen_attested_latin_form_fails(tmp_path:
         target_variant_overlay=overlay_path,
     )
     assert stats["errors"] == 1
+    assert not (tmp_path / "out.jsonl").exists()
 
 
 def test_overlay_row_conflicting_with_another_approved_overlay_form_fails(tmp_path: Path):
@@ -333,6 +430,54 @@ def test_valid_approved_overlay_adds_variant_without_mutating_source_fields(tmp_
     assert "synthvariant" in record["search_keys"]["casefold"]
     assert "provenance" not in record
     assert "derivation" not in record
+
+
+def test_overlay_collision_preserves_existing_destination_bytes(tmp_path: Path):
+    existing_out = tmp_path / "existing.jsonl"
+    original_bytes = b"keep-this-existing-output\n"
+    existing_out.write_bytes(original_bytes)
+
+    overlay_path = write_overlay(
+        tmp_path / "headword_conflict.jsonl",
+        [overlay_row(form="synthcanonical")],
+    )
+    ir_path = write_jsonl(tmp_path / "lexicon.jsonl", [synthetic_lexicon_ir()])
+    stats = process_ir_files(
+        [ir_path],
+        existing_out,
+        target_variant_overlay=overlay_path,
+    )
+    assert stats["errors"] == 1
+    assert existing_out.read_bytes() == original_bytes
+
+
+def test_cli_invalid_overlay_exits_non_zero_and_writes_no_output(tmp_path: Path):
+    ir_path = write_jsonl(tmp_path / "lexicon.jsonl", [synthetic_lexicon_ir()])
+    bad_overlay = write_overlay(
+        tmp_path / "bad_overlay.jsonl",
+        [overlay_row(reviewed_at="later")],
+    )
+    out_path = tmp_path / "cli_out.jsonl"
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "normalizer.cli",
+            "--input",
+            str(ir_path),
+            "--target-variant-overlay",
+            str(bad_overlay),
+            "--output",
+            str(out_path),
+        ],
+        cwd=str(REPO_ROOT),
+        env={**os.environ, "PYTHONPATH": "api:shared"},
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode != 0
+    assert not out_path.exists()
 
 
 def test_existing_r1_r1a_guards_still_pass():

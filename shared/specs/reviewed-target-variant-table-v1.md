@@ -22,7 +22,7 @@ explicit `--target-variant-overlay <path>` flag.
 | `target_script` | MUST be `latin` in v1 |
 | `review_document` | Repository-relative path under `docs/` |
 | `reviewer` | Non-empty string |
-| `reviewed_at` | ISO-8601 date or datetime |
+| `reviewed_at` | ISO-8601 date or datetime (e.g. `2026-07-05`, `2026-07-05T14:04:34Z`, `2026-07-05T14:04:34+00:00`) |
 | `rationale` | Non-empty audit string |
 | `source_norm_version` | MUST equal active ruleset (`norm_v3`) |
 
@@ -38,7 +38,7 @@ explicit `--target-variant-overlay <path>` flag.
 2. Approved rows are sorted by `(canonical_ir_id, variant_id)`.
 3. An approved `form` may appear only once under NFC comparison across all approved rows.
 4. `pending` and `rejected` rows are schema-validated but not applied.
-5. An approved row must target exactly one `lexicon_entry` in supplied IR inputs.
+5. An approved row must target exactly one `lexicon_entry` in supplied IR inputs with `source_id = src_malipense` (overlay v1 is frozen-Mali-Pense scoped).
 6. Approved rows fail when `canonical_ir_id` resolves to zero records, multiple records, or a non-lexicon unit.
 7. Approved rows fail on collision with canonical `headword_latin`, `anchor_names`, another record's attested Latin form, or another applied reviewed variant.
 8. The overlay must not modify `preferred_form`, `record_locator`, `evidence`, `source_id`, `parser_version`, `provenance`, or `derivation`.
