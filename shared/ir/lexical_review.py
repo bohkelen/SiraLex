@@ -183,7 +183,17 @@ def parse_reviewed_target_variants(ir_unit: dict[str, Any]) -> list[ReviewedTarg
         return []
     if not isinstance(raw_variants, list):
         raise LexicalReviewValidationError("reviewed_target_variants must be an array")
-    return [ReviewedTargetVariant.from_dict(item) for item in raw_variants]
+    variants = [ReviewedTargetVariant.from_dict(item) for item in raw_variants]
+    ir_id = str(ir_unit.get("ir_id", ""))
+    seen_keys: set[str] = set()
+    for variant in variants:
+        key = _nfc_key(variant.form)
+        if key in seen_keys:
+            raise LexicalReviewValidationError(
+                f"reviewed_target_variants contains duplicate form on {ir_id}"
+            )
+        seen_keys.add(key)
+    return variants
 
 
 @dataclass
@@ -233,11 +243,24 @@ class LexiconVariantRegistry:
         variant: ReviewedTargetVariant,
     ) -> None:
         ir_id = str(ir_unit.get("ir_id", ""))
+        fields_raw = ir_unit.get("fields_raw", {})
         anchor_names = ir_unit.get("record_locator", {}).get("anchor_names", [])
         if not isinstance(anchor_names, list):
             anchor_names = []
 
         variant_key = _nfc_key(variant.form)
+
+        headword_latin = fields_raw.get("headword_latin", "")
+        if (
+            isinstance(headword_latin, str)
+            and headword_latin.strip()
+            and _nfc_key(headword_latin) == variant_key
+        ):
+            raise LexicalReviewValidationError(
+                f"reviewed_target_variants.form duplicates canonical headword_latin "
+                f"on {ir_id}"
+            )
+
         for anchor in anchor_names:
             if isinstance(anchor, str) and _nfc_key(anchor) == variant_key:
                 raise LexicalReviewValidationError(

@@ -339,3 +339,82 @@ def test_duplicate_latin_attested_forms_block_reviewed_variants_across_records()
     registry = registry_for(first, second)
     with pytest.raises(LexicalReviewValidationError, match="conflicts with lexical record latin-owner-1"):
         normalize_lexicon_entry(second, variant_registry=registry)
+
+
+def reviewed_variant_holder_ir(
+    *,
+    ir_id: str = "variant-holder",
+    headword_latin: str = "móyibaa",
+    anchor_names: list[str] | None = None,
+    reviewed_forms: list[str] | None = None,
+) -> dict:
+    if anchor_names is None:
+        anchor_names = []
+    ir_unit = {
+        "ir_id": ir_id,
+        "ir_kind": "lexicon_entry",
+        "source_id": "src_malipense",
+        "parser_version": "malipense_lexicon_v1",
+        "evidence": [
+            {
+                "source_id": "src_malipense",
+                "snapshot_id": "20f263ef15dc6ae1",
+                "entry_block": {
+                    "start_selector": "span#holder",
+                    "end_selector": "span#holder-next",
+                },
+                "text_quote": headword_latin,
+            }
+        ],
+        "record_locator": {
+            "kind": "source_record_id",
+            "url_canonical": "https://www.mali-pense.net/emk/lexicon/m.htm",
+            "source_record_id": "e-holder",
+            "anchor_names": anchor_names,
+        },
+        "fields_raw": {
+            "headword_latin": headword_latin,
+            "senses": [{"gloss_en": "parent"}],
+        },
+    }
+    if reviewed_forms is not None:
+        ir_unit["reviewed_target_variants"] = [
+            reviewed_variant_item(form=form) for form in reviewed_forms
+        ]
+    return ir_unit
+
+
+def test_reviewed_variant_equal_to_own_headword_fails_with_empty_anchor_names():
+    ir_unit = reviewed_variant_holder_ir(
+        headword_latin="móyibaa",
+        anchor_names=[],
+        reviewed_forms=["móyibaa"],
+    )
+    registry = registry_for(ir_unit)
+    with pytest.raises(LexicalReviewValidationError, match="duplicates canonical headword_latin"):
+        normalize_lexicon_entry(ir_unit, variant_registry=registry)
+
+
+def test_reviewed_variant_equal_to_own_headword_fails_when_anchor_omits_headword():
+    ir_unit = reviewed_variant_holder_ir(
+        headword_latin="móyibaa",
+        anchor_names=["moyibaa"],
+        reviewed_forms=["móyibaa"],
+    )
+    registry = registry_for(ir_unit)
+    with pytest.raises(LexicalReviewValidationError, match="duplicates canonical headword_latin"):
+        normalize_lexicon_entry(ir_unit, variant_registry=registry)
+
+
+def test_duplicate_reviewed_variants_on_same_record_fail():
+    ir_unit = reviewed_variant_holder_ir(reviewed_forms=["móbaa", "móbaa"])
+    registry = registry_for(ir_unit)
+    with pytest.raises(LexicalReviewValidationError, match="duplicate form"):
+        normalize_lexicon_entry(ir_unit, variant_registry=registry)
+
+
+def test_nfc_equivalent_duplicate_reviewed_variants_on_same_record_fail():
+    ir_unit = reviewed_variant_holder_ir(reviewed_forms=["móbaa", "móbaa"])
+    registry = registry_for(ir_unit)
+    with pytest.raises(LexicalReviewValidationError, match="duplicate form"):
+        normalize_lexicon_entry(ir_unit, variant_registry=registry)
