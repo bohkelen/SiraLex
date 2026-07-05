@@ -185,4 +185,14 @@ No generated normalized or enriched outputs were committed.
 
 Commit `ce055dc` remains superseded historical evidence of the failed pre-recovery attempt.
 
+---
+
+## Reproducibility boundary
+
+The tracked owner-reviewed lexical records are reproducible from Git.
+
+A complete three-input normalization and enrichment run additionally requires the separately governed frozen Mali-Pense IR inputs to be provisioned locally. Those frozen inputs remain intentionally outside Git under the repository's dataset policy.
+
+---
+
 Phase 7N2A4B is now reproducible and accepted. `ndándayoro` and `ndándadiya` are tracked owner-approved lexical records with complete provenance and successful full-pipeline validation. Retrieval mappings and user-visible search behavior remain unchanged.
