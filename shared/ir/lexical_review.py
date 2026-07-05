@@ -188,11 +188,22 @@ def parse_reviewed_target_variants(ir_unit: dict[str, Any]) -> list[ReviewedTarg
 
 @dataclass
 class LexiconVariantRegistry:
-    """Tracks source-attested and reviewed forms to prevent duplicate target keys."""
+    """Tracks source-attested Latin and reviewed forms to prevent duplicate target keys.
 
-    _form_to_ir_id: dict[str, str] = field(default_factory=dict)
+    Source-attested N'Ko headwords are intentionally excluded from the global map:
+    the frozen Mali-Pense corpus legitimately reuses N'Ko forms across distinct
+    Latin entries. Per-record normalization still merges N'Ko into variant_forms.
+
+    Source-attested Latin forms are indexed without aborting on homographs so frozen
+    corpus normalization can complete. Reviewed target variants remain fail-closed
+    against other records' attested Latin forms and reviewed forms.
+    """
+
+    _attested_form_to_ir_ids: dict[str, set[str]] = field(default_factory=dict)
+    _reviewed_form_to_ir_id: dict[str, str] = field(default_factory=dict)
 
     def source_attested_forms(self, ir_unit: dict[str, Any]) -> list[str]:
+        """Latin attested forms indexed for cross-record reviewed-variant checks."""
         fields_raw = ir_unit.get("fields_raw", {})
         record_locator = ir_unit.get("record_locator", {})
         forms: list[str] = []
@@ -207,10 +218,6 @@ class LexiconVariantRegistry:
                 name for name in anchor_names if isinstance(name, str) and name.strip()
             )
 
-        headword_nko = fields_raw.get("headword_nko_provided")
-        if isinstance(headword_nko, str) and headword_nko.strip():
-            forms.append(headword_nko)
-
         return forms
 
     def register_source_attested(self, ir_unit: dict[str, Any]) -> None:
@@ -218,7 +225,7 @@ class LexiconVariantRegistry:
         if not ir_id:
             raise LexicalReviewValidationError("lexicon entry missing ir_id")
         for form in self.source_attested_forms(ir_unit):
-            self._register_form(ir_id, form)
+            self._index_attested_form(ir_id, form)
 
     def validate_reviewed_variant(
         self,
@@ -237,20 +244,29 @@ class LexiconVariantRegistry:
                     f"reviewed_target_variants.form duplicates anchor_names entry on {ir_id}"
                 )
 
-        owner = self._form_to_ir_id.get(variant_key)
-        if owner is not None and owner != ir_id:
+        attested_owners = self._attested_form_to_ir_ids.get(variant_key, set())
+        other_attested = attested_owners - {ir_id}
+        if other_attested:
             raise LexicalReviewValidationError(
-                f"reviewed_target_variants.form conflicts with lexical record {owner}"
+                "reviewed_target_variants.form conflicts with lexical record "
+                f"{sorted(other_attested)[0]}"
+            )
+
+        reviewed_owner = self._reviewed_form_to_ir_id.get(variant_key)
+        if reviewed_owner is not None and reviewed_owner != ir_id:
+            raise LexicalReviewValidationError(
+                f"reviewed_target_variants.form conflicts with lexical record {reviewed_owner}"
             )
 
     def register_reviewed_form(self, ir_id: str, form: str) -> None:
-        self._register_form(ir_id, form)
-
-    def _register_form(self, ir_id: str, form: str) -> None:
         key = _nfc_key(form)
-        owner = self._form_to_ir_id.get(key)
+        owner = self._reviewed_form_to_ir_id.get(key)
         if owner is not None and owner != ir_id:
             raise LexicalReviewValidationError(
                 f"duplicate lexical form {form!r} conflicts with record {owner}"
             )
-        self._form_to_ir_id[key] = ir_id
+        self._reviewed_form_to_ir_id[key] = ir_id
+
+    def _index_attested_form(self, ir_id: str, form: str) -> None:
+        key = _nfc_key(form)
+        self._attested_form_to_ir_ids.setdefault(key, set()).add(ir_id)

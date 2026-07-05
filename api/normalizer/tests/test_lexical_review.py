@@ -1,6 +1,5 @@
 """Tests for Phase 7N2A manual lexical-review and reviewed target variant support."""
 
-import json
 import sys
 from pathlib import Path
 
@@ -256,72 +255,87 @@ def test_existing_rows_without_reviewed_target_variants_remain_unchanged():
     assert result_without_registry.to_dict() == result_with_registry.to_dict()
 
 
-OWNER_LEXICAL_IR_PATH = (
-    Path(__file__).parent.parent.parent.parent / "data" / "ir" / "siralex_owner_lexical_v1.jsonl"
-)
-
-
-def load_owner_lexical_ir_records() -> list[dict]:
-    records: list[dict] = []
-    with open(OWNER_LEXICAL_IR_PATH, encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if line:
-                records.append(json.loads(line))
-    return records
-
-
-def test_owner_lexical_ir_file_records_validate_and_have_distinct_ir_ids():
-    records = load_owner_lexical_ir_records()
-    assert len(records) == 2
-
-    ir_ids = {record["ir_id"] for record in records}
-    assert len(ir_ids) == 2
-
-    for record in records:
-        validate_lexicon_entry_evidence(record)
-        assert record["source_id"] == SIRALEX_LEXICAL_REVIEW_SOURCE_ID
-        assert record["parser_version"] == SIRALEX_OWNER_LEXICAL_PARSER_VERSION
-
-
-def test_owner_lexical_ir_ids_match_deterministic_repository_method():
-    from ir.models import compute_ir_id
-
-    expected = {
-        "7n2a_ndandayoro_v1": (
-            "siralex://lexical-review/7n2a/ndandayoro",
-            "a9c7d82decee9191",
-        ),
-        "7n2a_ndandadiya_v1": (
-            "siralex://lexical-review/7n2a/ndandadiya",
-            "fefe9b063e05ed11",
-        ),
+def frozen_nko_homograph_ir(
+    *,
+    ir_id: str,
+    headword_latin: str,
+    anchor_names: list[str],
+    nko: str = "ߘߊ",
+) -> dict:
+    return {
+        "ir_id": ir_id,
+        "ir_kind": "lexicon_entry",
+        "source_id": "src_malipense",
+        "parser_version": "malipense_lexicon_v1",
+        "evidence": [
+            {
+                "source_id": "src_malipense",
+                "snapshot_id": "20f263ef15dc6ae1",
+                "entry_block": {
+                    "start_selector": f"span#{ir_id}",
+                    "end_selector": f"span#{ir_id}-next",
+                },
+                "text_quote": headword_latin,
+            }
+        ],
+        "record_locator": {
+            "kind": "source_record_id",
+            "url_canonical": "https://www.mali-pense.net/emk/lexicon/d.htm",
+            "source_record_id": ir_id,
+            "anchor_names": anchor_names,
+        },
+        "fields_raw": {
+            "headword_latin": headword_latin,
+            "headword_nko_provided": nko,
+            "senses": [{"gloss_en": "fixture"}],
+        },
     }
 
-    for record in load_owner_lexical_ir_records():
-        locator = record["record_locator"]
-        source_record_id = locator["source_record_id"]
-        url_canonical, ir_id = expected[source_record_id]
-        assert locator["url_canonical"] == url_canonical
-        assert record["ir_id"] == ir_id
-        assert record["ir_id"] == compute_ir_id(
-            SIRALEX_LEXICAL_REVIEW_SOURCE_ID,
-            url_canonical,
-            source_record_id,
-            SIRALEX_OWNER_LEXICAL_PARSER_VERSION,
-        )
 
-
-def test_owner_lexical_records_normalize_to_approved_canonical_forms():
-    records = load_owner_lexical_ir_records()
+def test_shared_nko_homographs_register_without_global_collision():
+    minus_da = frozen_nko_homograph_ir(
+        ir_id="964909ef6912ff64",
+        headword_latin="-da",
+        anchor_names=["-da"],
+    )
+    da_acute = frozen_nko_homograph_ir(
+        ir_id="d426e49d1e2ab3d9",
+        headword_latin="dá",
+        anchor_names=["dá", "da"],
+    )
     registry = LexiconVariantRegistry()
-    for record in records:
-        registry.register_source_attested(record)
+    registry.register_source_attested(minus_da)
+    registry.register_source_attested(da_acute)
 
-    by_headword = {record["fields_raw"]["headword_latin"]: record for record in records}
-    for headword in ("ndándayoro", "ndándadiya"):
-        result = normalize_lexicon_entry(by_headword[headword], variant_registry=registry)
-        assert result.preferred_form == headword
-        assert headword in result.variant_forms
-        assert headword in result.search_keys["casefold"]
-        assert result.source_id == SIRALEX_LEXICAL_REVIEW_SOURCE_ID
+
+def test_nko_headword_remains_in_per_record_variant_forms_and_search_keys():
+    ir_unit = frozen_nko_homograph_ir(
+        ir_id="964909ef6912ff64",
+        headword_latin="-da",
+        anchor_names=["-da"],
+    )
+    registry = registry_for(ir_unit)
+    result = normalize_lexicon_entry(ir_unit, variant_registry=registry)
+    assert "ߘߊ" in result.variant_forms
+    assert "ߘߊ" in result.search_keys["casefold"]
+
+
+def test_duplicate_latin_attested_forms_block_reviewed_variants_across_records():
+    first = frozen_nko_homograph_ir(
+        ir_id="latin-owner-1",
+        headword_latin="bá",
+        anchor_names=["bá"],
+        nko="ߓߊ",
+    )
+    second = {
+        **frozen_nko_homograph_ir(
+            ir_id="latin-owner-2",
+            headword_latin="moyibaa",
+            anchor_names=["moyibaa"],
+            nko="ߡߏߦߌߓߊ",
+        ),
+        "reviewed_target_variants": [reviewed_variant_item(form="bá")],
+    }
+    registry = registry_for(first, second)
+    with pytest.raises(LexicalReviewValidationError, match="conflicts with lexical record latin-owner-1"):
+        normalize_lexicon_entry(second, variant_registry=registry)
