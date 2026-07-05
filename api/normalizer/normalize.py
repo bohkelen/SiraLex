@@ -46,6 +46,7 @@ from ir.lexical_review import (
     LexiconVariantRegistry,
     SIRALEX_LEXICAL_REVIEW_SOURCE_ID,
     parse_reviewed_target_variants,
+    project_manual_provenance_derivation,
     validate_lexicon_entry_evidence,
 )
 
@@ -62,9 +63,11 @@ class NormalizedRecord:
     preferred_form: str
     variant_forms: list[str]
     search_keys: dict[str, list[str]]
+    provenance: dict[str, Any] | None = None
+    derivation: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "ir_id": self.ir_id,
             "ir_kind": self.ir_kind,
             "source_id": self.source_id,
@@ -73,6 +76,11 @@ class NormalizedRecord:
             "variant_forms": self.variant_forms,
             "search_keys": self.search_keys,
         }
+        if self.provenance is not None:
+            out["provenance"] = self.provenance
+        if self.derivation is not None:
+            out["derivation"] = self.derivation
+        return out
 
 
 def normalize_lexicon_entry(
@@ -90,6 +98,13 @@ def normalize_lexicon_entry(
     """
     if ir_unit.get("source_id") == SIRALEX_LEXICAL_REVIEW_SOURCE_ID:
         validate_lexicon_entry_evidence(ir_unit)
+
+    provenance: dict[str, Any] | None = None
+    derivation: dict[str, Any] | None = None
+    if ir_unit.get("source_id") == SIRALEX_LEXICAL_REVIEW_SOURCE_ID:
+        projected = project_manual_provenance_derivation(ir_unit)
+        provenance = projected["provenance"]
+        derivation = projected["derivation"]
 
     fields_raw = ir_unit.get("fields_raw", {})
     record_locator = ir_unit.get("record_locator", {})
@@ -146,6 +161,8 @@ def normalize_lexicon_entry(
         preferred_form=preferred_form,
         variant_forms=variant_forms,
         search_keys=search_keys,
+        provenance=provenance,
+        derivation=derivation,
     )
 
 

@@ -6,14 +6,22 @@ See docs/PHASE_7N2A3_SCHEMA_AND_ARTIFACT_DECISION.md.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from typing import Any
 
-from normalization.norm_v3 import normalize_nfc
+from normalization.norm_v3 import RULESET_ID, normalize_nfc
 
 SIRALEX_LEXICAL_REVIEW_SOURCE_ID = "src_siralex_lexical_review"
 SIRALEX_OWNER_LEXICAL_PARSER_VERSION = "siralex_owner_lexical_v1"
 OWNER_APPROVED_LEXICAL_DERIVATION_KIND = "owner_approved_lexical_addition"
+
+MANUAL_PROVENANCE_SOURCE_REQUIRED_FIELDS = frozenset(
+    {"id", "name", "url", "retrieved_at", "license_notes", "record_pointer"}
+)
+MANUAL_RECORD_POINTER_REQUIRED_FIELDS = frozenset(
+    {"kind", "source_record_id", "url_canonical"}
+)
 
 REVIEW_REFERENCE_REQUIRED_FIELDS = frozenset(
     {"document_path", "approval_status", "reviewer_role"}
@@ -127,6 +135,104 @@ def validate_manual_lexical_review_evidence(
         )
 
 
+def validate_manual_lexical_review_provenance(
+    ir_unit: dict[str, Any],
+    *,
+    line_context: str = "",
+) -> None:
+    """Validate provenance and derivation blocks for manual lexical-review IR rows."""
+    provenance = ir_unit.get("provenance")
+    if not isinstance(provenance, dict):
+        raise LexicalReviewValidationError(f"{line_context}provenance is required")
+
+    source = provenance.get("source")
+    if not isinstance(source, dict):
+        raise LexicalReviewValidationError(f"{line_context}provenance.source is required")
+
+    missing_source = MANUAL_PROVENANCE_SOURCE_REQUIRED_FIELDS - source.keys()
+    if missing_source:
+        raise LexicalReviewValidationError(
+            f"{line_context}provenance.source missing fields: {sorted(missing_source)}"
+        )
+
+    if source.get("id") != SIRALEX_LEXICAL_REVIEW_SOURCE_ID:
+        raise LexicalReviewValidationError(
+            f"{line_context}provenance.source.id must be {SIRALEX_LEXICAL_REVIEW_SOURCE_ID}"
+        )
+
+    for field_name in ("name", "retrieved_at", "license_notes"):
+        value = source.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            raise LexicalReviewValidationError(
+                f"{line_context}provenance.source.{field_name} must be a non-empty string"
+            )
+
+    url = source.get("url")
+    if url is not None and (not isinstance(url, str) or not url.strip()):
+        raise LexicalReviewValidationError(
+            f"{line_context}provenance.source.url must be a non-empty string or null"
+        )
+
+    record_pointer = source.get("record_pointer")
+    if not isinstance(record_pointer, dict):
+        raise LexicalReviewValidationError(
+            f"{line_context}provenance.source.record_pointer is required"
+        )
+
+    missing_pointer = MANUAL_RECORD_POINTER_REQUIRED_FIELDS - record_pointer.keys()
+    if missing_pointer:
+        raise LexicalReviewValidationError(
+            f"{line_context}provenance.source.record_pointer missing fields: "
+            f"{sorted(missing_pointer)}"
+        )
+
+    if record_pointer.get("kind") != "source_record_id":
+        raise LexicalReviewValidationError(
+            f"{line_context}provenance.source.record_pointer.kind must be source_record_id"
+        )
+
+    if record_pointer.get("snapshot_id"):
+        raise LexicalReviewValidationError(
+            f"{line_context}provenance.source.record_pointer must not include snapshot_id"
+        )
+
+    record_locator = ir_unit.get("record_locator", {})
+    for field_name in ("source_record_id", "url_canonical"):
+        pointer_value = record_pointer.get(field_name)
+        locator_value = record_locator.get(field_name)
+        if pointer_value != locator_value:
+            raise LexicalReviewValidationError(
+                f"{line_context}provenance.source.record_pointer.{field_name} must match "
+                f"record_locator.{field_name}"
+            )
+
+    derivation = ir_unit.get("derivation")
+    if not isinstance(derivation, dict):
+        raise LexicalReviewValidationError(f"{line_context}derivation is required")
+
+    if derivation.get("kind") != OWNER_APPROVED_LEXICAL_DERIVATION_KIND:
+        raise LexicalReviewValidationError(
+            f"{line_context}derivation.kind must be {OWNER_APPROVED_LEXICAL_DERIVATION_KIND}"
+        )
+
+    rule_versions = derivation.get("rule_versions")
+    if not isinstance(rule_versions, dict):
+        raise LexicalReviewValidationError(f"{line_context}derivation.rule_versions is required")
+
+    if rule_versions.get("normalization") != RULESET_ID:
+        raise LexicalReviewValidationError(
+            f"{line_context}derivation.rule_versions.normalization must be {RULESET_ID}"
+        )
+
+
+def project_manual_provenance_derivation(ir_unit: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Copy manual provenance and derivation blocks for normalized/enriched projection."""
+    return {
+        "provenance": copy.deepcopy(ir_unit["provenance"]),
+        "derivation": copy.deepcopy(ir_unit["derivation"]),
+    }
+
+
 def validate_malipense_lexicon_evidence(
     evidence: Any,
     *,
@@ -172,6 +278,7 @@ def validate_lexicon_entry_evidence(ir_unit: dict[str, Any], *, line_context: st
             raise LexicalReviewValidationError(
                 f"{line_context}manual lexical-review record_locator must not use Mali-Pense url_canonical"
             )
+        validate_manual_lexical_review_provenance(ir_unit, line_context=line_context)
         return
     if source_id == MALIPENSE_SOURCE_ID and ir_unit.get("ir_kind") == "lexicon_entry":
         validate_malipense_lexicon_evidence(evidence, line_context=line_context)

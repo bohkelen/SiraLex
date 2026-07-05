@@ -8,18 +8,60 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "shared"))
 
 from ir.lexical_review import (  # noqa: E402
+    OWNER_APPROVED_LEXICAL_DERIVATION_KIND,
     LexicalReviewValidationError,
     LexiconVariantRegistry,
     SIRALEX_LEXICAL_REVIEW_SOURCE_ID,
     SIRALEX_OWNER_LEXICAL_PARSER_VERSION,
+    project_manual_provenance_derivation,
     validate_lexicon_entry_evidence,
     validate_malipense_lexicon_evidence,
     validate_manual_lexical_review_evidence,
+    validate_manual_lexical_review_provenance,
 )
 from normalizer.normalize import normalize_lexicon_entry  # noqa: E402
 
 
+def manual_provenance_derivation_blocks(
+    *,
+    source_record_id: str = "7n2a_ndandayoro_v1",
+    url_canonical: str = "siralex://lexical-review/7n2a/ndandayoro",
+    retrieved_at: str = "2026-07-05T12:00:00Z",
+    license_notes: str = (
+        "Owner-approved SiraLex project lexical addition; not derived from Mali-Pense."
+    ),
+    source_url: str | None = "https://github.com/thethiccckening/SiraLex",
+    normalization_ruleset: str = "norm_v3",
+) -> dict:
+    return {
+        "provenance": {
+            "source": {
+                "id": SIRALEX_LEXICAL_REVIEW_SOURCE_ID,
+                "name": "SiraLex owner-reviewed lexical addition",
+                "url": source_url,
+                "retrieved_at": retrieved_at,
+                "license_notes": license_notes,
+                "record_pointer": {
+                    "kind": "source_record_id",
+                    "source_record_id": source_record_id,
+                    "url_canonical": url_canonical,
+                },
+            }
+        },
+        "derivation": {
+            "kind": OWNER_APPROVED_LEXICAL_DERIVATION_KIND,
+            "rule_versions": {"normalization": normalization_ruleset},
+        },
+    }
+
+
 def manual_lexical_ir(**overrides) -> dict:
+    record_locator = {
+        "kind": "source_record_id",
+        "url_canonical": "siralex://lexical-review/7n2a/ndandayoro",
+        "source_record_id": "7n2a_ndandayoro_v1",
+        "anchor_names": ["ndándayoro"],
+    }
     base = {
         "ir_id": "test-ndandayoro",
         "ir_kind": "lexicon_entry",
@@ -36,16 +78,15 @@ def manual_lexical_ir(**overrides) -> dict:
                 "text_quote": "ndándayoro",
             }
         ],
-        "record_locator": {
-            "kind": "source_record_id",
-            "url_canonical": "siralex://lexical-review/7n2a/ndandayoro",
-            "source_record_id": "7n2a_ndandayoro_v1",
-            "anchor_names": ["ndándayoro"],
-        },
+        "record_locator": record_locator,
         "fields_raw": {
             "headword_latin": "ndándayoro",
             "senses": [{"gloss_fr": "health institution"}],
         },
+        **manual_provenance_derivation_blocks(
+            source_record_id=record_locator["source_record_id"],
+            url_canonical=record_locator["url_canonical"],
+        ),
     }
     base.update(overrides)
     return base
@@ -418,3 +459,78 @@ def test_nfc_equivalent_duplicate_reviewed_variants_on_same_record_fail():
     registry = registry_for(ir_unit)
     with pytest.raises(LexicalReviewValidationError, match="duplicate form"):
         normalize_lexicon_entry(ir_unit, variant_registry=registry)
+
+
+def test_fully_populated_manual_lexical_review_ir_validates():
+    validate_lexicon_entry_evidence(manual_lexical_ir())
+    validate_manual_lexical_review_provenance(manual_lexical_ir())
+
+
+def test_manual_lexical_missing_provenance_source_id_fails():
+    ir_unit = manual_lexical_ir()
+    ir_unit["provenance"]["source"].pop("id")
+    with pytest.raises(LexicalReviewValidationError, match="missing fields"):
+        validate_lexicon_entry_evidence(ir_unit)
+
+
+def test_manual_lexical_missing_retrieved_at_fails():
+    ir_unit = manual_lexical_ir()
+    ir_unit["provenance"]["source"].pop("retrieved_at")
+    with pytest.raises(LexicalReviewValidationError, match="retrieved_at"):
+        validate_manual_lexical_review_provenance(ir_unit)
+
+
+def test_manual_lexical_missing_license_notes_fails():
+    ir_unit = manual_lexical_ir()
+    ir_unit["provenance"]["source"].pop("license_notes")
+    with pytest.raises(LexicalReviewValidationError, match="license_notes"):
+        validate_manual_lexical_review_provenance(ir_unit)
+
+
+def test_manual_lexical_mismatched_record_pointer_fails():
+    ir_unit = manual_lexical_ir()
+    ir_unit["provenance"]["source"]["record_pointer"]["source_record_id"] = "wrong-id"
+    with pytest.raises(LexicalReviewValidationError, match="must match record_locator"):
+        validate_manual_lexical_review_provenance(ir_unit)
+
+
+def test_manual_lexical_missing_derivation_kind_fails():
+    ir_unit = manual_lexical_ir()
+    ir_unit["derivation"].pop("kind")
+    with pytest.raises(LexicalReviewValidationError, match="derivation.kind"):
+        validate_manual_lexical_review_provenance(ir_unit)
+
+
+def test_manual_lexical_wrong_derivation_kind_fails():
+    ir_unit = manual_lexical_ir()
+    ir_unit["derivation"]["kind"] = "imported"
+    with pytest.raises(LexicalReviewValidationError, match="derivation.kind"):
+        validate_manual_lexical_review_provenance(ir_unit)
+
+
+def test_manual_lexical_wrong_normalization_ruleset_fails():
+    ir_unit = manual_lexical_ir()
+    ir_unit["derivation"]["rule_versions"]["normalization"] = "norm_v1"
+    with pytest.raises(LexicalReviewValidationError, match="normalization must be norm_v3"):
+        validate_manual_lexical_review_provenance(ir_unit)
+
+
+def test_manual_provenance_survives_normalization():
+    ir_unit = manual_lexical_ir()
+    registry = registry_for(ir_unit)
+    result = normalize_lexicon_entry(ir_unit, variant_registry=registry)
+    projected = project_manual_provenance_derivation(ir_unit)
+    assert result.provenance == projected["provenance"]
+    assert result.derivation == projected["derivation"]
+    assert result.to_dict()["provenance"] == projected["provenance"]
+    assert result.to_dict()["derivation"] == projected["derivation"]
+
+
+def test_malipense_fixture_output_unchanged_without_manual_provenance():
+    ir_unit = malipense_lexicon_ir()
+    result_without_registry = normalize_lexicon_entry(ir_unit)
+    registry = registry_for(ir_unit)
+    result_with_registry = normalize_lexicon_entry(ir_unit, variant_registry=registry)
+    assert result_without_registry.to_dict() == result_with_registry.to_dict()
+    assert "provenance" not in result_without_registry.to_dict()
+    assert "derivation" not in result_without_registry.to_dict()
