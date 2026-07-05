@@ -1,5 +1,6 @@
 """Tests for Phase 7N2A manual lexical-review and reviewed target variant support."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -253,3 +254,74 @@ def test_existing_rows_without_reviewed_target_variants_remain_unchanged():
     registry = registry_for(ir_unit)
     result_with_registry = normalize_lexicon_entry(ir_unit, variant_registry=registry)
     assert result_without_registry.to_dict() == result_with_registry.to_dict()
+
+
+OWNER_LEXICAL_IR_PATH = (
+    Path(__file__).parent.parent.parent.parent / "data" / "ir" / "siralex_owner_lexical_v1.jsonl"
+)
+
+
+def load_owner_lexical_ir_records() -> list[dict]:
+    records: list[dict] = []
+    with open(OWNER_LEXICAL_IR_PATH, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if line:
+                records.append(json.loads(line))
+    return records
+
+
+def test_owner_lexical_ir_file_records_validate_and_have_distinct_ir_ids():
+    records = load_owner_lexical_ir_records()
+    assert len(records) == 2
+
+    ir_ids = {record["ir_id"] for record in records}
+    assert len(ir_ids) == 2
+
+    for record in records:
+        validate_lexicon_entry_evidence(record)
+        assert record["source_id"] == SIRALEX_LEXICAL_REVIEW_SOURCE_ID
+        assert record["parser_version"] == SIRALEX_OWNER_LEXICAL_PARSER_VERSION
+
+
+def test_owner_lexical_ir_ids_match_deterministic_repository_method():
+    from ir.models import compute_ir_id
+
+    expected = {
+        "7n2a_ndandayoro_v1": (
+            "siralex://lexical-review/7n2a/ndandayoro",
+            "a9c7d82decee9191",
+        ),
+        "7n2a_ndandadiya_v1": (
+            "siralex://lexical-review/7n2a/ndandadiya",
+            "fefe9b063e05ed11",
+        ),
+    }
+
+    for record in load_owner_lexical_ir_records():
+        locator = record["record_locator"]
+        source_record_id = locator["source_record_id"]
+        url_canonical, ir_id = expected[source_record_id]
+        assert locator["url_canonical"] == url_canonical
+        assert record["ir_id"] == ir_id
+        assert record["ir_id"] == compute_ir_id(
+            SIRALEX_LEXICAL_REVIEW_SOURCE_ID,
+            url_canonical,
+            source_record_id,
+            SIRALEX_OWNER_LEXICAL_PARSER_VERSION,
+        )
+
+
+def test_owner_lexical_records_normalize_to_approved_canonical_forms():
+    records = load_owner_lexical_ir_records()
+    registry = LexiconVariantRegistry()
+    for record in records:
+        registry.register_source_attested(record)
+
+    by_headword = {record["fields_raw"]["headword_latin"]: record for record in records}
+    for headword in ("ndándayoro", "ndándadiya"):
+        result = normalize_lexicon_entry(by_headword[headword], variant_registry=registry)
+        assert result.preferred_form == headword
+        assert headword in result.variant_forms
+        assert headword in result.search_keys["casefold"]
+        assert result.source_id == SIRALEX_LEXICAL_REVIEW_SOURCE_ID
