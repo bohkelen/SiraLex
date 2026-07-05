@@ -66,6 +66,7 @@ def approved_alias(
     canonical_source_terms: list[str] | None = None,
     resolved_ir_ids: list[str] | None = None,
     status: str = "approved",
+    candidate_type: str = "french_plural_singular_alias",
 ) -> dict:
     row = {
         "schema_version": "source_alias_table_v1",
@@ -76,7 +77,7 @@ def approved_alias(
         "alias_source_term": alias_source_term,
         "canonical_source_terms": canonical_source_terms or ["oeil"],
         "resolved_ir_ids": resolved_ir_ids or ["id-oeil"],
-        "candidate_type": "french_plural_singular_alias",
+        "candidate_type": candidate_type,
         "evidence_ir_ids": ["id-oeil"],
         "rationale": "test rationale",
         "source_bundle_id": "test-bundle",
@@ -159,6 +160,42 @@ def test_unknown_candidate_type_rejected(tmp_path: Path):
 
     with pytest.raises(AliasValidationError, match="invalid candidate_type"):
         validate_alias_table(aliases_path, records_path, index_path)
+
+
+def test_french_common_form_alias_validates(tmp_path: Path):
+    row = approved_alias(
+        alias_id="alias-maman",
+        alias_source_term="maman",
+        canonical_source_terms=["mère"],
+        resolved_ir_ids=["id-mere-direct"],
+    )
+    row["candidate_type"] = "french_common_form_alias"
+    row["evidence_ir_ids"] = ["id-mere-direct"]
+
+    index_rows = base_index_rows() + [
+        {"key": "mère", "key_type": "src_casefold", "ir_ids": ["id-mere-direct"]},
+        {"key": "mère", "key_type": "src_diacritics_insensitive", "ir_ids": ["id-mere-direct"]},
+        {"key": "mère", "key_type": "src_punct_stripped", "ir_ids": ["id-mere-direct"]},
+        {"key": "mère", "key_type": "src_nospace", "ir_ids": ["id-mere-direct"]},
+    ]
+    records_path, index_path, aliases_path = make_fixture(tmp_path, [row], index_rows)
+
+    result = validate_alias_table(aliases_path, records_path, index_path)
+
+    assert result.summary["approved_alias_count"] == 1
+    assert result.summary["applied_alias_count"] == 1
+
+
+def test_existing_alias_candidate_types_remain_valid(tmp_path: Path):
+    for candidate_type in (
+        "french_plural_singular_alias",
+        "french_gender_alias",
+        "hyphenation_or_compound_alias",
+    ):
+        row = approved_alias(alias_id=f"alias-{candidate_type}", candidate_type=candidate_type)
+        records_path, index_path, aliases_path = make_fixture(tmp_path, [row])
+        result = validate_alias_table(aliases_path, records_path, index_path)
+        assert result.summary["approved_alias_count"] == 1
 
 
 def test_missing_evidence_id_rejected(tmp_path: Path):

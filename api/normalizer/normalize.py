@@ -41,6 +41,14 @@ from normalization.norm_v3 import (
     normalize_nfc,
 )
 
+from ir.lexical_review import (
+    LexicalReviewValidationError,
+    LexiconVariantRegistry,
+    SIRALEX_LEXICAL_REVIEW_SOURCE_ID,
+    parse_reviewed_target_variants,
+    validate_lexicon_entry_evidence,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,7 +75,10 @@ class NormalizedRecord:
         }
 
 
-def normalize_lexicon_entry(ir_unit: dict[str, Any]) -> NormalizedRecord:
+def normalize_lexicon_entry(
+    ir_unit: dict[str, Any],
+    variant_registry: LexiconVariantRegistry | None = None,
+) -> NormalizedRecord:
     """
     Normalize a lexicon_entry IR unit.
 
@@ -75,7 +86,11 @@ def normalize_lexicon_entry(ir_unit: dict[str, Any]) -> NormalizedRecord:
     Variant forms: record_locator.anchor_names (includes preferred form)
 
     If anchor_names is missing or empty, variant_forms = [headword_latin].
+    Reviewed target variants are merged after source-attested anchors only.
     """
+    if ir_unit.get("source_id") == SIRALEX_LEXICAL_REVIEW_SOURCE_ID:
+        validate_lexicon_entry_evidence(ir_unit)
+
     fields_raw = ir_unit.get("fields_raw", {})
     record_locator = ir_unit.get("record_locator", {})
 
@@ -103,11 +118,28 @@ def normalize_lexicon_entry(ir_unit: dict[str, Any]) -> NormalizedRecord:
         if not any(normalize_nfc(v) == nko_nfc for v in variant_forms):
             variant_forms.append(headword_nko)
 
+    reviewed_variants = parse_reviewed_target_variants(ir_unit)
+    if reviewed_variants:
+        if variant_registry is None:
+            raise LexicalReviewValidationError(
+                "reviewed_target_variants require a LexiconVariantRegistry"
+            )
+        for reviewed_variant in reviewed_variants:
+            variant_registry.validate_reviewed_variant(ir_unit, reviewed_variant)
+            reviewed_nfc = normalize_nfc(reviewed_variant.form)
+            if not any(normalize_nfc(v) == reviewed_nfc for v in variant_forms):
+                variant_forms.append(reviewed_variant.form)
+
     # Compute search keys from all variant forms
     search_keys = compute_search_keys(variant_forms)
 
+    ir_id = ir_unit.get("ir_id", "")
+    if variant_registry is not None and reviewed_variants:
+        for reviewed_variant in reviewed_variants:
+            variant_registry.register_reviewed_form(ir_id, reviewed_variant.form)
+
     return NormalizedRecord(
-        ir_id=ir_unit.get("ir_id", ""),
+        ir_id=ir_id,
         ir_kind=ir_unit.get("ir_kind", ""),
         source_id=ir_unit.get("source_id", ""),
         norm_version=RULESET_ID,
@@ -147,7 +179,10 @@ def normalize_index_mapping(ir_unit: dict[str, Any]) -> NormalizedRecord:
     )
 
 
-def normalize_ir_unit(ir_unit: dict[str, Any]) -> NormalizedRecord | None:
+def normalize_ir_unit(
+    ir_unit: dict[str, Any],
+    variant_registry: LexiconVariantRegistry | None = None,
+) -> NormalizedRecord | None:
     """
     Normalize a single IR unit based on its ir_kind.
 
@@ -156,12 +191,27 @@ def normalize_ir_unit(ir_unit: dict[str, Any]) -> NormalizedRecord | None:
     ir_kind = ir_unit.get("ir_kind", "")
 
     if ir_kind == "lexicon_entry":
-        return normalize_lexicon_entry(ir_unit)
+        return normalize_lexicon_entry(ir_unit, variant_registry=variant_registry)
     elif ir_kind == "index_mapping":
         return normalize_index_mapping(ir_unit)
     else:
         logger.warning(f"Unsupported ir_kind for normalization: {ir_kind}")
         return None
+
+
+def _load_ir_units(input_paths: list[Path]) -> list[tuple[Path, int, dict[str, Any]]]:
+    units: list[tuple[Path, int, dict[str, Any]]] = []
+    for input_path in input_paths:
+        if not input_path.exists():
+            logger.warning(f"Input file not found: {input_path}")
+            continue
+        with open(input_path, "r", encoding="utf-8") as in_f:
+            for line_num, line in enumerate(in_f, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                units.append((input_path, line_num, json.loads(line)))
+    return units
 
 
 def process_ir_files(
@@ -190,48 +240,56 @@ def process_ir_files(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(output_path, "w", encoding="utf-8") as out_f:
+    if verbose:
         for input_path in input_paths:
-            if not input_path.exists():
-                logger.warning(f"Input file not found: {input_path}")
-                continue
+            logger.info(f"Processing: {input_path}")
 
-            if verbose:
-                logger.info(f"Processing: {input_path}")
+    try:
+        loaded_units = _load_ir_units(input_paths)
+    except json.JSONDecodeError as exc:
+        logger.warning(f"Invalid JSON while loading IR units: {exc}")
+        stats["errors"] += 1
+        return stats
 
-            with open(input_path, "r", encoding="utf-8") as in_f:
-                for line_num, line in enumerate(in_f, 1):
-                    line = line.strip()
-                    if not line:
-                        continue
+    variant_registry = LexiconVariantRegistry()
+    for _input_path, _line_num, ir_unit in loaded_units:
+        if ir_unit.get("ir_kind") != "lexicon_entry":
+            continue
+        try:
+            variant_registry.register_source_attested(ir_unit)
+        except LexicalReviewValidationError as exc:
+            logger.warning(f"Error registering source-attested forms: {exc}")
+            stats["errors"] += 1
+            return stats
 
-                    try:
-                        ir_unit = json.loads(line)
-                        stats["ir_units_read"] += 1
+    with open(output_path, "w", encoding="utf-8") as out_f:
+        for input_path, line_num, ir_unit in loaded_units:
+            try:
+                stats["ir_units_read"] += 1
 
-                        normalized = normalize_ir_unit(ir_unit)
-                        if normalized is None:
-                            stats["skipped"] += 1
-                            continue
+                normalized = normalize_ir_unit(ir_unit, variant_registry=variant_registry)
+                if normalized is None:
+                    stats["skipped"] += 1
+                    continue
 
-                        out_f.write(
-                            json.dumps(normalized.to_dict(), ensure_ascii=False) + "\n"
-                        )
+                out_f.write(
+                    json.dumps(normalized.to_dict(), ensure_ascii=False) + "\n"
+                )
 
-                        if normalized.ir_kind == "lexicon_entry":
-                            stats["lexicon_entries_normalized"] += 1
-                        elif normalized.ir_kind == "index_mapping":
-                            stats["index_mappings_normalized"] += 1
+                if normalized.ir_kind == "lexicon_entry":
+                    stats["lexicon_entries_normalized"] += 1
+                elif normalized.ir_kind == "index_mapping":
+                    stats["index_mappings_normalized"] += 1
 
-                    except json.JSONDecodeError as e:
-                        logger.warning(
-                            f"Invalid JSON at {input_path}:{line_num}: {e}"
-                        )
-                        stats["errors"] += 1
-                    except Exception as e:
-                        logger.warning(
-                            f"Error normalizing {input_path}:{line_num}: {e}"
-                        )
-                        stats["errors"] += 1
+            except LexicalReviewValidationError as exc:
+                logger.warning(
+                    f"Error normalizing {input_path}:{line_num}: {exc}"
+                )
+                stats["errors"] += 1
+            except Exception as exc:
+                logger.warning(
+                    f"Error normalizing {input_path}:{line_num}: {exc}"
+                )
+                stats["errors"] += 1
 
     return stats

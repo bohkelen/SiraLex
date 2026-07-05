@@ -417,6 +417,30 @@ No slice authorizes work from another slice without explicit dependency completi
 
 ---
 
+## Health Retrieval Ordering Policy (7N2A4E)
+
+This policy applies only after 7N2A4B and 7N2A4E. It does not authorize mapping creation in earlier slices.
+
+```text
+Health retrieval ordering is deterministic and does not express semantic
+superiority.
+
+hôpital:
+1. dándaso
+2. ndándadiya
+3. ndándayoro
+
+clinique:
+1. ndándadiya
+2. ndándayoro
+
+centre de santé:
+1. ndándadiya
+2. ndándayoro
+```
+
+---
+
 ## Required Future Documentation Patch
 
 Do not modify existing documents in this task. A later documentation-only patch must correct any language that treats additive `hôpital` mapping as optional.

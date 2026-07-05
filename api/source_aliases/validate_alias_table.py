@@ -27,6 +27,7 @@ ALLOWED_CANDIDATE_TYPES = {
     "french_plural_singular_alias",
     "french_gender_alias",
     "hyphenation_or_compound_alias",
+    "french_common_form_alias",
 }
 REQUIRED_FIELDS = {
     "schema_version",

@@ -87,6 +87,11 @@ Allowed v1 candidate types:
 - `french_plural_singular_alias`
 - `french_gender_alias`
 - `hyphenation_or_compound_alias`
+- `french_common_form_alias`
+
+`french_common_form_alias` means a reviewed informal or common French form that
+copies an existing canonical French source posting exactly. It does not create a
+new index mapping, lexical record, or posting-order change.
 
 The source alias table MUST NOT represent:
 

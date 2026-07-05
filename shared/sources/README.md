@@ -7,6 +7,7 @@ See `shared/specs/source-registry.md` for field definitions and requirements.
 ## Files
 
 - `malipense.yaml` — Mali-pense / Malidaba French → Maninka dictionary (Phase 1 primary source)
+- `siralex_lexical_review.yaml` — SiraLex owner-reviewed lexical additions (Phase 7N2A manual source profile)
 
 ## Adding a new source
 
