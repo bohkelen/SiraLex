@@ -364,6 +364,39 @@ def synthetic_owner_index_mapping_record(
     }
 
 
+def competing_owner_like_index_mapping_record(ir_id: str = "idx-owner-competing") -> dict:
+    return {
+        "ir_id": ir_id,
+        "ir_kind": "index_mapping",
+        "source_id": "src_malipense",
+        "norm_version": "norm_v3",
+        "preferred_form": "evidence-clinique",
+        "variant_forms": ["evidence-clinique"],
+        "search_keys": {
+            "casefold": ["evidence-clinique"],
+            "diacritics_insensitive": ["evidence-clinique"],
+            "punct_stripped": ["evidence-clinique"],
+            "nospace": ["evidenceclinique"],
+        },
+        "display": {
+            "source_term": "evidence-clinique",
+            "source_lang": "fr",
+            "target_entries": [
+                {
+                    "lexicon_url": "https://www.mali-pense.net/emk/lexicon/fake.htm",
+                    "anchor": "fake-owner-anchor-1",
+                    "display_text": "ndándayoro",
+                },
+                {
+                    "lexicon_url": "https://www.mali-pense.net/emk/lexicon/fake.htm",
+                    "anchor": "fake-owner-anchor-2",
+                    "display_text": "ndándadiya",
+                },
+            ],
+        },
+    }
+
+
 def lookup_record(records: list[dict], ir_id: str) -> dict:
     for record in records:
         if record.get("ir_id") == ir_id:
@@ -488,6 +521,48 @@ def test_owner_reviewed_target_generates_without_synthetic_index_mapping(tmp_pat
         },
     ]
     assert report["owner_lexical_input"]["path"] == str(owner_ir_path)
+
+
+def test_owner_target_pointer_precedence_over_matching_index_mapping(tmp_path: Path):
+    owner_rows = owner_raw_rows_health()
+    owner_ir_path = write_owner_lexical_ir(tmp_path / "owner_ir.jsonl", owner_rows)
+    row = owner_adapter_row("clinique")
+    row["supporting_evidence_ir_ids"] = [
+        "a9c7d82decee9191",
+        "fefe9b063e05ed11",
+        "idx-owner-competing",
+    ]
+    records_path, index_path, supplements_path = make_fixture(
+        tmp_path,
+        [row],
+        records=[
+            *records_with_owner_targets(owner_rows),
+            competing_owner_like_index_mapping_record(),
+        ],
+    )
+
+    generated_records, _ = generate_supplement_records(
+        supplements_path,
+        records_path,
+        index_path,
+        owner_lexical_ir_path=owner_ir_path,
+    )
+    target_entries = generated_records[0]["display"]["target_entries"]
+    assert target_entries == [
+        {
+            "lexicon_url": "siralex://lexical-review/7n2a/ndandayoro",
+            "anchor": "7n2a_ndandayoro_v1",
+            "display_text": "ndándayoro",
+        },
+        {
+            "lexicon_url": "siralex://lexical-review/7n2a/ndandadiya",
+            "anchor": "7n2a_ndandadiya_v1",
+            "display_text": "ndándadiya",
+        },
+    ]
+    for entry in target_entries:
+        assert not entry["anchor"].startswith("fake-owner-anchor")
+        assert "mali-pense.net" not in entry["lexicon_url"]
 
 
 def test_missing_owner_lexical_ir_fails_when_owner_evidence_required(tmp_path: Path):
@@ -644,6 +719,26 @@ def test_owner_adapter_merge_preserves_order_and_no_duplicates(tmp_path: Path):
     generated_id = report["generated_supplement_records"][0]["generated_ir_id"]
     assert merged_posting == [generated_id]
     assert len(merged_posting) == len(set(merged_posting))
+    assert report["owner_lexical_input"]["path"] == str(owner_ir_path)
+    assert report["owner_lexical_input"]["row_count"] == 2
+    assert report["owner_reviewed_target_ids"] == sorted(HEALTH_TARGET_IDS)
+
+
+def test_merge_report_omits_owner_metadata_when_owner_path_unused(tmp_path: Path):
+    row = source_attested_row("clinique")
+    records_path, index_path, supplements_path = make_fixture(
+        tmp_path,
+        [row],
+        records=base_records(),
+    )
+    _, report = merge_supplements_into_search_index(
+        supplement_table_path=supplements_path,
+        records_path=records_path,
+        baseline_search_index_path=index_path,
+        baseline_bundle_dir=make_baseline_bundle_dir(tmp_path),
+    )
+    assert "owner_lexical_input" not in report
+    assert "owner_reviewed_target_ids" not in report
 
 
 def test_valid_new_source_mapping_passes_validation(tmp_path: Path):

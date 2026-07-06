@@ -311,6 +311,24 @@ def merge_supplements_into_search_index(
         "non_applied_supplement_rows": non_applied_rows,
         **summary,
     }
+    owner_reviewed_target_ids = generation_report.get("owner_reviewed_target_ids")
+    if isinstance(owner_reviewed_target_ids, list):
+        normalized_owner_ids = sorted(
+            {
+                item
+                for item in owner_reviewed_target_ids
+                if isinstance(item, str) and item
+            }
+        )
+        if normalized_owner_ids:
+            owner_lexical_input = generation_report.get("owner_lexical_input")
+            if isinstance(owner_lexical_input, dict):
+                report["owner_lexical_input"] = {
+                    "path": owner_lexical_input.get("path"),
+                    "sha256": owner_lexical_input.get("sha256"),
+                    "row_count": owner_lexical_input.get("row_count"),
+                }
+            report["owner_reviewed_target_ids"] = normalized_owner_ids
     return serialize_index(merged_index), report
 
 

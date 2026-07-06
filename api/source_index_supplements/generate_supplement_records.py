@@ -13,6 +13,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "shared"))
 
 from normalization.norm_v3 import compute_search_keys
+from ir.lexical_review import SIRALEX_LEXICAL_REVIEW_SOURCE_ID
 
 from .validate_supplements import (
     APPLICABLE_STATUS,
@@ -140,19 +141,26 @@ def build_target_entries(
     entries: list[dict[str, str]] = []
     for target_ir_id, target_form in zip(row.target_ir_ids, row.target_forms, strict=True):
         target_record = records_by_id[target_ir_id]
+        if target_record.get("source_id") == SIRALEX_LEXICAL_REVIEW_SOURCE_ID:
+            # Owner-reviewed lexical targets must resolve through the validated owner adapter.
+            owner_entry = _target_entry_from_owner_adapter(
+                row,
+                target_ir_id=target_ir_id,
+                target_form=target_form,
+                target_record=target_record,
+                owner_lexical_input=owner_lexical_input,
+            )
+            if owner_entry is not None:
+                entries.append(owner_entry)
+                continue
+            raise SupplementGenerationError(
+                f"{row.supplement_id}: owner-reviewed target {target_ir_id} requires "
+                "validated owner lexical evidence"
+            )
+
         evidence_entry = _target_entry_from_evidence(row, records_by_id, target_form)
         if evidence_entry:
             entries.append(evidence_entry)
-            continue
-        owner_entry = _target_entry_from_owner_adapter(
-            row,
-            target_ir_id=target_ir_id,
-            target_form=target_form,
-            target_record=target_record,
-            owner_lexical_input=owner_lexical_input,
-        )
-        if owner_entry is not None:
-            entries.append(owner_entry)
             continue
         raise SupplementGenerationError(
             f"{row.supplement_id}: no supporting index_mapping target_entry found "
