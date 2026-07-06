@@ -1,5 +1,12 @@
 # Phase 7N2A4E0 Health Source-Mapping Readiness Audit
 
+Correction notice:
+The original 7N2A4E0 report incorrectly identified the existing French
+place-path target as ndándadiya (fefe9b063e05ed11). The verified preserved
+base-path target is díya (de6fb406453616e3). This correction reinforces the
+existing prohibition on routing place or location to either approved
+health-institution record.
+
 ## 1) Exact current supplement-table schema
 
 Authoritative table path:
@@ -225,13 +232,18 @@ From `shared/source_index_supplements/source_index_supplements_v1.jsonl`:
 
 Observed behavior:
 
-- `place` already exists as a source index key in base IR and maps to `fefe9b063e05ed11` (`ndándadiya`).
+- `place` already exists in provisioned base IR as index mapping `96b72ff71179d689`.
+- The existing base `place` posting includes `díya` via `de6fb406453616e3` (alongside other non-health place senses).
+- `fefe9b063e05ed11` (`ndándadiya`) is not in the existing `place` posting.
+- `a9c7d82decee9191` (`ndándayoro`) is not in the existing `place` posting.
 - No supplement rows currently mention `yoro`, `place`, or `location`.
 - No source index key currently found for `yoro` or `location`.
 
 Boundary implication:
 
-- Existing `place -> ndándadiya` mapping must remain unchanged in future health supplement slices.
+- Existing `place -> díya` behavior remains unchanged.
+- No 7N2A mapping may route `place` or `location` to `ndándayoro` or `ndándadiya`.
+- Standalone `yoro` remains prohibited from lexical records, target variants, source aliases, source-index supplements, and all 7N2A retrieval paths.
 
 ## 10) Proposed future rows (design only; not inserted in 7N2A4E0)
 
@@ -280,7 +292,8 @@ In-scope for 7N2A4E1:
 Out-of-scope for 7N2A4E1:
 
 - Any changes to normalization/enrichment lexical record semantics.
-- Any changes to existing `place -> ndándadiya` behavior.
+- Any changes to existing `place -> díya` behavior.
+- No 7N2A mapping may route `place` or `location` to `ndándayoro` or `ndándadiya`.
 - Any introduction of `yoro` or `location` source keys without explicit approval.
 
 ## 12) Readiness conclusion
