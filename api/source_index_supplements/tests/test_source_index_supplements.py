@@ -21,6 +21,13 @@ from source_index_supplements.validate_supplements import (
     validate_supplement_table,
 )
 
+HEALTH_SUPPLEMENT_TERMS = {"hôpital", "clinique", "centre de santé"}
+HEALTH_TARGET_IDS = ["a9c7d82decee9191", "fefe9b063e05ed11"]
+HOPITAL_BASE_TARGET_ID = "71e323e2dafa590f"
+PLACE_MAPPING_ID = "96b72ff71179d689"
+PLACE_PRESERVED_TARGET_ID = "de6fb406453616e3"
+HEALTH_EVIDENCE_INDEX_IDS = ["7e95a0d4f7f80731", "1ed4f7a94fdba41f"]
+
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -225,6 +232,230 @@ def expected_generated_record(row: dict, records: list[dict] | None = None) -> d
         supplement_as_row(row),
         {record["ir_id"]: record for record in records or base_records()},
     )
+
+
+def load_owner_lexical_rows(repo_root: Path) -> dict[str, dict]:
+    owner_path = repo_root / "data/ir/siralex_owner_lexical_v1.jsonl"
+    rows = {}
+    for row in read_jsonl(owner_path):
+        rows[row["ir_id"]] = row
+    return rows
+
+
+def minimal_owner_lexicon_record(owner_row: dict) -> dict:
+    headword = owner_row["fields_raw"]["headword_latin"]
+    return {
+        "ir_id": owner_row["ir_id"],
+        "ir_kind": "lexicon_entry",
+        "source_id": owner_row["source_id"],
+        "norm_version": "norm_v3",
+        "preferred_form": headword,
+        "variant_forms": [headword],
+        "search_keys": {
+            "casefold": [headword],
+            "diacritics_insensitive": [headword],
+            "punct_stripped": [headword],
+            "nospace": [headword],
+        },
+        "display": {
+            "headword_latin": headword,
+            "anchor_names": [headword],
+            "senses": owner_row.get("fields_raw", {}).get("senses", []),
+        },
+    }
+
+
+def owner_evidence_index_mapping(ir_id: str, source_term: str, target_form: str, anchor: str) -> dict:
+    return {
+        "ir_id": ir_id,
+        "ir_kind": "index_mapping",
+        "source_id": "src_siralex_lexical_review",
+        "norm_version": "norm_v3",
+        "preferred_form": source_term,
+        "variant_forms": [source_term],
+        "search_keys": {
+            "casefold": [source_term],
+            "diacritics_insensitive": [source_term],
+            "punct_stripped": [source_term],
+            "nospace": [source_term],
+        },
+        "display": {
+            "source_term": source_term,
+            "source_lang": "fr",
+            "target_entries": [
+                {
+                    "lexicon_url": "siralex://lexical-review/7n2a",
+                    "anchor": anchor,
+                    "display_text": target_form,
+                }
+            ],
+        },
+    }
+
+
+def lookup_record(records: list[dict], ir_id: str) -> dict:
+    for record in records:
+        if record.get("ir_id") == ir_id:
+            return record
+    raise AssertionError(f"Record {ir_id} not found")
+
+
+def source_posting(index_rows: list[dict], source_term: str) -> list[str]:
+    return lookup(index_rows, source_term)
+
+
+def legacy_phase7b_phase7d_rows(all_rows: list[dict]) -> list[dict]:
+    return [row for row in all_rows if row.get("supplement_id", "").startswith(("src_supp_phase7b_", "src_supp_phase7d_"))]
+
+
+def augmented_phase7d_fixture(tmp_path: Path) -> tuple[Path, Path, Path, list[dict]]:
+    repo_root = Path(__file__).resolve().parents[3]
+    phase7d_bundle = repo_root / "web/public/bundle_full_20260606_6b8b401a"
+    supplements_path = repo_root / "shared/source_index_supplements/source_index_supplements_v1.jsonl"
+    owner_rows = load_owner_lexical_rows(repo_root)
+
+    base_records = read_jsonl(phase7d_bundle / "records.jsonl")
+    base_index = read_jsonl(phase7d_bundle / "search_index.jsonl")
+    supplements = read_jsonl(supplements_path)
+
+    augmented_records = [
+        *base_records,
+        minimal_owner_lexicon_record(owner_rows["a9c7d82decee9191"]),
+        minimal_owner_lexicon_record(owner_rows["fefe9b063e05ed11"]),
+        owner_evidence_index_mapping(
+            ir_id=HEALTH_EVIDENCE_INDEX_IDS[0],
+            source_term="hôpital (owner-reviewed ndándayoro evidence)",
+            target_form="ndándayoro",
+            anchor="7n2a_ndandayoro_v1",
+        ),
+        owner_evidence_index_mapping(
+            ir_id=HEALTH_EVIDENCE_INDEX_IDS[1],
+            source_term="hôpital (owner-reviewed ndándadiya evidence)",
+            target_form="ndándadiya",
+            anchor="7n2a_ndandadiya_v1",
+        ),
+    ]
+
+    records_path = tmp_path / "records.jsonl"
+    index_path = tmp_path / "search_index.jsonl"
+    supplements_tmp_path = tmp_path / "supplements.jsonl"
+    write_jsonl(records_path, augmented_records)
+    write_jsonl(index_path, base_index)
+    write_jsonl(supplements_tmp_path, supplements)
+    return records_path, index_path, supplements_tmp_path, supplements
+
+
+def test_tracked_health_rows_validate_and_merge_with_preserved_place_boundary(tmp_path: Path):
+    repo_root = Path(__file__).resolve().parents[3]
+    records_path, index_path, supplements_path, supplements = augmented_phase7d_fixture(tmp_path)
+
+    validation = validate_supplement_table(
+        supplements_path,
+        records_path,
+        index_path,
+        defer_index_conflicts=True,
+    )
+    assert validation.summary["approved_supplement_count"] >= 3
+
+    health_rows = [row for row in supplements if row.get("source_term") in HEALTH_SUPPLEMENT_TERMS]
+    assert {row["source_term"] for row in health_rows} == HEALTH_SUPPLEMENT_TERMS
+    assert len(health_rows) == 3
+    for row in health_rows:
+        assert row["status"] == "approved"
+        assert row["reviewer"] == "project owner / native-speaker linguistic authority"
+        assert row["reviewed_at"] == "2026-07-05"
+        assert row["source_norm_version"] == "norm_v3"
+        assert row["broad_mapping"] is False
+        assert row["broad_mapping_rationale"] == ""
+        assert row["target_ir_ids"] == HEALTH_TARGET_IDS
+        assert row["target_forms"] == ["ndándayoro", "ndándadiya"]
+
+    by_term = {row["source_term"]: row for row in health_rows}
+    assert by_term["hôpital"]["supplement_mode"] == "additive_source_mapping"
+    assert by_term["hôpital"]["candidate_type"] == "incomplete_source_mapping"
+    assert HOPITAL_BASE_TARGET_ID not in by_term["hôpital"]["target_ir_ids"]
+    assert "place" not in {row["source_term"] for row in supplements}
+    assert "location" not in {row["source_term"] for row in supplements}
+    assert "yoro" not in {row["source_term"] for row in supplements}
+
+    baseline_rows = read_jsonl(index_path)
+    assert source_posting(baseline_rows, "hôpital") == ["61843e6630c1fbae"]
+    assert source_posting(baseline_rows, "clinique") == []
+    assert source_posting(baseline_rows, "centre de santé") == []
+
+    merged_rows, report = merge_supplements_into_search_index(
+        supplement_table_path=supplements_path,
+        records_path=records_path,
+        baseline_search_index_path=index_path,
+        baseline_bundle_dir=repo_root / "web/public/bundle_full_20260606_6b8b401a",
+    )
+    merged_lookup = {(row["key_type"], row["key"]): row["ir_ids"] for row in merged_rows}
+    generated_ids = {
+        item["source_term"]: item["generated_ir_id"]
+        for item in report["generated_supplement_records"]
+    }
+    assert generated_ids.keys() >= HEALTH_SUPPLEMENT_TERMS
+
+    assert source_posting(merged_rows, "hôpital") == [
+        "61843e6630c1fbae",
+        generated_ids["hôpital"],
+    ]
+    assert source_posting(merged_rows, "clinique") == [generated_ids["clinique"]]
+    assert source_posting(merged_rows, "centre de santé") == [generated_ids["centre de santé"]]
+
+    generated_records = {
+        record["ir_id"]: record
+        for record in generate_supplement_records(supplements_path, records_path, index_path)[0]
+    }
+    hopital_targets = [
+        target["display_text"]
+        for target in generated_records[generated_ids["hôpital"]]["display"]["target_entries"]
+    ]
+    assert hopital_targets == ["ndándayoro", "ndándadiya"]
+    clinique_targets = [
+        target["display_text"]
+        for target in generated_records[generated_ids["clinique"]]["display"]["target_entries"]
+    ]
+    centre_targets = [
+        target["display_text"]
+        for target in generated_records[generated_ids["centre de santé"]]["display"]["target_entries"]
+    ]
+    assert clinique_targets == ["ndándayoro", "ndándadiya"]
+    assert centre_targets == ["ndándayoro", "ndándadiya"]
+
+    for row in merged_rows:
+        assert len(row["ir_ids"]) == len(set(row["ir_ids"]))
+
+    assert source_posting(merged_rows, "location") == []
+    assert source_posting(merged_rows, "yoro") == []
+
+    place_posting = source_posting(merged_rows, "place")
+    assert place_posting == [PLACE_MAPPING_ID]
+    place_record = lookup_record(read_jsonl(records_path), PLACE_MAPPING_ID)
+    place_target_anchors = {
+        entry.get("anchor") for entry in place_record.get("display", {}).get("target_entries", [])
+    }
+    assert "e2782" in place_target_anchors
+
+    lexicon_by_source_record = {}
+    for lex_row in read_jsonl(repo_root / "data/ir/malipense_lexicon_v3.jsonl"):
+        if lex_row.get("ir_kind") != "lexicon_entry":
+            continue
+        locator = lex_row.get("record_locator", {})
+        source_record_id = locator.get("source_record_id")
+        if isinstance(source_record_id, str):
+            lexicon_by_source_record[source_record_id] = lex_row["ir_id"]
+    resolved_place_targets = {
+        lexicon_by_source_record.get(anchor)
+        for anchor in place_target_anchors
+        if isinstance(anchor, str)
+    }
+    assert PLACE_PRESERVED_TARGET_ID in resolved_place_targets
+    assert "a9c7d82decee9191" not in resolved_place_targets
+    assert "fefe9b063e05ed11" not in resolved_place_targets
+
+    assert report["unexpected_changes"] == []
+    assert report["target_side_changed_key_list"] == []
 
 
 def test_valid_new_source_mapping_passes_validation(tmp_path: Path):
@@ -659,14 +890,17 @@ def test_deterministic_generated_id_collision_with_unrelated_record_fails(tmp_pa
         generate_supplement_records(supplements_path, records_path, index_path)
 
 
-def test_cumulative_phase7b_phase7d_replay_matches_current_bundle_states():
+def test_cumulative_phase7b_phase7d_replay_matches_current_bundle_states(tmp_path: Path):
     repo_root = Path(__file__).resolve().parents[3]
     supplements = repo_root / "shared/source_index_supplements/source_index_supplements_v1.jsonl"
     phase7b_bundle = repo_root / "web/public/bundle_full_20260603_d0e4f812"
     phase7d_bundle = repo_root / "web/public/bundle_full_20260606_6b8b401a"
+    scoped_rows = legacy_phase7b_phase7d_rows(read_jsonl(supplements))
+    scoped_supplements = tmp_path / "phase7b_phase7d_replay_supplements.jsonl"
+    write_jsonl(scoped_supplements, scoped_rows)
 
     phase7b_rows, phase7b_report = merge_supplements_into_search_index(
-        supplement_table_path=supplements,
+        supplement_table_path=scoped_supplements,
         records_path=phase7b_bundle / "records.jsonl",
         baseline_search_index_path=phase7b_bundle / "search_index.jsonl",
         baseline_bundle_dir=phase7b_bundle,
@@ -689,7 +923,7 @@ def test_cumulative_phase7b_phase7d_replay_matches_current_bundle_states():
     assert len(phase7b_rows) > 0
 
     phase7d_rows, phase7d_report = merge_supplements_into_search_index(
-        supplement_table_path=supplements,
+        supplement_table_path=scoped_supplements,
         records_path=phase7d_bundle / "records.jsonl",
         baseline_search_index_path=phase7d_bundle / "search_index.jsonl",
         baseline_bundle_dir=phase7d_bundle,
