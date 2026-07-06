@@ -10,6 +10,13 @@ This slice inserts exactly three approved source-index supplement rows for:
 
 No lexical normalization/enrichment semantics, aliases, target variants, runtime code, bundles, packages, catalog files, or release artifacts were modified.
 
+## Reproducibility note (R0)
+
+Phase `7N2A4E1-R0` adds an explicit owner-reviewed evidence adapter so health
+target evidence can be generated from validated owner lexical IR locators
+without fixture-only index-mapping records. Production supplement rows are
+unchanged in R0; this report remains the insertion record for E1.
+
 ## Inserted rows
 
 ```json
@@ -37,7 +44,7 @@ All generated artifacts were written under `/tmp/phase7n2a4e1`.
 ```bash
 python3 - <<'PY'
 # creates /tmp/phase7n2a4e1/records_augmented.jsonl and /tmp/phase7n2a4e1/search_index_base.jsonl
-# from web/public/bundle_full_20260606_6b8b401a plus owner records and temporary evidence mappings
+# from web/public/bundle_full_20260606_6b8b401a plus owner records
 PY
 ```
 

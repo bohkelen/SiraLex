@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from dataclasses import dataclass, field
@@ -12,7 +13,12 @@ from typing import Any
 # Add shared to path for normalization imports, matching the normalizer package.
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "shared"))
 
-from normalization.norm_v3 import compute_search_keys
+from normalization.norm_v3 import compute_search_keys, normalize_nfc
+from ir.lexical_review import (
+    SIRALEX_LEXICAL_REVIEW_SOURCE_ID,
+    validate_lexicon_entry_evidence,
+    validate_manual_lexical_review_provenance,
+)
 
 SCHEMA_VERSION = "source_index_supplement_v1"
 SOURCE_LANG = "fr"
@@ -59,6 +65,14 @@ APPROVED_REQUIRED_FIELDS = {"reviewer", "reviewed_at"}
 
 class SupplementValidationError(ValueError):
     """Raised when a source-index supplement table is invalid."""
+
+
+@dataclass(frozen=True)
+class OwnerLexicalInput:
+    path: Path
+    sha256: str
+    row_count: int
+    rows_by_id: dict[str, dict[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -130,6 +144,8 @@ class SupplementValidationResult:
     supplement_table_versions: list[str]
     schema_versions: list[str]
     summary: dict[str, int] = field(default_factory=dict)
+    owner_lexical_input: OwnerLexicalInput | None = None
+    owner_reviewed_target_ids: list[str] = field(default_factory=list)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -149,6 +165,70 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
                 raise SupplementValidationError(f"{path}:{line_number}: expected JSON object")
             objects.append(payload)
     return objects
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_owner_lexical_input(path: Path) -> OwnerLexicalInput:
+    rows_by_id: dict[str, dict[str, Any]] = {}
+    row_count = 0
+    with path.open("r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, 1):
+            text = line.strip()
+            if not text:
+                continue
+            row_count += 1
+            try:
+                row = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise SupplementValidationError(
+                    f"{path}:{line_number}: invalid owner lexical JSON: {exc}"
+                ) from exc
+            if not isinstance(row, dict):
+                raise SupplementValidationError(
+                    f"{path}:{line_number}: expected JSON object"
+                )
+            ir_id = row.get("ir_id")
+            if not isinstance(ir_id, str) or not ir_id:
+                raise SupplementValidationError(f"{path}:{line_number}: missing owner ir_id")
+            if ir_id in rows_by_id:
+                raise SupplementValidationError(
+                    f"{path}:{line_number}: duplicate owner ir_id {ir_id}"
+                )
+            if row.get("ir_kind") != "lexicon_entry":
+                raise SupplementValidationError(
+                    f"{path}:{line_number}: owner row {ir_id} must be lexicon_entry"
+                )
+            if row.get("source_id") != SIRALEX_LEXICAL_REVIEW_SOURCE_ID:
+                raise SupplementValidationError(
+                    f"{path}:{line_number}: owner row {ir_id} must have "
+                    f"source_id={SIRALEX_LEXICAL_REVIEW_SOURCE_ID}"
+                )
+            try:
+                validate_lexicon_entry_evidence(
+                    row,
+                    line_context=f"{path}:{line_number}: ",
+                )
+                validate_manual_lexical_review_provenance(
+                    row,
+                    line_context=f"{path}:{line_number}: ",
+                )
+            except ValueError as exc:
+                raise SupplementValidationError(str(exc)) from exc
+            rows_by_id[ir_id] = row
+
+    return OwnerLexicalInput(
+        path=path,
+        sha256=file_sha256(path),
+        row_count=row_count,
+        rows_by_id=rows_by_id,
+    )
 
 
 def load_records_by_id(records_path: Path) -> dict[str, dict[str, Any]]:
@@ -337,7 +417,90 @@ def _validate_target_notes(row: SupplementRow) -> None:
                 )
 
 
-def validate_row_shape(row: SupplementRow, records_by_id: dict[str, dict[str, Any]]) -> None:
+def validate_owner_target_evidence(
+    row: SupplementRow,
+    target_ir_id: str,
+    target_form: str,
+    target_record: dict[str, Any],
+    owner_lexical_input: OwnerLexicalInput | None,
+) -> dict[str, Any] | None:
+    if target_record.get("source_id") != SIRALEX_LEXICAL_REVIEW_SOURCE_ID:
+        return None
+
+    if owner_lexical_input is None:
+        raise SupplementValidationError(
+            f"line {row.line_number}: target {target_ir_id} requires explicit --owner-lexical-ir"
+        )
+    if target_ir_id not in row.row["supporting_evidence_ir_ids"]:
+        raise SupplementValidationError(
+            f"line {row.line_number}: owner target {target_ir_id} must appear in "
+            "supporting_evidence_ir_ids"
+        )
+
+    owner_row = owner_lexical_input.rows_by_id.get(target_ir_id)
+    if owner_row is None:
+        raise SupplementValidationError(
+            f"line {row.line_number}: owner target {target_ir_id} not found in "
+            f"{owner_lexical_input.path}"
+        )
+    if owner_row.get("ir_kind") != "lexicon_entry":
+        raise SupplementValidationError(
+            f"line {row.line_number}: owner row {target_ir_id} must be lexicon_entry"
+        )
+    if owner_row.get("source_id") != SIRALEX_LEXICAL_REVIEW_SOURCE_ID:
+        raise SupplementValidationError(
+            f"line {row.line_number}: owner row {target_ir_id} must have "
+            f"source_id={SIRALEX_LEXICAL_REVIEW_SOURCE_ID}"
+        )
+
+    try:
+        validate_lexicon_entry_evidence(
+            owner_row,
+            line_context=f"line {row.line_number}: owner row {target_ir_id}: ",
+        )
+        validate_manual_lexical_review_provenance(
+            owner_row,
+            line_context=f"line {row.line_number}: owner row {target_ir_id}: ",
+        )
+    except ValueError as exc:
+        raise SupplementValidationError(str(exc)) from exc
+
+    headword = owner_row.get("fields_raw", {}).get("headword_latin")
+    if not isinstance(headword, str) or not headword.strip():
+        raise SupplementValidationError(
+            f"line {row.line_number}: owner row {target_ir_id} missing fields_raw.headword_latin"
+        )
+    if normalize_nfc(headword) != normalize_nfc(target_form):
+        raise SupplementValidationError(
+            f"line {row.line_number}: owner row {target_ir_id} headword_latin does not match "
+            f"target_form {target_form!r} under NFC"
+        )
+
+    record_locator = owner_row.get("record_locator")
+    if not isinstance(record_locator, dict):
+        raise SupplementValidationError(
+            f"line {row.line_number}: owner row {target_ir_id} missing record_locator"
+        )
+    if record_locator.get("kind") != "source_record_id":
+        raise SupplementValidationError(
+            f"line {row.line_number}: owner row {target_ir_id} record_locator.kind must be "
+            "source_record_id"
+        )
+    for field_name in ("url_canonical", "source_record_id"):
+        value = record_locator.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            raise SupplementValidationError(
+                f"line {row.line_number}: owner row {target_ir_id} record_locator.{field_name} "
+                "must be non-empty"
+            )
+    return owner_row
+
+
+def validate_row_shape(
+    row: SupplementRow,
+    records_by_id: dict[str, dict[str, Any]],
+    owner_lexical_input: OwnerLexicalInput | None,
+) -> set[str]:
     missing = sorted(REQUIRED_FIELDS - set(row.row))
     if missing:
         raise SupplementValidationError(f"line {row.line_number}: missing required fields {missing}")
@@ -450,6 +613,19 @@ def validate_row_shape(row: SupplementRow, records_by_id: dict[str, dict[str, An
                 f"line {row.line_number}: target form {target_form!r} is not attested "
                 f"on {target_ir_id}"
             )
+    owner_target_ids: set[str] = set()
+    for target_ir_id, target_form in zip(row.target_ir_ids, row.target_forms, strict=True):
+        target_record = records_by_id[target_ir_id]
+        owner_row = validate_owner_target_evidence(
+            row=row,
+            target_ir_id=target_ir_id,
+            target_form=target_form,
+            target_record=target_record,
+            owner_lexical_input=owner_lexical_input,
+        )
+        if owner_row is not None:
+            owner_target_ids.add(target_ir_id)
+    return owner_target_ids
 
 
 def validate_approved_row_against_index(
@@ -527,13 +703,20 @@ def validate_supplement_table(
     search_index_path: Path,
     *,
     defer_index_conflicts: bool = False,
+    owner_lexical_ir_path: Path | None = None,
 ) -> SupplementValidationResult:
+    owner_lexical_input = (
+        load_owner_lexical_input(owner_lexical_ir_path)
+        if owner_lexical_ir_path is not None
+        else None
+    )
     records_by_id = load_records_by_id(records_path)
     index = load_search_index(search_index_path)
     rows = read_supplement_rows(supplement_table_path)
 
     seen_supplement_ids: set[str] = set()
     outcomes: list[SupplementOutcome] = []
+    owner_reviewed_target_ids: set[str] = set()
 
     schema_versions = sorted({str(row.row.get("schema_version", "")) for row in rows})
     supplement_table_versions = sorted(
@@ -551,7 +734,9 @@ def validate_supplement_table(
             )
         seen_supplement_ids.add(row.supplement_id)
 
-        validate_row_shape(row, records_by_id)
+        owner_reviewed_target_ids.update(
+            validate_row_shape(row, records_by_id, owner_lexical_input)
+        )
         if row.status == APPLICABLE_STATUS:
             outcomes.append(
                 validate_approved_row_against_index(
@@ -567,6 +752,8 @@ def validate_supplement_table(
         supplement_table_versions=supplement_table_versions,
         schema_versions=schema_versions,
         summary=summarize_rows(rows, outcomes),
+        owner_lexical_input=owner_lexical_input,
+        owner_reviewed_target_ids=sorted(owner_reviewed_target_ids),
     )
 
 
@@ -577,7 +764,7 @@ def result_to_report(result: SupplementValidationResult) -> dict[str, Any]:
         else "multiple"
     )
     schema_version = result.schema_versions[0] if len(result.schema_versions) == 1 else "multiple"
-    return {
+    report: dict[str, Any] = {
         "source_index_supplement_tables": [
             {
                 "schema_version": schema_version,
@@ -587,6 +774,14 @@ def result_to_report(result: SupplementValidationResult) -> dict[str, Any]:
         ],
         "supplements": [outcome.to_dict() for outcome in result.outcomes],
     }
+    if result.owner_lexical_input is not None:
+        report["owner_lexical_input"] = {
+            "path": str(result.owner_lexical_input.path),
+            "sha256": result.owner_lexical_input.sha256,
+            "row_count": result.owner_lexical_input.row_count,
+        }
+        report["owner_reviewed_target_ids"] = result.owner_reviewed_target_ids
+    return report
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -594,6 +789,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--supplements", type=Path, required=True, help="Source supplement JSONL table")
     parser.add_argument("--records", type=Path, required=True, help="Bundle records.jsonl")
     parser.add_argument("--search-index", type=Path, required=True, help="Base search_index.jsonl")
+    parser.add_argument(
+        "--owner-lexical-ir",
+        type=Path,
+        default=None,
+        help="Optional owner lexical IR JSONL used for explicit owner-reviewed target evidence",
+    )
     parser.add_argument("--output-report", type=Path, default=None, help="Optional report JSON path")
     parser.add_argument(
         "--defer-index-conflicts",
@@ -611,6 +812,7 @@ def main(argv: list[str] | None = None) -> int:
             args.records,
             args.search_index,
             defer_index_conflicts=args.defer_index_conflicts,
+            owner_lexical_ir_path=args.owner_lexical_ir,
         )
     except SupplementValidationError as exc:
         print(f"Source-index supplement validation FAILED: {exc}", file=sys.stderr)

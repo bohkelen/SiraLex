@@ -138,6 +138,33 @@ generation. Generated records use:
 
 Generated records MUST NOT mutate original records.
 
+### Owner-reviewed evidence adapter (explicit input only)
+
+The default evidence path remains source-attested `index_mapping` evidence.
+
+An explicit secondary evidence adapter is available only when the command is
+given `--owner-lexical-ir PATH`.
+
+This adapter is valid only for targets from
+`source_id == "src_siralex_lexical_review"` and only when all of the following
+hold:
+
+- target `ir_id` exists exactly once in the supplied owner lexical IR;
+- owner row validates with lexical-review evidence/provenance contracts;
+- target `ir_id` appears in both `target_ir_ids` and
+  `supporting_evidence_ir_ids`;
+- NFC(`target_form`) exactly matches NFC(owner `fields_raw.headword_latin`);
+- owner `record_locator.kind == "source_record_id"` with non-empty
+  `url_canonical` and `source_record_id`.
+
+When used, generated `target_entries` are built from the validated owner row:
+
+- `lexicon_url`: owner `record_locator.url_canonical`
+- `anchor`: owner `record_locator.source_record_id`
+- `display_text`: owner `fields_raw.headword_latin`
+
+No automatic owner-file discovery is permitted.
+
 ## Collision handling
 
 Validation MUST reject conflicts by default:
