@@ -1125,7 +1125,10 @@ def test_generated_records_produce_expected_source_search_rows(tmp_path: Path):
 
     assert lookup(index_entries, "poil") == [generated_records[0]["ir_id"]]
     assert lookup(index_entries, "poils") == [generated_records[1]["ir_id"]]
-    assert lookup(index_entries, "tante") == ["idx-tante", generated_records[2]["ir_id"]]
+    # Canonical search-index builder posts lexicographic ir_id order (not first-seen).
+    assert lookup(index_entries, "tante") == sorted(
+        ["idx-tante", generated_records[2]["ir_id"]]
+    )
 
 
 def test_compatibility_merge_only_changes_targeted_source_keys(tmp_path: Path):

@@ -3,7 +3,13 @@ Search index builder: Normalized JSONL → Inverted search index JSONL.
 
 Reads normalized records and materializes a flat inverted index where
 each line maps a directional (key_type, key) pair to an ordered list of
-ir_ids. Posting order preserves first occurrence in normalized record order.
+ir_ids.
+
+Posting collection deduplicates by first occurrence in normalized record
+order. Before serialization, each posting list is sorted lexicographically
+by `ir_id`. That deterministic order matches the frozen Phase 7L / featured
+Phase 7J search-index posting contracts and is independent of record-stream
+order.
 
 This module never mutates normalized records. Output is a separate JSONL
 file that can be used for offline search resolution.
@@ -16,6 +22,7 @@ Output schema (one JSON object per line):
 }
 
 Lines are sorted by (key_type, key) for deterministic output.
+Within each line, ir_ids are sorted lexicographically.
 """
 
 import json
@@ -41,6 +48,15 @@ def directional_key_type(ir_kind: str, key_type: str) -> str | None:
     return None
 
 
+def sort_posting_ir_ids(ir_ids: list[str]) -> list[str]:
+    """
+    Return a deterministic posting list ordered by lexicographic ir_id.
+
+    Deduplication is preserved: callers must pass unique ir_ids.
+    """
+    return sorted(ir_ids)
+
+
 def build_inverted_index(
     normalized_records: list[dict[str, Any]],
 ) -> dict[tuple[str, str], list[str]]:
@@ -52,7 +68,8 @@ def build_inverted_index(
             "ir_id" and "search_keys" fields.
 
     Returns:
-        dict mapping (directional key_type, key) → ordered list of ir_ids
+        dict mapping (directional key_type, key) → ordered list of ir_ids.
+        Posting lists are lexicographically sorted by ir_id.
     """
     index: dict[tuple[str, str], list[str]] = defaultdict(list)
 
@@ -72,13 +89,21 @@ def build_inverted_index(
         for key_type, keys in search_keys.items():
             directional_type = directional_key_type(ir_kind, key_type)
             if directional_type is None:
-                logger.warning("Normalized record %s has unsupported ir_kind=%r, skipping", ir_id, ir_kind)
+                logger.warning(
+                    "Normalized record %s has unsupported ir_kind=%r, skipping",
+                    ir_id,
+                    ir_kind,
+                )
                 break
             for key in keys:
                 if key:  # skip empty keys
                     postings = index[(directional_type, key)]
                     if ir_id not in postings:
                         postings.append(ir_id)
+
+    # Deterministic posting order: lexicographic ir_id within each key.
+    for key in list(index.keys()):
+        index[key] = sort_posting_ir_ids(index[key])
 
     return index
 
@@ -89,12 +114,11 @@ def serialize_index(
     """
     Serialize the inverted index into a sorted list of dicts.
 
-    Each dict has: key, key_type, ir_ids (ordered list).
-    Entries are sorted by (key_type, key) for deterministic output. Posting
-    lists preserve first-seen record order from build_inverted_index.
+    Each dict has: key, key_type, ir_ids (lexicographically ordered list).
+    Entries are sorted by (key_type, key) for deterministic output.
 
     Args:
-        index: inverted index mapping (key_type, key) → ordered list of ir_ids
+        index: inverted index mapping (key_type, key) → list of ir_ids
 
     Returns:
         list of dicts, sorted by (key_type, key)
@@ -104,7 +128,7 @@ def serialize_index(
         entries.append({
             "key": key,
             "key_type": key_type,
-            "ir_ids": list(ir_ids),
+            "ir_ids": sort_posting_ir_ids(list(ir_ids)),
         })
     return entries
 
