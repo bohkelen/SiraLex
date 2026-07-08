@@ -1,0 +1,45 @@
+{
+  "manifest_schema_version": "bundle_manifest_v1",
+  "bundle_id": "bundle_full_20260708_27643bb0",
+  "bundle_type": "full",
+  "bundle_format": "directory",
+  "compression": "none",
+  "record_schema_id": "normalized_v1",
+  "record_schema_version": "1",
+  "rule_versions": {
+    "normalization": "norm_v3"
+  },
+  "search_index_directional": true,
+  "sources": {
+    "included": [
+      "src_malipense"
+    ],
+    "excluded": []
+  },
+  "reconciliation_action": "REPLACE_ALL",
+  "update_mode": "REPLACE_ALL",
+  "build": {
+    "ir_parser_versions": [
+      "malipense_index_v1",
+      "malipense_lexicon_v3"
+    ],
+    "git_commit": "ef40d03c8c926ae9f19d7aa6089c5e02b5c591bd",
+    "record_counts": {
+      "lexicon_entries": 8825,
+      "index_mappings": 10508
+    }
+  },
+  "files": [
+    {
+      "path": "records.jsonl",
+      "byte_length": 15957720,
+      "sha256": "sha256:2c67c3f5446bfbfb078ed60f8d6e073fd0b105b816e714b6e14369c197e75f9e"
+    },
+    {
+      "path": "search_index.jsonl",
+      "byte_length": 10209217,
+      "sha256": "sha256:b2ea152d8f83a0873111058f893e84435e3e0bda2d1f40afbaee0826f040bdd6"
+    }
+  ],
+  "content_sha256": "sha256:27643bb092ff31117a133378db7562080c8b1d0d87fe111f5b83973e15a08484"
+}
