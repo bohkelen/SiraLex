@@ -91,18 +91,35 @@ def _write_jsonl(path: Path, records: list[dict]) -> None:
 def test_manual_provenance_and_derivation_survive_enrichment_unchanged():
     ir_unit = manual_lexical_ir()
     normalized = normalized_manual_record()
-    lookup = {ir_unit["ir_id"]: ir_unit["fields_raw"]}
+    lookup = {
+        ir_unit["ir_id"]: {
+            "fields_raw": ir_unit["fields_raw"],
+            "record_locator": ir_unit["record_locator"],
+            "ir_kind": "lexicon_entry",
+        }
+    }
     enriched = enrich_record(normalized, lookup)
 
     assert enriched["provenance"] == normalized["provenance"]
     assert enriched["derivation"] == normalized["derivation"]
     assert enriched["display"] == ir_unit["fields_raw"]
+    assert enriched["record_locator"]["source_record_id"] == "7n2a_ndandayoro_v1"
+    assert (
+        enriched["provenance"]["source"]["record_pointer"]["url_canonical"]
+        == ir_unit["record_locator"]["url_canonical"]
+    )
 
 
 def test_display_only_gate_passes_for_manual_provenance_enrichment():
     normalized = normalized_manual_record()
     ir_unit = manual_lexical_ir()
-    lookup = {ir_unit["ir_id"]: ir_unit["fields_raw"]}
+    lookup = {
+        ir_unit["ir_id"]: {
+            "fields_raw": ir_unit["fields_raw"],
+            "record_locator": ir_unit["record_locator"],
+            "ir_kind": "lexicon_entry",
+        }
+    }
     enriched = enrich_record(normalized, lookup)
 
     issues = validate_display_only(
@@ -123,7 +140,22 @@ def test_display_only_gate_passes_for_malipense_without_provenance():
         "search_keys": {"casefold": ["dándaso"]},
     }
     ir_fields = {"headword_latin": "dándaso", "senses": [{"gloss_en": "hospital"}]}
-    enriched = enrich_record(normalized, {"malipense-fixture": ir_fields})
+    locator = {
+        "kind": "source_record_id",
+        "url_canonical": "https://www.mali-pense.net/emk/lexicon/d.htm",
+        "source_record_id": "e2533",
+        "anchor_names": ["dándaso"],
+    }
+    enriched = enrich_record(
+        normalized,
+        {
+            "malipense-fixture": {
+                "fields_raw": ir_fields,
+                "record_locator": locator,
+                "ir_kind": "lexicon_entry",
+            }
+        },
+    )
 
     issues = validate_display_only(
         {normalized["ir_id"]: normalized},
@@ -132,6 +164,7 @@ def test_display_only_gate_passes_for_malipense_without_provenance():
     assert issues == []
     assert "provenance" not in enriched
     assert "derivation" not in enriched
+    assert enriched["record_locator"]["source_record_id"] == "e2533"
 
 
 def test_manual_provenance_end_to_end_file_enrichment():
