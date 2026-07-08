@@ -13,6 +13,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 API_ROOT = REPO_ROOT / "api"
 MATRIX_PATH = REPO_ROOT / "shared/search_regression/search_regression_matrix_v1.jsonl"
 MANIFEST_PATH = REPO_ROOT / "shared/search_regression/matrix_manifest_v1.json"
+MATRIX_7N2A_PATH = REPO_ROOT / "shared/search_regression/search_regression_matrix_7n2a_v1.jsonl"
+MANIFEST_7N2A_PATH = REPO_ROOT / "shared/search_regression/matrix_manifest_7n2a_v1.json"
 GOLDEN_PATH = REPO_ROOT / "shared/search_regression/tests/golden_python_replay_v1.json"
 BUNDLE_PATH = REPO_ROOT / "web/public/bundle_full_20260616_phase7j_alias_round2_candidate"
 CATALOG_PATH = REPO_ROOT / "web/public/catalog.json"
@@ -337,3 +339,28 @@ def test_cli_exits_nonzero_on_checksum_mismatch(tmp_path):
     )
     assert proc.returncode == 1
     assert "checksum mismatch" in proc.stderr
+
+
+def test_cli_accepts_additive_matrix_manifest_and_arbitrary_bundle_path(tmp_path):
+    arbitrary_bundle = tmp_path / "future_candidate_bundle_dir"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(CLI_PATH),
+            "--matrix",
+            str(MATRIX_7N2A_PATH),
+            "--manifest",
+            str(MANIFEST_7N2A_PATH),
+            "--bundle",
+            str(arbitrary_bundle),
+            "--output",
+            str(tmp_path / "unused.json"),
+        ],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 1
+    assert "usage:" not in proc.stderr
+    assert "bundle path is not a directory" in proc.stderr

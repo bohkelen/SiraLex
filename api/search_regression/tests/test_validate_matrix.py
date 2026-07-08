@@ -12,6 +12,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 API_ROOT = REPO_ROOT / "api"
 MATRIX_PATH = REPO_ROOT / "shared/search_regression/search_regression_matrix_v1.jsonl"
 MANIFEST_PATH = REPO_ROOT / "shared/search_regression/matrix_manifest_v1.json"
+MATRIX_7N2A_PATH = REPO_ROOT / "shared/search_regression/search_regression_matrix_7n2a_v1.jsonl"
+MANIFEST_7N2A_PATH = REPO_ROOT / "shared/search_regression/matrix_manifest_7n2a_v1.json"
 
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
@@ -56,6 +58,28 @@ def _valid_loader_row(**overrides) -> dict:
         "source_of_expectation": "test",
         "bundle_id": BUNDLE_ID,
         "norm_version": NORM_VERSION,
+        "review_status": "approved",
+    }
+    row.update(overrides)
+    return row
+
+
+def _valid_additive_row(case_id: str = "add_case_001", **overrides) -> dict:
+    row = {
+        "case_id": case_id,
+        "query": "maman",
+        "query_unicode_form": "nfc",
+        "direction": "source_to_target",
+        "expected_result_status": "hit_single",
+        "expected_result_count": 1,
+        "expected_ir_ids": ["e5164efcdf5e6ca4"],
+        "expected_matched_key_type": "casefold",
+        "expected_matched_key": "maman",
+        "expected_deep_ladder": False,
+        "case_family": "source_alias_hit",
+        "source_of_expectation": "phase7n2a_additive_test",
+        "bundle_id": "bundle_full_phase7n2a_recomposed_candidate_tbd",
+        "norm_version": "norm_v3",
         "review_status": "approved",
     }
     row.update(overrides)
@@ -535,3 +559,58 @@ def test_miss_with_nonempty_ir_ids_rejected(manifest):
     )
     errors = validate_case(case, manifest)
     assert any("miss requires empty expected_ir_ids" in error.message for error in errors)
+
+
+def test_legacy_7l_manifest_defaults_to_phase7l_pinned_family():
+    manifest = load_matrix_manifest(MANIFEST_PATH)
+    assert manifest.matrix_family == "phase7l_pinned"
+
+
+def test_missing_required_7l_seed_query_fails_with_pinned_family():
+    manifest = load_matrix_manifest(MANIFEST_PATH)
+    cases = load_matrix_jsonl(MATRIX_PATH)
+    missing_fruit = [case for case in cases if case.query != "fruit"]
+    errors = validate_matrix(missing_fruit, manifest)
+    assert any("missing required seed queries" in error.message for error in errors)
+    assert any("fruit" in error.message for error in errors)
+
+
+def test_additive_7n2a_matrix_validates_without_7l_seed_queries():
+    manifest = load_matrix_manifest(MANIFEST_7N2A_PATH)
+    cases = load_matrix_jsonl(MATRIX_7N2A_PATH)
+    errors = validate_matrix(cases, manifest)
+    assert errors == []
+
+
+def test_additive_7n2a_manifest_case_count_matches_matrix_rows():
+    manifest = load_matrix_manifest(MANIFEST_7N2A_PATH)
+    cases = load_matrix_jsonl(MATRIX_7N2A_PATH)
+    assert manifest.matrix_family == "phase7n2a_additive"
+    assert manifest.case_count == len(cases)
+
+
+def test_manifest_loader_rejects_unknown_matrix_family(tmp_path):
+    _assert_manifest_rejects(
+        tmp_path,
+        _valid_manifest(matrix_family="unknown_family"),
+        "matrix_family",
+    )
+
+
+def test_additive_family_duplicate_case_id_fails_closed():
+    manifest = load_matrix_manifest(MANIFEST_7N2A_PATH)
+    one = SearchRegressionCase(**_valid_additive_row(case_id="dup_case", query="maman"))
+    two = SearchRegressionCase(**_valid_additive_row(case_id="dup_case", query="móbaa"))
+    errors = validate_matrix([one, two], manifest)
+    assert any("duplicate case_id" in error.message for error in errors)
+
+
+def test_additive_family_case_count_mismatch_fails_closed():
+    manifest = replace(load_matrix_manifest(MANIFEST_7N2A_PATH), case_count=3)
+    cases = [
+        SearchRegressionCase(**_valid_additive_row(case_id="add_case_001")),
+        SearchRegressionCase(**_valid_additive_row(case_id="add_case_002", query="hôpital")),
+    ]
+    errors = validate_matrix(cases, manifest)
+    assert any("manifest case_count" in error.message for error in errors)
+    assert any("does not match loaded rows" in error.message for error in errors)

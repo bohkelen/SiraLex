@@ -220,12 +220,24 @@ def validate_matrix(
         seen_case_ids.add(case.case_id)
         seen_queries.add(case.query)
 
-    missing_queries = sorted(SEED_QUERIES - seen_queries)
-    if missing_queries:
+    matrix_family = manifest.matrix_family if manifest is not None else "phase7l_pinned"
+    if matrix_family == "phase7l_pinned":
+        missing_queries = sorted(SEED_QUERIES - seen_queries)
+        if missing_queries:
+            errors.append(
+                ValidationError(
+                    case_id="",
+                    message=f"missing required seed queries: {', '.join(missing_queries)}",
+                )
+            )
+    elif matrix_family == "phase7n2a_additive":
+        # Additive matrices run beside 7L and do not inherit the pinned 7L seed set.
+        pass
+    else:
         errors.append(
             ValidationError(
                 case_id="",
-                message=f"missing required seed queries: {', '.join(missing_queries)}",
+                message=f"unsupported matrix family {matrix_family!r}",
             )
         )
 

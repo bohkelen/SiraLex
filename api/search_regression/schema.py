@@ -1,4 +1,4 @@
-"""Schema and loaders for the Phase 7L search regression matrix."""
+"""Schema and loaders for search regression matrices and manifests."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Any
 
 CASE_SCHEMA_VERSION = "search_regression_case_v1"
 MANIFEST_SCHEMA_VERSION = "search_regression_matrix_manifest_v1"
+MATRIX_FAMILIES = frozenset({"phase7l_pinned", "phase7n2a_additive"})
 
 QUERY_UNICODE_FORMS = frozenset({"nfc", "nfd", "mixed", "not_applicable"})
 DIRECTIONS = frozenset({"source_to_target", "target_to_source"})
@@ -249,6 +250,7 @@ class MatrixManifest:
     search_index_sha256: str
     bundle_content_sha256: str
     case_count: int
+    matrix_family: str = "phase7l_pinned"
     purpose: str | None = None
 
     @classmethod
@@ -278,6 +280,13 @@ class MatrixManifest:
         search_index_sha256 = _manifest_require_string(raw, "search_index_sha256")
         bundle_content_sha256 = _manifest_require_string(raw, "bundle_content_sha256")
         case_count = _manifest_require_int_not_bool(raw, "case_count")
+        matrix_family = _manifest_optional_string(raw, "matrix_family") or "phase7l_pinned"
+        if matrix_family not in MATRIX_FAMILIES:
+            allowed = ", ".join(sorted(MATRIX_FAMILIES))
+            raise _manifest_error(
+                "matrix_family",
+                f"must be one of {{{allowed}}}, got {matrix_family!r}",
+            )
         purpose = _manifest_optional_string(raw, "purpose")
 
         return cls(
@@ -289,6 +298,7 @@ class MatrixManifest:
             search_index_sha256=search_index_sha256,
             bundle_content_sha256=bundle_content_sha256,
             case_count=case_count,
+            matrix_family=matrix_family,
             purpose=purpose,
         )
 
