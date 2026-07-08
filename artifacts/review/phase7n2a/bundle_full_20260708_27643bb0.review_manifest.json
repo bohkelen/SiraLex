@@ -1,0 +1,46 @@
+{
+  "bundle_id": "bundle_full_20260708_27643bb0",
+  "bundle_path_source": "/tmp/phase7n2a4f2r2_acceptance/bundle_full_20260708_27643bb0",
+  "review_zip_path": "artifacts/review/phase7n2a/bundle_full_20260708_27643bb0.review.zip",
+  "bundle_content_sha256": "sha256:27643bb092ff31117a133378db7562080c8b1d0d87fe111f5b83973e15a08484",
+  "records_sha256": "sha256:2c67c3f5446bfbfb078ed60f8d6e073fd0b105b816e714b6e14369c197e75f9e",
+  "search_index_sha256": "sha256:b2ea152d8f83a0873111058f893e84435e3e0bda2d1f40afbaee0826f040bdd6",
+  "zip_sha256": "sha256:ea94111b77130e5930834e6d0a5252c4fe569915a89347e72d7913468a58a078",
+  "created_from_report": "docs/reports/phase7n2a4f2r2_candidate_acceptance_gates_report.md",
+  "acceptance_report_commit": "a7ec5a7f6e6baedb933aa25e1debe88ee6caf239",
+  "acceptance_report_path": "docs/reports/phase7n2a4f2r2_candidate_acceptance_gates_report.md",
+  "accepted_gate_results": {
+    "frozen_7l": {
+      "passed": 13,
+      "failed": 0
+    },
+    "additive_7n2a": {
+      "passed": 8,
+      "failed": 0
+    }
+  },
+  "included_files": [
+    "bundle.manifest.json",
+    "checksums.sha256",
+    "records.jsonl",
+    "search_index.jsonl"
+  ],
+  "excluded_temp_files": [
+    "7l_replay_report.json",
+    "7n2a_replay_report.json",
+    "matrix_manifest_7l_candidate.json",
+    "matrix_manifest_7n2a_candidate.json",
+    "search_regression_matrix_7l_candidate.jsonl",
+    "search_regression_matrix_7n2a_candidate.jsonl",
+    "normalized_7n2a.jsonl",
+    "records_enriched_7n2a.jsonl",
+    "records_with_supplements_7n2a.jsonl",
+    "search_index_base_7n2a.jsonl",
+    "search_index_alias_7n2a.jsonl",
+    "search_index_final_7n2a.jsonl",
+    "source_alias_*.json",
+    "source_supplement_*.json",
+    "stage0_*.json"
+  ],
+  "promotion_status": "review_artifact_only_not_promoted"
+}
