@@ -1,0 +1,11 @@
+{
+  "schema_version": "search_regression_matrix_manifest_v1",
+  "matrix_schema_version": "search_regression_case_v1",
+  "bundle_id": "bundle_full_phase7n2a_recomposed_candidate_tbd",
+  "catalog_version": "phase7n2a-candidate-not-yet-published",
+  "norm_version": "norm_v3",
+  "search_index_sha256": "sha256:pending_phase7n2a4f2_candidate_recomposition",
+  "bundle_content_sha256": "sha256:pending_phase7n2a4f2_candidate_recomposition",
+  "case_count": 8,
+  "purpose": "Additive 7N2A integration matrix for a future recomposed candidate. Runs beside frozen Phase 7L and does not replace it."
+}
