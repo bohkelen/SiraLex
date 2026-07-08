@@ -247,7 +247,11 @@ def test_matrix_expectation_mismatch_reports_field_level_details():
     index = load_search_index(BUNDLE_PATH / "search_index.jsonl")
     failed = replay_case(index, mutated)
     assert failed.expected_match is False
-    assert any("actual_ir_ids" in item for item in failed.mismatches)
+    assert any(
+        "direct source posting IDs" in item or "actual_ir_ids" in item
+        for item in failed.mismatches
+    )
+    assert failed.expected_id_space == "direct_ir_ids"
 
 
 def test_cli_stdout_mode_writes_valid_json_and_exit_code_zero():
