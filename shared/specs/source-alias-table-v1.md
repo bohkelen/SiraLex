@@ -90,8 +90,17 @@ Allowed v1 candidate types:
 - `french_common_form_alias`
 
 `french_common_form_alias` means a reviewed informal or common French form that
-copies an existing canonical French source posting exactly. It does not create a
-new index mapping, lexical record, or posting-order change.
+may intentionally pin a narrower approved subset of an existing canonical French
+source posting. It does not create a new index mapping or lexical record.
+
+For `french_common_form_alias` rows:
+
+- `resolved_ir_ids` is authoritative and must be explicitly declared.
+- `evidence_ir_ids` must exactly equal `resolved_ir_ids`.
+- every declared `resolved_ir_id` must be present in canonical source-term
+  resolution output.
+- declared order must preserve canonical posting order.
+- canonical source posting rows are never mutated.
 
 The source alias table MUST NOT represent:
 
@@ -121,11 +130,13 @@ Aliases are source-side only:
 For each approved alias, the build MUST recompute the deterministic ordered
 posting list for `canonical_source_terms` from the base source index.
 
-The recomputed posting list MUST exactly equal `resolved_ir_ids`, including
-order. Canonical resolution preserves `canonical_source_terms` order, preserves
-each base posting list order, and deduplicates by first seen `ir_id`. If the
-recomputed posting list differs, the alias row is stale or invalid and MUST be
-rejected before any output index is written.
+For all candidate types except `french_common_form_alias`, the recomputed
+posting list MUST exactly equal `resolved_ir_ids`, including order.
+
+For `french_common_form_alias`, `resolved_ir_ids` may be a strict ordered
+subset of the recomputed canonical posting list, but only under the explicit
+constraints above. If constraints are not met, the alias row is stale or
+invalid and MUST be rejected before any output index is written.
 
 ## Collision handling
 

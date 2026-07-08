@@ -16,7 +16,7 @@ from .validate_alias_table import (
     generated_key_types_for_source_term,
     load_search_index,
     read_alias_rows,
-    resolve_canonical_source_terms,
+    resolve_declared_alias_postings,
     result_to_report,
     search_keys_for_source_term,
     validate_alias_table,
@@ -76,12 +76,10 @@ def apply_approved_aliases(
         if row.status != APPLICABLE_STATUS:
             continue
 
-        resolved_ir_ids = resolve_canonical_source_terms(base_index, row.canonical_source_terms)
-        if resolved_ir_ids != row.resolved_ir_ids:
-            raise AliasApplicationError(
-                f"{row.alias_id}: resolved_ir_ids changed after validation; "
-                f"declared={row.resolved_ir_ids} recomputed={resolved_ir_ids}"
-            )
+        try:
+            resolved_ir_ids = resolve_declared_alias_postings(row, base_index)
+        except AliasValidationError as exc:
+            raise AliasApplicationError(str(exc)) from exc
 
         generated_keys = search_keys_for_source_term(row.alias_source_term)
         generated_key_types = generated_key_types_for_source_term(row.alias_source_term)

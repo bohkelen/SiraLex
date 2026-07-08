@@ -256,6 +256,64 @@ def resolve_canonical_source_terms(
     return resolved
 
 
+def _is_ordered_subsequence(candidate: list[str], reference: list[str]) -> bool:
+    if not candidate:
+        return True
+    cursor = 0
+    for value in reference:
+        if value == candidate[cursor]:
+            cursor += 1
+            if cursor == len(candidate):
+                return True
+    return False
+
+
+def resolve_declared_alias_postings(
+    row: AliasRow,
+    index: dict[tuple[str, str], list[str]],
+) -> list[str]:
+    recomputed = resolve_canonical_source_terms(index, row.canonical_source_terms)
+    declared = row.resolved_ir_ids
+
+    # french_common_form_alias rows are allowed to pin a narrower, explicit
+    # subset of canonical postings, but must remain evidence-anchored and
+    # canonical-order preserving.
+    if row.row.get("candidate_type") == "french_common_form_alias":
+        evidence_ir_ids = [str(ir_id) for ir_id in row.row.get("evidence_ir_ids", [])]
+        if evidence_ir_ids != declared:
+            raise AliasValidationError(
+                f"{row.alias_id}: french_common_form_alias requires evidence_ir_ids "
+                f"to exactly equal resolved_ir_ids; resolved={declared} evidence={evidence_ir_ids}"
+            )
+
+        missing_from_canonical = [ir_id for ir_id in declared if ir_id not in recomputed]
+        if missing_from_canonical:
+            raise AliasValidationError(
+                f"{row.alias_id}: declared resolved_ir_ids are not present in canonical "
+                f"source postings; missing={missing_from_canonical} canonical={recomputed}"
+            )
+
+        if not _is_ordered_subsequence(declared, recomputed):
+            raise AliasValidationError(
+                f"{row.alias_id}: declared resolved_ir_ids must preserve canonical posting order; "
+                f"declared={declared} canonical={recomputed}"
+            )
+
+        stray_evidence = [ir_id for ir_id in evidence_ir_ids if ir_id not in recomputed]
+        if stray_evidence:
+            raise AliasValidationError(
+                f"{row.alias_id}: evidence_ir_ids include ids not tied to declared canonical "
+                f"source postings; stray={stray_evidence} canonical={recomputed}"
+            )
+        return declared
+
+    if recomputed != declared:
+        raise AliasValidationError(
+            f"{row.alias_id}: resolved_ir_ids mismatch; declared={declared} recomputed={recomputed}"
+        )
+    return declared
+
+
 def validate_row_shape(row: AliasRow, records_by_id: dict[str, dict[str, Any]]) -> None:
     missing = sorted(REQUIRED_FIELDS - set(row.row))
     if missing:
@@ -340,12 +398,7 @@ def validate_approved_row_against_index(
     row: AliasRow,
     index: dict[tuple[str, str], list[str]],
 ) -> AliasOutcome:
-    recomputed = resolve_canonical_source_terms(index, row.canonical_source_terms)
-    declared = row.resolved_ir_ids
-    if recomputed != declared:
-        raise AliasValidationError(
-            f"{row.alias_id}: resolved_ir_ids mismatch; declared={declared} recomputed={recomputed}"
-        )
+    declared = resolve_declared_alias_postings(row, index)
 
     generated_keys = search_keys_for_source_term(row.alias_source_term)
     generated_key_types = sorted({key_type for key_type, _ in generated_keys})
