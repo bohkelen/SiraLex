@@ -1,0 +1,12 @@
+{
+  "schema_version": "search_regression_matrix_manifest_v1",
+  "matrix_schema_version": "search_regression_case_v1",
+  "bundle_id": "bundle_full_phase7n2b_recomposed_candidate_tbd",
+  "catalog_version": "phase7n2b-candidate-not-yet-published",
+  "norm_version": "norm_v3",
+  "matrix_family": "phase7n2a_additive",
+  "search_index_sha256": "sha256:PENDING_7N2B_CANDIDATE_RECOMPOSITION",
+  "bundle_content_sha256": "sha256:PENDING_7N2B_CANDIDATE_RECOMPOSITION",
+  "case_count": 9,
+  "purpose": "Additive 7N2B regression matrix for moto alias, prix owner lexical starter Son, phrase boundaries, papa/père boundary, deferred fièvre miss, and maman unchanged guard. Runs beside frozen Phase 7L and does not replace it. Bundle/hash fields are placeholders until Phase 7N2B4G5 candidate recomposition."
+}
