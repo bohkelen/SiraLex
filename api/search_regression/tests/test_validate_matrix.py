@@ -33,7 +33,7 @@ from search_regression.validate_matrix import (  # noqa: E402
 
 BUNDLE_ID = "bundle_full_20260616_phase7j_alias_round2_candidate"
 NORM_VERSION = "norm_v3"
-CATALOG_VERSION = "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2"
+CATALOG_VERSION = "norm-v3-prior-featured-fallback-phase7j"
 SEARCH_INDEX_SHA256 = (
     "sha256:4326bc4c9c7d51229b4afa44048751ff122a451dce3d52c2d20d56ac8281418e"
 )

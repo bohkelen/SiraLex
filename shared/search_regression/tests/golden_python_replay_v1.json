@@ -1,7 +1,7 @@
 {
   "schema_version": "search_regression_python_run_v1",
   "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
-  "catalog_version": "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2",
+  "catalog_version": "norm-v3-prior-featured-fallback-phase7j",
   "norm_version": "norm_v3",
   "search_index_sha256": "sha256:4326bc4c9c7d51229b4afa44048751ff122a451dce3d52c2d20d56ac8281418e",
   "matrix_case_count": 13,
