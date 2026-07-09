@@ -1,4 +1,4 @@
-"""Schema and loaders for the Phase 7L search regression matrix."""
+"""Schema and loaders for search regression matrices and manifests."""
 
 from __future__ import annotations
 
@@ -9,10 +9,13 @@ from typing import Any
 
 CASE_SCHEMA_VERSION = "search_regression_case_v1"
 MANIFEST_SCHEMA_VERSION = "search_regression_matrix_manifest_v1"
+MATRIX_FAMILIES = frozenset({"phase7l_pinned", "phase7n2a_additive"})
 
 QUERY_UNICODE_FORMS = frozenset({"nfc", "nfd", "mixed", "not_applicable"})
 DIRECTIONS = frozenset({"source_to_target", "target_to_source"})
 RESULT_STATUSES = frozenset({"miss", "hit_single", "hit_multi"})
+EXPECTED_ID_SPACES = frozenset({"direct_ir_ids", "resolved_target_ir_ids"})
+DEFAULT_EXPECTED_ID_SPACE = "direct_ir_ids"
 MATCHED_KEY_TYPES = frozenset(
     {"casefold", "diacritics_insensitive", "punct_stripped", "nospace", "none"}
 )
@@ -170,6 +173,7 @@ class SearchRegressionCase:
     bundle_id: str
     norm_version: str
     review_status: str
+    expected_id_space: str = DEFAULT_EXPECTED_ID_SPACE
     case_tags: list[str] | None = None
     notes: str | None = None
 
@@ -215,6 +219,21 @@ class SearchRegressionCase:
         bundle_id = _require_string(raw, "bundle_id", line_number=line_number)
         norm_version = _require_string(raw, "norm_version", line_number=line_number)
         review_status = _require_string(raw, "review_status", line_number=line_number)
+        expected_id_space_raw = _optional_string(
+            raw, "expected_id_space", line_number=line_number
+        )
+        expected_id_space = (
+            DEFAULT_EXPECTED_ID_SPACE
+            if expected_id_space_raw is None
+            else expected_id_space_raw
+        )
+        if expected_id_space not in EXPECTED_ID_SPACES:
+            allowed = ", ".join(sorted(EXPECTED_ID_SPACES))
+            raise _load_error(
+                line_number,
+                "expected_id_space",
+                f"must be one of {{{allowed}}}, got {expected_id_space!r}",
+            )
         case_tags = _optional_string_list(raw, "case_tags", line_number=line_number)
         notes = _optional_string(raw, "notes", line_number=line_number)
 
@@ -234,6 +253,7 @@ class SearchRegressionCase:
             bundle_id=bundle_id,
             norm_version=norm_version,
             review_status=review_status,
+            expected_id_space=expected_id_space,
             case_tags=case_tags,
             notes=notes,
         )
@@ -249,6 +269,7 @@ class MatrixManifest:
     search_index_sha256: str
     bundle_content_sha256: str
     case_count: int
+    matrix_family: str = "phase7l_pinned"
     purpose: str | None = None
 
     @classmethod
@@ -278,6 +299,13 @@ class MatrixManifest:
         search_index_sha256 = _manifest_require_string(raw, "search_index_sha256")
         bundle_content_sha256 = _manifest_require_string(raw, "bundle_content_sha256")
         case_count = _manifest_require_int_not_bool(raw, "case_count")
+        matrix_family = _manifest_optional_string(raw, "matrix_family") or "phase7l_pinned"
+        if matrix_family not in MATRIX_FAMILIES:
+            allowed = ", ".join(sorted(MATRIX_FAMILIES))
+            raise _manifest_error(
+                "matrix_family",
+                f"must be one of {{{allowed}}}, got {matrix_family!r}",
+            )
         purpose = _manifest_optional_string(raw, "purpose")
 
         return cls(
@@ -289,6 +317,7 @@ class MatrixManifest:
             search_index_sha256=search_index_sha256,
             bundle_content_sha256=bundle_content_sha256,
             case_count=case_count,
+            matrix_family=matrix_family,
             purpose=purpose,
         )
 

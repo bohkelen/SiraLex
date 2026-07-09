@@ -36,6 +36,15 @@ def main():
         help="Output normalized JSONL file path",
     )
     parser.add_argument(
+        "--target-variant-overlay",
+        type=Path,
+        default=None,
+        help=(
+            "Optional reviewed target-variant overlay JSONL. "
+            "When omitted, raw-source normalization runs with no overlay."
+        ),
+    )
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -53,12 +62,17 @@ def main():
     print(f"Input files: {len(args.input)}")
     for p in args.input:
         print(f"  {p}")
+    if args.target_variant_overlay is not None:
+        print(f"Target-variant overlay: {args.target_variant_overlay}")
+    else:
+        print("Target-variant overlay: (none — raw normalization)")
     print()
 
     stats = process_ir_files(
         args.input,
         args.output,
         verbose=args.verbose,
+        target_variant_overlay=args.target_variant_overlay,
     )
 
     print()
@@ -70,8 +84,19 @@ def main():
     print(f"Index mappings normalized:    {stats['index_mappings_normalized']}")
     print(f"Skipped:                      {stats['skipped']}")
     print(f"Errors:                       {stats['errors']}")
+    if stats.get("target_variant_overlay_path"):
+        print(f"Overlay path:                 {stats['target_variant_overlay_path']}")
+        print(f"Overlay SHA-256:              {stats['target_variant_overlay_sha256']}")
+        print(f"Overlay rows:                 {stats['target_variant_overlay_row_count']}")
+        print(
+            "Overlay applied rows:         "
+            f"{stats['target_variant_overlay_applied_row_count']}"
+        )
     print(f"Output: {args.output}")
     print("=" * 50)
+
+    if stats["errors"] > 0:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

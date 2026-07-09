@@ -104,7 +104,7 @@ Records may be:
 
 To keep this transparent, records SHOULD include a `derivation` object:
 
-- **`derivation.kind`**: `imported` | `normalized` | `transliterated` | `merged` | `manual_override`
+- **`derivation.kind`**: `imported` | `normalized` | `transliterated` | `merged` | `manual_override` | `owner_approved_lexical_addition`
 - **`derivation.inputs`**: list of input record references (when derived/merged)
 - **`derivation.rule_versions`**: version stamps for:
   - normalization ruleset (e.g. `norm_v1`)
@@ -115,6 +115,12 @@ No “silent mutation”: if a ruleset changes, new outputs must carry the new v
 **Manual overrides / corrections**
 If `derivation.kind = manual_override`, the override MUST be represented as a separate correction record
 (using RFC 6902 JSON Patch semantics) that references a target record + scope. The base evidence MUST remain immutable.
+
+**Owner-approved lexical additions**
+If `derivation.kind = owner_approved_lexical_addition`, the record is a new lexical addition approved under
+SiraLex governance rather than scraped from a third-party page. It MUST use `source_id = src_siralex_lexical_review`,
+the manual lexical-review evidence profile, and an internal `siralex://lexical-review/` record locator. It MUST NOT
+claim Mali-Pense snapshot or page evidence.
 
 ## Multi-source attribution
 

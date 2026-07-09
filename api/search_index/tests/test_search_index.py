@@ -3,12 +3,13 @@ Golden fixture tests for search index builder.
 
 Tests cover:
 1. Basic inverted index construction from normalized records
-2. Deduplication and deterministic first-seen ordering of ir_ids
+2. Deduplication and deterministic lexicographic ordering of ir_ids
 3. Multi-record key collision (multiple ir_ids for the same key)
 4. Serialization sort order (by key_type, then key)
 5. Round-trip determinism (same input → same output bytes)
 6. Edge cases (empty keys, missing fields, empty input)
 7. End-to-end file processing with known fixtures
+8. Featured-record rebuild preserves frozen 7L posting order
 """
 
 import json
@@ -21,6 +22,12 @@ from search_index.build_index import (
     build_inverted_index,
     process_normalized_file,
     serialize_index,
+    sort_posting_ir_ids,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+FEATURED_BUNDLE = (
+    REPO_ROOT / "web/public/bundle_full_20260616_phase7j_alias_round2_candidate"
 )
 
 
@@ -159,6 +166,86 @@ class TestBuildInvertedIndex:
         assert FIXTURE_LEXICON_DOBEN["ir_id"] in doben_ids
         assert FIXTURE_LEXICON_DOBEN_ALT["ir_id"] in doben_ids
         assert len(doben_ids) == 2
+        # Lexicographic posting order, independent of record-stream order.
+        assert doben_ids == sorted(doben_ids)
+
+    def test_multi_hit_source_keys_are_lexicographically_ordered(self):
+        """Source multi-hit postings sort by ir_id, not first-seen order."""
+        records = [
+            make_normalized_record(
+                ir_id="d540716db9321a83",
+                ir_kind="index_mapping",
+                search_keys={"casefold": ["mère"]},
+            ),
+            make_normalized_record(
+                ir_id="e5164efcdf5e6ca4",
+                ir_kind="index_mapping",
+                search_keys={"casefold": ["mère"]},
+            ),
+            make_normalized_record(
+                ir_id="0f517a71c373f51d",
+                ir_kind="index_mapping",
+                search_keys={"casefold": ["mère"]},
+            ),
+        ]
+        index = build_inverted_index(records)
+        assert index[("src_casefold", "mère")] == [
+            "0f517a71c373f51d",
+            "d540716db9321a83",
+            "e5164efcdf5e6ca4",
+        ]
+
+    def test_multi_hit_target_keys_are_lexicographically_ordered(self):
+        """Target multi-hit postings sort by ir_id, not first-seen order."""
+        records = [
+            make_normalized_record(
+                ir_id="e28e149f57ab616b",
+                ir_kind="lexicon_entry",
+                search_keys={"casefold": ["kùn"]},
+            ),
+            make_normalized_record(
+                ir_id="753fa18e0a6df4ab",
+                ir_kind="lexicon_entry",
+                search_keys={"casefold": ["kùn"]},
+            ),
+        ]
+        index = build_inverted_index(records)
+        assert index[("tgt_casefold", "kùn")] == [
+            "753fa18e0a6df4ab",
+            "e28e149f57ab616b",
+        ]
+
+    def test_posting_order_independent_of_record_stream_order(self):
+        forward = build_inverted_index(
+            [
+                make_normalized_record(
+                    ir_id="bbb",
+                    ir_kind="index_mapping",
+                    search_keys={"casefold": ["x"]},
+                ),
+                make_normalized_record(
+                    ir_id="aaa",
+                    ir_kind="index_mapping",
+                    search_keys={"casefold": ["x"]},
+                ),
+            ]
+        )
+        reverse = build_inverted_index(
+            [
+                make_normalized_record(
+                    ir_id="aaa",
+                    ir_kind="index_mapping",
+                    search_keys={"casefold": ["x"]},
+                ),
+                make_normalized_record(
+                    ir_id="bbb",
+                    ir_kind="index_mapping",
+                    search_keys={"casefold": ["x"]},
+                ),
+            ]
+        )
+        assert forward[("src_casefold", "x")] == ["aaa", "bbb"]
+        assert reverse[("src_casefold", "x")] == ["aaa", "bbb"]
 
     def test_bilingual_bundle_emits_source_and_target_key_families(self):
         records = [FIXTURE_LEXICON_DOBEN, FIXTURE_INDEX_ABANDONNER]
@@ -246,10 +333,11 @@ class TestSerializeIndex:
             ("tgt_nospace", "b"),
         ]
 
-    def test_ir_ids_preserve_posting_order(self):
+    def test_ir_ids_are_lexicographically_sorted(self):
         index = {("tgt_casefold", "x"): ["ccc", "aaa", "bbb"]}
         entries = serialize_index(index)
-        assert entries[0]["ir_ids"] == ["ccc", "aaa", "bbb"]
+        assert entries[0]["ir_ids"] == ["aaa", "bbb", "ccc"]
+        assert sort_posting_ir_ids(["ccc", "aaa", "bbb"]) == ["aaa", "bbb", "ccc"]
 
     def test_empty_index(self):
         entries = serialize_index({})
@@ -451,7 +539,55 @@ class TestProcessNormalizedFile:
                     assert isinstance(obj["key_type"], str), f"Line {line_num}: key_type not str"
                     assert isinstance(obj["ir_ids"], list), f"Line {line_num}: ir_ids not list"
                     assert len(obj["ir_ids"]) > 0, f"Line {line_num}: ir_ids empty"
-                    # ir_ids preserve first-seen record order.
+                    # ir_ids are unique and lexicographically ordered.
                     assert len(obj["ir_ids"]) == len(set(obj["ir_ids"])), (
                         f"Line {line_num}: duplicate ir_ids"
                     )
+                    assert obj["ir_ids"] == sorted(obj["ir_ids"]), (
+                        f"Line {line_num}: ir_ids not lexicographically sorted"
+                    )
+
+
+# ===========================================================================
+# Category 4: Featured-record rebuild preserves frozen 7L posting order
+# ===========================================================================
+
+class TestFeaturedRecordRebuildOrdering:
+    """Rebuild from featured records must match frozen 7L posting contracts."""
+
+    @pytest.fixture(scope="class")
+    def rebuilt_from_featured(self):
+        if not FEATURED_BUNDLE.is_dir():
+            pytest.skip(f"featured bundle missing: {FEATURED_BUNDLE}")
+        records_path = FEATURED_BUNDLE / "records.jsonl"
+        records = []
+        with records_path.open(encoding="utf-8") as handle:
+            for line in handle:
+                text = line.strip()
+                if text:
+                    records.append(json.loads(text))
+        return build_inverted_index(records)
+
+    def test_mere_posting_order_matches_frozen_7l(self, rebuilt_from_featured):
+        assert rebuilt_from_featured[("src_casefold", "mère")] == [
+            "0f517a71c373f51d",
+            "d540716db9321a83",
+            "e5164efcdf5e6ca4",
+        ]
+
+    def test_kun_tgt_casefold_posting_order_matches_frozen_7l(self, rebuilt_from_featured):
+        assert rebuilt_from_featured[("tgt_casefold", "kùn")] == [
+            "753fa18e0a6df4ab",
+            "e28e149f57ab616b",
+        ]
+
+    def test_featured_multi_posting_keys_are_lexicographic(self, rebuilt_from_featured):
+        """Sanity: rebuilt multi-hit postings are lexicographic (featured rule)."""
+        multi = {
+            key: ids
+            for key, ids in rebuilt_from_featured.items()
+            if len(ids) > 1
+        }
+        assert multi
+        for key, ids in multi.items():
+            assert ids == sorted(ids), f"{key} not lexicographic: {ids}"

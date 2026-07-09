@@ -13,15 +13,19 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "shared"))
 
 from normalization.norm_v3 import compute_search_keys
+from ir.lexical_review import SIRALEX_LEXICAL_REVIEW_SOURCE_ID
 
 from .validate_supplements import (
     APPLICABLE_STATUS,
+    OwnerLexicalInput,
     SupplementRow,
     SupplementValidationError,
     load_search_index,
     load_records_by_id,
+    load_owner_lexical_input,
     result_to_report,
     search_keys_for_source_term,
+    validate_owner_target_evidence,
     validate_supplement_table,
 )
 
@@ -103,13 +107,57 @@ def _target_entry_from_evidence(
     return None
 
 
+def _target_entry_from_owner_adapter(
+    row: SupplementRow,
+    *,
+    target_ir_id: str,
+    target_form: str,
+    target_record: dict[str, Any],
+    owner_lexical_input: OwnerLexicalInput | None,
+) -> dict[str, str] | None:
+    owner_row = validate_owner_target_evidence(
+        row=row,
+        target_ir_id=target_ir_id,
+        target_form=target_form,
+        target_record=target_record,
+        owner_lexical_input=owner_lexical_input,
+    )
+    if owner_row is None:
+        return None
+    locator = owner_row["record_locator"]
+    headword = owner_row["fields_raw"]["headword_latin"]
+    return {
+        "lexicon_url": str(locator["url_canonical"]),
+        "anchor": str(locator["source_record_id"]),
+        "display_text": str(headword),
+    }
+
+
 def build_target_entries(
     row: SupplementRow,
     records_by_id: dict[str, dict[str, Any]],
+    owner_lexical_input: OwnerLexicalInput | None,
 ) -> list[dict[str, str]]:
     entries: list[dict[str, str]] = []
     for target_ir_id, target_form in zip(row.target_ir_ids, row.target_forms, strict=True):
         target_record = records_by_id[target_ir_id]
+        if target_record.get("source_id") == SIRALEX_LEXICAL_REVIEW_SOURCE_ID:
+            # Owner-reviewed lexical targets must resolve through the validated owner adapter.
+            owner_entry = _target_entry_from_owner_adapter(
+                row,
+                target_ir_id=target_ir_id,
+                target_form=target_form,
+                target_record=target_record,
+                owner_lexical_input=owner_lexical_input,
+            )
+            if owner_entry is not None:
+                entries.append(owner_entry)
+                continue
+            raise SupplementGenerationError(
+                f"{row.supplement_id}: owner-reviewed target {target_ir_id} requires "
+                "validated owner lexical evidence"
+            )
+
         evidence_entry = _target_entry_from_evidence(row, records_by_id, target_form)
         if evidence_entry:
             entries.append(evidence_entry)
@@ -132,6 +180,7 @@ def build_search_keys(source_term: str) -> dict[str, list[str]]:
 def build_generated_record(
     row: SupplementRow,
     records_by_id: dict[str, dict[str, Any]],
+    owner_lexical_input: OwnerLexicalInput | None,
 ) -> dict[str, Any]:
     target_records = [records_by_id[target_ir_id] for target_ir_id in row.target_ir_ids]
     source_ids = [
@@ -153,7 +202,7 @@ def build_generated_record(
         "display": {
             "source_term": source_display_text,
             "source_lang": row.row["source_lang"],
-            "target_entries": build_target_entries(row, records_by_id),
+            "target_entries": build_target_entries(row, records_by_id, owner_lexical_input),
         },
     }
 
@@ -396,13 +445,20 @@ def generate_supplement_records(
     supplement_table_path: Path,
     records_path: Path,
     search_index_path: Path,
+    owner_lexical_ir_path: Path | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    owner_lexical_input = (
+        load_owner_lexical_input(owner_lexical_ir_path)
+        if owner_lexical_ir_path is not None
+        else None
+    )
     try:
         validation_result = validate_supplement_table(
             supplement_table_path=supplement_table_path,
             records_path=records_path,
             search_index_path=search_index_path,
             defer_index_conflicts=True,
+            owner_lexical_ir_path=owner_lexical_ir_path,
         )
     except SupplementValidationError as exc:
         raise SupplementGenerationError(str(exc)) from exc
@@ -427,7 +483,7 @@ def generate_supplement_records(
             )
         expected_generated_ids.add(generated_id)
 
-        expected_record = build_generated_record(row, records_by_id)
+        expected_record = build_generated_record(row, records_by_id, owner_lexical_input)
         existing_record = records_by_id.get(generated_id)
         try:
             if existing_record is not None:
@@ -501,6 +557,12 @@ def generate_supplement_records(
     table_summary["conflicted_supplement_count"] = len(conflicted_supplements)
     report["supplement_input_path"] = str(supplement_table_path)
     report["supplement_input_sha256"] = file_sha256(supplement_table_path)
+    if owner_lexical_input is not None:
+        report["owner_lexical_input"] = {
+            "path": str(owner_lexical_input.path),
+            "sha256": owner_lexical_input.sha256,
+            "row_count": owner_lexical_input.row_count,
+        }
     report["applied_supplement_count"] = len(applied_supplements)
     report["already_present_supplement_count"] = len(already_present_supplements)
     report["conflicted_supplement_count"] = len(conflicted_supplements)
@@ -533,11 +595,13 @@ def generate_augmented_records(
     search_index_path: Path,
     output_records_path: Path,
     output_report_path: Path,
+    owner_lexical_ir_path: Path | None = None,
 ) -> dict[str, Any]:
     generated_records, report = generate_supplement_records(
         supplement_table_path=supplement_table_path,
         records_path=records_path,
         search_index_path=search_index_path,
+        owner_lexical_ir_path=owner_lexical_ir_path,
     )
     base_records = read_records(records_path)
     write_jsonl(output_records_path, base_records + generated_records)
@@ -554,6 +618,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--supplements", type=Path, required=True, help="Source supplement JSONL table")
     parser.add_argument("--records", type=Path, required=True, help="Base enriched records.jsonl")
     parser.add_argument("--search-index", type=Path, required=True, help="Base search_index.jsonl")
+    parser.add_argument(
+        "--owner-lexical-ir",
+        type=Path,
+        default=None,
+        help="Optional owner lexical IR JSONL used for explicit owner-reviewed target evidence",
+    )
     parser.add_argument(
         "--output-records",
         type=Path,
@@ -575,6 +645,7 @@ def main(argv: list[str] | None = None) -> int:
             search_index_path=args.search_index,
             output_records_path=args.output_records,
             output_report_path=args.output_report,
+            owner_lexical_ir_path=args.owner_lexical_ir,
         )
     except SupplementGenerationError as exc:
         print(f"Source-index supplement generation FAILED: {exc}", file=sys.stderr)

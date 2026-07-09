@@ -463,6 +463,48 @@ This spec stops at capture + IR, but it MUST be explicit about mutability bounda
 - IR is immutable once written (new parser versions produce new IR; old IR is preserved).
 - Human/editorial changes MUST be stored as **separate override/correction records** that reference a target record + scope; they MUST NOT mutate snapshot, fragment, IR, or normalized base records in place.
 
+## Owner-reviewed lexical additions (Phase 7N2A)
+
+Records under `source_id = src_siralex_lexical_review` use a manual lexical-review evidence profile.
+They MUST NOT claim Mali-Pense snapshot or page evidence.
+
+Required evidence item shape:
+
+```json
+{
+  "source_id": "src_siralex_lexical_review",
+  "review_reference": {
+    "document_path": "docs/reviews/phase7n2a_ndandayoro_lexical_review.md",
+    "approval_status": "owner linguistic approval recorded",
+    "reviewer_role": "project owner / native-speaker linguistic authority"
+  },
+  "text_quote": "<owner-approved candidate form>"
+}
+```
+
+`parser_version` for these records MUST be `siralex_owner_lexical_v1`.
+`record_locator.url_canonical` MUST use an internal `siralex://lexical-review/` URI.
+
+Downstream provenance uses `derivation.kind = owner_approved_lexical_addition`.
+
+## Reviewed target variants (Phase 7N2A)
+
+Existing Mali-Pense lexicon entries MAY include an optional top-level
+`reviewed_target_variants[]` array for owner-approved target-side spelling variants.
+
+Each item MUST include:
+
+```text
+form
+review_document
+reviewer
+reviewed_at
+rationale
+```
+
+`record_locator.anchor_names` remains source-attested only. Reviewed variants are merged
+into normalized `variant_forms` at normalization time and MUST NOT alter `preferred_form`.
+
 This prevents "just edit the DB row" drift and preserves auditability/rollback.
 
 ### Minimal correction record schema (required)

@@ -128,6 +128,16 @@ Alias or supplement table edits alone do not change Phase 7L contracts until the
 
 ## Changelog entries
 
+### 2026-07-08 — Align frozen 7L catalog_version with post-F8 7J provenance label
+
+- **Reviewer:** project maintainer / agent (CI unblock after 7N2A featured promotion)
+- **Commit / PR:** pending (feat/phase-2.0.5-offline-pwa)
+- **Change category:** catalog_pointer | golden_update
+- **Pinned bundle:** `bundle_full_20260616_phase7j_alias_round2_candidate` + `sha256:4326bc4c9c7d51229b4afa44048751ff122a451dce3d52c2d20d56ac8281418e` (unchanged)
+- **Matrix cases affected:** none (lookup contracts unchanged; 13/13 identical)
+- **Review note:** Phase 7N2A4F8 promoted 7N2A to featured via `VITE_FEATURED_BUNDLE_ID` and relabeled the retained 7J catalog entry to `norm-v3-prior-featured-fallback-phase7j`. Frozen Phase 7L still pins the 7J bundle directory and search-index identity. Replay resolves `catalog_version` from live `catalog.json`, so Python/runtime goldens and `matrix_manifest_v1.json` must carry the new provenance label. No search-result, checksum, or case expectation changes.
+- **Validation:** Python pytest pass; runtime vitest search_regression pass; parity confirmed (cases unchanged).
+
 Add new entries below (newest first). Use this template only; do not treat the template as history.
 
 ```markdown

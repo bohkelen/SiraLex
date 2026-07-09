@@ -221,6 +221,12 @@ Bundle `records.jsonl` contains **enriched records** — normalized search metad
     "synonyms_raw": [],
     "etymology_raw": null,
     "literal_meaning_raw": null
+  },
+  "record_locator": {
+    "kind": "source_record_id",
+    "url_canonical": "https://www.mali-pense.net/emk/lexicon/d.htm",
+    "source_record_id": "e2203",
+    "anchor_names": ["-da"]
   }
 }
 ```
@@ -239,12 +245,40 @@ For `ir_kind = "index_mapping"`, the `display` field contains:
 }
 ```
 
+Index-mapping enriched rows MUST NOT include top-level `record_locator`.
+
 ### `display` field rules (normative)
 
 - `display` contains a **shallow, read-only projection** of IR `fields_raw` sufficient for user-facing rendering.
 - `display` MUST NOT contain inferred, ranked, or normalized content.
 - All values are copied from IR `fields_raw` unchanged.
 - If the IR record for a given `ir_id` is unavailable, the enrichment step MUST emit the record **without** a `display` field and log a warning.
+
+### `record_locator` field rules (normative; lexicon_entry only)
+
+For `ir_kind = "lexicon_entry"`, enrichment MUST project durable IR locator metadata onto the enriched record so consumers can join `index_mapping.display.target_entries[].anchor` to a lexicon `ir_id` without display-text matching.
+
+Required keys (copied from IR `record_locator`, not from `fields_raw`):
+
+- `kind` (non-empty string; typically `source_record_id`)
+- `url_canonical` (non-empty string)
+- `source_record_id` (non-empty string; e.g. Mali-Pense HTML anchor `e2533`)
+- `anchor_names` (list of strings; always present on enriched output)
+
+Rules:
+
+- Projection is fail-closed on missing/invalid join-critical keys (`kind`,
+  `url_canonical`, `source_record_id`).
+- If IR omits `anchor_names`, enrichment MUST emit `anchor_names: []` (some
+  Mali-Pense IR rows lack the key). Invalid non-list `anchor_names` MUST abort.
+- Locator-tuple uniqueness is fail-closed: two different lexicon `ir_id`s MUST
+  NOT expose the same `(source_id, url_canonical, source_record_id)` unless an
+  explicit allowlist is introduced later (none in this version).
+- Owner-reviewed lexicon rows MUST continue to preserve
+  `provenance.source.record_pointer.url_canonical` and
+  `provenance.source.record_pointer.source_record_id` from the normalized
+  baseline; enrichment MUST NOT rewrite provenance.
+- `record_locator` MUST NOT be inferred from `display_text` / headword forms alone.
 
 ### Enrichment non-goals
 

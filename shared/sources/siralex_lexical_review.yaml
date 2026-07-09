@@ -1,0 +1,33 @@
+# SiraLex owner-reviewed lexical addition source
+# See shared/specs/source-registry.md and docs/PHASE_7N2A3_SCHEMA_AND_ARTIFACT_DECISION.md
+
+source_id: src_siralex_lexical_review
+name: "SiraLex owner-reviewed lexical addition"
+homepage_url: "https://github.com/thethiccckening/SiraLex"
+
+authors:
+  - name: "SiraLex project maintainers"
+    role: "lexical review governance"
+
+claimed_license: "project-internal-review"
+license_inference_note: |
+  This source identity is for owner-approved Maninka lexical additions that are
+  not scraped from Mali-Pense pages. Records under this source_id must use the
+  manual lexical-review evidence profile with review_reference and must not claim
+  Mali-Pense snapshot or page evidence.
+
+redistribution_policy: "permitted_with_attribution"
+
+takedown_policy_ref: |
+  Use GitHub issue template "Data removal / source maintainer request".
+
+contact_status: "not_attempted"
+
+record_identity_notes: |
+  Record locators use internal siralex://lexical-review/ URIs.
+  parser_version for manual additions: siralex_owner_lexical_v1
+  derivation.kind for downstream provenance: owner_approved_lexical_addition
+
+attribution_template: |
+  Lexical addition reviewed under SiraLex Phase 7N2A governance.
+  Review sheet: {review_document}

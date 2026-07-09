@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from enrichment.enrich import (
+    EnrichmentLocatorError,
     build_ir_lookup,
     enrich_record,
     enrich_records,
@@ -46,6 +47,7 @@ def make_ir_unit(
             "kind": "source_record_id",
             "url_canonical": "https://example.com/test",
             "source_record_id": ir_id,
+            "anchor_names": [ir_id],
         },
         "fields_raw": fields_raw or {},
     }
@@ -186,7 +188,11 @@ class TestBuildIrLookup:
             lookup = build_ir_lookup([ir_path])
             assert len(lookup) == 1
             assert "aaaa1111bbbb2222" in lookup
-            assert lookup["aaaa1111bbbb2222"] == LEXICON_FIELDS_RAW
+            assert lookup["aaaa1111bbbb2222"]["fields_raw"] == LEXICON_FIELDS_RAW
+            assert lookup["aaaa1111bbbb2222"]["record_locator"] == FIXTURE_IR_LEXICON[
+                "record_locator"
+            ]
+            assert lookup["aaaa1111bbbb2222"]["ir_kind"] == "lexicon_entry"
 
     def test_multiple_files(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -199,6 +205,7 @@ class TestBuildIrLookup:
             assert len(lookup) == 2
             assert "aaaa1111bbbb2222" in lookup
             assert "eeee5555ffff6666" in lookup
+            assert lookup["eeee5555ffff6666"]["fields_raw"] == INDEX_FIELDS_RAW
 
     def test_missing_file_skipped(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -230,7 +237,7 @@ class TestBuildIrLookup:
             lookup = build_ir_lookup([ir_path])
             assert len(lookup) == 1
             # Should keep the first one (LEXICON_FIELDS_RAW), not the duplicate
-            assert lookup["aaaa1111bbbb2222"] == LEXICON_FIELDS_RAW
+            assert lookup["aaaa1111bbbb2222"]["fields_raw"] == LEXICON_FIELDS_RAW
 
     def test_missing_ir_id_skipped(self):
         bad_record = {"fields_raw": {"headword_latin": "test"}}
@@ -276,18 +283,50 @@ class TestEnrichRecord:
         assert "display" in enriched
         assert enriched["display"] == LEXICON_FIELDS_RAW
 
+    def test_lexicon_entry_projects_record_locator_from_full_lookup(self):
+        lookup = {
+            "aaaa1111bbbb2222": {
+                "fields_raw": LEXICON_FIELDS_RAW,
+                "record_locator": FIXTURE_IR_LEXICON["record_locator"],
+                "ir_kind": "lexicon_entry",
+            }
+        }
+        enriched = enrich_record(FIXTURE_NORMALIZED_LEXICON, lookup)
+
+        assert enriched["display"] == LEXICON_FIELDS_RAW
+        assert enriched["record_locator"] == {
+            "kind": "source_record_id",
+            "url_canonical": "https://example.com/test",
+            "source_record_id": "aaaa1111bbbb2222",
+            "anchor_names": ["aaaa1111bbbb2222"],
+        }
+
     def test_index_mapping_enriched(self):
         lookup = {"eeee5555ffff6666": INDEX_FIELDS_RAW}
         enriched = enrich_record(FIXTURE_NORMALIZED_INDEX, lookup)
 
         assert "display" in enriched
         assert enriched["display"] == INDEX_FIELDS_RAW
+        assert "record_locator" not in enriched
+
+    def test_index_mapping_full_lookup_omits_record_locator(self):
+        lookup = {
+            "eeee5555ffff6666": {
+                "fields_raw": INDEX_FIELDS_RAW,
+                "record_locator": FIXTURE_IR_INDEX["record_locator"],
+                "ir_kind": "index_mapping",
+            }
+        }
+        enriched = enrich_record(FIXTURE_NORMALIZED_INDEX, lookup)
+        assert enriched["display"] == INDEX_FIELDS_RAW
+        assert "record_locator" not in enriched
 
     def test_missing_ir_record_no_display(self):
         lookup = {}  # Empty lookup
         enriched = enrich_record(FIXTURE_NORMALIZED_LEXICON, lookup)
 
         assert "display" not in enriched
+        assert "record_locator" not in enriched
 
     def test_normalized_fields_preserved(self):
         """Enrichment must not alter the original normalized fields."""
@@ -315,6 +354,17 @@ class TestEnrichRecord:
 
         # Must be equal — not filtered, not transformed
         assert enriched["display"] == fields_raw
+
+    def test_lexicon_full_lookup_missing_locator_fails_closed(self):
+        lookup = {
+            "aaaa1111bbbb2222": {
+                "fields_raw": LEXICON_FIELDS_RAW,
+                "record_locator": None,
+                "ir_kind": "lexicon_entry",
+            }
+        }
+        with pytest.raises(EnrichmentLocatorError, match="record_locator"):
+            enrich_record(FIXTURE_NORMALIZED_LEXICON, lookup)
 
     def test_does_not_mutate_input(self):
         """Enrichment must not mutate the input normalized record."""
@@ -369,6 +419,13 @@ class TestEnrichRecords:
                 assert "ir_id" in rec
                 assert "search_keys" in rec
 
+            by_id = {r["ir_id"]: r for r in records}
+            assert by_id["aaaa1111bbbb2222"]["record_locator"] == FIXTURE_IR_LEXICON[
+                "record_locator"
+            ]
+            assert "record_locator" not in by_id["eeee5555ffff6666"]
+            assert stats["enriched_with_record_locator"] == 1
+
     def test_lexicon_display_fields_correct(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             norm_path = Path(tmpdir) / "normalized.jsonl"
@@ -393,6 +450,10 @@ class TestEnrichRecords:
             assert display["senses"][0]["gloss_en"] == "to begin"
             assert len(display["senses"][0]["examples"]) == 1
             assert display["variants_raw"] == ["dɔbɛn", "dòbèn"]
+            assert records[0]["record_locator"]["source_record_id"] == "aaaa1111bbbb2222"
+            assert records[0]["record_locator"]["kind"] == "source_record_id"
+            assert records[0]["record_locator"]["url_canonical"] == "https://example.com/test"
+            assert records[0]["record_locator"]["anchor_names"] == ["aaaa1111bbbb2222"]
 
     def test_index_mapping_display_fields_correct(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -413,6 +474,7 @@ class TestEnrichRecords:
             assert display["source_lang"] == "fr"
             assert len(display["target_entries"]) == 1
             assert display["target_entries"][0]["display_text"] == "bàn"
+            assert "record_locator" not in records[0]
 
     def test_missing_ir_produces_record_without_display(self):
         """Normalized records without matching IR still appear in output."""

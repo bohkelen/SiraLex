@@ -9,6 +9,7 @@ from .schema import (
     CASE_FAMILIES,
     CASE_SCHEMA_VERSION,
     DIRECTIONS,
+    EXPECTED_ID_SPACES,
     MANIFEST_SCHEMA_VERSION,
     MATCHED_KEY_TYPES,
     QUERY_UNICODE_FORMS,
@@ -76,6 +77,16 @@ def validate_case(
 
     if case.direction not in DIRECTIONS:
         add(f"invalid direction {case.direction!r}")
+
+    if case.expected_id_space not in EXPECTED_ID_SPACES:
+        add(f"invalid expected_id_space {case.expected_id_space!r}")
+    elif (
+        case.expected_id_space == "resolved_target_ir_ids"
+        and case.direction != "source_to_target"
+    ):
+        add(
+            "resolved_target_ir_ids is valid only when direction == source_to_target"
+        )
 
     if case.expected_result_status not in RESULT_STATUSES:
         add(f"invalid expected_result_status {case.expected_result_status!r}")
@@ -220,12 +231,24 @@ def validate_matrix(
         seen_case_ids.add(case.case_id)
         seen_queries.add(case.query)
 
-    missing_queries = sorted(SEED_QUERIES - seen_queries)
-    if missing_queries:
+    matrix_family = manifest.matrix_family if manifest is not None else "phase7l_pinned"
+    if matrix_family == "phase7l_pinned":
+        missing_queries = sorted(SEED_QUERIES - seen_queries)
+        if missing_queries:
+            errors.append(
+                ValidationError(
+                    case_id="",
+                    message=f"missing required seed queries: {', '.join(missing_queries)}",
+                )
+            )
+    elif matrix_family == "phase7n2a_additive":
+        # Additive matrices run beside 7L and do not inherit the pinned 7L seed set.
+        pass
+    else:
         errors.append(
             ValidationError(
                 case_id="",
-                message=f"missing required seed queries: {', '.join(missing_queries)}",
+                message=f"unsupported matrix family {matrix_family!r}",
             )
         )
 

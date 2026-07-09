@@ -72,6 +72,12 @@ def main():
     print(f"IR records loaded:            {stats['ir_records_loaded']}")
     print(f"Normalized records read:      {stats['normalized_records_read']}")
     print(f"Enriched with display:        {stats['enriched_with_display']}")
+    print(
+        f"Enriched with record_locator: {stats.get('enriched_with_record_locator', 0)}"
+    )
+    print(
+        f"Duplicate locator tuples:     {stats.get('duplicate_locator_tuples', 0)}"
+    )
     print(f"Missing display (no IR):      {stats['missing_display']}")
     print(f"Parse errors:                 {stats['parse_errors']}")
     print(f"Output: {args.output}")

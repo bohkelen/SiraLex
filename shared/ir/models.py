@@ -355,6 +355,7 @@ class IRUnit:
     record_locator: RecordLocator
     fields_raw: LexiconEntryFieldsRaw | IndexMappingFieldsRaw | dict[str, Any]
     parse_warnings: list[str] = field(default_factory=list)
+    reviewed_target_variants: list[dict[str, Any]] | None = None
     
     # Warning policy version (thresholds that generated the warnings)
     warning_policy_id: str | None = None
@@ -382,6 +383,8 @@ class IRUnit:
         
         if self.parse_warnings:
             result["parse_warnings"] = self.parse_warnings
+        if self.reviewed_target_variants:
+            result["reviewed_target_variants"] = self.reviewed_target_variants
         if self.warning_policy_id:
             result["warning_policy_id"] = self.warning_policy_id
         if self.ocr_engine:

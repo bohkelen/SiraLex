@@ -28,6 +28,55 @@ def test_pass_when_only_display_added(tmp_path: Path) -> None:
     assert validate_display_only(b, e) == []
 
 
+def test_pass_when_display_and_record_locator_added(tmp_path: Path) -> None:
+    from enrichment.validate_enrichment_display_only import _load_jsonl_by_ir_id
+
+    base = Path(tmp_path / "norm.jsonl")
+    enr = Path(tmp_path / "enriched.jsonl")
+    line_b = (
+        '{"ir_id":"a","ir_kind":"lexicon_entry","source_id":"s","norm_version":"norm_v3",'
+        '"preferred_form":"x","variant_forms":["x"],"search_keys":{"casefold":["x"]}}\n'
+    )
+    base.write_text(line_b, encoding="utf-8")
+    rec = (
+        '{"ir_id":"a","ir_kind":"lexicon_entry","source_id":"s","norm_version":"norm_v3",'
+        '"preferred_form":"x","variant_forms":["x"],"search_keys":{"casefold":["x"]},'
+        '"display":{"headword_latin":"x"},'
+        '"record_locator":{"kind":"source_record_id","url_canonical":"https://example.com/x",'
+        '"source_record_id":"e1","anchor_names":["x"]}}\n'
+    )
+    enr.write_text(rec, encoding="utf-8")
+
+    b, _ = _load_jsonl_by_ir_id(base)
+    e, _ = _load_jsonl_by_ir_id(enr)
+    assert validate_display_only(b, e) == []
+
+
+def test_fail_when_record_locator_missing_source_record_id(tmp_path: Path) -> None:
+    from enrichment.validate_enrichment_display_only import _load_jsonl_by_ir_id
+
+    base = Path(tmp_path / "norm.jsonl")
+    enr = Path(tmp_path / "enriched.jsonl")
+    line_b = (
+        '{"ir_id":"a","ir_kind":"lexicon_entry","source_id":"s","norm_version":"norm_v3",'
+        '"preferred_form":"x","variant_forms":["x"],"search_keys":{}}\n'
+    )
+    base.write_text(line_b, encoding="utf-8")
+    rec = (
+        '{"ir_id":"a","ir_kind":"lexicon_entry","source_id":"s","norm_version":"norm_v3",'
+        '"preferred_form":"x","variant_forms":["x"],"search_keys":{},'
+        '"display":{"headword_latin":"x"},'
+        '"record_locator":{"kind":"source_record_id","url_canonical":"https://example.com/x",'
+        '"anchor_names":["x"]}}\n'
+    )
+    enr.write_text(rec, encoding="utf-8")
+
+    b, _ = _load_jsonl_by_ir_id(base)
+    e, _ = _load_jsonl_by_ir_id(enr)
+    errs = validate_display_only(b, e)
+    assert any("source_record_id" in m for m in errs)
+
+
 def test_fail_on_missing_display(tmp_path: Path) -> None:
     from enrichment.validate_enrichment_display_only import _load_jsonl_by_ir_id
 

@@ -13,6 +13,8 @@ Misc/
 # Env / secrets
 .env
 .env.*
+# Allow committed non-secret production bundle selector.
+!web/.env.production
 
 # Python
 __pycache__/
@@ -39,5 +41,8 @@ web/playwright-report/
 web/test-results/
 
 
-# Snapshot data (raw captures - do not commit to git)
-data/
+# Snapshot / pipeline data (do not commit)
+data/*
+!data/ir/
+data/ir/*
+!data/ir/siralex_owner_lexical_v1.jsonl

@@ -18,6 +18,14 @@ from .models import (
     IRUnit,
     compute_ir_id,
 )
+from .lexical_review import (
+    LexicalReviewValidationError,
+    LexiconVariantRegistry,
+    OWNER_APPROVED_LEXICAL_DERIVATION_KIND,
+    ReviewedTargetVariant,
+    SIRALEX_LEXICAL_REVIEW_SOURCE_ID,
+    SIRALEX_OWNER_LEXICAL_PARSER_VERSION,
+)
 
 __all__ = [
     "IRKind",
@@ -32,4 +40,10 @@ __all__ = [
     "TargetEntry",
     "IRUnit",
     "compute_ir_id",
+    "LexicalReviewValidationError",
+    "LexiconVariantRegistry",
+    "OWNER_APPROVED_LEXICAL_DERIVATION_KIND",
+    "ReviewedTargetVariant",
+    "SIRALEX_LEXICAL_REVIEW_SOURCE_ID",
+    "SIRALEX_OWNER_LEXICAL_PARSER_VERSION",
 ]

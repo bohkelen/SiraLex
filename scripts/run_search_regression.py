@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the Phase 7L curated search regression matrix against a pinned bundle."""
+"""Run a curated search regression matrix against a specified bundle."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--matrix", type=Path, required=True, help="Matrix JSONL path")
     parser.add_argument("--manifest", type=Path, required=True, help="Matrix manifest JSON path")
-    parser.add_argument("--bundle", type=Path, required=True, help="Pinned bundle directory")
+    parser.add_argument("--bundle", type=Path, required=True, help="Bundle directory under test")
     parser.add_argument(
         "--catalog",
         type=Path,

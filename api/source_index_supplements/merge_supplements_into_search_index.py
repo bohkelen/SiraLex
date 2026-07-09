@@ -168,12 +168,14 @@ def merge_supplements_into_search_index(
     records_path: Path,
     baseline_search_index_path: Path,
     baseline_bundle_dir: Path,
+    owner_lexical_ir_path: Path | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     try:
         generated_records, generation_report = generate_supplement_records(
             supplement_table_path=supplement_table_path,
             records_path=records_path,
             search_index_path=baseline_search_index_path,
+            owner_lexical_ir_path=owner_lexical_ir_path,
         )
     except SupplementGenerationError as exc:
         raise SupplementMergeError(str(exc)) from exc
@@ -309,6 +311,24 @@ def merge_supplements_into_search_index(
         "non_applied_supplement_rows": non_applied_rows,
         **summary,
     }
+    owner_reviewed_target_ids = generation_report.get("owner_reviewed_target_ids")
+    if isinstance(owner_reviewed_target_ids, list):
+        normalized_owner_ids = sorted(
+            {
+                item
+                for item in owner_reviewed_target_ids
+                if isinstance(item, str) and item
+            }
+        )
+        if normalized_owner_ids:
+            owner_lexical_input = generation_report.get("owner_lexical_input")
+            if isinstance(owner_lexical_input, dict):
+                report["owner_lexical_input"] = {
+                    "path": owner_lexical_input.get("path"),
+                    "sha256": owner_lexical_input.get("sha256"),
+                    "row_count": owner_lexical_input.get("row_count"),
+                }
+            report["owner_reviewed_target_ids"] = normalized_owner_ids
     return serialize_index(merged_index), report
 
 
@@ -319,12 +339,14 @@ def merge_and_write(
     baseline_bundle_dir: Path,
     output_search_index_path: Path,
     output_report_path: Path,
+    owner_lexical_ir_path: Path | None = None,
 ) -> dict[str, Any]:
     rows, report = merge_supplements_into_search_index(
         supplement_table_path=supplement_table_path,
         records_path=records_path,
         baseline_search_index_path=baseline_search_index_path,
         baseline_bundle_dir=baseline_bundle_dir,
+        owner_lexical_ir_path=owner_lexical_ir_path,
     )
     write_search_index_rows(output_search_index_path, rows)
     output_report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -363,6 +385,12 @@ def main(argv: list[str] | None = None) -> int:
         required=True,
         help="Compatibility merge report JSON path",
     )
+    parser.add_argument(
+        "--owner-lexical-ir",
+        type=Path,
+        default=None,
+        help="Optional owner lexical IR JSONL used for explicit owner-reviewed target evidence",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -373,6 +401,7 @@ def main(argv: list[str] | None = None) -> int:
             baseline_bundle_dir=args.baseline_bundle_dir,
             output_search_index_path=args.output_search_index,
             output_report_path=args.output_report,
+            owner_lexical_ir_path=args.owner_lexical_ir,
         )
     except SupplementMergeError as exc:
         print(f"Source-index supplement compatibility merge FAILED: {exc}", file=sys.stderr)

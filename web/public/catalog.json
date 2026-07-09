@@ -4,10 +4,26 @@
     {
       "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
       "name": "French ↔ Maninka",
-      "version": "norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2",
+      "version": "norm-v3-prior-featured-fallback-phase7j",
       "size_bytes": 24532394,
       "url_base": "./bundle_full_20260616_phase7j_alias_round2_candidate/",
       "content_sha256": "sha256:e54b8fdf39558ecb639c0763ea9454f085aded7b48f867affe1f96a44709c2ef",
+      "languages": {
+        "source_lang": "fr",
+        "target_lang": "mnk"
+      },
+      "language_labels": {
+        "source": "French",
+        "target": "Maninka"
+      }
+    },
+    {
+      "bundle_id": "bundle_full_20260708_27643bb0",
+      "name": "French ↔ Maninka",
+      "version": "norm-v3-featured-7n2a4f8-7l13-7n2a8-runtime-smoke-pass",
+      "size_bytes": 26166937,
+      "url_base": "./bundle_full_20260708_27643bb0/",
+      "content_sha256": "sha256:27643bb092ff31117a133378db7562080c8b1d0d87fe111f5b83973e15a08484",
       "languages": {
         "source_lang": "fr",
         "target_lang": "mnk"
