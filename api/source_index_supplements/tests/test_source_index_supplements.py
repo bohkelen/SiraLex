@@ -838,7 +838,7 @@ def test_tracked_health_rows_validate_with_durable_assembly_only(tmp_path: Path)
         assemble_records_with_duplicate_guard(baseline_records, owner_enriched_records)
     )
     assert baseline_count > 0
-    assert owner_count == 2
+    assert owner_count == 3
     assert combined_count == baseline_count + owner_count
     assert duplicate_count == 0
     write_jsonl(records_augmented_path, combined_records)
@@ -906,8 +906,9 @@ def test_tracked_health_rows_validate_with_durable_assembly_only(tmp_path: Path)
         },
     ]
     assert generation_report["owner_lexical_input"]["path"] == str(owner_ir_path)
-    assert generation_report["owner_lexical_input"]["row_count"] == 2
-    assert generation_report["owner_reviewed_target_ids"] == sorted(HEALTH_TARGET_IDS)
+    assert generation_report["owner_lexical_input"]["row_count"] == 3
+    assert set(HEALTH_TARGET_IDS).issubset(set(generation_report["owner_reviewed_target_ids"]))
+    assert "3b8c3b7a0c5e897d" in generation_report["owner_reviewed_target_ids"]
 
     merged_rows, merge_report = merge_supplements_into_search_index(
         supplement_table_path=supplements_path,
@@ -928,8 +929,9 @@ def test_tracked_health_rows_validate_with_durable_assembly_only(tmp_path: Path)
     assert c_mapping_ids == [generated_by_term["clinique"]["ir_id"]]
     assert cds_mapping_ids == [generated_by_term["centre de santé"]["ir_id"]]
     assert merge_report["owner_lexical_input"]["path"] == str(owner_ir_path)
-    assert merge_report["owner_lexical_input"]["row_count"] == 2
-    assert merge_report["owner_reviewed_target_ids"] == sorted(HEALTH_TARGET_IDS)
+    assert merge_report["owner_lexical_input"]["row_count"] == 3
+    assert set(HEALTH_TARGET_IDS).issubset(set(merge_report["owner_reviewed_target_ids"]))
+    assert "3b8c3b7a0c5e897d" in merge_report["owner_reviewed_target_ids"]
 
     malipense_source_record_to_ir_id: dict[str, str] = {}
     for row in read_jsonl(repo_root / "data/ir/malipense_lexicon_v3.jsonl"):

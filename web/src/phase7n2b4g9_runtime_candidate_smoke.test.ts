@@ -1,19 +1,19 @@
 /**
- * Phase 7N2A4F6 runtime smoke — retargeted in Phase 7N2B4G11.
+ * Phase 7N2B4G9 runtime smoke — retargeted in Phase 7N2B4G11.
  *
- * Historical F6 (pre-promotion) asserted 7J as featured and 7N2A as a
- * catalog-visible candidate only. That evidence remains archived in
- * docs/reports/phase7n2a4f6_runtime_candidate_smoke_test_report.md.
- * F11 retarget tracked 7N2A as featured after F8.
+ * Historical G9 asserted 7N2A as featured and 7N2B as a catalog-visible
+ * candidate only. That evidence remains archived in
+ * docs/reports/phase7n2b4g9_runtime_candidate_smoke_test_report.md.
  *
- * After G11 promotion, this file verifies current catalog/runtime truth:
- * 7N2B is featured via VITE_FEATURED_BUNDLE_ID; 7N2A/7J remain fallback/rollback.
- * Full featured-promotion install proofs live in phase7n2b4g11_*.test.ts.
+ * After G11 promotion, this file tracks current catalog/runtime truth:
+ * 7N2B is featured via VITE_FEATURED_BUNDLE_ID; 7N2A remains prior/fallback;
+ * 7J remains older rollback. Full G11 promotion proofs live in
+ * phase7n2b4g11_featured_promotion.test.ts.
  */
 import "fake-indexeddb/auto";
 
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -28,30 +28,31 @@ import {
   getActiveBundleMeta,
   getInstalledBundleMeta,
   openSiralexDb,
+  setActiveBundleId,
 } from "./idb/siralex_db";
-import { importRecordsJsonl } from "./import/import_records";
-import { importSearchIndexJsonl } from "./import/import_search_index";
 import { installRemoteCatalogBundle } from "./install/bundle_install";
-import { isIndexMappingDisplay } from "./types/records";
+import { isIndexMappingDisplay, isLexiconDisplay } from "./types/records";
 import { resolveRecords } from "./search/resolve_records";
 import { searchQuery } from "./search/search_query";
-import { runMatrixRegression } from "./search_regression/run_matrix";
 
 const REPO_ROOT = join(import.meta.dirname, "..", "..");
 const CATALOG_PATH = join(REPO_ROOT, "web/public/catalog.json");
 const ENV_PRODUCTION_PATH = join(REPO_ROOT, "web/.env.production");
+
 const FEATURED_BUNDLE_ID = "bundle_full_20260710_337619ff";
 const PRIOR_FEATURED_BUNDLE_ID = "bundle_full_20260708_27643bb0";
 const FALLBACK_BUNDLE_ID = "bundle_full_20260616_phase7j_alias_round2_candidate";
+
 const FEATURED_DIR = join(REPO_ROOT, "web/public", FEATURED_BUNDLE_ID);
-const FALLBACK_DIR = join(REPO_ROOT, "web/public", FALLBACK_BUNDLE_ID);
-const MATRIX_PATH = join(REPO_ROOT, "shared/search_regression/search_regression_matrix_v1.jsonl");
+const PRIOR_DIR = join(REPO_ROOT, "web/public", PRIOR_FEATURED_BUNDLE_ID);
 
 const EXPECTED_FEATURED = {
   version: "norm-v3-featured-7n2b4g11-7l13-7n2a8-7n2b9-runtime-smoke-pass",
   content_sha256: "sha256:337619ff43131acde1390d7892d687372785729dac5d85abe82b61cc92285c3c",
   records_sha256: "sha256:d99242ed0c049759ec265f3583683c99a3146854b4481b6d3de86cbd33f50a90",
   search_index_sha256: "sha256:55bf98fc99a592f7003aa338fc7b4790bc9cd642b676c99a725d83a5f9ca79e3",
+  prix_direct_id: "ffbf014bd96ffabf",
+  prix_owner_ir_id: "3b8c3b7a0c5e897d",
 } as const;
 
 const EXPECTED_PRIOR = {
@@ -63,6 +64,11 @@ const EXPECTED_FALLBACK = {
   version: "norm-v3-prior-featured-fallback-phase7j",
   content_sha256: "sha256:e54b8fdf39558ecb639c0763ea9454f085aded7b48f867affe1f96a44709c2ef",
 } as const;
+
+const ENV_PRODUCTION_EXPECTED = `# Non-secret production featured bundle selector (Phase 7N2B4G11).
+# Public identity also present in web/public/catalog.json.
+VITE_FEATURED_BUNDLE_ID=bundle_full_20260710_337619ff
+`;
 
 function sha256File(path: string): string {
   return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`;
@@ -150,7 +156,7 @@ function targetDisplayTexts(records: Awaited<ReturnType<typeof resolveRecords>>)
   return out;
 }
 
-describe("Phase 7N2A4F6 runtime smoke (retargeted post-promotion)", () => {
+describe("Phase 7N2B4G9 runtime smoke (G11 retarget)", () => {
   beforeEach(async () => {
     await deleteSiralexDb().catch(() => undefined);
   });
@@ -159,7 +165,9 @@ describe("Phase 7N2A4F6 runtime smoke (retargeted post-promotion)", () => {
     await deleteSiralexDb().catch(() => undefined);
   });
 
-  it("catalog lists three bundles; production env selects 7N2B as featured; 7J remains rollback", () => {
+  it("catalog contains 7J, prior 7N2A, and featured 7N2B; production env selects 7N2B", () => {
+    expect(readFileSync(ENV_PRODUCTION_PATH, "utf-8")).toBe(ENV_PRODUCTION_EXPECTED);
+
     const featuredBundleId = readProductionFeaturedBundleId();
     expect(featuredBundleId).toBe(FEATURED_BUNDLE_ID);
 
@@ -169,44 +177,43 @@ describe("Phase 7N2A4F6 runtime smoke (retargeted post-promotion)", () => {
     const featured = getFeaturedCatalogEntry(bundles, featuredBundleId);
     const sortFirst = getFeaturedCatalogEntry(bundles, undefined);
     const fallback = bundles.find((entry) => entry.bundle_id === FALLBACK_BUNDLE_ID);
-    const promoted = bundles.find((entry) => entry.bundle_id === FEATURED_BUNDLE_ID);
-    const prior7n2a = bundles.find((entry) => entry.bundle_id === PRIOR_FEATURED_BUNDLE_ID);
-    expect(prior7n2a).toBeDefined();
-    expect(prior7n2a!.version).toBe(EXPECTED_PRIOR.version);
-    expect(prior7n2a!.content_sha256).toBe(EXPECTED_PRIOR.content_sha256);
+    const prior = bundles.find((entry) => entry.bundle_id === PRIOR_FEATURED_BUNDLE_ID);
 
     expect(featured.bundle_id).toBe(FEATURED_BUNDLE_ID);
     expect(featured.version).toBe(EXPECTED_FEATURED.version);
     expect(featured.content_sha256).toBe(EXPECTED_FEATURED.content_sha256);
 
-    // Sort-order alone still prefers 7J — featured selection is VITE, not sort.
     expect(sortFirst.bundle_id).toBe(FALLBACK_BUNDLE_ID);
 
     expect(fallback).toBeDefined();
     expect(fallback!.version).toBe(EXPECTED_FALLBACK.version);
     expect(fallback!.content_sha256).toBe(EXPECTED_FALLBACK.content_sha256);
-    expect(promoted).toBeDefined();
-    expect(promoted!.url_base).toBe(`./${FEATURED_BUNDLE_ID}/`);
+
+    expect(prior).toBeDefined();
+    expect(prior!.version).toBe(EXPECTED_PRIOR.version);
+    expect(prior!.content_sha256).toBe(EXPECTED_PRIOR.content_sha256);
+    expect(prior!.url_base).toBe(`./${PRIOR_FEATURED_BUNDLE_ID}/`);
 
     expect(sha256File(join(FEATURED_DIR, "records.jsonl"))).toBe(EXPECTED_FEATURED.records_sha256);
     expect(sha256File(join(FEATURED_DIR, "search_index.jsonl"))).toBe(
       EXPECTED_FEATURED.search_index_sha256,
     );
-    const manifest = JSON.parse(readFileSync(join(FEATURED_DIR, "bundle.manifest.json"), "utf-8")) as {
-      bundle_id: string;
-      content_sha256: string;
-    };
+    const manifest = JSON.parse(
+      readFileSync(join(FEATURED_DIR, "bundle.manifest.json"), "utf-8"),
+    ) as { bundle_id: string; content_sha256: string };
     expect(manifest.bundle_id).toBe(FEATURED_BUNDLE_ID);
     expect(manifest.content_sha256).toBe(EXPECTED_FEATURED.content_sha256);
   });
 
   it(
-    "featured install activates 7N2B; search smoke passes; 7J remains installable as fallback",
+    "installs featured 7N2B; installing prior 7N2A without activate leaves 7N2B active; explicit select searches 7N2A",
     async () => {
       const featuredBundleId = readProductionFeaturedBundleId();
       const bundles = loadCatalogEntries();
       const featuredEntry = getFeaturedCatalogEntry(bundles, featuredBundleId);
+      const priorEntry = bundles.find((entry) => entry.bundle_id === PRIOR_FEATURED_BUNDLE_ID)!;
       expect(featuredEntry.bundle_id).toBe(FEATURED_BUNDLE_ID);
+      expect(priorEntry.bundle_id).toBe(PRIOR_FEATURED_BUNDLE_ID);
 
       const db = await openSiralexDb();
       try {
@@ -214,20 +221,60 @@ describe("Phase 7N2A4F6 runtime smoke (retargeted post-promotion)", () => {
           fetchImpl: fileFetchImpl(FEATURED_DIR),
           activateOnCommit: true,
         });
-        let active = await getActiveBundleMeta(db);
-        expect(active?.bundle_id).toBe(FEATURED_BUNDLE_ID);
         expect(await getActiveBundleId(db)).toBe(FEATURED_BUNDLE_ID);
-        const scope = active!.storage_scope_id!;
+        const featuredScope = (await getActiveBundleMeta(db))!.storage_scope_id!;
+        expect(await searchIds(db, featuredScope, "maman")).toEqual(["e5164efcdf5e6ca4"]);
+        expect(await searchIds(db, featuredScope, "moto")).toEqual([
+          "b5c9a49f6db2a991",
+          "0a56b8047aeaf117",
+        ]);
+        expect(await searchIds(db, featuredScope, "prix")).toEqual([EXPECTED_FEATURED.prix_direct_id]);
+
+        await installRemoteCatalogBundle(db, priorEntry, "https://example.test/catalog.json", {
+          fetchImpl: fileFetchImpl(PRIOR_DIR),
+          activateOnCommit: false,
+        });
+        const installedPrior = await getInstalledBundleMeta(db, PRIOR_FEATURED_BUNDLE_ID);
+        expect(installedPrior?.expected_content_sha256).toBe(EXPECTED_PRIOR.content_sha256);
+        expect(await getActiveBundleId(db)).toBe(FEATURED_BUNDLE_ID);
+        expect((await getActiveBundleMeta(db))?.bundle_id).toBe(FEATURED_BUNDLE_ID);
+
+        await setActiveBundleId(db, PRIOR_FEATURED_BUNDLE_ID);
+        expect(await getActiveBundleId(db)).toBe(PRIOR_FEATURED_BUNDLE_ID);
+        const priorScope = (await getActiveBundleMeta(db))!.storage_scope_id!;
+        expect(await searchIds(db, priorScope, "maman")).toEqual(["e5164efcdf5e6ca4"]);
+        expect(await searchIds(db, priorScope, "moto")).toEqual([]);
+        expect(await searchIds(db, priorScope, "prix")).toEqual([]);
+
+        await setActiveBundleId(db, FEATURED_BUNDLE_ID);
+        expect(await getActiveBundleId(db)).toBe(FEATURED_BUNDLE_ID);
 
         const smoke: Array<{
           query: string;
-          direction?: "source_to_target" | "target_to_source";
           expectedIds: string[];
+          expectedDisplays?: string[];
         }> = [
-          { query: "moto", expectedIds: ["b5c9a49f6db2a991", "0a56b8047aeaf117"] },
-          { query: "prix", expectedIds: ["ffbf014bd96ffabf"] },
+          {
+            query: "moto",
+            expectedIds: ["b5c9a49f6db2a991", "0a56b8047aeaf117"],
+            expectedDisplays: ["pópo", "pópo"],
+          },
+          {
+            query: "prix",
+            expectedIds: [EXPECTED_FEATURED.prix_direct_id],
+            expectedDisplays: ["Son"],
+          },
           { query: "maman", expectedIds: ["e5164efcdf5e6ca4"] },
-          { query: "móbaa", direction: "target_to_source", expectedIds: ["c5f78c8ac66eac6b"] },
+          { query: "fièvre", expectedIds: [] },
+          { query: "comment dit-on école", expectedIds: [] },
+          { query: "combien ça coûte", expectedIds: [] },
+          { query: "merci beaucoup", expectedIds: [] },
+          {
+            query: "papa",
+            expectedIds: ["b8053579e3035e88"],
+            expectedDisplays: ["bàba", "bàwa"],
+          },
+          { query: "père", expectedIds: ["423369d78d42c100"], expectedDisplays: ["fà"] },
           { query: "hôpital", expectedIds: ["61843e6630c1fbae", "ff4ee495ef997adf"] },
           { query: "clinique", expectedIds: ["ff42659295a657dc"] },
           { query: "centre de santé", expectedIds: ["ffb73938da1a4576"] },
@@ -235,100 +282,70 @@ describe("Phase 7N2A4F6 runtime smoke (retargeted post-promotion)", () => {
           { query: "location", expectedIds: [] },
           { query: "yoro", expectedIds: [] },
         ];
+
         for (const caseRow of smoke) {
-          const ids = await searchIds(db, scope, caseRow.query, caseRow.direction ?? "source_to_target");
+          const ids = await searchIds(db, featuredScope, caseRow.query);
           expect(ids, caseRow.query).toEqual(caseRow.expectedIds);
+          if (caseRow.expectedDisplays) {
+            const displays = targetDisplayTexts(
+              await resolveRecords(db, featuredScope, ids),
+            );
+            expect(displays, `${caseRow.query} displays`).toEqual(caseRow.expectedDisplays);
+          }
         }
 
-        expect(targetDisplayTexts(await resolveRecords(db, scope, await searchIds(db, scope, "hôpital")))).toEqual([
-          "dándaso",
-          "ndándayoro",
-          "ndándadiya",
+        const prixRecords = await resolveRecords(db, featuredScope, [
+          EXPECTED_FEATURED.prix_direct_id,
         ]);
+        expect(prixRecords).toHaveLength(1);
+        expect(isIndexMappingDisplay(prixRecords[0]!)).toBe(true);
+        if (isIndexMappingDisplay(prixRecords[0]!)) {
+          const targets = prixRecords[0]!.display.target_entries ?? [];
+          expect(targets).toHaveLength(1);
+          expect(targets[0]!.display_text.normalize("NFC")).toBe("Son");
+          expect(targets[0]!.anchor).toBe("7n2b_son_v1");
+        }
+        const sonRecords = await resolveRecords(db, featuredScope, [
+          EXPECTED_FEATURED.prix_owner_ir_id,
+        ]);
+        expect(sonRecords).toHaveLength(1);
+        expect(isLexiconDisplay(sonRecords[0]!)).toBe(true);
+        if (isLexiconDisplay(sonRecords[0]!)) {
+          expect(sonRecords[0]!.preferred_form.normalize("NFC")).toBe("Son");
+          expect(sonRecords[0]!.ir_id).toBe(EXPECTED_FEATURED.prix_owner_ir_id);
+          expect(sonRecords[0]!.display.headword_latin.normalize("NFC")).toBe("Son");
+        }
+
         expect(
-          targetDisplayTexts(await resolveRecords(db, scope, await searchIds(db, scope, "clinique"))),
+          targetDisplayTexts(
+            await resolveRecords(db, featuredScope, await searchIds(db, featuredScope, "hôpital")),
+          ),
+        ).toEqual(["dándaso", "ndándayoro", "ndándadiya"]);
+        expect(
+          targetDisplayTexts(
+            await resolveRecords(db, featuredScope, await searchIds(db, featuredScope, "clinique")),
+          ),
         ).toEqual(["ndándayoro", "ndándadiya"]);
         expect(
-          targetDisplayTexts(await resolveRecords(db, scope, await searchIds(db, scope, "centre de santé"))),
+          targetDisplayTexts(
+            await resolveRecords(
+              db,
+              featuredScope,
+              await searchIds(db, featuredScope, "centre de santé"),
+            ),
+          ),
         ).toEqual(["ndándayoro", "ndándadiya"]);
 
-        const fallbackEntry = bundles.find((entry) => entry.bundle_id === FALLBACK_BUNDLE_ID)!;
-        await installRemoteCatalogBundle(db, fallbackEntry, "https://example.test/catalog.json", {
-          fetchImpl: fileFetchImpl(FALLBACK_DIR),
-          activateOnCommit: false,
-        });
-        const installedFallback = await getInstalledBundleMeta(db, FALLBACK_BUNDLE_ID);
-        expect(installedFallback?.expected_content_sha256).toBe(EXPECTED_FALLBACK.content_sha256);
-        expect(await getActiveBundleId(db)).toBe(FEATURED_BUNDLE_ID);
+        const placeDisplays = targetDisplayTexts(
+          await resolveRecords(db, featuredScope, await searchIds(db, featuredScope, "place")),
+        );
+        expect(placeDisplays).not.toContain("ndándayoro");
+        expect(placeDisplays).not.toContain("ndándadiya");
       } finally {
         db.close();
       }
-    },
-    600_000,
-  );
 
-  it(
-    "promoted featured 7N2B passes frozen 7L runtime matrix 13/13",
-    async () => {
-      const tempManifestPath = join("/tmp", "phase7n2b4g11_f6_retarget_7l_manifest.json");
-      writeFileSync(
-        tempManifestPath,
-        `${JSON.stringify(
-          {
-            schema_version: "search_regression_matrix_manifest_v1",
-            matrix_schema_version: "search_regression_case_v1",
-            bundle_id: FEATURED_BUNDLE_ID,
-            catalog_version: EXPECTED_FEATURED.version,
-            norm_version: "norm_v3",
-            search_index_sha256: EXPECTED_FEATURED.search_index_sha256,
-            bundle_content_sha256: EXPECTED_FEATURED.content_sha256,
-            case_count: 13,
-            purpose: "Temporary G11 retargeted F6 7L runtime matrix (tracked matrices untouched).",
-          },
-          null,
-          2,
-        )}\n`,
-        "utf-8",
-      );
-
-      const result = await runMatrixRegression({
-        matrixPath: MATRIX_PATH,
-        manifestPath: tempManifestPath,
-        bundleDir: FEATURED_DIR,
-        catalogPath: CATALOG_PATH,
-      });
-      expect(result.bundle_id).toBe(FEATURED_BUNDLE_ID);
-      expect(result.catalog_version).toBe(EXPECTED_FEATURED.version);
-      expect(result.passed_case_count).toBe(13);
-      expect(result.failed_case_count).toBe(0);
-    },
-    180_000,
-  );
-
-  it(
-    "featured search_index loads through the same IndexedDB import path used by runtime",
-    async () => {
-      const db = await openSiralexDb();
-      try {
-        const indexText = readFileSync(join(FEATURED_DIR, "search_index.jsonl"));
-        const recordsText = readFileSync(join(FEATURED_DIR, "records.jsonl"));
-        await importSearchIndexJsonl(db, new Blob([indexText]), {
-          bundleId: FEATURED_BUNDLE_ID,
-          batchSize: 500,
-        });
-        await importRecordsJsonl(db, new Blob([recordsText]), {
-          bundleId: FEATURED_BUNDLE_ID,
-          batchSize: 500,
-        });
-
-        expect(await searchIds(db, FEATURED_BUNDLE_ID, "maman")).toEqual(["e5164efcdf5e6ca4"]);
-        expect(await searchIds(db, FEATURED_BUNDLE_ID, "hôpital")).toEqual([
-          "61843e6630c1fbae",
-          "ff4ee495ef997adf",
-        ]);
-      } finally {
-        db.close();
-      }
+      expect(readFileSync(ENV_PRODUCTION_PATH, "utf-8")).toBe(ENV_PRODUCTION_EXPECTED);
     },
     600_000,
   );

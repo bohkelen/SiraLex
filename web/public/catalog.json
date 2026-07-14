@@ -20,10 +20,26 @@
     {
       "bundle_id": "bundle_full_20260708_27643bb0",
       "name": "French ↔ Maninka",
-      "version": "norm-v3-featured-7n2a4f8-7l13-7n2a8-runtime-smoke-pass",
+      "version": "norm-v3-prior-featured-fallback-7n2a4f8",
       "size_bytes": 26166937,
       "url_base": "./bundle_full_20260708_27643bb0/",
       "content_sha256": "sha256:27643bb092ff31117a133378db7562080c8b1d0d87fe111f5b83973e15a08484",
+      "languages": {
+        "source_lang": "fr",
+        "target_lang": "mnk"
+      },
+      "language_labels": {
+        "source": "French",
+        "target": "Maninka"
+      }
+    },
+    {
+      "bundle_id": "bundle_full_20260710_337619ff",
+      "name": "French ↔ Maninka",
+      "version": "norm-v3-featured-7n2b4g11-7l13-7n2a8-7n2b9-runtime-smoke-pass",
+      "size_bytes": 26169580,
+      "url_base": "./bundle_full_20260710_337619ff/",
+      "content_sha256": "sha256:337619ff43131acde1390d7892d687372785729dac5d85abe82b61cc92285c3c",
       "languages": {
         "source_lang": "fr",
         "target_lang": "mnk"
