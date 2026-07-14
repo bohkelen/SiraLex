@@ -157,12 +157,17 @@ describe("Phase 7N2A4F6 runtime smoke (retargeted post-promotion)", () => {
     expect(featuredBundleId).toBe(FEATURED_BUNDLE_ID);
 
     const bundles = loadCatalogEntries();
-    expect(bundles).toHaveLength(2);
+    expect(bundles).toHaveLength(3);
 
     const featured = getFeaturedCatalogEntry(bundles, featuredBundleId);
     const sortFirst = getFeaturedCatalogEntry(bundles, undefined);
     const fallback = bundles.find((entry) => entry.bundle_id === FALLBACK_BUNDLE_ID);
     const promoted = bundles.find((entry) => entry.bundle_id === FEATURED_BUNDLE_ID);
+    const candidate7n2b = bundles.find(
+      (entry) => entry.bundle_id === "bundle_full_20260710_337619ff",
+    );
+    expect(candidate7n2b).toBeDefined();
+    expect(candidate7n2b!.version).toContain("candidate-catalog-visible-7n2b4g8");
 
     expect(featured.bundle_id).toBe(FEATURED_BUNDLE_ID);
     expect(featured.version).toBe(EXPECTED_FEATURED.version);

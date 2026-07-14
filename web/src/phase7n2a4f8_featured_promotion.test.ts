@@ -166,7 +166,10 @@ describe("Phase 7N2A4F8 featured promotion", () => {
     expect(fallback!.version).toBe(EXPECTED_FALLBACK.version);
     expect(fallback!.content_sha256).toBe(EXPECTED_FALLBACK.content_sha256);
     expect(promoted).toBeDefined();
-    expect(bundles).toHaveLength(2);
+    expect(bundles).toHaveLength(3);
+    expect(
+      bundles.find((entry) => entry.bundle_id === "bundle_full_20260710_337619ff"),
+    ).toBeDefined();
 
     expect(sha256File(join(PROMOTED_DIR, "records.jsonl"))).toBe(EXPECTED_PROMOTED.records_sha256);
     expect(sha256File(join(PROMOTED_DIR, "search_index.jsonl"))).toBe(

@@ -32,6 +32,22 @@
         "source": "French",
         "target": "Maninka"
       }
+    },
+    {
+      "bundle_id": "bundle_full_20260710_337619ff",
+      "name": "French ↔ Maninka",
+      "version": "norm-v3-candidate-catalog-visible-7n2b4g8-7l13-7n2a8-7n2b9",
+      "size_bytes": 26169580,
+      "url_base": "./bundle_full_20260710_337619ff/",
+      "content_sha256": "sha256:337619ff43131acde1390d7892d687372785729dac5d85abe82b61cc92285c3c",
+      "languages": {
+        "source_lang": "fr",
+        "target_lang": "mnk"
+      },
+      "language_labels": {
+        "source": "French",
+        "target": "Maninka"
+      }
     }
   ]
 }
