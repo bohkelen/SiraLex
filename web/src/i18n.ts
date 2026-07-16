@@ -264,7 +264,7 @@ const MESSAGES = {
     "search.disabledNoActiveBundle": "Search disabled: no active bundle.",
     "search.noMatch": "No results for \"{query}\".",
     "search.noMatchGuidance": "No results for \"{query}\". Check the search direction or try another form.",
-    "search.noPhraseMatch": "No exact result for this expression. Try one word at a time.",
+    "search.noPhraseMatch": "Try searching one word at a time.",
     "search.resultMeta": "{count} result(s) for \"{query}\"",
     "search.error": "Search error: {error}",
     "render.noTranslation": "(no translation available)",
@@ -508,7 +508,7 @@ const MESSAGES = {
     "search.noMatch": "Aucun résultat pour « {query} ».",
     "search.noMatchGuidance":
       "Aucun résultat pour « {query} ». Vérifiez le sens de recherche ou essayez une autre forme.",
-    "search.noPhraseMatch": "Aucun résultat exact pour cette expression. Essayez un mot à la fois.",
+    "search.noPhraseMatch": "Essayez de chercher un mot à la fois.",
     "search.resultMeta": "{count} résultat(s) pour « {query} »",
     "search.error": "Erreur de recherche : {error}",
     "render.noTranslation": "(pas de traduction disponible)",

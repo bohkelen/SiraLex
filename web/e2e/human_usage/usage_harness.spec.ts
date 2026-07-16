@@ -272,7 +272,13 @@ function parseResultCount(searchMetaText: string): number | null {
 }
 
 function deriveObservedStatus(searchMetaText: string, resultCount: number | null): ObservedResultStatus {
-  if (/No results|No exact result|Aucun résultat|Aucun résultat exact/i.test(searchMetaText)) return "miss";
+  if (
+    /No results|No exact result|Aucun résultat|Aucun résultat exact|Try searching one word at a time|Essayez de chercher un mot à la fois|one word at a time|un mot à la fois/i.test(
+      searchMetaText,
+    )
+  ) {
+    return "miss";
+  }
   if (resultCount === 1) return "hit_single";
   if (typeof resultCount === "number" && resultCount > 1) return "hit_multi";
   return "blocked";

@@ -157,7 +157,60 @@ describe("Phase 7G result rendering", () => {
 
   it("returns phrase-miss copy for multi-word no-result queries", () => {
     expect(getNoResultMessage("ferme la bouche")).toBe(
-      "Aucun résultat exact pour cette expression. Essayez un mot à la fois.",
+      "Essayez de chercher un mot à la fois.",
+    );
+  });
+});
+
+describe("Phase 7N2E4J3 minimal phrase guidance", () => {
+  it("returns FR phrase guidance for phrase-like misses", () => {
+    setCurrentLocale("fr");
+    expect(getNoResultMessage("comment dit-on école")).toBe(
+      "Essayez de chercher un mot à la fois.",
+    );
+    expect(getNoResultMessage("merci beaucoup")).toBe(
+      "Essayez de chercher un mot à la fois.",
+    );
+  });
+
+  it("returns EN phrase guidance for phrase-like misses", () => {
+    setCurrentLocale("en");
+    expect(getNoResultMessage("comment dit-on école")).toBe(
+      "Try searching one word at a time.",
+    );
+  });
+
+  it("keeps single-word miss guidance (not phrase guidance)", () => {
+    setCurrentLocale("fr");
+    const singleWordMiss = getNoResultMessage("inconnu");
+    expect(singleWordMiss).toBe(
+      "Aucun résultat pour « inconnu ». Vérifiez le sens de recherche ou essayez une autre forme.",
+    );
+    expect(singleWordMiss).not.toContain("un mot à la fois");
+
+    setCurrentLocale("en");
+    const enSingleWordMiss = getNoResultMessage("unknownlemma");
+    expect(enSingleWordMiss).toContain("No results for");
+    expect(enSingleWordMiss).not.toBe("Try searching one word at a time.");
+  });
+
+  it("does not return phrase guidance for empty or whitespace-only queries", () => {
+    setCurrentLocale("en");
+    expect(getNoResultMessage("")).not.toBe("Try searching one word at a time.");
+    expect(getNoResultMessage("   ")).not.toBe("Try searching one word at a time.");
+    setCurrentLocale("fr");
+    expect(getNoResultMessage("")).not.toBe("Essayez de chercher un mot à la fois.");
+    expect(getNoResultMessage("   ")).not.toBe("Essayez de chercher un mot à la fois.");
+  });
+
+  it("documents that phrase guidance is miss-path only (hits never call getNoResultMessage)", () => {
+    // Search hits render result cards via renderResultsList; getNoResultMessage is only
+    // used when ir_ids.length === 0. A phrase-like query that hits therefore never shows
+    // phrase guidance. This assertion keeps the miss helper contract explicit.
+    setCurrentLocale("en");
+    expect(typeof getNoResultMessage).toBe("function");
+    expect(getNoResultMessage("some multiword miss")).toBe(
+      "Try searching one word at a time.",
     );
   });
 });
