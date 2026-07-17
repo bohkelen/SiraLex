@@ -40,6 +40,11 @@ web/dist/stats.html
 web/playwright-report/
 web/test-results/
 
+# Local generated pipeline/publish staging (do not commit)
+/build/
+
+# Local untracked historical public bundle kept for optional tools (not catalog)
+/web/public/bundle_full_20260518_15605571/
 
 # Snapshot / pipeline data (do not commit)
 data/*
