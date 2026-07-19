@@ -151,7 +151,7 @@ describe("Phase 7G result rendering", () => {
 
   it("returns improved empty-state copy", () => {
     expect(getNoResultMessage("inconnu")).toBe(
-      "Aucun résultat pour « inconnu ». Vérifiez le sens de recherche ou essayez une autre forme.",
+      "Aucun résultat pour « inconnu ». Essayez une autre orthographe ou une autre forme.",
     );
   });
 
@@ -184,14 +184,18 @@ describe("Phase 7N2E4J3 minimal phrase guidance", () => {
     setCurrentLocale("fr");
     const singleWordMiss = getNoResultMessage("inconnu");
     expect(singleWordMiss).toBe(
-      "Aucun résultat pour « inconnu ». Vérifiez le sens de recherche ou essayez une autre forme.",
+      "Aucun résultat pour « inconnu ». Essayez une autre orthographe ou une autre forme.",
     );
     expect(singleWordMiss).not.toContain("un mot à la fois");
+    expect(singleWordMiss).not.toContain("sens de recherche");
 
     setCurrentLocale("en");
     const enSingleWordMiss = getNoResultMessage("unknownlemma");
-    expect(enSingleWordMiss).toContain("No results for");
+    expect(enSingleWordMiss).toBe(
+      'No results for "unknownlemma". Try another spelling or form.',
+    );
     expect(enSingleWordMiss).not.toBe("Try searching one word at a time.");
+    expect(enSingleWordMiss).not.toContain("search direction");
   });
 
   it("does not return phrase guidance for empty or whitespace-only queries", () => {

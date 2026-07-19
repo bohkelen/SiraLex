@@ -263,7 +263,7 @@ const MESSAGES = {
     "search.disabledBusy": "Search temporarily unavailable during install/update.",
     "search.disabledNoActiveBundle": "Search disabled: no active bundle.",
     "search.noMatch": "No results for \"{query}\".",
-    "search.noMatchGuidance": "No results for \"{query}\". Check the search direction or try another form.",
+    "search.noMatchGuidance": "No results for \"{query}\". Try another spelling or form.",
     "search.noPhraseMatch": "Try searching one word at a time.",
     "search.resultMeta": "{count} result(s) for \"{query}\"",
     "search.error": "Search error: {error}",
@@ -507,7 +507,7 @@ const MESSAGES = {
     "search.disabledNoActiveBundle": "Recherche désactivée : aucun bundle actif.",
     "search.noMatch": "Aucun résultat pour « {query} ».",
     "search.noMatchGuidance":
-      "Aucun résultat pour « {query} ». Vérifiez le sens de recherche ou essayez une autre forme.",
+      "Aucun résultat pour « {query} ». Essayez une autre orthographe ou une autre forme.",
     "search.noPhraseMatch": "Essayez de chercher un mot à la fois.",
     "search.resultMeta": "{count} résultat(s) pour « {query} »",
     "search.error": "Erreur de recherche : {error}",
