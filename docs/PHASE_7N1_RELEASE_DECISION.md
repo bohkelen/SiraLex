@@ -23,9 +23,11 @@ rejected
 
 **Current status:** `not_ready_for_validation`
 
-**Why:** A reproducible candidate package has been built and recorded from the exact currently featured logical bundle. No human tester has begun the real-device matrix. Release status remains `not_ready_for_validation`.
+**Why:** Phase 7N1R1 recorded one immutable release-candidate `.siralex.zip` wrapping the current featured 7N2B bundle (`bundle_full_20260710_337619ff`). No human tester has begun the real-device matrix. Release status remains `not_ready_for_validation`.
 
 Advance to `in_device_validation` only after a reproducible candidate is built, recorded in the evidence file, and a human tester begins the device matrix.
+
+**Identity provenance:** Phase 7N1R1 (`docs/reports/phase7n1r1_featured_release_candidate_package_report.md`) retires the stale Phase 7J package identity from the original Slice 5 record. Do not use the old 7J package SHA for remaining Phase 7N1 device evidence.
 
 ---
 
@@ -34,13 +36,16 @@ Advance to `in_device_validation` only after a reproducible candidate is built, 
 | Field | Value |
 |---|---|
 | Recorded? | yes |
-| Primary `bundle_id` | `bundle_full_20260616_phase7j_alias_round2_candidate` |
-| Primary `content_sha256` | `sha256:e54b8fdf39558ecb639c0763ea9454f085aded7b48f867affe1f96a44709c2ef` |
-| Package filename | `bundle_full_20260616_phase7j_alias_round2_candidate.siralex.zip` |
-| Package SHA-256 | `sha256:d8273a18b739b8f0c165335dd104f944cb4079ed826a54f43b28d77ba26f7903` |
-| git commit at build | `befccc6ddec2a06dba5f609cfd20df067764f646` |
+| Primary `bundle_id` | `bundle_full_20260710_337619ff` |
+| Primary `content_sha256` | `sha256:337619ff43131acde1390d7892d687372785729dac5d85abe82b61cc92285c3c` |
+| Featured catalog version | `norm-v3-featured-7n2b4g11-7l13-7n2a8-7n2b9-runtime-smoke-pass` |
+| Package filename | `bundle_full_20260710_337619ff.siralex.zip` |
+| Package SHA-256 | `sha256:f27530705132bf0fb81628f129d49d985b8456b63734bfbb93a966ded7c143b0` |
+| Package byte length | `26171149` |
+| git commit at build | `6ce089186a79fb970c2fd519a0bae8895f4a59a8` |
 | Evidence record link | `docs/reports/phase7n1_slice5_device_evidence_record.md` |
-| Provenance | Package constructed as a deterministic STORED-ZIP transport envelope around the exact currently featured logical bundle. Records, index, manifest identity, and content hash were not regenerated or altered. |
+| R1 package report | `docs/reports/phase7n1r1_featured_release_candidate_package_report.md` |
+| Provenance | Package constructed as a deterministic STORED-ZIP transport envelope around the exact currently featured logical bundle (`VITE_FEATURED_BUNDLE_ID=bundle_full_20260710_337619ff`). Records, index, manifest identity, and content hash were not regenerated or altered. |
 
 ---
 
@@ -96,11 +101,11 @@ Required before any approval status:
 - [ ] all required environments have completed evidence
 - [ ] all blocker scenarios pass
 - [ ] all major issues have explicit accepted disposition
-- [ ] candidate package identity is recorded
+- [x] candidate package identity is recorded
 - [ ] offline persistence passes on Android and iPhone
 - [ ] release decision signed by designated project owner
 
-All boxes remain unchecked.
+Device-evidence boxes remain unchecked; candidate identity recorded in Phase 7N1R1.
 
 ---
 
@@ -122,8 +127,8 @@ All boxes remain unchecked.
 | Decision status | `not_ready_for_validation` |
 | Decision owner | |
 | Decision date | |
-| Decision rationale | A reproducible candidate package has been built and recorded from the exact currently featured logical bundle. No human tester has begun the real-device matrix. Release status remains not_ready_for_validation. |
-| Follow-up items | Transfer the recorded featured-bundle package to real devices; execute Android and iPhone matrix; attach evidence; review blockers. |
+| Decision rationale | Phase 7N1R1 established the immutable featured release-candidate package for `bundle_full_20260710_337619ff` (package SHA-256 `sha256:f27530705132bf0fb81628f129d49d985b8456b63734bfbb93a966ded7c143b0`). No human tester has begun the real-device matrix. Release status remains not_ready_for_validation. |
+| Follow-up items | Build/record replacement package for scenario B if needed; transfer the recorded 7N2B package to real devices; execute Android and iPhone matrix; attach evidence; review blockers. |
 | Rollback / recovery note | No package release authorized. Existing catalog and featured bundle paths unchanged. Invalid package attempts must leave prior active dictionary intact per Slice 4 behavior. |
 
 ---

@@ -64,10 +64,11 @@ Record from in-app diagnostics or maintainer verification **at session start**.
 | `norm_version` | |
 | Matches `web/public/catalog.json` featured entry? | yes / no |
 
-**Featured baseline at template time:**
+**Featured baseline at template time (Phase 7N1R1):**
 
-- `bundle_id`: `bundle_full_20260616_phase7j_alias_round2_candidate`
-- `catalog_version`: `norm-v3-featured-enriched-source-aliases-3-source-index-supplements-2`
+- `bundle_id`: `bundle_full_20260710_337619ff`
+- `catalog_version`: `norm-v3-featured-7n2b4g11-7l13-7n2a8-7n2b9-runtime-smoke-pass`
+- package release candidate: `bundle_full_20260710_337619ff.siralex.zip` (`sha256:f27530705132bf0fb81628f129d49d985b8456b63734bfbb93a966ded7c143b0`)
 
 ---
 
