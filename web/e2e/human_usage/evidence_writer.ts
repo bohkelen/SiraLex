@@ -152,6 +152,10 @@ function deriveIssueClass(status: ObservedResultStatus, expected: IssueClass): I
   if (status === "hit_multi" && expected === "pending_human_review") return "interpretability";
   if (status === "miss" && expected === "pending_human_review") return "pending_human_review";
   if (status === "blocked" || status === "error") return "setup_ux";
+  // Successful offline/reopen searches are not setup failures (offline_check personas expect setup_ux).
+  if ((status === "hit_single" || status === "hit_multi") && expected === "setup_ux") {
+    return "no_issue_observed";
+  }
   return expected;
 }
 
