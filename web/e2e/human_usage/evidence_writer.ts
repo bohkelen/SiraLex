@@ -156,6 +156,10 @@ function deriveIssueClass(status: ObservedResultStatus, expected: IssueClass): I
   if ((status === "hit_single" || status === "hit_multi") && expected === "setup_ux") {
     return "no_issue_observed";
   }
+  // Normal offline content miss after searchable reopen is not a setup failure.
+  if (status === "miss" && expected === "setup_ux") {
+    return "no_issue_observed";
+  }
   return expected;
 }
 

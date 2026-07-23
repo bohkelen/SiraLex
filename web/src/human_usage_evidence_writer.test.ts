@@ -40,7 +40,7 @@ function rowFor(status: "hit_single" | "hit_multi" | "miss" | "blocked" | "error
   });
 }
 
-describe("Phase 7N2K4P2 offline issue-class cleanup", () => {
+describe("Phase 7N2K/L offline issue-class cleanup", () => {
   it("maps successful offline hit_single away from setup_ux", () => {
     const row = rowFor("hit_single");
     expect(row.issue_class).toBe("no_issue_observed");
@@ -53,16 +53,31 @@ describe("Phase 7N2K4P2 offline issue-class cleanup", () => {
     expect(row.candidate_intervention_category).toBe("none");
   });
 
-  it("keeps miss + setup_ux unchanged", () => {
+  it("keeps miss + setup_ux as no_issue_observed with status still miss", () => {
     const row = rowFor("miss");
-    expect(row.issue_class).toBe("setup_ux");
-    expect(row.candidate_intervention_category).toBe("offline_install_reliability");
+    expect(row.observed_result.status).toBe("miss");
+    expect(row.issue_class).toBe("no_issue_observed");
+    expect(row.candidate_intervention_category).toBe("none");
   });
 
   it("keeps blocked and error as setup_ux", () => {
     expect(rowFor("blocked").issue_class).toBe("setup_ux");
     expect(rowFor("error").issue_class).toBe("setup_ux");
     expect(rowFor("blocked").candidate_intervention_category).toBe("offline_install_reliability");
+  });
+
+  it("keeps pending_human_review + miss as pending_human_review", () => {
+    const reviewTask: ScenarioTask = {
+      ...offlineTask,
+      id: "pending_review_miss",
+      layer: "scenario_card",
+      expectedIssueClass: "pending_human_review",
+      candidateInterventionCategory: "human_review_required",
+    };
+    const row = rowFor("miss", reviewTask);
+    expect(row.observed_result.status).toBe("miss");
+    expect(row.issue_class).toBe("pending_human_review");
+    expect(row.candidate_intervention_category).toBe("human_review_required");
   });
 
   it("leaves non-setup expected classes unchanged for hits", () => {
