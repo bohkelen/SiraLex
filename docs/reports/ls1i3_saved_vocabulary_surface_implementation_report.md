@@ -8,7 +8,7 @@ LS1_SAVED_VOCABULARY_SURFACE_IMPLEMENTED
 
 ## Commit
 
-`TBD_AT_COMMIT` — replaced below after git commit.
+`ddf431a51692f5901bf91d25a48c3b4456c92271` (`feat(learning): add saved vocabulary surface`).
 
 Built on LS1I2 `91f6e8490dbac464231e6f1e6a9de9c2da118cf4`.
 
