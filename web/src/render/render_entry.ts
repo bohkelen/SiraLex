@@ -15,6 +15,7 @@ import type {
   SenseRaw,
   ExampleRaw,
   SubEntry,
+  TargetEntry,
 } from "../types/records";
 import { isLexiconDisplay, isIndexMappingDisplay } from "../types/records";
 import { t } from "../i18n";
@@ -266,10 +267,9 @@ function renderLexiconEntry(
 }
 
 function renderIndexMapping(
-  record: EnrichedRecord,
   d: IndexMappingDisplayFields,
   targetEntriesLabel: string,
-  onSearch?: (query: string) => void,
+  onOpenTargetEntry?: (target: TargetEntry) => void,
 ): HTMLElement {
   const wrap = el("div", "entry-detail entry-index");
 
@@ -277,16 +277,26 @@ function renderIndexMapping(
   header.appendChild(el("h3", "entry-headword", d.source_term));
   wrap.appendChild(header);
 
+  const status = el("div", "entry-target-status");
+  status.id = "entry-target-status";
+  status.setAttribute("role", "status");
+  status.hidden = true;
+  wrap.appendChild(status);
+
   if (d.target_entries && d.target_entries.length > 0) {
     const targets = el("div", "entry-targets");
     targets.appendChild(el("div", "targets-label", targetEntriesLabel));
     for (const target of d.target_entries) {
-      if (onSearch) {
+      if (onOpenTargetEntry) {
         const btn = document.createElement("button");
         btn.className = "target-item target-link";
         btn.type = "button";
+        btn.setAttribute(
+          "aria-label",
+          t("entry.openTarget", { headword: target.display_text }),
+        );
         btn.appendChild(el("span", "target-text", target.display_text));
-        btn.addEventListener("click", () => onSearch(target.display_text));
+        btn.addEventListener("click", () => onOpenTargetEntry(target));
         targets.appendChild(btn);
       } else {
         const item = el("div", "target-item");
@@ -302,7 +312,11 @@ function renderIndexMapping(
 
 export type EntryDetailCallbacks = {
   onBack: () => void;
-  onSearch?: (query: string) => void;
+  /**
+   * Open a target lexicon entry from an index mapping by identity (anchor/ir_id).
+   * Must not perform a text search.
+   */
+  onOpenTargetEntry?: (target: TargetEntry) => void;
   targetEntriesLabel?: string;
   /** Present only for lexicon entries when the app wants a Learning Save control. */
   learning?: EntryLearningCallbacks;
@@ -316,7 +330,8 @@ export type EntryDetailView = {
 /**
  * Render a full entry detail view for a single enriched record.
  * Includes a "Back to results" callback button.
- * If onSearch is provided, target entries in index mappings become clickable.
+ * If onOpenTargetEntry is provided, target entries in index mappings become
+ * clickable for direct lexicon-entry navigation (not text search).
  */
 export function renderEntryDetail(
   record: EnrichedRecord,
@@ -340,10 +355,9 @@ export function renderEntryDetail(
   } else if (isIndexMappingDisplay(record)) {
     container.appendChild(
       renderIndexMapping(
-        record,
         record.display,
         callbacks.targetEntriesLabel ?? t("entry.targetEntriesDefault"),
-        callbacks.onSearch,
+        callbacks.onOpenTargetEntry,
       ),
     );
   } else {
@@ -351,4 +365,12 @@ export function renderEntryDetail(
   }
 
   return { root: container, setLearningSaveState };
+}
+
+/** Show a non-destructive unavailable message on an open index-mapping surface. */
+export function showTargetEntryUnavailable(root: HTMLElement): void {
+  const status = root.querySelector<HTMLElement>("#entry-target-status");
+  if (!status) return;
+  status.hidden = false;
+  status.textContent = t("entry.targetUnavailable");
 }

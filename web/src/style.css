@@ -574,6 +574,25 @@ a {
   font-weight: 600;
 }
 
+.entry-target-status {
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--danger, #c45c5c);
+}
+
+.entry-target-status[hidden] {
+  display: none;
+}
+
+.entry-headword:focus {
+  outline: none;
+}
+
+.entry-headword:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .target-item {
   font-size: 14px;
   padding-left: 8px;

@@ -95,7 +95,7 @@ import {
   renderResultsList,
   type ResultDisplayContext,
 } from "./render/render_results";
-import { renderEntryDetail } from "./render/render_entry";
+import { renderEntryDetail, showTargetEntryUnavailable } from "./render/render_entry";
 import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
 import {
   canOfferLearningSave,
@@ -106,7 +106,8 @@ import {
   createSavedVocabularySession,
   type SavedVocabularyModel,
 } from "./learning/saved_vocabulary_session";
-import type { EnrichedRecord } from "./types/records";
+import { openTargetLexiconEntry } from "./navigation/open_target_lexicon_entry";
+import type { EnrichedRecord, TargetEntry } from "./types/records";
 import { isLexiconDisplay } from "./types/records";
 
 registerSW({ immediate: true });
@@ -2087,6 +2088,11 @@ searchInput.addEventListener("input", () => {
   }, 150);
 });
 
+/** Origin for entry-detail Back navigation (no router). */
+type EntryNavOrigin =
+  | { kind: "search"; restoreDirection: SearchDirection }
+  | { kind: "saved_vocabulary" };
+
 function showResultsList() {
   resultsHostContext = "search";
   savedVocabularyGeneration += 1;
@@ -2094,15 +2100,12 @@ function showResultsList() {
   if (lastSearchResults.length === 0) return;
 
   const list = renderResultsList(lastSearchResults, (record) => {
-    showEntryDetail(record, "search");
+    showEntryDetail(record, {
+      kind: "search",
+      restoreDirection: searchDirection,
+    });
   });
   if (list) searchResults.appendChild(list);
-}
-
-function triggerSearch(query: string) {
-  searchInput.value = query;
-  searchSeq += 1;
-  void runSearch(query);
 }
 
 function showSavedVocabulary() {
@@ -2123,7 +2126,7 @@ function showSavedVocabulary() {
         showResultsList();
       },
       onOpen: (row) => {
-        showEntryDetail(row.liveEntry, "saved_vocabulary");
+        showEntryDetail(row.liveEntry, { kind: "saved_vocabulary" });
       },
       onRemove: (row) => {
         void session.remove(row.bundle_id, row.ir_id).then((result) => {
@@ -2152,10 +2155,59 @@ function showSavedVocabulary() {
   void session.load();
 }
 
-function showEntryDetail(record: EnrichedRecord, openedFrom: "search" | "saved_vocabulary" = "search") {
+function setSearchDirection(direction: SearchDirection) {
+  if (searchDirection === direction) {
+    updateLangToggle();
+    return;
+  }
+  searchDirection = direction;
+  updateLangToggle();
+}
+
+function handleOpenTargetLexiconEntry(target: TargetEntry, mappingRoot: HTMLElement) {
+  const pendingEntryGen = entryDetailGeneration;
+  const pendingSearchSeq = searchSeq;
+  const pendingHost = resultsHostContext;
+  const pendingBundleId = currentActiveBundle?.bundle_id;
+  const restoreDirection = searchDirection;
+  const preservedQuery = searchInput.value;
+
+  void openTargetLexiconEntry({
+    target,
+    restoreDirection,
+    getActiveMeta: () => currentActiveBundle,
+    openDb: openSiralexDb,
+    isCurrent: () =>
+      entryDetailGeneration === pendingEntryGen &&
+      searchSeq === pendingSearchSeq &&
+      resultsHostContext === pendingHost &&
+      currentActiveBundle?.bundle_id === pendingBundleId &&
+      searchInput.value === preservedQuery,
+    setDirectionTargetToSource: () => {
+      setSearchDirection("target_to_source");
+    },
+    openEntryDetail: (record, backDirection) => {
+      showEntryDetail(record, { kind: "search", restoreDirection: backDirection });
+      const headword = searchResults.querySelector<HTMLElement>(".entry-headword");
+      headword?.focus();
+    },
+    onUnavailable: () => {
+      if (
+        entryDetailGeneration !== pendingEntryGen ||
+        resultsHostContext !== pendingHost ||
+        searchSeq !== pendingSearchSeq
+      ) {
+        return;
+      }
+      showTargetEntryUnavailable(mappingRoot);
+    },
+  });
+}
+
+function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
   const generation = ++entryDetailGeneration;
-  resultsHostContext = openedFrom === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
-  if (openedFrom === "search") {
+  resultsHostContext = origin.kind === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
+  if (origin.kind === "search") {
     savedVocabularyGeneration += 1;
   }
   searchResults.innerHTML = "";
@@ -2178,15 +2230,19 @@ function showEntryDetail(record: EnrichedRecord, openedFrom: "search" | "saved_v
       })
     : undefined;
 
+  let entryRoot: HTMLElement | null = null;
   const view = renderEntryDetail(record, {
     onBack: () => {
-      if (openedFrom === "saved_vocabulary") {
+      if (origin.kind === "saved_vocabulary") {
         showSavedVocabulary();
-      } else {
-        showResultsList();
+        return;
       }
+      setSearchDirection(origin.restoreDirection);
+      showResultsList();
     },
-    onSearch: (query) => triggerSearch(query),
+    onOpenTargetEntry: (target) => {
+      if (entryRoot) handleOpenTargetLexiconEntry(target, entryRoot);
+    },
     targetEntriesLabel: getTargetEntriesLabel(
       currentActiveBundle?.language_meta,
       t("language.target"),
@@ -2206,8 +2262,15 @@ function showEntryDetail(record: EnrichedRecord, openedFrom: "search" | "saved_v
       : undefined,
   });
 
+  entryRoot = view.root;
   setLearningSaveState = view.setLearningSaveState;
   searchResults.appendChild(view.root);
+
+  const headword = view.root.querySelector<HTMLElement>(".entry-headword");
+  if (headword && !headword.hasAttribute("tabindex")) {
+    headword.tabIndex = -1;
+  }
+  headword?.focus();
 
   if (offerLearning && learningAvailable && session) {
     void session.loadInitial();
