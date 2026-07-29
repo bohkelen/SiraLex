@@ -101,6 +101,11 @@ import {
   createEntryLearningSession,
   type LearningSaveControlState,
 } from "./learning/entry_learning_session";
+import {
+  createEmptySavedVocabularyViewModel,
+  createSavedVocabularySession,
+} from "./learning/saved_vocabulary_session";
+import { applySavedVocabularyView } from "./render/render_saved_vocabulary";
 import type { EnrichedRecord } from "./types/records";
 import { isLexiconDisplay } from "./types/records";
 
@@ -156,7 +161,10 @@ app.innerHTML = `
       <div id="activeDictionaryRow" style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
         <div class="row" style="align-items: center; justify-content: space-between; gap: 8px">
           <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
-          <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
+          <div class="row" style="gap: 8px; flex-shrink: 0">
+            <button id="openSavedVocabulary" class="btn" type="button">${t("learning.openSaved")}</button>
+            <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
+          </div>
         </div>
       </div>
 
@@ -330,6 +338,7 @@ const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
 const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
+const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
 const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
 const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
 const featuredInstallBtn = mustGetEl<HTMLButtonElement>("#featuredInstall");
@@ -814,6 +823,10 @@ localeSelect.addEventListener("change", () => {
 openManageDictionariesBtn.addEventListener("click", () => {
   manageDictionariesPanel.open = true;
   manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+openSavedVocabularyBtn.addEventListener("click", () => {
+  showSavedVocabulary();
 });
 
 catalogUrlInput.addEventListener("input", () => {
@@ -2007,6 +2020,8 @@ let queryLoggingSettleTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingSettledLogPayload: SettledQueryLogPayload | undefined;
 let searchSeq = 0;
 let entryDetailGeneration = 0;
+let savedVocabularyGeneration = 0;
+let returnToSavedVocabularyAfterEntry = false;
 let lastSearchResults: ResultDisplayContext[] = [];
 
 function cancelPendingSettledQueryLog() {
@@ -2083,12 +2098,78 @@ function triggerSearch(query: string) {
   void runSearch(query);
 }
 
+function showSavedVocabulary() {
+  const generation = ++savedVocabularyGeneration;
+  entryDetailGeneration += 1; // invalidate any in-flight entry learning updates
+  returnToSavedVocabularyAfterEntry = false;
+  searchResults.innerHTML = "";
+
+  const root = document.createElement("div");
+  searchResults.appendChild(root);
+
+  const boundMeta = currentActiveBundle;
+  const boundBundleId = boundMeta?.bundle_id ?? null;
+  const boundScopeId = boundMeta ? getBundleStorageScopeId(boundMeta) : null;
+
+  const session = createSavedVocabularySession({
+    getActiveMeta: () => currentActiveBundle,
+    openDb: openSiralexDb,
+    isCurrent: () => generation === savedVocabularyGeneration,
+    isBindingCurrent: (bundleId, storageScopeId) => {
+      const meta = currentActiveBundle;
+      if (!meta) return false;
+      return meta.bundle_id === bundleId && getBundleStorageScopeId(meta) === storageScopeId;
+    },
+    publish: (vm) => {
+      if (generation !== savedVocabularyGeneration) return;
+      applySavedVocabularyView(root, vm, {
+        onBack: () => showResultsList(),
+        onOpen: (irId) => {
+          void session.openRow(irId);
+        },
+        onRemove: (irId) => {
+          void session.removeRow(irId);
+        },
+      });
+    },
+    onOpenEntry: (entry) => {
+      returnToSavedVocabularyAfterEntry = true;
+      showEntryDetail(entry);
+    },
+    confirmRemove: () => window.confirm(t("learning.removeConfirm")),
+  });
+
+  // Seed loading chrome immediately (also covers unavailable when no binding).
+  if (!boundBundleId || !boundScopeId) {
+    applySavedVocabularyView(root, createEmptySavedVocabularyViewModel("unavailable"), {
+      onBack: () => showResultsList(),
+      onOpen: () => undefined,
+      onRemove: () => undefined,
+    });
+    return;
+  }
+
+  applySavedVocabularyView(root, createEmptySavedVocabularyViewModel("loading"), {
+    onBack: () => showResultsList(),
+    onOpen: (irId) => {
+      void session.openRow(irId);
+    },
+    onRemove: (irId) => {
+      void session.removeRow(irId);
+    },
+  });
+  void session.load();
+}
+
 function showEntryDetail(record: EnrichedRecord) {
   const generation = ++entryDetailGeneration;
+  savedVocabularyGeneration += 1; // drop in-flight saved-vocab updates when leaving the surface
   searchResults.innerHTML = "";
 
   const offerLearning = isLexiconDisplay(record);
   const learningAvailable = offerLearning && canOfferLearningSave(record, currentActiveBundle);
+  const backToSaved = returnToSavedVocabularyAfterEntry;
+  returnToSavedVocabularyAfterEntry = false;
 
   let setLearningSaveState: ((state: LearningSaveControlState) => void) | undefined;
 
@@ -2106,7 +2187,13 @@ function showEntryDetail(record: EnrichedRecord) {
     : undefined;
 
   const view = renderEntryDetail(record, {
-    onBack: () => showResultsList(),
+    onBack: () => {
+      if (backToSaved) {
+        showSavedVocabulary();
+        return;
+      }
+      showResultsList();
+    },
     onSearch: (query) => triggerSearch(query),
     targetEntriesLabel: getTargetEntriesLabel(
       currentActiveBundle?.language_meta,
