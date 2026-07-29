@@ -3,29 +3,30 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  STORE_RECORDS,
   deleteSiralexDb,
   openSiralexDb,
   type ActiveBundleMeta,
 } from "../idb/siralex_db";
-import type { EnrichedRecord } from "../types/records";
+import { buildDisplayCache } from "./build_display_cache";
 import { saveLearningRecord } from "./learning_record_store";
 import {
+  buildSavedVocabularyRowVm,
   createSavedVocabularySession,
-  filterRecordsForActiveScope,
-  type SavedVocabularyViewModel,
+  type SavedVocabularyModel,
 } from "./saved_vocabulary_session";
+import type { EnrichedRecord } from "../types/records";
+import { STORE_RECORDS } from "../idb/siralex_db";
 
-const BUNDLE = "bundle_sv";
-const SCOPE = `${BUNDLE}::sha256:scope-a`;
-const SCOPE_OTHER = `${BUNDLE}::sha256:scope-b`;
-const HASH = "sha256:scope-a";
+const BUNDLE_A = "bundle_sv_a";
+const BUNDLE_B = "bundle_sv_b";
+const SCOPE_A = `${BUNDLE_A}::sha256:aaa`;
+const HASH_A = "sha256:aaa";
 
 function makeMeta(overrides: Partial<ActiveBundleMeta> = {}): ActiveBundleMeta {
   return {
-    bundle_id: BUNDLE,
-    storage_scope_id: SCOPE,
-    expected_content_sha256: HASH,
+    bundle_id: BUNDLE_A,
+    storage_scope_id: SCOPE_A,
+    expected_content_sha256: HASH_A,
     manifest_schema_version: "bundle_manifest_v1",
     record_schema_id: "normalized_v1",
     record_schema_version: "1",
@@ -48,76 +49,26 @@ function makeLexicon(irId: string, headword: string): EnrichedRecord {
     search_keys: {},
     display: {
       headword_latin: headword,
-      senses: [{ gloss_fr: `${headword}-gloss` }],
+      senses: [{ gloss_fr: `${headword}-fr` }],
     },
   };
 }
 
-async function putLive(db: IDBDatabase, scope: string, entry: EnrichedRecord): Promise<void> {
+async function putDictionaryRecord(
+  db: IDBDatabase,
+  storageScopeId: string,
+  record: EnrichedRecord,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_RECORDS, "readwrite");
-    tx.objectStore(STORE_RECORDS).put({ ...entry, bundle_id: scope });
+    tx.objectStore(STORE_RECORDS).put({ ...record, bundle_id: storageScopeId });
     tx.addEventListener("complete", () => resolve());
     tx.addEventListener("error", () => reject(tx.error));
+    tx.addEventListener("abort", () => reject(tx.error));
   });
 }
 
-async function seedSaved(
-  db: IDBDatabase,
-  irId: string,
-  headword: string,
-  scope = SCOPE,
-  hash = HASH,
-): Promise<void> {
-  await saveLearningRecord(db, {
-    bundle_id: BUNDLE,
-    ir_id: irId,
-    ir_kind: "lexicon_entry",
-    content_sha256: hash,
-    storage_scope_id: scope,
-    display_cache: { headword_latin: headword, gloss_short: `${headword}-cache` },
-  });
-}
-
-describe("filterRecordsForActiveScope", () => {
-  it("keeps only matching bundle_id and storage_scope_id", () => {
-    const rows = filterRecordsForActiveScope(
-      [
-        {
-          schema_version: "learning_record_v1",
-          bundle_id: BUNDLE,
-          ir_id: "a",
-          ir_kind: "lexicon_entry",
-          content_sha256: HASH,
-          storage_scope_id: SCOPE,
-          status: "still_learning",
-          created_at: "2026-07-29T00:00:00.000Z",
-          display_cache: { headword_latin: "a" },
-          last_reviewed: null,
-          review_count: 0,
-        },
-        {
-          schema_version: "learning_record_v1",
-          bundle_id: BUNDLE,
-          ir_id: "b",
-          ir_kind: "lexicon_entry",
-          content_sha256: "sha256:scope-b",
-          storage_scope_id: SCOPE_OTHER,
-          status: "still_learning",
-          created_at: "2026-07-29T00:00:01.000Z",
-          display_cache: { headword_latin: "b" },
-          last_reviewed: null,
-          review_count: 0,
-        },
-      ],
-      BUNDLE,
-      SCOPE,
-    );
-    expect(rows.map((r) => r.ir_id)).toEqual(["a"]);
-  });
-});
-
-describe("Saved Vocabulary session", () => {
+describe("LS1I3 Saved Vocabulary session", () => {
   beforeEach(async () => {
     try {
       await deleteSiralexDb();
@@ -126,193 +77,249 @@ describe("Saved Vocabulary session", () => {
     }
   });
 
-  it("loads from loading to populated using display cache and active scope", async () => {
+  it("lists only active-bundle records in store order and resolves live content", async () => {
     const db = await openSiralexDb();
-    await putLive(db, SCOPE, makeLexicon("lex-1", "live-head"));
-    await seedSaved(db, "lex-1", "cached-head");
-    const vms: SavedVocabularyViewModel[] = [];
+    const older = makeLexicon("lex-old", "older");
+    const newer = makeLexicon("lex-new", "newer");
+    await putDictionaryRecord(db, SCOPE_A, older);
+    await putDictionaryRecord(db, SCOPE_A, newer);
+
+    await saveLearningRecord(db, {
+      bundle_id: BUNDLE_A,
+      ir_id: "lex-old",
+      ir_kind: "lexicon_entry",
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      display_cache: buildDisplayCache(older),
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    await saveLearningRecord(db, {
+      bundle_id: BUNDLE_A,
+      ir_id: "lex-new",
+      ir_kind: "lexicon_entry",
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      display_cache: buildDisplayCache(newer),
+    });
+    await saveLearningRecord(db, {
+      bundle_id: BUNDLE_B,
+      ir_id: "lex-other",
+      ir_kind: "lexicon_entry",
+      content_sha256: "sha256:b",
+      storage_scope_id: `${BUNDLE_B}::sha256:b`,
+      display_cache: { headword_latin: "other" },
+    });
+
+    const updates: SavedVocabularyModel[] = [];
     const session = createSavedVocabularySession({
       getActiveMeta: () => makeMeta(),
       openDb: async () => db,
       isCurrent: () => true,
-      isBindingCurrent: () => true,
-      publish: (vm) => vms.push(vm),
-      onOpenEntry: () => undefined,
+      onUpdate: (m) => updates.push(m),
       confirmRemove: () => true,
     });
     await session.load();
-    expect(vms[0]?.state).toBe("loading");
-    const last = vms.at(-1)!;
-    expect(last.state).toBe("populated");
-    expect(last.rows).toHaveLength(1);
-    expect(last.rows[0]?.headword_latin).toBe("cached-head");
-    expect(last.rows[0]?.gloss_short).toBe("cached-head-cache");
-    expect(last.rows[0]?.openable).toBe(true);
+    const last = updates.at(-1)!;
+    expect(last.surface).toBe("populated");
+    if (last.surface === "populated" || last.surface === "removing") {
+      expect(last.rows.map((r) => r.ir_id)).toEqual(["lex-new", "lex-old"]);
+      expect(last.rows.every((r) => r.state === "resolved")).toBe(true);
+      expect(last.rows[0]!.primaryText).toBe("newer");
+      expect(last.rows.some((r) => r.bundle_id === BUNDLE_B)).toBe(false);
+    }
     db.close();
   });
 
-  it("loads to empty when no scoped records exist", async () => {
+  it("keeps unresolved soft orphans and does not call list without active bundle", async () => {
     const db = await openSiralexDb();
-    await seedSaved(db, "lex-other-scope", "x", SCOPE_OTHER, "sha256:scope-b");
-    const vms: SavedVocabularyViewModel[] = [];
+    await saveLearningRecord(db, {
+      bundle_id: BUNDLE_A,
+      ir_id: "missing",
+      ir_kind: "lexicon_entry",
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      display_cache: { headword_latin: "ghost", gloss_short: "cache" },
+    });
+
+    const updates: SavedVocabularyModel[] = [];
     const session = createSavedVocabularySession({
       getActiveMeta: () => makeMeta(),
       openDb: async () => db,
       isCurrent: () => true,
-      isBindingCurrent: () => true,
-      publish: (vm) => vms.push(vm),
-      onOpenEntry: () => undefined,
+      onUpdate: (m) => updates.push(m),
       confirmRemove: () => true,
     });
     await session.load();
-    expect(vms.at(-1)?.state).toBe("empty");
-    expect(vms.at(-1)?.rows).toEqual([]);
-    db.close();
-  });
+    const last = updates.at(-1)!;
+    expect(last.surface).toBe("populated");
+    if (last.surface === "populated" || last.surface === "removing") {
+      expect(last.rows[0]!.state).toBe("unresolved");
+      if (last.rows[0]!.state === "unresolved") {
+        expect(last.rows[0]!.primaryText).toBe("ghost");
+        expect(last.rows[0]!.reason).toBe("entry_missing");
+      }
+    }
 
-  it("opens entry by saved ir_id without reconstructing from cache as authority", async () => {
-    const db = await openSiralexDb();
-    const live = makeLexicon("lex-1", "live-head");
-    await putLive(db, SCOPE, live);
-    await seedSaved(db, "lex-1", "cached-head");
-    const onOpenEntry = vi.fn();
-    const session = createSavedVocabularySession({
-      getActiveMeta: () => makeMeta(),
-      openDb: async () => db,
-      isCurrent: () => true,
-      isBindingCurrent: () => true,
-      publish: () => undefined,
-      onOpenEntry,
-      confirmRemove: () => true,
-    });
-    await session.load();
-    await session.openRow("lex-1");
-    expect(onOpenEntry).toHaveBeenCalledTimes(1);
-    expect(onOpenEntry.mock.calls[0]![0].ir_id).toBe("lex-1");
-    expect(onOpenEntry.mock.calls[0]![0].display?.headword_latin).toBe("live-head");
-    db.close();
-  });
-
-  it("removes successfully and refreshes the list", async () => {
-    const db = await openSiralexDb();
-    await putLive(db, SCOPE, makeLexicon("lex-1", "a"));
-    await seedSaved(db, "lex-1", "a");
-    const vms: SavedVocabularyViewModel[] = [];
-    const session = createSavedVocabularySession({
-      getActiveMeta: () => makeMeta(),
-      openDb: async () => db,
-      isCurrent: () => true,
-      isBindingCurrent: () => true,
-      publish: (vm) => vms.push(vm),
-      onOpenEntry: () => undefined,
-      confirmRemove: () => true,
-    });
-    await session.load();
-    await session.removeRow("lex-1");
-    expect(vms.some((vm) => vm.state === "removing")).toBe(true);
-    expect(vms.at(-1)?.state).toBe("empty");
-    db.close();
-  });
-
-  it("failed removal leaves the item visible and recoverable", async () => {
-    const db = await openSiralexDb();
-    await putLive(db, SCOPE, makeLexicon("lex-1", "a"));
-    await seedSaved(db, "lex-1", "a");
-    let call = 0;
-    const vms: SavedVocabularyViewModel[] = [];
-    const session = createSavedVocabularySession({
-      getActiveMeta: () => makeMeta(),
+    const noBundleUpdates: SavedVocabularyModel[] = [];
+    let listed = false;
+    const noBundle = createSavedVocabularySession({
+      getActiveMeta: () => undefined,
       openDb: async () => {
-        call += 1;
-        if (call === 1) return db; // load
-        throw new Error("remove boom");
+        listed = true;
+        return db;
       },
       isCurrent: () => true,
-      isBindingCurrent: () => true,
-      publish: (vm) => vms.push(vm),
-      onOpenEntry: () => undefined,
+      onUpdate: (m) => noBundleUpdates.push(m),
       confirmRemove: () => true,
     });
-    await session.load();
-    await session.removeRow("lex-1");
-    const last = vms.at(-1)!;
-    expect(last.state).toBe("populated");
-    expect(last.rows).toHaveLength(1);
-    expect(last.statusMessage).toBe("remove_failed");
+    await noBundle.load();
+    expect(listed).toBe(false);
+    expect(noBundleUpdates.at(-1)?.surface).toBe("unavailable");
     db.close();
   });
 
-  it("suppresses repeated removal clicks while busy", async () => {
+  it("remove cancel / confirm / failure / absent / stale-drop", async () => {
     const db = await openSiralexDb();
-    await putLive(db, SCOPE, makeLexicon("lex-1", "a"));
-    await seedSaved(db, "lex-1", "a");
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
+    const entry = makeLexicon("lex-1", "word");
+    await putDictionaryRecord(db, SCOPE_A, entry);
+    await saveLearningRecord(db, {
+      bundle_id: BUNDLE_A,
+      ir_id: "lex-1",
+      ir_kind: "lexicon_entry",
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      display_cache: buildDisplayCache(entry),
     });
+
+    let confirm = false;
+    const updates: SavedVocabularyModel[] = [];
+    let current = true;
+    const session = createSavedVocabularySession({
+      getActiveMeta: () => makeMeta(),
+      openDb: async () => db,
+      isCurrent: () => current,
+      onUpdate: (m) => updates.push(m),
+      confirmRemove: () => confirm,
+    });
+    await session.load();
+
+    expect(await session.remove(BUNDLE_A, "lex-1")).toBe("cancelled");
+    expect(session.getRows().length).toBe(1);
+
+    confirm = true;
+    expect(await session.remove(BUNDLE_A, "lex-1")).toBe("ok");
+    expect(session.getRows().length).toBe(0);
+    expect(updates.at(-1)?.surface).toBe("empty");
+
+    // Already absent behaves as success when somehow still in memory — re-save and remove via API first
+    await saveLearningRecord(db, {
+      bundle_id: BUNDLE_A,
+      ir_id: "lex-1",
+      ir_kind: "lexicon_entry",
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      display_cache: buildDisplayCache(entry),
+    });
+    await session.load();
+    // Delete underneath then remove again
+    const { removeLearningRecord } = await import("./learning_record_store");
+    await removeLearningRecord(db, BUNDLE_A, "lex-1");
+    expect(await session.remove(BUNDLE_A, "lex-1")).toBe("ok");
+
+    await saveLearningRecord(db, {
+      bundle_id: BUNDLE_A,
+      ir_id: "lex-2",
+      ir_kind: "lexicon_entry",
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      display_cache: { headword_latin: "late" },
+    });
+    await session.load();
+    current = false;
+    const before = updates.length;
+    expect(await session.remove(BUNDLE_A, "lex-2")).toBe("stale");
+    expect(updates.length).toBe(before);
+    db.close();
+  });
+
+  it("remove failure retains row with row error", async () => {
+    const db = await openSiralexDb();
+    const entry = makeLexicon("lex-fail", "fail");
+    await putDictionaryRecord(db, SCOPE_A, entry);
+    await saveLearningRecord(db, {
+      bundle_id: BUNDLE_A,
+      ir_id: "lex-fail",
+      ir_kind: "lexicon_entry",
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      display_cache: buildDisplayCache(entry),
+    });
+
+    const updates: SavedVocabularyModel[] = [];
     let openCount = 0;
     const session = createSavedVocabularySession({
       getActiveMeta: () => makeMeta(),
       openDb: async () => {
         openCount += 1;
-        if (openCount === 1) return db;
-        await gate;
-        return db;
+        if (openCount === 1) return db; // load
+        throw new Error("remove db fail");
       },
       isCurrent: () => true,
-      isBindingCurrent: () => true,
-      publish: () => undefined,
-      onOpenEntry: () => undefined,
+      onUpdate: (m) => updates.push(m),
       confirmRemove: () => true,
     });
     await session.load();
-    const first = session.removeRow("lex-1");
-    const second = session.removeRow("lex-1");
-    release();
-    await Promise.all([first, second]);
-    // load + one remove path (second suppressed before openDb)
-    expect(openCount).toBeLessThanOrEqual(3);
+    expect(await session.remove(BUNDLE_A, "lex-fail")).toBe("failed");
+    expect(session.getRows().length).toBe(1);
+    const last = updates.at(-1)!;
+    expect(last.surface).toBe("populated");
+    if (last.surface === "populated" || last.surface === "removing") {
+      expect(Object.keys(last.rowErrors).length).toBe(1);
+    }
     db.close();
   });
 
-  it("publishes unavailable when storage/meta is missing", async () => {
-    const vms: SavedVocabularyViewModel[] = [];
-    const session = createSavedVocabularySession({
-      getActiveMeta: () => undefined,
-      openDb: openSiralexDb,
-      isCurrent: () => true,
-      isBindingCurrent: () => true,
-      publish: (vm) => vms.push(vm),
-      onOpenEntry: () => undefined,
-      confirmRemove: () => true,
+  it("buildSavedVocabularyRowVm uses live vs cache correctly", () => {
+    const lr = {
+      schema_version: "learning_record_v1" as const,
+      bundle_id: BUNDLE_A,
+      ir_id: "lex-1",
+      ir_kind: "lexicon_entry" as const,
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      status: "still_learning" as const,
+      created_at: "2026-07-29T12:00:00.000Z",
+      display_cache: { headword_latin: "cached", gloss_short: "old" },
+      last_reviewed: null,
+      review_count: 0,
+    };
+    const live = makeLexicon("lex-1", "live");
+    const resolved = buildSavedVocabularyRowVm({
+      state: "resolved",
+      learningRecord: lr,
+      liveEntry: live,
     });
-    await session.load();
-    expect(vms.at(-1)?.state).toBe("unavailable");
+    expect(resolved.state).toBe("resolved");
+    if (resolved.state === "resolved") {
+      expect(resolved.primaryText).toBe("live");
+      expect(resolved.secondaryText).toBe("live-fr");
+    }
+    const unresolved = buildSavedVocabularyRowVm({
+      state: "unresolved",
+      learningRecord: lr,
+      reason: "entry_missing",
+    });
+    expect(unresolved.state).toBe("unresolved");
+    if (unresolved.state === "unresolved") {
+      expect(unresolved.primaryText).toBe("cached");
+      expect(unresolved.secondaryText).toBe("old");
+    }
   });
 
-  it("publishes error on initial load failure", async () => {
-    const vms: SavedVocabularyViewModel[] = [];
-    const session = createSavedVocabularySession({
-      getActiveMeta: () => makeMeta(),
-      openDb: async () => {
-        throw new Error("idb down");
-      },
-      isCurrent: () => true,
-      isBindingCurrent: () => true,
-      publish: (vm) => vms.push(vm),
-      onOpenEntry: () => undefined,
-      confirmRemove: () => true,
-    });
-    await session.load();
-    expect(vms[0]?.state).toBe("loading");
-    expect(vms.at(-1)?.state).toBe("error");
-  });
-
-  it("drops stale load results", async () => {
+  it("drops late load updates after navigation", async () => {
     const db = await openSiralexDb();
-    await seedSaved(db, "lex-1", "a");
     let current = true;
-    const publish = vi.fn();
+    const onUpdate = vi.fn();
     const session = createSavedVocabularySession({
       getActiveMeta: () => makeMeta(),
       openDb: async () => {
@@ -320,43 +327,12 @@ describe("Saved Vocabulary session", () => {
         return db;
       },
       isCurrent: () => current,
-      isBindingCurrent: () => true,
-      publish,
-      onOpenEntry: () => undefined,
+      onUpdate,
       confirmRemove: () => true,
     });
     await session.load();
-    // loading may publish once while current; later result must be dropped
-    expect(publish.mock.calls.every((c) => c[0].state !== "populated")).toBe(true);
-    db.close();
-  });
-
-  it("drops stale removal results", async () => {
-    const db = await openSiralexDb();
-    await putLive(db, SCOPE, makeLexicon("lex-1", "a"));
-    await seedSaved(db, "lex-1", "a");
-    let current = true;
-    let opens = 0;
-    const publish = vi.fn();
-    const session = createSavedVocabularySession({
-      getActiveMeta: () => makeMeta(),
-      openDb: async () => {
-        opens += 1;
-        if (opens === 1) return db;
-        current = false;
-        return db;
-      },
-      isCurrent: () => current,
-      isBindingCurrent: () => true,
-      publish,
-      onOpenEntry: () => undefined,
-      confirmRemove: () => true,
-    });
-    await session.load();
-    const before = publish.mock.calls.length;
-    await session.removeRow("lex-1");
-    const afterStates = publish.mock.calls.slice(before).map((c) => c[0].state);
-    expect(afterStates.includes("empty")).toBe(false);
+    // loading may have been emitted before openDb; after current=false, no populated update
+    expect(onUpdate.mock.calls.every((c) => c[0].surface !== "populated")).toBe(true);
     db.close();
   });
 });

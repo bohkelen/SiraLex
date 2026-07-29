@@ -6,108 +6,135 @@
 LS1_SAVED_VOCABULARY_SURFACE_IMPLEMENTED
 ```
 
-## Commit
-
-`ddf431a51692f5901bf91d25a48c3b4456c92271` (`feat(learning): add saved vocabulary surface`).
-
-Built on LS1I2 `91f6e8490dbac464231e6f1e6a9de9c2da118cf4`.
+Active-bundle Learning Records are now visible, openable when resolved, and
+removable with confirmation. Soft orphans remain listed. No Review, Reflect,
+flashcards, progress, favorites, multi-list, morphology, or audio.
 
 ---
 
-## Surface placement
+## 1. Entry-point placement
 
-Button `#openSavedVocabulary` in `#activeDictionaryRow` beside Manage
-dictionaries. Host: `#searchResults` (same panel as search results / entry
-detail). Back returns to the prior results list.
+In `#activeDictionaryRow`, beside Manage dictionaries:
 
----
+- Button `#openSavedVocabulary`
+- Label: EN `Saved vocabulary` / FR `Vocabulaire enregistré` (`learning.openSaved`)
 
-## View states
-
-`loading` | `empty` | `populated` | `removing` | `unavailable` | `error`
-
-Row flags: `openable` / `unresolved` / `removing`. Optional status:
-`remove_failed` | `open_failed` while the list remains visible.
+Host: `#searchResults` (same in-panel host as results/entry).
 
 ---
 
-## Session / renderer boundary
+## 2. Navigation model
+
+Explicit `resultsHostContext`:
+
+```text
+search | saved_vocabulary | entry_from_search | entry_from_saved
+```
+
+| Action | Behavior |
+| --- | --- |
+| Open Saved Vocabulary | Replace `#searchResults`; do not rerun search |
+| Back from Saved Vocabulary | Restore prior results list via `showResultsList` (no search re-run) |
+| Open resolved row | `showEntryDetail(liveEntry, "saved_vocabulary")` |
+| Back from that entry | Reopen Saved Vocabulary |
+| Open entry from search | Back returns to results list |
+
+`savedVocabularyGeneration` invalidates late list/remove updates.
+
+---
+
+## 3. Boundary
 
 | Module | Role |
 | --- | --- |
-| `saved_vocabulary_session.ts` | IDB list/remove/resolve, scope binding, stale guards, immutable VMs |
-| `render_saved_vocabulary.ts` | Presentation only — applies VM, fires callbacks |
-| `main.ts` | Navigation wiring, generation tokens, confirm dialog |
+| `render_saved_vocabulary.ts` | Presentation only |
+| `saved_vocabulary_session.ts` | Load / resolve / remove / confirm gate / row VM |
+| `main.ts` | Entry point, host context, generation, confirm via `window.confirm` |
 
 ---
 
-## Bundle / scope filtering
+## 4. View model and surface states
 
-`filterRecordsForActiveScope`: keep only rows where
-`bundle_id === active.bundle_id` **and**
-`storage_scope_id === getBundleStorageScopeId(active)`.
-No silent fallback to another bundle or scope.
+Row VM: `resolved` (live entry + texts) | `unresolved` (display_cache + reason).
 
----
+Surface: `loading` | `empty` | `populated` | `removing` | `unavailable` | `error`.
 
-## Navigation behavior
-
-Open uses saved `ir_id`, live-resolves against the active storage scope, then
-`showEntryDetail(liveEntry)` without rerunning search. Back from that entry
-returns to Saved Vocabulary. List labels use **display_cache** only (not live
-lexicon reconstruction for row text).
+Order: store order (newest `created_at` first). No alphabetical re-sort.
 
 ---
 
-## Removal behavior
+## 5. Loading / resolution
 
-Confirm via `learning.removeConfirm`. Atomic `removeLearningRecord`. Busy
-clicks ignored (`inflightRemove`). Failure restores previous rows +
-`remove_failed` status.
+1. Emit loading
+2. Active meta absent → unavailable (no list-by-bundle)
+3. `listLearningRecordsByBundle(active.bundle_id)`
+4. Resolve each with `resolveLearningRecordForUi` (`Promise.all`)
+5. Per-row resolve failure → unresolved soft orphan, not page error
 
----
-
-## Stale-async mechanism
-
-`savedVocabularyGeneration` + `isCurrent` / `isBindingCurrent(bundleId, scope)`.
-Opening entry detail increments saved-vocab generation; opening Saved Vocabulary
-invalidates entry-detail learning updates.
+Cache is never mutated or promoted to lexical authority.
 
 ---
 
-## Accessibility / i18n
+## 6. Rows
 
-Semantic `<ul>` list, button controls, focus-visible styles, `aria-busy` on
-surface/remove, `role="status"` messaging. EN/FR keys under `learning.*`
-(including saved vocabulary, empty, loading, unresolved, remove confirm, open).
+- **Resolved:** live Latin / N’Ko / short gloss; Open + Remove
+- **Unresolved:** cache texts + “Unavailable in this dictionary”; Remove only
+- Empty primary → `learning.unresolvedFallback`
+- No IDs/hashes in normal UI
 
 ---
 
-## Test results
+## 7. Open entry
+
+Uses `liveEntry` only; LS1I2 Save affordance remains; initial state loads as saved when present.
+
+---
+
+## 8. Remove
+
+Confirm (EN/FR) → busy row → `removeLearningRecord` → drop row or empty; failure keeps row + row-level error. Cancel leaves list unchanged. Dictionary untouched.
+
+---
+
+## 9. Stale-async
+
+Generation + `resultsHostContext === "saved_vocabulary"` on session `isCurrent` and `applyModel`. Opening search/entry from search bumps generation.
+
+---
+
+## 10. Accessibility / i18n
+
+- `h2#saved-vocab-heading`, `ul` list, real buttons
+- `aria-busy` on busy rows; row errors `role="status"`
+- Focus after successful remove → next Open/Remove or Back
+- Keys: `learning.savedVocabulary`, `openSaved`, `backToSearch`, `loading`, `empty`, `noActiveBundle`, `unresolved`, `unresolvedFallback`, `open`, `remove`, `removeConfirm`, `listError`, plus existing removeError
+
+---
+
+## 11. Tests and validation
 
 | Suite | Result |
 | --- | --- |
-| Saved Vocabulary session/renderer | 15 passed |
-| Learning persistence + LS1I2 sessions/renderer | passed |
-| Full `npm run test:run` | **31 files / 320 tests passed** |
-| `npm run build` | **Pass** |
+| Renderer | 5 passed |
+| Session | 6 passed |
+| Navigation guards | 2 passed |
+| LS1I1 + LS1I2 focused | passed |
+| Full suite | **32 files / 318 tests passed** |
+| Build | **Pass** |
 
 ---
 
-## Deviations
+## 12. Deviations
 
-None material. Collection Remove keeps confirm (LS1D1); entry-detail Unsave
-remains confirm-free (LS1I2).
+None material. Application navigation covered via guard unit tests + main wiring rather than a full Playwright shell harness in this slice.
 
 ---
 
-## Recommended next slice
+## 13. Next slice
 
 ```text
-LS1I4 — Offline, update, and soft-orphan verification
+LS1I4 — Offline, Update, and Soft-Orphan Verification
 ```
-
-or LS1I5 closure if verification is folded into existing coverage.
 
 ---
 
@@ -116,4 +143,5 @@ or LS1I5 closure if verification is folded into existing coverage.
 | Field | Value |
 | --- | --- |
 | Decision | `LS1_SAVED_VOCABULARY_SURFACE_IMPLEMENTED` |
-| Schema / migration / search / catalog changes | None |
+| Scope | Active-bundle collection only |
+| Soft orphans | Visible + removable |

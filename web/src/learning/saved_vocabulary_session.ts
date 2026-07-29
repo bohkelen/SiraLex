@@ -1,14 +1,38 @@
 /**
- * LS1I3 — Saved Vocabulary session / view-model owner.
- * Presentation stays in the renderer; this module owns IDB and async sequencing.
+ * LS1I3 — Saved Vocabulary session: list, resolve, remove for active bundle.
+ * Presentation stays in render_saved_vocabulary.ts.
  */
 
 import type { ActiveBundleMeta } from "../idb/siralex_db";
-import { getBundleStorageScopeId } from "../idb/siralex_db";
-import type { EnrichedRecord } from "../types/records";
-import { resolveLearningRecordForUi } from "./learning_record_resolve";
+import { isLexiconDisplay, type EnrichedRecord } from "../types/records";
+import {
+  resolveLearningRecordForUi,
+  type LearningRecordUiResolution,
+} from "./learning_record_resolve";
 import { listLearningRecordsByBundle, removeLearningRecord } from "./learning_record_store";
-import type { LearningRecordV1 } from "./learning_record_types";
+import type { LearningRecordUnresolvedReason, LearningRecordV1 } from "./learning_record_types";
+
+export type SavedVocabularyRowVm =
+  | {
+      state: "resolved";
+      bundle_id: string;
+      ir_id: string;
+      learningRecord: LearningRecordV1;
+      liveEntry: EnrichedRecord;
+      primaryText: string;
+      secondaryText?: string;
+      nkoText?: string;
+    }
+  | {
+      state: "unresolved";
+      bundle_id: string;
+      ir_id: string;
+      learningRecord: LearningRecordV1;
+      primaryText: string;
+      secondaryText?: string;
+      nkoText?: string;
+      reason: LearningRecordUnresolvedReason;
+    };
 
 export type SavedVocabularySurfaceState =
   | "loading"
@@ -18,239 +42,210 @@ export type SavedVocabularySurfaceState =
   | "unavailable"
   | "error";
 
-export type SavedVocabularyRowVm = {
-  ir_id: string;
-  bundle_id: string;
-  storage_scope_id: string;
-  headword_latin: string;
-  headword_nko?: string;
-  gloss_short?: string;
-  openable: boolean;
-  unresolved: boolean;
-  removing: boolean;
-};
+export type SavedVocabularyModel =
+  | { surface: "loading" }
+  | { surface: "unavailable" }
+  | { surface: "error" }
+  | { surface: "empty" }
+  | {
+      surface: "populated" | "removing";
+      rows: SavedVocabularyRowVm[];
+      removingKey?: string;
+      rowErrors: Record<string, string>;
+    };
 
-export type SavedVocabularyViewModel = {
-  state: SavedVocabularySurfaceState;
-  boundBundleId: string | null;
-  boundStorageScopeId: string | null;
-  rows: SavedVocabularyRowVm[];
-  /** Optional status line for remove failure while list remains visible. */
-  statusMessage: "none" | "remove_failed" | "open_failed";
-};
-
-export function createEmptySavedVocabularyViewModel(
-  state: SavedVocabularySurfaceState = "loading",
-): SavedVocabularyViewModel {
-  return {
-    state,
-    boundBundleId: null,
-    boundStorageScopeId: null,
-    rows: [],
-    statusMessage: "none",
-  };
+export function rowKey(bundleId: string, irId: string): string {
+  return `${bundleId}\0${irId}`;
 }
 
-function rowFromRecord(record: LearningRecordV1, openable: boolean, removing: boolean): SavedVocabularyRowVm {
-  const headword =
-    typeof record.display_cache.headword_latin === "string" &&
-    record.display_cache.headword_latin.trim() !== ""
-      ? record.display_cache.headword_latin
-      : record.ir_id;
-
-  return {
-    ir_id: record.ir_id,
-    bundle_id: record.bundle_id,
-    storage_scope_id: record.storage_scope_id,
-    headword_latin: headword,
-    ...(record.display_cache.headword_nko
-      ? { headword_nko: record.display_cache.headword_nko }
-      : {}),
-    ...(record.display_cache.gloss_short ? { gloss_short: record.display_cache.gloss_short } : {}),
-    openable,
-    unresolved: !openable,
-    removing,
-  };
+function firstLiveGloss(entry: EnrichedRecord): string | undefined {
+  if (!isLexiconDisplay(entry) || !entry.display.senses) return undefined;
+  for (const sense of entry.display.senses) {
+    if (typeof sense.gloss_fr === "string" && sense.gloss_fr.trim() !== "") {
+      return sense.gloss_fr.trim();
+    }
+  }
+  for (const sense of entry.display.senses) {
+    if (typeof sense.gloss_en === "string" && sense.gloss_en.trim() !== "") {
+      return sense.gloss_en.trim();
+    }
+  }
+  return undefined;
 }
 
-/**
- * Keep only Learning Records for the active logical bundle_id and active storage scope.
- * No silent fallback to another bundle or scope.
- */
-export function filterRecordsForActiveScope(
-  records: LearningRecordV1[],
-  bundleId: string,
-  storageScopeId: string,
-): LearningRecordV1[] {
-  return records.filter(
-    (record) => record.bundle_id === bundleId && record.storage_scope_id === storageScopeId,
-  );
+/** Build a row VM from a resolution result. Does not mutate display_cache. */
+export function buildSavedVocabularyRowVm(resolution: LearningRecordUiResolution): SavedVocabularyRowVm {
+  const lr = resolution.learningRecord;
+  if (resolution.state === "resolved") {
+    const live = resolution.liveEntry;
+    let primaryText = "";
+    let nkoText: string | undefined;
+    if (isLexiconDisplay(live)) {
+      primaryText = live.display.headword_latin.trim();
+      const nko = live.display.headword_nko_provided?.trim();
+      if (nko) nkoText = nko;
+    }
+    if (!primaryText) {
+      primaryText = lr.display_cache?.headword_latin?.trim() || "";
+    }
+    const secondary = firstLiveGloss(live);
+    return {
+      state: "resolved",
+      bundle_id: lr.bundle_id,
+      ir_id: lr.ir_id,
+      learningRecord: lr,
+      liveEntry: live,
+      primaryText,
+      ...(nkoText ? { nkoText } : {}),
+      ...(secondary ? { secondaryText: secondary } : {}),
+    };
+  }
+
+  const cache = lr.display_cache;
+  const primaryText =
+    typeof cache?.headword_latin === "string" ? cache.headword_latin.trim() : "";
+  const nko =
+    typeof cache?.headword_nko === "string" && cache.headword_nko.trim() !== ""
+      ? cache.headword_nko.trim()
+      : undefined;
+  const secondary =
+    typeof cache?.gloss_short === "string" && cache.gloss_short.trim() !== ""
+      ? cache.gloss_short.trim()
+      : undefined;
+
+  return {
+    state: "unresolved",
+    bundle_id: lr.bundle_id,
+    ir_id: lr.ir_id,
+    learningRecord: lr,
+    primaryText,
+    ...(nko ? { nkoText: nko } : {}),
+    ...(secondary ? { secondaryText: secondary } : {}),
+    reason: resolution.reason,
+  };
 }
 
 export type SavedVocabularySessionDeps = {
   getActiveMeta: () => ActiveBundleMeta | undefined;
   openDb: () => Promise<IDBDatabase>;
-  /** True while this surface generation is still current. */
   isCurrent: () => boolean;
-  /** Active binding still matches the binding used when the async work started. */
-  isBindingCurrent: (bundleId: string, storageScopeId: string) => boolean;
-  publish: (vm: SavedVocabularyViewModel) => void;
-  onOpenEntry: (entry: EnrichedRecord) => void;
+  onUpdate: (model: SavedVocabularyModel) => void;
+  /** Return true to proceed with remove. */
   confirmRemove: (row: SavedVocabularyRowVm) => boolean;
 };
 
+/**
+ * Load/resolve/remove Saved Vocabulary for the active logical bundle.
+ */
 export function createSavedVocabularySession(deps: SavedVocabularySessionDeps) {
+  let rows: SavedVocabularyRowVm[] = [];
+  let rowErrors: Record<string, string> = {};
+  let removingKey: string | undefined;
   let inflightRemove = false;
-  let lastVm = createEmptySavedVocabularyViewModel("loading");
 
-  function publish(vm: SavedVocabularyViewModel): void {
+  function emitPopulated(surface: "populated" | "removing" = "populated"): void {
     if (!deps.isCurrent()) return;
-    lastVm = vm;
-    deps.publish(vm);
-  }
-
-  async function buildPopulatedVm(
-    db: IDBDatabase,
-    meta: ActiveBundleMeta,
-    bundleId: string,
-    storageScopeId: string,
-    removingIrId: string | null,
-    statusMessage: SavedVocabularyViewModel["statusMessage"],
-  ): Promise<SavedVocabularyViewModel> {
-    const listed = await listLearningRecordsByBundle(db, bundleId);
-    const scoped = filterRecordsForActiveScope(listed, bundleId, storageScopeId);
-
-    const rows: SavedVocabularyRowVm[] = [];
-    for (const record of scoped) {
-      const resolution = await resolveLearningRecordForUi(db, record, meta);
-      const openable = resolution.state === "resolved";
-      rows.push(rowFromRecord(record, openable, removingIrId === record.ir_id));
+    if (rows.length === 0) {
+      deps.onUpdate({ surface: "empty" });
+      return;
     }
-
-    return {
-      state: removingIrId ? "removing" : rows.length === 0 ? "empty" : "populated",
-      boundBundleId: bundleId,
-      boundStorageScopeId: storageScopeId,
-      rows,
-      statusMessage,
-    };
+    deps.onUpdate({
+      surface,
+      rows: [...rows],
+      removingKey,
+      rowErrors: { ...rowErrors },
+    });
   }
 
   return {
-    getLastViewModel(): SavedVocabularyViewModel {
-      return lastVm;
-    },
-
     async load(): Promise<void> {
-      publish(createEmptySavedVocabularyViewModel("loading"));
-
+      deps.onUpdate({ surface: "loading" });
       const meta = deps.getActiveMeta();
       if (!meta || typeof meta.bundle_id !== "string" || meta.bundle_id.trim() === "") {
-        publish(createEmptySavedVocabularyViewModel("unavailable"));
-        return;
-      }
-      const bundleId = meta.bundle_id;
-      const storageScopeId = getBundleStorageScopeId(meta);
-      if (typeof storageScopeId !== "string" || storageScopeId.trim() === "") {
-        publish(createEmptySavedVocabularyViewModel("unavailable"));
+        if (deps.isCurrent()) deps.onUpdate({ surface: "unavailable" });
         return;
       }
 
       try {
         const db = await deps.openDb();
-        if (!deps.isCurrent() || !deps.isBindingCurrent(bundleId, storageScopeId)) return;
-        const vm = await buildPopulatedVm(db, meta, bundleId, storageScopeId, null, "none");
-        if (!deps.isCurrent() || !deps.isBindingCurrent(bundleId, storageScopeId)) return;
-        publish(vm);
-      } catch {
-        if (!deps.isCurrent() || !deps.isBindingCurrent(bundleId, storageScopeId)) return;
-        publish({
-          ...createEmptySavedVocabularyViewModel("error"),
-          boundBundleId: bundleId,
-          boundStorageScopeId: storageScopeId,
-        });
-      }
-    },
+        if (!deps.isCurrent()) return;
 
-    async openRow(irId: string): Promise<void> {
-      if (!deps.isCurrent()) return;
-      const meta = deps.getActiveMeta();
-      if (!meta) {
-        publish({ ...lastVm, statusMessage: "open_failed" });
-        return;
-      }
-      const bundleId = meta.bundle_id;
-      const storageScopeId = getBundleStorageScopeId(meta);
-      const row = lastVm.rows.find((r) => r.ir_id === irId);
-      if (!row || !row.openable) return;
-      if (row.bundle_id !== bundleId || row.storage_scope_id !== storageScopeId) return;
+        const listed = await listLearningRecordsByBundle(db, meta.bundle_id);
+        if (!deps.isCurrent()) return;
 
-      try {
-        const db = await deps.openDb();
-        if (!deps.isCurrent() || !deps.isBindingCurrent(bundleId, storageScopeId)) return;
-        const listed = await listLearningRecordsByBundle(db, bundleId);
-        const record = listed.find(
-          (r) => r.ir_id === irId && r.storage_scope_id === storageScopeId,
+        if (listed.length === 0) {
+          rows = [];
+          rowErrors = {};
+          removingKey = undefined;
+          deps.onUpdate({ surface: "empty" });
+          return;
+        }
+
+        const resolved = await Promise.all(
+          listed.map(async (lr) => {
+            try {
+              return await resolveLearningRecordForUi(db, lr, meta);
+            } catch {
+              return {
+                state: "unresolved" as const,
+                learningRecord: lr,
+                reason: "entry_missing" as const,
+              };
+            }
+          }),
         );
-        if (!record) {
-          if (!deps.isCurrent()) return;
-          publish({ ...lastVm, statusMessage: "open_failed" });
-          return;
-        }
-        const resolution = await resolveLearningRecordForUi(db, record, meta);
-        if (!deps.isCurrent() || !deps.isBindingCurrent(bundleId, storageScopeId)) return;
-        if (resolution.state !== "resolved") {
-          publish({ ...lastVm, statusMessage: "open_failed" });
-          return;
-        }
-        deps.onOpenEntry(resolution.liveEntry);
+        if (!deps.isCurrent()) return;
+
+        rows = resolved.map(buildSavedVocabularyRowVm);
+        rowErrors = {};
+        removingKey = undefined;
+        emitPopulated("populated");
       } catch {
         if (!deps.isCurrent()) return;
-        publish({ ...lastVm, statusMessage: "open_failed" });
+        deps.onUpdate({ surface: "error" });
       }
     },
 
-    async removeRow(irId: string): Promise<void> {
-      if (inflightRemove || !deps.isCurrent()) return;
-      const meta = deps.getActiveMeta();
-      if (!meta) return;
-      const bundleId = meta.bundle_id;
-      const storageScopeId = getBundleStorageScopeId(meta);
-      const row = lastVm.rows.find((r) => r.ir_id === irId);
-      if (!row) return;
-      if (row.bundle_id !== bundleId || row.storage_scope_id !== storageScopeId) return;
-      if (!deps.confirmRemove(row)) return;
+    async remove(bundleId: string, irId: string): Promise<"cancelled" | "ok" | "stale" | "failed"> {
+      if (inflightRemove || !deps.isCurrent()) return "stale";
+      const key = rowKey(bundleId, irId);
+      const row = rows.find((r) => r.bundle_id === bundleId && r.ir_id === irId);
+      if (!row) return "stale";
+
+      if (!deps.confirmRemove(row)) {
+        return "cancelled";
+      }
 
       inflightRemove = true;
-      const previous = lastVm;
-      publish({
-        ...previous,
-        state: "removing",
-        statusMessage: "none",
-        rows: previous.rows.map((r) =>
-          r.ir_id === irId ? { ...r, removing: true } : { ...r, removing: false },
-        ),
-      });
+      removingKey = key;
+      delete rowErrors[key];
+      emitPopulated("removing");
 
       try {
         const db = await deps.openDb();
-        if (!deps.isCurrent() || !deps.isBindingCurrent(bundleId, storageScopeId)) return;
+        if (!deps.isCurrent()) return "stale";
         await removeLearningRecord(db, bundleId, irId);
-        if (!deps.isCurrent() || !deps.isBindingCurrent(bundleId, storageScopeId)) return;
-        const vm = await buildPopulatedVm(db, meta, bundleId, storageScopeId, null, "none");
-        if (!deps.isCurrent() || !deps.isBindingCurrent(bundleId, storageScopeId)) return;
-        publish(vm);
+        if (!deps.isCurrent()) return "stale";
+
+        rows = rows.filter((r) => !(r.bundle_id === bundleId && r.ir_id === irId));
+        removingKey = undefined;
+        delete rowErrors[key];
+        emitPopulated("populated");
+        return "ok";
       } catch {
-        if (!deps.isCurrent() || !deps.isBindingCurrent(bundleId, storageScopeId)) return;
-        publish({
-          ...previous,
-          state: previous.rows.length === 0 ? "empty" : "populated",
-          statusMessage: "remove_failed",
-          rows: previous.rows.map((r) => ({ ...r, removing: false })),
-        });
+        if (!deps.isCurrent()) return "stale";
+        removingKey = undefined;
+        rowErrors[key] = "remove_failed";
+        emitPopulated("populated");
+        return "failed";
       } finally {
         inflightRemove = false;
       }
+    },
+
+    /** Test/helper: current in-memory rows (empty if not populated). */
+    getRows(): SavedVocabularyRowVm[] {
+      return [...rows];
     },
   };
 }

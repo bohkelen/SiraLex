@@ -379,11 +379,17 @@ a {
 .saved-vocab-title {
   margin: 0;
   font-size: 16px;
+  font-weight: 700;
 }
 
 .saved-vocab-status {
-  font-size: 13px;
+  margin: 0;
   color: var(--muted);
+  font-size: 13px;
+}
+
+.saved-vocab-page-error {
+  color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
 }
 
 .saved-vocab-list {
@@ -392,27 +398,19 @@ a {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.saved-vocab-item {
+.saved-vocab-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-.saved-vocab-item-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.saved-vocab-headword {
+.saved-vocab-primary {
   font-weight: 600;
   font-size: 15px;
 }
@@ -422,25 +420,26 @@ a {
   color: var(--muted);
 }
 
-.saved-vocab-gloss {
+.saved-vocab-secondary {
   font-size: 13px;
-  color: var(--muted);
+  color: color-mix(in oklab, var(--text) 85%, var(--muted) 15%);
 }
 
 .saved-vocab-unresolved {
   font-size: 12px;
-  color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
+  color: var(--muted);
+  margin-top: 2px;
 }
 
-.saved-vocab-item-actions {
+.saved-vocab-actions {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .saved-vocab-open,
-.saved-vocab-remove {
+.saved-vocab-remove,
+.saved-vocab-back {
   font-size: 13px;
   padding: 6px 10px;
 }
@@ -450,6 +449,11 @@ a {
 .saved-vocab-back:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--accent) 55%, white 10%);
   outline-offset: 2px;
+}
+
+.saved-vocab-row-error {
+  font-size: 12px;
+  color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
 }
 
 .entry-headword {

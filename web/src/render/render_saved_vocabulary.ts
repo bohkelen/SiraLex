@@ -4,77 +4,74 @@
 
 import { t } from "../i18n";
 import type {
+  SavedVocabularyModel,
   SavedVocabularyRowVm,
-  SavedVocabularyViewModel,
 } from "../learning/saved_vocabulary_session";
-
-export type SavedVocabularyRendererCallbacks = {
-  onBack: () => void;
-  onOpen: (irId: string) => void;
-  onRemove: (irId: string) => void;
-};
+import { rowKey } from "../learning/saved_vocabulary_session";
 
 function el(tag: string, cls?: string, text?: string): HTMLElement {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text) node.textContent = text;
-  return node;
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text) e.textContent = text;
+  return e;
 }
 
-function statusText(vm: SavedVocabularyViewModel): string {
-  switch (vm.state) {
-    case "loading":
-      return t("learning.loading");
-    case "empty":
-      return t("learning.empty");
-    case "unavailable":
-      return t("learning.noActiveBundle");
-    case "error":
-      return t("learning.listError");
-    case "removing":
-      return t("learning.removing");
-    case "populated":
-      if (vm.statusMessage === "remove_failed") return t("learning.removeError");
-      if (vm.statusMessage === "open_failed") return t("learning.openFailed");
-      return "";
-    default:
-      return "";
-  }
-}
+export type SavedVocabularyCallbacks = {
+  onBack: () => void;
+  onOpen: (row: SavedVocabularyRowVm & { state: "resolved" }) => void;
+  onRemove: (row: SavedVocabularyRowVm) => void;
+};
+
+export type SavedVocabularyView = {
+  root: HTMLElement;
+  /** Preferred focus target after a successful remove (may be null). */
+  focusAfterRemove: HTMLElement | null;
+};
 
 function renderRow(
   row: SavedVocabularyRowVm,
-  callbacks: SavedVocabularyRendererCallbacks,
-  listBusy: boolean,
+  callbacks: SavedVocabularyCallbacks,
+  removingKey: string | undefined,
+  rowError: string | undefined,
 ): HTMLElement {
-  const item = el("li", "saved-vocab-item");
-  item.dataset.irId = row.ir_id;
+  const key = rowKey(row.bundle_id, row.ir_id);
+  const li = el("li", "saved-vocab-row");
+  li.setAttribute("data-row-key", key);
 
-  const main = el("div", "saved-vocab-item-main");
-  const title = el("div", "saved-vocab-headword", row.headword_latin);
+  const main = el("div", "saved-vocab-row-main");
+  const title = el("div", "saved-vocab-primary");
+  const primaryText =
+    row.primaryText.trim() !== "" ? row.primaryText : t("learning.unresolvedFallback");
+  title.textContent = primaryText;
   main.appendChild(title);
-  if (row.headword_nko) {
-    main.appendChild(el("div", "saved-vocab-nko", row.headword_nko));
-  }
-  if (row.gloss_short) {
-    main.appendChild(el("div", "saved-vocab-gloss", row.gloss_short));
-  }
-  if (row.unresolved) {
-    main.appendChild(el("div", "saved-vocab-unresolved", t("learning.unresolved")));
-  }
-  item.appendChild(main);
 
-  const actions = el("div", "saved-vocab-item-actions");
+  if (row.nkoText) {
+    main.appendChild(el("div", "saved-vocab-nko", row.nkoText));
+  }
+  if (row.secondaryText) {
+    main.appendChild(el("div", "saved-vocab-secondary", row.secondaryText));
+  }
 
-  if (row.openable) {
+  if (row.state === "unresolved") {
+    const badge = el("div", "saved-vocab-unresolved", t("learning.unresolved"));
+    badge.setAttribute("data-reason", row.reason);
+    main.appendChild(badge);
+  }
+
+  li.appendChild(main);
+
+  const actions = el("div", "saved-vocab-actions");
+  const busy = removingKey === key;
+
+  if (row.state === "resolved") {
     const openBtn = document.createElement("button");
     openBtn.type = "button";
     openBtn.className = "btn saved-vocab-open";
-    openBtn.textContent = t("learning.openEntry");
-    openBtn.disabled = listBusy || row.removing;
+    openBtn.textContent = t("learning.open");
+    openBtn.disabled = busy;
     openBtn.addEventListener("click", () => {
-      if (listBusy || row.removing) return;
-      callbacks.onOpen(row.ir_id);
+      if (busy) return;
+      callbacks.onOpen(row);
     });
     actions.appendChild(openBtn);
   }
@@ -82,68 +79,96 @@ function renderRow(
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
   removeBtn.className = "btn saved-vocab-remove";
-  removeBtn.textContent = row.removing ? t("learning.removing") : t("learning.remove");
-  removeBtn.disabled = listBusy || row.removing;
-  removeBtn.setAttribute("aria-busy", row.removing ? "true" : "false");
+  removeBtn.textContent = t("learning.remove");
+  removeBtn.disabled = busy;
+  removeBtn.setAttribute("aria-busy", busy ? "true" : "false");
   removeBtn.addEventListener("click", () => {
-    if (listBusy || row.removing) return;
-    callbacks.onRemove(row.ir_id);
+    if (busy) return;
+    callbacks.onRemove(row);
   });
   actions.appendChild(removeBtn);
+  li.appendChild(actions);
 
-  item.appendChild(actions);
-  return item;
+  if (rowError) {
+    const err = el("div", "saved-vocab-row-error", t("learning.removeError"));
+    err.id = `saved-vocab-error-${key.replace(/\0/g, "-")}`;
+    err.setAttribute("role", "status");
+    removeBtn.setAttribute("aria-describedby", err.id);
+    li.appendChild(err);
+  }
+
+  if (busy) {
+    li.setAttribute("aria-busy", "true");
+  }
+
+  return li;
 }
 
 /**
- * Apply an immutable view-model to a Saved Vocabulary root element.
+ * Render the Saved Vocabulary surface for the given model.
  */
-export function applySavedVocabularyView(
-  root: HTMLElement,
-  vm: SavedVocabularyViewModel,
-  callbacks: SavedVocabularyRendererCallbacks,
-): void {
-  root.replaceChildren();
-  root.className = "saved-vocab-surface";
-  root.setAttribute("aria-busy", vm.state === "loading" || vm.state === "removing" ? "true" : "false");
+export function renderSavedVocabulary(
+  model: SavedVocabularyModel,
+  callbacks: SavedVocabularyCallbacks,
+): SavedVocabularyView {
+  const root = el("div", "saved-vocab-surface");
 
   const backBtn = document.createElement("button");
   backBtn.type = "button";
   backBtn.className = "btn entry-back saved-vocab-back";
   backBtn.textContent = t("learning.backToSearch");
-  backBtn.addEventListener("click", callbacks.onBack);
+  backBtn.addEventListener("click", () => callbacks.onBack());
   root.appendChild(backBtn);
 
-  root.appendChild(el("h2", "saved-vocab-title", t("learning.savedVocabulary")));
+  const heading = el("h2", "saved-vocab-title", t("learning.savedVocabulary"));
+  heading.id = "saved-vocab-heading";
+  root.appendChild(heading);
 
-  const status = el("div", "saved-vocab-status");
-  status.id = "saved-vocab-status";
-  status.setAttribute("role", "status");
-  const message = statusText(vm);
-  status.textContent = message;
-  status.hidden = message === "";
-  root.appendChild(status);
+  let focusAfterRemove: HTMLElement | null = null;
 
-  if (vm.state === "loading" || vm.state === "unavailable" || vm.state === "error" || vm.state === "empty") {
-    return;
+  if (model.surface === "loading") {
+    const status = el("p", "saved-vocab-status", t("learning.loading"));
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-busy", "true");
+    root.appendChild(status);
+    return { root, focusAfterRemove: null };
+  }
+
+  if (model.surface === "unavailable") {
+    root.appendChild(el("p", "saved-vocab-status", t("learning.noActiveBundle")));
+    focusAfterRemove = backBtn;
+    return { root, focusAfterRemove };
+  }
+
+  if (model.surface === "error") {
+    const err = el("p", "saved-vocab-status saved-vocab-page-error", t("learning.listError"));
+    err.setAttribute("role", "alert");
+    root.appendChild(err);
+    focusAfterRemove = backBtn;
+    return { root, focusAfterRemove };
+  }
+
+  if (model.surface === "empty") {
+    root.appendChild(el("p", "saved-vocab-status", t("learning.empty")));
+    focusAfterRemove = backBtn;
+    return { root, focusAfterRemove };
   }
 
   const list = document.createElement("ul");
   list.className = "saved-vocab-list";
-  list.setAttribute("aria-label", t("learning.savedVocabulary"));
+  list.setAttribute("aria-labelledby", heading.id);
 
-  const listBusy = vm.state === "removing";
-  for (const row of vm.rows) {
-    list.appendChild(renderRow(row, callbacks, listBusy));
+  for (const row of model.rows) {
+    const key = rowKey(row.bundle_id, row.ir_id);
+    const rowError = model.rowErrors[key];
+    list.appendChild(renderRow(row, callbacks, model.removingKey, rowError));
   }
   root.appendChild(list);
-}
 
-export function renderSavedVocabularySurface(
-  vm: SavedVocabularyViewModel,
-  callbacks: SavedVocabularyRendererCallbacks,
-): HTMLElement {
-  const root = el("div", "saved-vocab-surface");
-  applySavedVocabularyView(root, vm, callbacks);
-  return root;
+  // Prefer focusing the next row's Open/Remove after a remove; caller may use this.
+  const firstAction =
+    list.querySelector<HTMLButtonElement>(".saved-vocab-open, .saved-vocab-remove") ?? backBtn;
+  focusAfterRemove = firstAction;
+
+  return { root, focusAfterRemove };
 }

@@ -96,16 +96,16 @@ import {
   type ResultDisplayContext,
 } from "./render/render_results";
 import { renderEntryDetail } from "./render/render_entry";
+import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
 import {
   canOfferLearningSave,
   createEntryLearningSession,
   type LearningSaveControlState,
 } from "./learning/entry_learning_session";
 import {
-  createEmptySavedVocabularyViewModel,
   createSavedVocabularySession,
+  type SavedVocabularyModel,
 } from "./learning/saved_vocabulary_session";
-import { applySavedVocabularyView } from "./render/render_saved_vocabulary";
 import type { EnrichedRecord } from "./types/records";
 import { isLexiconDisplay } from "./types/records";
 
@@ -161,7 +161,7 @@ app.innerHTML = `
       <div id="activeDictionaryRow" style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
         <div class="row" style="align-items: center; justify-content: space-between; gap: 8px">
           <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
-          <div class="row" style="gap: 8px; flex-shrink: 0">
+          <div class="row" style="gap: 8px; flex-wrap: wrap">
             <button id="openSavedVocabulary" class="btn" type="button">${t("learning.openSaved")}</button>
             <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
           </div>
@@ -337,8 +337,8 @@ function mustGetEl<T extends Element>(selector: string): T {
 const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
-const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
 const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
+const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
 const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
 const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
 const featuredInstallBtn = mustGetEl<HTMLButtonElement>("#featuredInstall");
@@ -2021,8 +2021,11 @@ let pendingSettledLogPayload: SettledQueryLogPayload | undefined;
 let searchSeq = 0;
 let entryDetailGeneration = 0;
 let savedVocabularyGeneration = 0;
-let returnToSavedVocabularyAfterEntry = false;
 let lastSearchResults: ResultDisplayContext[] = [];
+
+/** Explicit host context for #searchResults navigation (LS1I3). */
+type ResultsHostContext = "search" | "saved_vocabulary" | "entry_from_search" | "entry_from_saved";
+let resultsHostContext: ResultsHostContext = "search";
 
 function cancelPendingSettledQueryLog() {
   if (queryLoggingSettleTimer !== undefined) {
@@ -2072,6 +2075,8 @@ searchInput.addEventListener("input", () => {
   const query = searchInput.value;
   if (query.trim() === "") {
     searchSeq += 1;
+    savedVocabularyGeneration += 1;
+    resultsHostContext = "search";
     searchMeta.textContent = "";
     searchResults.innerHTML = "";
     lastSearchResults = [];
@@ -2083,11 +2088,13 @@ searchInput.addEventListener("input", () => {
 });
 
 function showResultsList() {
+  resultsHostContext = "search";
+  savedVocabularyGeneration += 1;
   searchResults.innerHTML = "";
   if (lastSearchResults.length === 0) return;
 
   const list = renderResultsList(lastSearchResults, (record) => {
-    showEntryDetail(record);
+    showEntryDetail(record, "search");
   });
   if (list) searchResults.appendChild(list);
 }
@@ -2100,76 +2107,61 @@ function triggerSearch(query: string) {
 
 function showSavedVocabulary() {
   const generation = ++savedVocabularyGeneration;
-  entryDetailGeneration += 1; // invalidate any in-flight entry learning updates
-  returnToSavedVocabularyAfterEntry = false;
+  resultsHostContext = "saved_vocabulary";
+  entryDetailGeneration += 1;
   searchResults.innerHTML = "";
 
-  const root = document.createElement("div");
-  searchResults.appendChild(root);
+  let lastFocusTarget: HTMLElement | null = null;
 
-  const boundMeta = currentActiveBundle;
-  const boundBundleId = boundMeta?.bundle_id ?? null;
-  const boundScopeId = boundMeta ? getBundleStorageScopeId(boundMeta) : null;
+  const applyModel = (model: SavedVocabularyModel) => {
+    if (generation !== savedVocabularyGeneration || resultsHostContext !== "saved_vocabulary") {
+      return;
+    }
+    const view = renderSavedVocabulary(model, {
+      onBack: () => {
+        savedVocabularyGeneration += 1;
+        showResultsList();
+      },
+      onOpen: (row) => {
+        showEntryDetail(row.liveEntry, "saved_vocabulary");
+      },
+      onRemove: (row) => {
+        void session.remove(row.bundle_id, row.ir_id).then((result) => {
+          if (generation !== savedVocabularyGeneration) return;
+          if (result === "ok" && lastFocusTarget) {
+            lastFocusTarget.focus();
+          }
+        });
+      },
+    });
+    searchResults.innerHTML = "";
+    searchResults.appendChild(view.root);
+    lastFocusTarget = view.focusAfterRemove;
+  };
 
   const session = createSavedVocabularySession({
     getActiveMeta: () => currentActiveBundle,
     openDb: openSiralexDb,
-    isCurrent: () => generation === savedVocabularyGeneration,
-    isBindingCurrent: (bundleId, storageScopeId) => {
-      const meta = currentActiveBundle;
-      if (!meta) return false;
-      return meta.bundle_id === bundleId && getBundleStorageScopeId(meta) === storageScopeId;
-    },
-    publish: (vm) => {
-      if (generation !== savedVocabularyGeneration) return;
-      applySavedVocabularyView(root, vm, {
-        onBack: () => showResultsList(),
-        onOpen: (irId) => {
-          void session.openRow(irId);
-        },
-        onRemove: (irId) => {
-          void session.removeRow(irId);
-        },
-      });
-    },
-    onOpenEntry: (entry) => {
-      returnToSavedVocabularyAfterEntry = true;
-      showEntryDetail(entry);
-    },
+    isCurrent: () =>
+      generation === savedVocabularyGeneration && resultsHostContext === "saved_vocabulary",
+    onUpdate: applyModel,
     confirmRemove: () => window.confirm(t("learning.removeConfirm")),
   });
 
-  // Seed loading chrome immediately (also covers unavailable when no binding).
-  if (!boundBundleId || !boundScopeId) {
-    applySavedVocabularyView(root, createEmptySavedVocabularyViewModel("unavailable"), {
-      onBack: () => showResultsList(),
-      onOpen: () => undefined,
-      onRemove: () => undefined,
-    });
-    return;
-  }
-
-  applySavedVocabularyView(root, createEmptySavedVocabularyViewModel("loading"), {
-    onBack: () => showResultsList(),
-    onOpen: (irId) => {
-      void session.openRow(irId);
-    },
-    onRemove: (irId) => {
-      void session.removeRow(irId);
-    },
-  });
+  applyModel({ surface: "loading" });
   void session.load();
 }
 
-function showEntryDetail(record: EnrichedRecord) {
+function showEntryDetail(record: EnrichedRecord, openedFrom: "search" | "saved_vocabulary" = "search") {
   const generation = ++entryDetailGeneration;
-  savedVocabularyGeneration += 1; // drop in-flight saved-vocab updates when leaving the surface
+  resultsHostContext = openedFrom === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
+  if (openedFrom === "search") {
+    savedVocabularyGeneration += 1;
+  }
   searchResults.innerHTML = "";
 
   const offerLearning = isLexiconDisplay(record);
   const learningAvailable = offerLearning && canOfferLearningSave(record, currentActiveBundle);
-  const backToSaved = returnToSavedVocabularyAfterEntry;
-  returnToSavedVocabularyAfterEntry = false;
 
   let setLearningSaveState: ((state: LearningSaveControlState) => void) | undefined;
 
@@ -2188,11 +2180,11 @@ function showEntryDetail(record: EnrichedRecord) {
 
   const view = renderEntryDetail(record, {
     onBack: () => {
-      if (backToSaved) {
+      if (openedFrom === "saved_vocabulary") {
         showSavedVocabulary();
-        return;
+      } else {
+        showResultsList();
       }
-      showResultsList();
     },
     onSearch: (query) => triggerSearch(query),
     targetEntriesLabel: getTargetEntriesLabel(
@@ -2258,6 +2250,8 @@ async function runSearch(query: string) {
 
     if (result.ir_ids.length === 0) {
       searchMeta.textContent = getNoResultMessage(query);
+      savedVocabularyGeneration += 1;
+      resultsHostContext = "search";
       searchResults.innerHTML = "";
       lastSearchResults = [];
       scheduleSettledQueryLog({
