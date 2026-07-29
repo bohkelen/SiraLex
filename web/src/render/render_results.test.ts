@@ -227,14 +227,14 @@ describe("Phase 7G entry detail cleanup", () => {
   it("hides ordinary-user internal metadata in detail pages", () => {
     const detail = renderEntryDetail(INDEX_RECORD, { onBack: () => undefined });
 
-    expect(detail.textContent).toContain("main");
-    expect(detail.textContent).toContain("bólo");
-    expect(detail.textContent).not.toContain("ir_id");
-    expect(detail.textContent).not.toContain("record-main");
-    expect(detail.textContent).not.toContain("src-test");
-    expect(detail.textContent).not.toContain("norm-test");
-    expect(detail.querySelector(".entry-pos")).toBeNull();
-    expect(detail.textContent).not.toMatch(/\bfr\b/);
-    expect(detail.textContent).not.toContain("e1");
+    expect(detail.root.textContent).toContain("main");
+    expect(detail.root.textContent).toContain("bólo");
+    expect(detail.root.textContent).not.toContain("ir_id");
+    expect(detail.root.textContent).not.toContain("record-main");
+    expect(detail.root.textContent).not.toContain("src-test");
+    expect(detail.root.textContent).not.toContain("norm-test");
+    expect(detail.root.querySelector(".entry-pos")).toBeNull();
+    expect(detail.root.textContent).not.toMatch(/\bfr\b/);
+    expect(detail.root.textContent).not.toContain("e1");
   });
 });

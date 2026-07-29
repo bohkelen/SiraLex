@@ -96,7 +96,13 @@ import {
   type ResultDisplayContext,
 } from "./render/render_results";
 import { renderEntryDetail } from "./render/render_entry";
+import {
+  canOfferLearningSave,
+  createEntryLearningSession,
+  type LearningSaveControlState,
+} from "./learning/entry_learning_session";
 import type { EnrichedRecord } from "./types/records";
+import { isLexiconDisplay } from "./types/records";
 
 registerSW({ immediate: true });
 
@@ -2000,6 +2006,7 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 let queryLoggingSettleTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingSettledLogPayload: SettledQueryLogPayload | undefined;
 let searchSeq = 0;
+let entryDetailGeneration = 0;
 let lastSearchResults: ResultDisplayContext[] = [];
 
 function cancelPendingSettledQueryLog() {
@@ -2077,8 +2084,28 @@ function triggerSearch(query: string) {
 }
 
 function showEntryDetail(record: EnrichedRecord) {
+  const generation = ++entryDetailGeneration;
   searchResults.innerHTML = "";
-  const detail = renderEntryDetail(record, {
+
+  const offerLearning = isLexiconDisplay(record);
+  const learningAvailable = offerLearning && canOfferLearningSave(record, currentActiveBundle);
+
+  let setLearningSaveState: ((state: LearningSaveControlState) => void) | undefined;
+
+  const session = offerLearning
+    ? createEntryLearningSession({
+        record,
+        getActiveMeta: () => currentActiveBundle,
+        openDb: openSiralexDb,
+        isCurrent: () => generation === entryDetailGeneration,
+        setState: (state) => {
+          if (generation !== entryDetailGeneration) return;
+          setLearningSaveState?.(state);
+        },
+      })
+    : undefined;
+
+  const view = renderEntryDetail(record, {
     onBack: () => showResultsList(),
     onSearch: (query) => triggerSearch(query),
     targetEntriesLabel: getTargetEntriesLabel(
@@ -2087,8 +2114,27 @@ function showEntryDetail(record: EnrichedRecord) {
       (label) => t("entry.targetEntries", { label }),
       getCurrentLocale(),
     ),
+    learning: offerLearning
+      ? {
+          initialState: learningAvailable ? "loading" : "unavailable",
+          onSave: () => {
+            void session?.save();
+          },
+          onUnsave: () => {
+            void session?.unsave();
+          },
+        }
+      : undefined,
   });
-  searchResults.appendChild(detail);
+
+  setLearningSaveState = view.setLearningSaveState;
+  searchResults.appendChild(view.root);
+
+  if (offerLearning && learningAvailable && session) {
+    void session.loadInitial();
+  } else if (offerLearning && !learningAvailable) {
+    view.setLearningSaveState?.("unavailable");
+  }
 }
 
 async function runSearch(query: string) {
