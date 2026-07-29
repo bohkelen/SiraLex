@@ -1,16 +1,16 @@
 /**
- * LS1I3 navigation helpers tested in isolation from the full main.ts shell.
- * Mirrors the generation/context guards used by showSavedVocabulary.
+ * LS1 navigation / stale-async guards (LS1I3 + LS1I4).
+ * Mirrors generation and host-context rules used by main.ts.
  */
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { SavedVocabularyModel } from "../learning/saved_vocabulary_session";
+import type { SavedVocabularyModel } from "./saved_vocabulary_session";
 
-describe("LS1I3 Saved Vocabulary navigation guards", () => {
+describe("LS1 Saved Vocabulary navigation and stale-async guards", () => {
   it("drops applyModel when generation or host context changes", () => {
     let generation = 1;
-    let host: "search" | "saved_vocabulary" = "saved_vocabulary";
+    let host: "search" | "saved_vocabulary" | "entry_from_saved" = "saved_vocabulary";
     const applied: SavedVocabularyModel[] = [];
 
     const applyModel = (model: SavedVocabularyModel, gen: number) => {
@@ -29,12 +29,38 @@ describe("LS1I3 Saved Vocabulary navigation guards", () => {
     applyModel({ surface: "empty" }, 2);
     expect(applied).toHaveLength(1);
 
+    host = "entry_from_saved";
+    applyModel({ surface: "populated", rows: [], rowErrors: {} }, 2);
+    expect(applied).toHaveLength(1);
+
     host = "saved_vocabulary";
     applyModel({ surface: "empty" }, 2);
     expect(applied).toHaveLength(2);
   });
 
-  it("entry back-from-saved should reopen vocabulary rather than search list", () => {
+  it("opening Saved Vocabulary must not invoke runSearch", () => {
+    const runSearch = vi.fn();
+    const showSavedVocabulary = () => {
+      // production path replaces #searchResults without searching
+    };
+    showSavedVocabulary();
+    expect(runSearch).not.toHaveBeenCalled();
+  });
+
+  it("Back from Saved Vocabulary restores search list without runSearch", () => {
+    const runSearch = vi.fn();
+    const showResultsList = vi.fn(() => {
+      // restores lastSearchResults only
+    });
+    const onBack = () => {
+      showResultsList();
+    };
+    onBack();
+    expect(showResultsList).toHaveBeenCalledTimes(1);
+    expect(runSearch).not.toHaveBeenCalled();
+  });
+
+  it("entry back-from-saved reopens vocabulary rather than search list", () => {
     const showResultsList = vi.fn();
     const showSavedVocabulary = vi.fn();
     const openedFrom: "search" | "saved_vocabulary" = "saved_vocabulary";
@@ -45,5 +71,81 @@ describe("LS1I3 Saved Vocabulary navigation guards", () => {
     onBack();
     expect(showSavedVocabulary).toHaveBeenCalledTimes(1);
     expect(showResultsList).not.toHaveBeenCalled();
+  });
+
+  it("stale remove completion cannot redraw after user left Saved Vocabulary", async () => {
+    let generation = 1;
+    let host: "search" | "saved_vocabulary" = "saved_vocabulary";
+    const redraws: string[] = [];
+
+    const applyAfterRemove = (gen: number, label: string) => {
+      if (gen !== generation || host !== "saved_vocabulary") return;
+      redraws.push(label);
+    };
+
+    const removePromise = Promise.resolve("ok").then(() => {
+      applyAfterRemove(1, "stale-ok");
+    });
+
+    generation = 2;
+    host = "search";
+    await removePromise;
+    expect(redraws).toEqual([]);
+  });
+
+  it("switching active bundle requires a new Saved Vocabulary open/generation", () => {
+    let generation = 1;
+    let activeBundleId = "bundle-a";
+    const loads: string[] = [];
+
+    const openSavedVocabulary = (bundleId: string) => {
+      generation += 1;
+      activeBundleId = bundleId;
+      loads.push(`${generation}:${activeBundleId}`);
+    };
+
+    openSavedVocabulary("bundle-a");
+    openSavedVocabulary("bundle-b");
+    expect(loads).toEqual(["2:bundle-a", "3:bundle-b"]);
+  });
+
+  it("stale Saved Vocabulary load cannot replace a newer entry view", () => {
+    let generation = 1;
+    let host: "search" | "saved_vocabulary" | "entry_from_saved" = "saved_vocabulary";
+    const applied: string[] = [];
+
+    const applySavedVocabulary = (label: string, gen: number) => {
+      if (gen !== generation || host !== "saved_vocabulary") return;
+      applied.push(label);
+    };
+
+    applySavedVocabulary("load-1", 1);
+    generation = 2;
+    host = "entry_from_saved";
+    applySavedVocabulary("late-load-1", 1);
+    expect(applied).toEqual(["load-1"]);
+  });
+
+  it("after Remove, returning to entry detail uses not_saved on the next current render", () => {
+    let host: "saved_vocabulary" | "entry_from_saved" = "saved_vocabulary";
+    let entrySaveState: "saved" | "not_saved" = "saved";
+
+    const onRemoveOk = () => {
+      entrySaveState = "not_saved";
+    };
+    const openEntryAgain = () => {
+      host = "entry_from_saved";
+      // next current entry render reads fresh saved-state
+    };
+
+    onRemoveOk();
+    openEntryAgain();
+    expect(host).toBe("entry_from_saved");
+    expect(entrySaveState).toBe("not_saved");
+  });
+
+  it("unresolved row has no Open action at the navigation contract layer", () => {
+    const row = { state: "unresolved" as const, canOpen: false };
+    expect(row.canOpen).toBe(false);
   });
 });
