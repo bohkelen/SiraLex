@@ -52,6 +52,21 @@ function isValidStatus(value: unknown): value is LearningRecordStatus {
   return value === "still_learning" || value === "remembered";
 }
 
+/**
+ * Accept ISO-8601 timestamps that parse as a real Date and round-trip by instant.
+ * Rejects empty/whitespace, prose ("yesterday"), and invalid calendar strings.
+ * No external date library.
+ */
+export function isValidIsoTimestamp(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  if (value.trim() === "" || value !== value.trim()) return false;
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return false;
+  const parsed = new Date(ms);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return Date.parse(parsed.toISOString()) === ms;
+}
+
 function assertDisplayCache(cache: unknown, label: string): asserts cache is LearningRecordDisplayCache {
   if (typeof cache !== "object" || cache === null) {
     throw new Error(`${label}: display_cache must be an object`);
@@ -99,13 +114,13 @@ export function validateLearningRecordForWrite(record: unknown, label = "learnin
   if (!isValidStatus(r.status)) {
     throw new Error(`${label}: status must be "still_learning" or "remembered"`);
   }
-  if (!isNonEmptyString(r.created_at)) {
-    throw new Error(`${label}: created_at must be a non-empty string`);
+  if (!isValidIsoTimestamp(r.created_at)) {
+    throw new Error(`${label}: created_at must be a valid ISO-8601 timestamp`);
   }
   assertDisplayCache(r.display_cache, label);
 
-  if (r.last_reviewed !== null && !isNonEmptyString(r.last_reviewed)) {
-    throw new Error(`${label}: last_reviewed must be null or a non-empty string`);
+  if (r.last_reviewed !== null && !isValidIsoTimestamp(r.last_reviewed)) {
+    throw new Error(`${label}: last_reviewed must be null or a valid ISO-8601 timestamp`);
   }
   if (typeof r.review_count !== "number" || !Number.isInteger(r.review_count) || r.review_count < 0) {
     throw new Error(`${label}: review_count must be a non-negative integer`);

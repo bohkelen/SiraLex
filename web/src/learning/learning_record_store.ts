@@ -31,12 +31,45 @@ function txDone(tx: IDBTransaction): Promise<void> {
   });
 }
 
+function isConstraintError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "name" in err &&
+    (err as { name: string }).name === "ConstraintError"
+  );
+}
+
 function compareCreatedAtDesc(a: LearningRecordV1, b: LearningRecordV1): number {
   if (a.created_at !== b.created_at) {
     return a.created_at < b.created_at ? 1 : -1;
   }
   // Deterministic tie-break on ir_id.
   return a.ir_id.localeCompare(b.ir_id);
+}
+
+function buildNewLearningRecord(input: SaveLearningRecordInput): LearningRecordV1 {
+  return {
+    schema_version: LEARNING_RECORD_SCHEMA_VERSION,
+    bundle_id: input.bundle_id,
+    ir_id: input.ir_id,
+    ir_kind: "lexicon_entry",
+    content_sha256: input.content_sha256,
+    storage_scope_id: input.storage_scope_id,
+    status: "still_learning",
+    created_at: new Date().toISOString(),
+    display_cache: {
+      headword_latin: input.display_cache.headword_latin,
+      ...(input.display_cache.headword_nko !== undefined
+        ? { headword_nko: input.display_cache.headword_nko }
+        : {}),
+      ...(input.display_cache.gloss_short !== undefined
+        ? { gloss_short: input.display_cache.gloss_short }
+        : {}),
+    },
+    last_reviewed: null,
+    review_count: 0,
+  };
 }
 
 export async function getLearningRecord(
@@ -62,6 +95,11 @@ export async function isLearningRecordSaved(
 
 /**
  * Create a Learning Record when absent; return existing unchanged when present.
+ *
+ * Existence check and possible create run in one `learning_records` readwrite
+ * transaction (first-write-wins). Uses `add` for create-only insertion; on a
+ * rare ConstraintError, returns the persisted winner rather than a speculative
+ * loser object.
  */
 export async function saveLearningRecord(
   db: IDBDatabase,
@@ -69,39 +107,31 @@ export async function saveLearningRecord(
 ): Promise<LearningRecordV1> {
   validateSaveLearningRecordInput(input);
 
-  const existing = await getLearningRecord(db, input.bundle_id, input.ir_id);
+  const key: [string, string] = [input.bundle_id, input.ir_id];
+  const tx = db.transaction(STORE_LEARNING_RECORDS, "readwrite");
+  const store = tx.objectStore(STORE_LEARNING_RECORDS);
+
+  const existing = (await reqToPromise(store.get(key))) as LearningRecordV1 | undefined;
   if (existing) {
+    await txDone(tx);
     return existing;
   }
 
-  const record: LearningRecordV1 = {
-    schema_version: LEARNING_RECORD_SCHEMA_VERSION,
-    bundle_id: input.bundle_id,
-    ir_id: input.ir_id,
-    ir_kind: "lexicon_entry",
-    content_sha256: input.content_sha256,
-    storage_scope_id: input.storage_scope_id,
-    status: "still_learning",
-    created_at: new Date().toISOString(),
-    display_cache: {
-      headword_latin: input.display_cache.headword_latin,
-      ...(input.display_cache.headword_nko !== undefined
-        ? { headword_nko: input.display_cache.headword_nko }
-        : {}),
-      ...(input.display_cache.gloss_short !== undefined
-        ? { gloss_short: input.display_cache.gloss_short }
-        : {}),
-    },
-    last_reviewed: null,
-    review_count: 0,
-  };
-
+  const record = buildNewLearningRecord(input);
   validateLearningRecordForWrite(record, "saveLearningRecord");
 
-  const tx = db.transaction(STORE_LEARNING_RECORDS, "readwrite");
-  tx.objectStore(STORE_LEARNING_RECORDS).put(record);
-  await txDone(tx);
-  return record;
+  try {
+    await reqToPromise(store.add(record));
+    await txDone(tx);
+    return record;
+  } catch (err) {
+    if (isConstraintError(err)) {
+      // Transaction aborted; return the first committed winner, not this speculative row.
+      const winner = await getLearningRecord(db, input.bundle_id, input.ir_id);
+      if (winner) return winner;
+    }
+    throw err;
+  }
 }
 
 export async function listLearningRecordsByBundle(

@@ -31,7 +31,13 @@ import {
   saveLearningRecord,
 } from "./learning_record_store";
 import type { SaveLearningRecordInput } from "./learning_record_types";
-import { LEARNING_RECORD_SCHEMA_VERSION, validateSaveLearningRecordInput } from "./learning_record_types";
+import {
+  LEARNING_RECORD_SCHEMA_VERSION,
+  isValidIsoTimestamp,
+  validateLearningRecordForWrite,
+  validateSaveLearningRecordInput,
+} from "./learning_record_types";
+import type { LearningRecordV1 } from "./learning_record_types";
 
 const BUNDLE_A = "bundle_learning_a";
 const BUNDLE_B = "bundle_learning_b";
@@ -86,6 +92,23 @@ function makeSaveInput(overrides: Partial<SaveLearningRecordInput> = {}): SaveLe
       headword_nko: "ߞߎ߲",
       gloss_short: "tête",
     },
+    ...overrides,
+  };
+}
+
+function makeValidRecordForValidation(overrides: Partial<LearningRecordV1> = {}): LearningRecordV1 {
+  return {
+    schema_version: LEARNING_RECORD_SCHEMA_VERSION,
+    bundle_id: BUNDLE_A,
+    ir_id: "lex-1",
+    ir_kind: "lexicon_entry",
+    content_sha256: HASH_A,
+    storage_scope_id: SCOPE_A,
+    status: "still_learning",
+    created_at: "2026-07-29T16:00:00.000Z",
+    display_cache: { headword_latin: "kùn" },
+    last_reviewed: null,
+    review_count: 0,
     ...overrides,
   };
 }
@@ -231,6 +254,49 @@ describe("buildDisplayCache", () => {
   });
 });
 
+describe("ISO timestamp validation", () => {
+  it("accepts valid created_at", () => {
+    expect(isValidIsoTimestamp("2026-07-29T16:00:00.000Z")).toBe(true);
+    expect(() => validateLearningRecordForWrite(makeValidRecordForValidation())).not.toThrow();
+  });
+
+  it("rejects malformed created_at", () => {
+    expect(isValidIsoTimestamp("yesterday")).toBe(false);
+    expect(isValidIsoTimestamp("  ")).toBe(false);
+    expect(isValidIsoTimestamp(" 2026-07-29T16:00:00.000Z")).toBe(false);
+    expect(() =>
+      validateLearningRecordForWrite(makeValidRecordForValidation({ created_at: "yesterday" })),
+    ).toThrow(/created_at/);
+  });
+
+  it("rejects invalid calendar dates", () => {
+    expect(isValidIsoTimestamp("2026-99-99")).toBe(false);
+    expect(() =>
+      validateLearningRecordForWrite(makeValidRecordForValidation({ created_at: "2026-99-99" })),
+    ).toThrow(/created_at/);
+  });
+
+  it("accepts valid non-null last_reviewed", () => {
+    expect(() =>
+      validateLearningRecordForWrite(
+        makeValidRecordForValidation({ last_reviewed: "2026-07-29T17:30:00.000Z" }),
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects malformed non-null last_reviewed", () => {
+    expect(() =>
+      validateLearningRecordForWrite(makeValidRecordForValidation({ last_reviewed: "tomorrow" })),
+    ).toThrow(/last_reviewed/);
+  });
+
+  it("accepts null last_reviewed", () => {
+    expect(() =>
+      validateLearningRecordForWrite(makeValidRecordForValidation({ last_reviewed: null })),
+    ).not.toThrow();
+  });
+});
+
 describe("Learning Record persistence API", () => {
   beforeEach(async () => {
     try {
@@ -332,6 +398,46 @@ describe("Learning Record persistence API", () => {
     expect(second.status).toBe("still_learning");
     expect(second.review_count).toBe(0);
     expect(await countStoreRows(db, STORE_LEARNING_RECORDS)).toBe(1);
+    db.close();
+  });
+
+  it("concurrent saves first-write-wins without overwrite", async () => {
+    const db = await openSiralexDb();
+    const competing: SaveLearningRecordInput[] = [
+      makeSaveInput({
+        content_sha256: "sha256:concurrent-1",
+        storage_scope_id: `${BUNDLE_A}::sha256:concurrent-1`,
+        display_cache: { headword_latin: "alpha", gloss_short: "cache-a" },
+      }),
+      makeSaveInput({
+        content_sha256: "sha256:concurrent-2",
+        storage_scope_id: `${BUNDLE_A}::sha256:concurrent-2`,
+        display_cache: { headword_latin: "beta", gloss_short: "cache-b" },
+      }),
+      makeSaveInput({
+        content_sha256: "sha256:concurrent-3",
+        storage_scope_id: `${BUNDLE_A}::sha256:concurrent-3`,
+        display_cache: { headword_latin: "gamma", gloss_short: "cache-c" },
+      }),
+    ];
+
+    const results = await Promise.all(competing.map((input) => saveLearningRecord(db, input)));
+
+    expect(await countStoreRows(db, STORE_LEARNING_RECORDS)).toBe(1);
+    const persisted = await getLearningRecord(db, BUNDLE_A, "lex-1");
+    expect(persisted).toBeDefined();
+    for (const result of results) {
+      expect(result).toEqual(persisted);
+    }
+    expect(new Set(results.map((r) => r.created_at)).size).toBe(1);
+    expect(new Set(results.map((r) => r.content_sha256)).size).toBe(1);
+    expect(new Set(results.map((r) => r.storage_scope_id)).size).toBe(1);
+    expect(new Set(results.map((r) => r.display_cache.headword_latin)).size).toBe(1);
+    expect(results[0]!.status).toBe("still_learning");
+    expect(results[0]!.review_count).toBe(0);
+    expect(results[0]!.last_reviewed).toBeNull();
+    // Losing speculative stamps/caches must not replace the winner.
+    expect(["alpha", "beta", "gamma"]).toContain(persisted!.display_cache.headword_latin);
     db.close();
   });
 
