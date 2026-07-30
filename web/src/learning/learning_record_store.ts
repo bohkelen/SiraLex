@@ -1,5 +1,5 @@
 /**
- * LS1 Learning Record IndexedDB store API.
+ * LS1/LS2 Learning Record IndexedDB store API.
  *
  * Transactions touch STORE_LEARNING_RECORDS only — never dictionary or query logs.
  */
@@ -10,7 +10,11 @@ import {
 } from "../idb/siralex_db";
 import {
   LEARNING_RECORD_SCHEMA_VERSION,
+  LearningRecordNotFoundError,
+  isLearningReflectionOutcome,
+  isValidIsoTimestamp,
   type LearningRecordV1,
+  type LearningReflectionOutcome,
   type SaveLearningRecordInput,
   validateLearningRecordForWrite,
   validateSaveLearningRecordInput,
@@ -70,6 +74,86 @@ function buildNewLearningRecord(input: SaveLearningRecordInput): LearningRecordV
     last_reviewed: null,
     review_count: 0,
   };
+}
+
+function assertNonEmptyId(value: string, label: string): void {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+}
+
+/**
+ * Apply a completed LS2 reflection atomically on an existing Learning Record.
+ *
+ * Single `learning_records` readwrite transaction: get → validate → put.
+ * Updates only `status`, `last_reviewed`, and `review_count`.
+ */
+export async function reflectOnLearningRecord(
+  db: IDBDatabase,
+  bundleId: string,
+  irId: string,
+  outcome: LearningReflectionOutcome,
+  reviewedAt?: string,
+): Promise<LearningRecordV1> {
+  assertNonEmptyId(bundleId, "reflectOnLearningRecord: bundleId");
+  assertNonEmptyId(irId, "reflectOnLearningRecord: irId");
+  if (!isLearningReflectionOutcome(outcome)) {
+    throw new Error('reflectOnLearningRecord: outcome must be "still_learning" or "remembered"');
+  }
+
+  const timestamp = reviewedAt ?? new Date().toISOString();
+  if (!isValidIsoTimestamp(timestamp)) {
+    throw new Error("reflectOnLearningRecord: reviewedAt must be a valid ISO-8601 timestamp");
+  }
+
+  const key: [string, string] = [bundleId, irId];
+  const tx = db.transaction(STORE_LEARNING_RECORDS, "readwrite");
+  const store = tx.objectStore(STORE_LEARNING_RECORDS);
+
+  const existing = (await reqToPromise(store.get(key))) as LearningRecordV1 | undefined;
+  if (existing == null) {
+    tx.abort();
+    throw new LearningRecordNotFoundError(bundleId, irId);
+  }
+
+  try {
+    validateLearningRecordForWrite(existing, "reflectOnLearningRecord:current");
+  } catch (err) {
+    tx.abort();
+    throw err;
+  }
+
+  if (existing.bundle_id !== bundleId || existing.ir_id !== irId) {
+    tx.abort();
+    throw new Error("reflectOnLearningRecord: stored identity does not match requested key");
+  }
+
+  if (
+    !Number.isSafeInteger(existing.review_count) ||
+    existing.review_count < 0 ||
+    existing.review_count >= Number.MAX_SAFE_INTEGER
+  ) {
+    tx.abort();
+    throw new Error("reflectOnLearningRecord: review_count cannot be incremented safely");
+  }
+
+  const updated: LearningRecordV1 = {
+    ...existing,
+    status: outcome,
+    last_reviewed: timestamp,
+    review_count: existing.review_count + 1,
+  };
+
+  try {
+    validateLearningRecordForWrite(updated, "reflectOnLearningRecord:updated");
+  } catch (err) {
+    tx.abort();
+    throw err;
+  }
+
+  await reqToPromise(store.put(updated));
+  await txDone(tx);
+  return updated;
 }
 
 export async function getLearningRecord(

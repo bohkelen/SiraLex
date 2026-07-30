@@ -8,6 +8,9 @@ export const LEARNING_RECORD_SCHEMA_VERSION = "learning_record_v1" as const;
 
 export type LearningRecordStatus = "still_learning" | "remembered";
 
+/** LS2 reflection outcomes — identical to status values; not widened. */
+export type LearningReflectionOutcome = LearningRecordStatus;
+
 export type LearningRecordDisplayCache = {
   headword_latin: string;
   headword_nko?: string;
@@ -44,12 +47,26 @@ export type LearningRecordUnresolvedReason =
   | "entry_missing"
   | "not_lexicon_entry";
 
+export class LearningRecordNotFoundError extends Error {
+  readonly name = "LearningRecordNotFoundError";
+
+  constructor(bundleId: string, irId: string) {
+    super(`Learning Record not found: (${bundleId}, ${irId})`);
+  }
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "";
 }
 
 function isValidStatus(value: unknown): value is LearningRecordStatus {
   return value === "still_learning" || value === "remembered";
+}
+
+export function isLearningReflectionOutcome(
+  value: unknown,
+): value is LearningReflectionOutcome {
+  return isValidStatus(value);
 }
 
 /**
@@ -124,6 +141,9 @@ export function validateLearningRecordForWrite(record: unknown, label = "learnin
   }
   if (typeof r.review_count !== "number" || !Number.isInteger(r.review_count) || r.review_count < 0) {
     throw new Error(`${label}: review_count must be a non-negative integer`);
+  }
+  if (!Number.isSafeInteger(r.review_count)) {
+    throw new Error(`${label}: review_count must be a safe integer`);
   }
 }
 
