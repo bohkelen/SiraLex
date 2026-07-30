@@ -456,6 +456,175 @@ a {
   color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
 }
 
+/* --- Review surface (LS2I3) --- */
+
+.review-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.review-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.review-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.review-page-error,
+.review-card-error {
+  color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
+}
+
+.review-card-error {
+  font-size: 12px;
+  margin: 0;
+}
+
+.review-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.review-position {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.review-headword {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.review-nko {
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.review-pos {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.review-prompt {
+  margin: 0;
+  font-size: 14px;
+}
+
+.review-revealed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.review-meaning-heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.review-sense-header {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.review-sense-num {
+  color: var(--muted);
+}
+
+.review-example {
+  margin-top: 4px;
+  padding-left: 8px;
+  font-size: 13px;
+}
+
+.review-example-nko,
+.review-example-trans {
+  color: var(--muted);
+}
+
+.review-variants {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.review-reveal,
+.review-still-learning,
+.review-remembered,
+.review-again,
+.review-back {
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.review-reveal:focus-visible,
+.review-still-learning:focus-visible,
+.review-remembered:focus-visible,
+.review-again:focus-visible,
+.review-back:focus-visible,
+.review-headword:focus-visible,
+.review-meaning-heading:focus-visible,
+.review-title:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 55%, white 10%);
+  outline-offset: 2px;
+}
+
+.review-busy-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.review-complete-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.review-count {
+  margin: 0;
+  font-size: 14px;
+}
+
+@media (max-width: 480px) {
+  .review-card {
+    padding: 10px;
+  }
+
+  .review-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .review-reveal,
+  .review-still-learning,
+  .review-remembered,
+  .review-again {
+    width: 100%;
+  }
+}
+
 .entry-headword {
   margin: 0;
   font-size: 20px;

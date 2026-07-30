@@ -97,6 +97,7 @@ import {
 } from "./render/render_results";
 import { renderEntryDetail, showTargetEntryUnavailable } from "./render/render_entry";
 import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
+import { createReviewSurfaceHost } from "./learning/review_surface_host";
 import {
   canOfferLearningSave,
   createEntryLearningSession,
@@ -164,6 +165,7 @@ app.innerHTML = `
           <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
           <div class="row" style="gap: 8px; flex-wrap: wrap">
             <button id="openSavedVocabulary" class="btn" type="button">${t("learning.openSaved")}</button>
+            <button id="startReview" class="btn" type="button">${t("review.start")}</button>
             <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
           </div>
         </div>
@@ -339,6 +341,7 @@ const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
 const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
+const startReviewBtn = mustGetEl<HTMLButtonElement>("#startReview");
 const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
 const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
 const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
@@ -828,6 +831,10 @@ openManageDictionariesBtn.addEventListener("click", () => {
 
 openSavedVocabularyBtn.addEventListener("click", () => {
   showSavedVocabulary();
+});
+
+startReviewBtn.addEventListener("click", () => {
+  showReviewSurface();
 });
 
 catalogUrlInput.addEventListener("input", () => {
@@ -2022,12 +2029,24 @@ let pendingSettledLogPayload: SettledQueryLogPayload | undefined;
 let searchSeq = 0;
 let entryDetailGeneration = 0;
 let savedVocabularyGeneration = 0;
+let reviewGeneration = 0;
+let activeReviewHost: ReturnType<typeof createReviewSurfaceHost> | undefined;
 let lastSearchResults: ResultDisplayContext[] = [];
 
-/** Explicit host context for #searchResults navigation (LS1I3). */
-type ResultsHostContext = "search" | "saved_vocabulary" | "entry_from_search" | "entry_from_saved";
+/** Explicit host context for #searchResults navigation (LS1I3 / LS2I3). */
+type ResultsHostContext =
+  | "search"
+  | "saved_vocabulary"
+  | "entry_from_search"
+  | "entry_from_saved"
+  | "review";
 let resultsHostContext: ResultsHostContext = "search";
 
+function disposeActiveReviewHost() {
+  activeReviewHost?.dispose();
+  activeReviewHost = undefined;
+  reviewGeneration += 1;
+}
 function cancelPendingSettledQueryLog() {
   if (queryLoggingSettleTimer !== undefined) {
     clearTimeout(queryLoggingSettleTimer);
@@ -2077,6 +2096,7 @@ searchInput.addEventListener("input", () => {
   if (query.trim() === "") {
     searchSeq += 1;
     savedVocabularyGeneration += 1;
+    disposeActiveReviewHost();
     resultsHostContext = "search";
     searchMeta.textContent = "";
     searchResults.innerHTML = "";
@@ -2096,6 +2116,7 @@ type EntryNavOrigin =
 function showResultsList() {
   resultsHostContext = "search";
   savedVocabularyGeneration += 1;
+  disposeActiveReviewHost();
   searchResults.innerHTML = "";
   if (lastSearchResults.length === 0) return;
 
@@ -2108,7 +2129,35 @@ function showResultsList() {
   if (list) searchResults.appendChild(list);
 }
 
+/**
+ * LS2I3 — temporary chrome entry to Review. LS2I4 moves Start Review into
+ * Saved Vocabulary and owns final collection integration / focus restore.
+ */
+function showReviewSurface() {
+  disposeActiveReviewHost();
+  const generation = ++reviewGeneration;
+  resultsHostContext = "review";
+  entryDetailGeneration += 1;
+  savedVocabularyGeneration += 1;
+  searchResults.innerHTML = "";
+
+  const host = createReviewSurfaceHost({
+    mount: searchResults,
+    getActiveMeta: () => currentActiveBundle,
+    openDb: openSiralexDb,
+    isHostCurrent: () =>
+      generation === reviewGeneration && resultsHostContext === "review",
+    onBack: () => {
+      disposeActiveReviewHost();
+      showSavedVocabulary();
+    },
+  });
+  activeReviewHost = host;
+  host.start();
+}
+
 function showSavedVocabulary() {
+  disposeActiveReviewHost();
   const generation = ++savedVocabularyGeneration;
   resultsHostContext = "saved_vocabulary";
   entryDetailGeneration += 1;
@@ -2207,6 +2256,7 @@ function handleOpenTargetLexiconEntry(target: TargetEntry, mappingRoot: HTMLElem
 function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
   const generation = ++entryDetailGeneration;
   resultsHostContext = origin.kind === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
+  disposeActiveReviewHost();
   if (origin.kind === "search") {
     savedVocabularyGeneration += 1;
   }
