@@ -1,8 +1,9 @@
 /**
- * LS1I3 / LS2I4 — Saved Vocabulary surface renderer (presentation only).
+ * LS1I3 / LS2I4 / LS3I2 — Saved Vocabulary surface renderer (presentation only).
  */
 
-import { getCurrentLocale, t, type Locale } from "../i18n";
+import { getCurrentLocale, t, type Locale, type TranslationKey } from "../i18n";
+import type { SavedVocabularyProgressVm } from "../learning/saved_vocabulary_progress";
 import type {
   SavedVocabularyModel,
   SavedVocabularyReviewStatus,
@@ -43,7 +44,7 @@ export type SavedVocabularyView = {
   root: HTMLElement;
   /** Preferred focus target after a successful remove (may be null). */
   focusAfterRemove: HTMLElement | null;
-  /** Start Review control when present. */
+  /** Start / Continue Review control when present. */
   startReviewButton: HTMLButtonElement | null;
   heading: HTMLElement | null;
 };
@@ -67,36 +68,101 @@ function appendReviewStatus(main: HTMLElement, status: SavedVocabularyReviewStat
   }
 }
 
+function appendMetric(dl: HTMLElement, labelKey: TranslationKey, value: number, testId: string): void {
+  const row = el("div", "saved-vocab-progress-item");
+  row.setAttribute("data-progress-metric", testId);
+  const dt = document.createElement("dt");
+  dt.className = "saved-vocab-progress-label";
+  dt.textContent = t(labelKey);
+  const dd = document.createElement("dd");
+  dd.className = "saved-vocab-progress-value";
+  dd.textContent = String(value);
+  row.appendChild(dt);
+  row.appendChild(dd);
+  dl.appendChild(row);
+}
+
+function renderProgressSummary(progress: SavedVocabularyProgressVm): HTMLElement {
+  const section = el("section", "saved-vocab-progress");
+  section.setAttribute("aria-labelledby", "saved-vocab-progress-heading");
+
+  const heading = el("h3", "saved-vocab-progress-heading", t("progress.heading"));
+  heading.id = "saved-vocab-progress-heading";
+  section.appendChild(heading);
+
+  const dl = document.createElement("dl");
+  dl.className = "saved-vocab-progress-list";
+  appendMetric(dl, "progress.saved", progress.total_saved, "saved");
+  appendMetric(dl, "progress.notReviewed", progress.not_reviewed, "not_reviewed");
+  appendMetric(dl, "progress.stillLearning", progress.still_learning, "still_learning");
+  appendMetric(dl, "progress.remembered", progress.remembered, "remembered");
+  if (progress.showUnavailable) {
+    appendMetric(dl, "progress.unavailable", progress.unavailable, "unavailable");
+  }
+  section.appendChild(dl);
+  return section;
+}
+
+function returnCueKey(
+  cue: SavedVocabularyProgressVm["returnCue"],
+): TranslationKey | undefined {
+  if (cue === "review_new") return "progress.cue.reviewNew";
+  if (cue === "review_still_learning") return "progress.cue.reviewStillLearning";
+  if (cue === "review_again") return "progress.cue.reviewAgain";
+  return undefined;
+}
+
+function renderReturnCue(progress: SavedVocabularyProgressVm): HTMLElement | null {
+  const key = returnCueKey(progress.returnCue);
+  if (!key) return null;
+  const cue = el("p", "saved-vocab-return-cue", t(key));
+  cue.setAttribute("data-return-cue", progress.returnCue);
+  return cue;
+}
+
 function renderStartReviewRegion(
   model:
     | { surface: "loading" }
     | Extract<SavedVocabularyModel, { surface: "populated" | "removing" }>,
   callbacks: SavedVocabularyCallbacks,
-): { region: HTMLElement; button: HTMLButtonElement } {
+): { region: HTMLElement; button: HTMLButtonElement | null } {
   const region = el("div", "saved-vocab-start-review-region");
+
+  if (model.surface === "loading") {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn saved-vocab-start-review";
+    button.id = "saved-vocab-start-review";
+    button.textContent = t("progress.startReview");
+    button.disabled = true;
+    region.appendChild(button);
+    return { region, button };
+  }
+
+  const action = model.progress.reviewAction;
+  if (action.state === "hidden") {
+    return { region, button: null };
+  }
+
   const button = document.createElement("button");
   button.type = "button";
   button.className = "btn saved-vocab-start-review";
   button.id = "saved-vocab-start-review";
-  button.textContent = t("review.start");
+  button.textContent =
+    action.state === "enabled" && action.label === "continue"
+      ? t("progress.continueReview")
+      : t("progress.startReview");
 
   const removing = model.surface === "removing";
-  const loading = model.surface === "loading";
-  const canStart =
-    model.surface === "populated" && model.canStartReview === true && !removing && !loading;
-  const unresolvedOnly =
-    (model.surface === "populated" || model.surface === "removing") &&
-    model.rows.length > 0 &&
-    !model.canStartReview;
-
-  button.disabled = !canStart;
+  const enabled = action.state === "enabled" && !removing;
+  button.disabled = !enabled;
   button.addEventListener("click", () => {
     if (button.disabled) return;
     callbacks.onStartReview();
   });
   region.appendChild(button);
 
-  if (unresolvedOnly) {
+  if (action.state === "disabled") {
     const hint = el("p", "saved-vocab-start-review-hint", t("review.noResolved"));
     hint.id = "saved-vocab-start-review-hint";
     hint.setAttribute("role", "status");
@@ -239,6 +305,22 @@ export function renderSavedVocabulary(
     focusAfterRemove = backBtn;
     return { root, focusAfterRemove, startReviewButton: null, heading };
   }
+
+  // populated | removing
+  root.appendChild(renderProgressSummary(model.progress));
+
+  if (model.progress.showUnavailable) {
+    const explanation = el(
+      "p",
+      "saved-vocab-unavailable-explanation",
+      t("progress.unavailableExplanation"),
+    );
+    explanation.id = "saved-vocab-unavailable-explanation";
+    root.appendChild(explanation);
+  }
+
+  const cue = renderReturnCue(model.progress);
+  if (cue) root.appendChild(cue);
 
   const { region, button } = renderStartReviewRegion(model, callbacks);
   root.appendChild(region);

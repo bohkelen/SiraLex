@@ -37,7 +37,6 @@ describe("LS1 Saved Vocabulary navigation and stale-async guards", () => {
         rows: [],
         rowErrors: {},
         progress: deriveSavedVocabularyProgress([]).progress,
-        canStartReview: false,
       },
       2,
     );

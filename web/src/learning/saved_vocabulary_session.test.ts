@@ -11,7 +11,6 @@ import { buildDisplayCache } from "./build_display_cache";
 import { saveLearningRecord } from "./learning_record_store";
 import {
   buildSavedVocabularyRowVm,
-  canStartReviewFromSavedVocabularyModel,
   createSavedVocabularySession,
   deriveSavedVocabularyReviewStatus,
   type SavedVocabularyModel,
@@ -408,7 +407,7 @@ describe("LS1I3 Saved Vocabulary session", () => {
     ).toBe("unknown");
   });
 
-  it("sets canStartReview from resolved rows and preserves order with no writes", async () => {
+  it("attaches Progress and preserves order with no writes", async () => {
     const db = await openSiralexDb();
     try {
       const a = makeLexicon("lex-a", "a");
@@ -458,16 +457,14 @@ describe("LS1I3 Saved Vocabulary session", () => {
       const last = updates.at(-1)!;
       expect(last.surface).toBe("populated");
       if (last.surface === "populated") {
-        expect(last.canStartReview).toBe(true);
-        expect(canStartReviewFromSavedVocabularyModel(last)).toBe(true);
         expect(last.progress.reviewAction).toEqual({ state: "enabled", label: "start" });
         expect(last.progress.total_saved).toBe(2);
         expect(last.progress.not_reviewed).toBe(2);
         expect(last.progress.reviewable).toBe(2);
         expect(last.progress.returnCue).toBe("review_new");
-        expect(last.canStartReview).toBe(last.progress.reviewAction.state === "enabled");
         expect(last.rows.map((r) => r.ir_id)).toEqual(["lex-b", "lex-a"]);
         expect(last.rows.every((r) => r.reviewStatus.state === "not_reviewed")).toBe(true);
+        expect("canStartReview" in last).toBe(false);
       }
 
       const learningCountAfter = await new Promise<number>((resolve, reject) => {
@@ -489,7 +486,7 @@ describe("LS1I3 Saved Vocabulary session", () => {
     }
   });
 
-  it("disables Start Review eligibility for unresolved-only collections", async () => {
+  it("disables Progress Review action for unresolved-only collections", async () => {
     const db = await openSiralexDb();
     try {
       await saveLearningRecord(db, {
@@ -512,15 +509,13 @@ describe("LS1I3 Saved Vocabulary session", () => {
       const last = updates.at(-1)!;
       expect(last.surface).toBe("populated");
       if (last.surface === "populated") {
-        expect(last.canStartReview).toBe(false);
-        expect(canStartReviewFromSavedVocabularyModel(last)).toBe(false);
         expect(last.progress.reviewAction).toEqual({
           state: "disabled",
           reason: "no_reviewable_entries",
         });
         expect(last.progress.unavailable).toBe(1);
         expect(last.progress.showUnavailable).toBe(true);
-        expect(last.canStartReview).toBe(last.progress.reviewAction.state === "enabled");
+        expect("canStartReview" in last).toBe(false);
       }
     } finally {
       db.close();

@@ -81,14 +81,8 @@ export type SavedVocabularyModel =
       rows: SavedVocabularyRowVm[];
       removingKey?: string;
       rowErrors: Record<string, string>;
-      /** Derived Progress & Return summary (LS3I1). */
+      /** Derived Progress & Return summary (LS3I1 / LS3I2). */
       progress: SavedVocabularyProgressVm;
-      /**
-       * Immediate UI signal: Review action enabled.
-       * Derived from `progress.reviewAction.state === "enabled"` (LS3 eligibility).
-       * @deprecated Prefer `progress.reviewAction`; retained for LS3I1→I2 transition.
-       */
-      canStartReview: boolean;
     };
 
 export function rowKey(bundleId: string, irId: string): string {
@@ -123,12 +117,6 @@ export function deriveSavedVocabularyReviewStatus(
     };
   }
   return { state: "unknown" };
-}
-
-/** Immediate Start Review eligibility from a loaded collection model. */
-export function canStartReviewFromSavedVocabularyModel(model: SavedVocabularyModel): boolean {
-  if (model.surface !== "populated") return false;
-  return model.canStartReview;
 }
 
 function firstLiveGloss(entry: EnrichedRecord): string | undefined {
@@ -233,7 +221,6 @@ export function createSavedVocabularySession(deps: SavedVocabularySessionDeps) {
       removingKey,
       rowErrors: { ...rowErrors },
       progress,
-      canStartReview: progress.reviewAction.state === "enabled",
     });
   }
 

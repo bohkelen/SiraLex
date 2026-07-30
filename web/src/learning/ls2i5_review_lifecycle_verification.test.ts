@@ -311,7 +311,7 @@ describe("LS2I5 review lifecycle verification", () => {
       expect(populated.surface).toBe("populated");
       if (populated.surface === "populated") {
         expect(populated.rows[0]!.state).toBe("unresolved");
-        expect(populated.canStartReview).toBe(false);
+        expect(populated.progress.reviewAction.state).toBe("disabled");
         expect(populated.rows[0]!.reviewStatus.state).toBe("remembered");
       }
 
@@ -330,7 +330,7 @@ describe("LS2I5 review lifecycle verification", () => {
       if (restored.surface === "populated") {
         expect(restored.rows[0]!.state).toBe("resolved");
         expect(restored.rows[0]!.reviewStatus.state).toBe("remembered");
-        expect(restored.canStartReview).toBe(true);
+        expect(restored.progress.reviewAction.state).toBe("enabled");
       }
       const lr = await getLearningRecord(db, BUNDLE_A, "orphan");
       expect(lr?.review_count).toBe(1);
@@ -610,7 +610,6 @@ describe("LS2I5 review lifecycle verification", () => {
       rows,
       rowErrors: {},
       progress: deriveSavedVocabularyProgress(rows).progress,
-      canStartReview: true,
     };
     const { root } = renderSavedVocabulary(model, {
       onBack: () => undefined,
