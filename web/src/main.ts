@@ -2212,6 +2212,8 @@ function showSavedVocabulary() {
         if (generation !== savedVocabularyGeneration || resultsHostContext !== "saved_vocabulary") {
           return;
         }
+        // Application-owned suppression: one Review host at a time (no second Start Review).
+        if (activeReviewHost?.isActive()) return;
         showReviewSurface();
       },
     });
