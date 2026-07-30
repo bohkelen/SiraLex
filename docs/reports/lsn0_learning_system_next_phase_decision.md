@@ -3,7 +3,13 @@
 ## 1. Decision
 
 ```text
-LSN0_MORE_USAGE_EVIDENCE_REQUIRED
+LSN0_NEXT_PHASE_SELECTED
+```
+
+Selected direction:
+
+```text
+LS3 — Progress & Return Surface
 ```
 
 This slice is documentation-only. No Learning capability was implemented.
@@ -17,27 +23,37 @@ Authoritative inputs:
 - current Learning Record schema and Review/Save implementation
 - current dictionary record model
 - repository product evidence under `docs/` and local structured-usability artifacts
+- owner lock: keep building via Progress & Return Surface
 
 ---
 
 ## 2. Executive finding
 
-After durable Save (LS1) and deterministic Review and Reflect (LS2), SiraLex
-does **not** yet have enough real Learning usage evidence to justify selecting
-Review Scheduling, Learning History, richer lexical Review support,
-source-language learning objects, translation-relationship objects, collection
-organization, or portability/sync as the next Learning System capability.
+After durable Save (LS1) and deterministic Review and Reflect (LS2), the
+highest-value next Learning System capability is a lightweight **Progress &
+Return Surface**.
 
-Executable correctness of LS1/LS2 proves the closed loop works. It does not
-prove which next capability users need.
+> **Progress & Return Surface**: A lightweight orientation layer that tells the
+> user what they have saved, what remains unreviewed, what they are still
+> learning, what they currently remember, and where to continue.
 
-> **Executable correctness is not product validation.**
+This direction extracts more value from existing Learning Records without
+creating a new identity, event store, scheduling policy, corpus dependency, or
+migration.
 
-The highest-value next Learning System action is a **bounded evidence-gathering
-phase** that measures whether real learners save, return, review across days,
-and find deterministic Review burdensome or lexically insufficient — without
-adding Learning telemetry by default and without silently reusing query-log
-consent.
+Progress is a **derived presentation** of current Learning Records, not a new
+source of truth. Counts describe current collection state. They are not proof
+of long-term retention. **Remembered must not be described as mastered.**
+
+Competing directions (scheduling, history, lexical enrichment, source objects,
+translation relationships, organization, portability/sync) remain valuable
+later but are rejected for now under the owner keep-building posture and the
+architectural constraints below.
+
+Executable correctness of LS1/LS2 is not treated as product validation of
+scheduling demand. Progress is selected because it closes the MVP return-habit
+gap using already-shipped fields, not because longitudinal Review usage has
+been measured.
 
 ---
 
@@ -70,6 +86,7 @@ Schema (`learning_record_v1`, IndexedDB `learning_records`, DB version 4):
 | `status` | Latest self-assessment: `still_learning` \| `remembered` |
 | `last_reviewed` | Timestamp of last successful reflection, else `null` |
 | `review_count` | Successful reflection count |
+| `created_at` | Save timestamp |
 | `display_cache` | Save-time fallback for unresolved rows only |
 | content stamps | Resolution stamps, not identity |
 
@@ -90,16 +107,18 @@ pairs.
 
 ### Dictionary authority
 
-Live Maninka `lexicon_entry` remains lexical authority. Review meaning comes
-from live senses/glosses/examples/variants. Source-language discovery uses
-`index_mapping` lookup keys, not a genuine source lexicon.
+Live Maninka `lexicon_entry` remains lexical authority. Source-language
+discovery uses `index_mapping` lookup keys, not a genuine source lexicon.
 
-### Naming tension recorded
+### Naming clarification
 
 MVP definition historically labeled **LS3 Progress & Return Surface**
 (lightweight counts). LS2 closure labeled **Review Scheduling** as an LS3
-*candidate* and required this LSN0 decision before either is assumed. These
-are different concepts; neither is auto-selected here.
+*candidate* and required this LSN0 decision before either was assumed.
+
+**This decision locks Progress**, not Scheduling. Future scheduling work, if
+any, must use a distinct label and must not silently reinterpret LS2 fields as
+objective mastery.
 
 ---
 
@@ -109,48 +128,36 @@ are different concepts; neither is auto-selected here.
 
 | Class | Meaning | Learning relevance |
 | --- | --- | --- |
-| A — Natural-use | Opt-in real tester exports / field observation | **Absent for Learning Save/Review** |
+| A — Natural-use | Opt-in real tester exports / field observation | Absent for Learning Save/Review |
 | B — Structured usability | Scripted Playwright harness; `can_influence_demand = false` | Search/lookup only; not Learning demand |
-| C — Automated tests | Vitest / Playwright LS1/LS2 | Correctness only |
+| C — Automated tests | Vitest / Playwright LS1/LS2 | Correctness of Save/Review loop |
 | D — Architecture / product docs | MVP, LS1/LS2 defs and closures | Planning constraints |
+| E — Owner product lock | Explicit keep-building selection | Authorizes Progress selection |
 
 ### Hierarchy application
 
 1. **Observed user behavior (Learning):** none in repository.
-2. **Explicit user requests (Learning next feature):** none found.
-3. **Usability defects:** search/interpretability/spelling probes exist as
-   Class B; no Learning Review abandonment or status-confusion field reports.
+2. **Explicit user / owner requests:** owner locks Progress & Return Surface as
+   the keep-building next phase.
+3. **Usability defects:** search/interpretability probes exist as Class B; no
+   Learning Review abandonment field reports.
 4. **Issue history:** Phase 7N / search dispositions; not Learning queue pain.
 5. **Implementation limitations:** known from LS1/LS2 closures (device-local,
-   no history, no scheduling, no source objects, no export).
+   no history, no scheduling, no source objects, no export, no progress counts).
 6. **Corpus/data limitations:** lemma gaps, sense ambiguity, sparse examples,
-   no audio/morphology in runtime IR; N’Ko coverage uneven.
+   no audio/morphology in runtime IR.
 7. **Architecture constraints:** `(bundle_id, ir_id)` identity; dictionary
-   isolation; query-log consent ≠ Learning consent; offline-first.
-8. **General learning theory:** SRS / spaced practice known in literature —
-   **must not override** missing product evidence.
+   isolation; query-log consent ≠ Learning consent; offline-first; Progress
+   must remain derived.
+8. **General learning theory:** must not force scheduling ahead of Progress.
 
-### Key repository sources
+### Key finding for this decision
 
-| Source | Finding |
-| --- | --- |
-| LS1 / LS2 closures | Save + Review closed; next = LSN0 decision |
-| MVP definition | No SRS in MVP; Progress was planned as counts, not scheduling |
-| `docs/LOCAL_USAGE_AUTOMATION.md` | Structured usability cannot influence demand |
-| Local `data/local_evidence/human_usage_automation/` | Search probes; session_type `structured_usability` |
-| Learning Playwright / Vitest | Offline Save/Review correctness (Class C) |
-| Corpus / Phase 7N reports | Lookup and content-quality issues; not Learning demand |
-
-### What the inventory does **not** contain
-
-- Real Review session counts over multiple days
-- Retained Learning users
-- Status-transition patterns from real learners
-- Complaints about forgetting or due reminders
-- Evidence that all-item deterministic Review is too burdensome
-- Evidence users understand Still learning vs Remembered in the field
-- Evidence lexical content is or is not sufficient for repeated Review
-- Requests for lists, tags, export, sync, source-entry Save, or pair learning
+Absence of longitudinal Learning usage evidence **blocks scheduling** and other
+high-risk directions. It does **not** block Progress: Progress uses only
+current Learning Record fields already written by LS1/LS2 and completes the
+MVP orientation gap already defined in
+`learning_system_mvp_definition.md`.
 
 ---
 
@@ -160,19 +167,12 @@ are different concepts; neither is auto-selected here.
 NO_USAGE_EVIDENCE
 ```
 
-Rationale:
+Natural-use Learning Save/Review evidence remains absent. That classification
+is unchanged and continues to constrain scheduling, history-as-product, and
+sync.
 
-- LS1/LS2 executable suites demonstrate capability, not adoption.
-- Structured usability evidence is search-oriented and explicitly
-  non-demand-influencing.
-- No committed natural-use Learning exports or field observations of Save →
-  Review → return habit exist in the repository.
-- Therefore the repository cannot yet justify scheduling or any other
-  Learning feature as “highest-value next” on observed user value.
-
-If owner-held natural-use Learning evidence exists outside the repository, it
-was not available as an authoritative input for this decision and must be
-introduced explicitly before overturning this classification.
+Progress is selected under owner keep-building authority plus architectural
+fit to existing fields — not by claiming Class A usage proof.
 
 ---
 
@@ -211,8 +211,8 @@ Each candidate is scored 1–5 on the required criteria.
 favorability = 6 − raw_score
 ```
 
-Net interpretation uses qualitative dominance, not an unexplained total.
-Subjective judgment is stated where scores are close.
+Net interpretation uses qualitative dominance. Owner keep-building preference
+is stated explicitly where it decides among evidence-weak options.
 
 ---
 
@@ -220,23 +220,23 @@ Subjective judgment is stated where scores are close.
 
 | Candidate | User value | Data dep.↓ | Learn. effect | Arch. fit | Offline | Impl. cost↓ | Model risk↓ | Reversible | Measurable | Opp. cost↓ | Net reading |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A Scheduling | 1 | 2 | 4 | 3 | 3 | 4 | 4 | 2 | 4 | 5 | Theory-strong; evidence-weak; premature |
-| B History | 1 | 1 | 2 | 4 | 5 | 3 | 4 | 3 | 3 | 4 | Clean foundation; no demand yet |
-| C Lexical support | 2* | 4–5 | 4 | 4 | 5 | 2–5† | 2–5† | 3 | 3 | 4 | Content gaps real; Learning demand unproven |
+| **Progress (selected)** | 2 | 1 | 3 | 5 | 5 | 2 | 1 | 5 | 3 | 2 | Best keep-building path now |
+| A Scheduling | 1 | 2 | 4 | 3 | 3 | 4 | 4 | 2 | 4 | 5 | Premature |
+| B History | 1 | 1 | 2 | 4 | 5 | 3 | 4 | 3 | 3 | 4 | Infrastructure without consumer |
+| C Lexical support | 2* | 4–5 | 4 | 4 | 5 | 2–5† | 2–5† | 3 | 3 | 4 | Corpus-constrained |
 | D Source objects | 1 | 5 | 3 | 2 | 4 | 5 | 5 | 2 | 3 | 5 | Blocked on source lexicon |
-| E Translation objs | 1 | 4 | 3 | 2 | 4 | 5 | 5 | 2 | 3 | 5 | Needs identity decision + demand |
-| F Organization | 1 | 1 | 1 | 4 | 5 | 3 | 3 | 3 | 2 | 4 | Management, not recall; no size pain |
-| G Portability | 1 | 1 | 1 | 3 | 4‡ | 3–5§ | 4–5§ | 3 | 2 | 4 | Backup useful in theory; no request |
-| H (other) | — | — | — | — | — | — | — | — | — | — | None stronger from evidence |
+| E Translation objs | 1 | 4 | 3 | 2 | 4 | 5 | 5 | 2 | 3 | 5 | Blocked on identity |
+| F Organization | 1 | 1 | 1 | 4 | 5 | 3 | 3 | 3 | 2 | 4 | Premature |
+| G Portability | 1 | 1 | 1 | 3 | 4‡ | 3–5§ | 4–5§ | 3 | 2 | 4 | Weaker immediate learning value |
 
-\* Class B search/content friction only; not Learning Review complaints.  
-† Low if surfacing existing fields; high if requiring corpus/audio/morphology.  
-‡ Local export is offline-friendly; cloud sync is not.  
+\* Class B search/content friction only.
+† Low if surfacing existing fields; high if requiring corpus/audio/morphology.
+‡ Local export offline-friendly; cloud sync is not.
 § Export-only lower; cloud sync much higher.
 
-**Judgment:** No candidate dominates on observed user value. Theoretical learning
-gain (especially A/C) cannot authorize implementation under the required
-evidence hierarchy. The dominating action is evidence gathering.
+**Judgment:** Progress dominates now on architectural fit, low data-model risk,
+reversibility, offline suitability, and immediate product completeness of the
+MVP loop. Scheduling and History remain important later but are not selected.
 
 ---
 
@@ -247,69 +247,19 @@ evidence hierarchy. The dominating action is evidence gathering.
 Select which saved entries are due and when, so large collections remain
 tractable and spacing improves retention.
 
-### Is collection size large enough now?
+### Why rejected for now
 
-Unknown. No natural-use collection-size distribution exists. Deterministic
-all-item Review is not shown to be burdensome.
+- No longitudinal Learning usage evidence that deterministic Review is too
+  burdensome.
+- LS2 stores latest `status`, `last_reviewed`, and `review_count` only — not
+  enough for responsible interval reconstruction.
+- A `next_review_at` field would introduce clock, offline backlog, unresolved,
+  and bundle-removal policies without a validated user problem.
+- Named SRS algorithms are not justified by commonality alone.
+- Scheduling value cannot be validated without multi-day use.
 
-### Does LS2 collect enough history to schedule responsibly?
-
-No. LS2 stores latest `status`, `last_reviewed`, and `review_count` only.
-That is insufficient for responsible interval reconstruction, forgetting
-curves, or audit of prior outcomes. Same-status reflections collapse into a
-count without a timeline.
-
-### Is latest status + count enough?
-
-For a toy due flag, maybe. For defensible scheduling, no — prior outcomes,
-timestamps per event, and policy for clock/offline gaps are missing.
-
-### Would scheduling require immutable Review Events?
-
-Not strictly for a naive `next_review_at` write, but responsible scheduling,
-analytics, sync merge, and reversal audit strongly prefer append-only events.
-Building scheduling on latest-state alone risks irreversible field meaning
-drift.
-
-### Is `next_review_at` sufficient or premature?
-
-Premature as a product commitment. A single due timestamp invites clock skew,
-offline backlog explosions, and silent mastery reinterpretation of LS2 fields
-— forbidden without an explicit decision.
-
-### Device clock changes
-
-Local due times can jump forward/backward; users may see empty or flooded
-queues. Any scheduler needs a defined clock policy.
-
-### Long offline periods
-
-Many items become due at once; session load and abandonment risk rise. Needs
-a backlog policy (cap, priority, or deferred catch-up).
-
-### Bundle removal
-
-Learning Records survive; live resolution may fail → items leave Review while
-due state could linger on unresolved rows. Due semantics for soft orphans must
-be defined.
-
-### Unresolved entries
-
-Must remain non-reviewable; due state must not fabricate Review cards from
-`display_cache`.
-
-### Deterministic simple scheduling vs SM-2
-
-If scheduling were ever justified, a transparent due-state model would beat a
-named SRS algorithm. SM-2/Anki-like scoring is not recommended merely because
-it is common. Current evidence cannot validate any algorithm longitudinally.
-
-### Can scheduling be validated without longitudinal use?
-
-No. Scheduling value is inherently multi-day. Shipping it now would optimize
-for theory, not observed SiraLex Learning behavior.
-
-**Scheduling conclusion:** Do not select now.
+**Scheduling conclusion:** Premature without due-state policy and longitudinal
+evidence. Rejected for now.
 
 ---
 
@@ -327,119 +277,72 @@ type LearningReviewEvent = {
 };
 ```
 
-| Concern | Assessment |
-| --- | --- |
-| Identity | Needs stable `event_id`; must not overload `(bundle_id, ir_id)` |
-| Ordering | Requires comparable `reviewed_at` + deterministic tie-break |
-| Append-only | Prefer immutable append; mutate Learning Record summary separately |
-| Deletion policy | User remove Learning Record vs retain/orphan events needs a rule |
-| Bundle removal | Events should not cascade-delete with dictionary data; resolution may still fail |
-| DB deletion | Full DB wipe should remove events with Learning Records |
-| Storage growth | Linear in reflections; needs retention/compaction policy eventually |
-| Migration | New store or schema version; non-trivial |
-| Reconstruction | Enables timeline, better scheduling inputs, sync merge |
-| Sync | Helps conflict resolution later; also expands privacy surface |
-| Privacy | Vocabulary + learning behavior is sensitive; separate consent |
-| Usefulness before analytics/scheduling | Architectural cleanliness alone is not product value |
+History would help defensible scheduling, analytics, and sync merge later. It
+adds identity, append-only storage, deletion, growth, migration, and privacy
+surface **without a current user-facing consumer**.
 
-**History conclusion:** Valuable prerequisite for *defensible* scheduling and
-sync, but not highest-value next capability under `NO_USAGE_EVIDENCE`. Do not
-select solely because it is architecturally clean.
+Progress does not require Review Events: counts derive from current Learning
+Record fields.
+
+**History conclusion:** Adds infrastructure without a current user-facing
+consumer. Rejected for now.
 
 ---
 
 ## 10. Richer Lexical Support analysis
 
-### Is learning limited more by queue logic or content?
-
-With no real Review usage, this cannot be answered from Learning evidence.
-From dictionary evidence and Review implementation:
-
-- Review already surfaces live senses, glosses, examples, and variants when
-  present.
-- Empty examples, multi-sense ambiguity, missing lemmas, absent audio, and
-  deferred morphology are **source-data / roadmap** constraints.
-- UI cannot manufacture authoritative lexical content.
-
-### Separation
+Review already surfaces live senses, glosses, examples, and variants when
+present. Remaining gaps (missing examples, lemma coverage, audio, morphology,
+N’Ko sparsity) are primarily **source-data / roadmap** constraints. UI cannot
+manufacture authoritative lexical content.
 
 | Gap | Type |
 | --- | --- |
-| Sense selection UX / clearer multi-sense presentation | product feature gap (possible later) |
+| Clearer multi-sense presentation | product feature gap (possible later) |
 | Missing examples / glosses / lemmas | source-data gap |
-| Pronunciation / audio | source-data + packaging gap (future roadmap) |
-| Morphology paradigms | source-data + Branch C gap |
-| Generated N’Ko | deferred linguistic policy, not Learning UI |
+| Pronunciation / audio | source-data + packaging gap |
+| Morphology | source-data + Branch C gap |
 
-Structured usability (Class B) shows lookup/interpretability friction
-(kinship, accents, phrase-like queries, some lexical misses). That supports
-dictionary/search quality work more than Learning System UI work, and still
-cannot influence demand ranking without owner disposition / natural-use.
-
-**Lexical-support conclusion:** Content quality constrains Review quality, but
-LSN0 does not select a Learning UI enrichment milestone. If owner evidence
-later shows Review fails because meanings/examples are inadequate, the next
-milestone may belong to the **corpus pipeline**, not Learning System UI —
-outcome class `LSN0_CORPUS_WORK_REQUIRED_BEFORE_NEXT_LEARNING_FEATURE` would
-then apply. Present Learning evidence is insufficient to declare that now.
+**Lexical-support conclusion:** Valuable, but primarily constrained by
+authoritative corpus data. Rejected as the next Learning System phase.
 
 ---
 
 ## 11. Source-Language Learning Object analysis
 
+Source side today is `index_mapping` (lookup keys + target postings), not a
+genuine FR/EN source lexicon with definitions and senses.
+
 | Question | Answer |
 | --- | --- |
-| Object identity | Would need a genuine source lexicon `ir_id` (or equivalent), not a query string |
-| Dictionary-owned vs learning-owned | Lexical object dictionary-owned; Learning Record remains personal overlay |
-| Current source data | `index_mapping`: `source_term` + `source_lang` + target postings — **not** definitions/senses |
-| Links to Maninka | Via `target_entries` anchors / locators |
-| Independent Review | Only after genuine source entries exist and Save eligibility expands |
-| Save source vs save relationship | Distinct; must not overload `(bundle_id, ir_id)` of a Maninka entry |
-| Direction vs identity | Display direction must not redefine identity |
-| One source → many Maninka | Mapping already multi-target; source-entry Save ≠ choosing one translation |
+| Object identity | Would need genuine source lexicon records |
+| Current data | Mapping keys only |
+| Save / Review | Blocked until source lexicon exists |
+| Relation to Progress | Orthogonal; Progress uses Maninka Learning Records |
 
-**Conclusion:** Blocked on absent genuine source lexicon records. Do not
-select.
+**Conclusion:** Blocked until genuine source lexicon records exist. Rejected
+for now.
 
 ---
 
 ## 12. Translation-Relationship analysis
 
-Conceptual identity (illustrative only):
+A bilingual learning object such as `man ↔ bolo` is distinct from saving either
+lexicon entry. It requires separate identity and relation semantics and must
+not overload `(bundle_id, ir_id)`.
 
-```text
-(bundle_id, source_object_id, target_ir_id, relation_id)
-```
-
-| Question | Answer |
-| --- | --- |
-| Word vs relationship | Users may want either; current product saves the Maninka word |
-| One source → many targets | Yes; relationship objects multiply quickly |
-| One target → many sources | Yes via reverse glosses / mappings |
-| Bundle updates | Relation validity can break; needs soft-orphan policy |
-| Ownership | Relation metadata may be dictionary-owned; progress is learning-owned |
-| Review direction | Prompt side (FR→Maninka vs Maninka→FR) is presentation, not identity |
-| Both directions | Would need explicit product rules |
-| Store model | Likely new Learning Record type or separate store — not `(bundle_id, ir_id)` overload |
-
-**Conclusion:** Architecturally interesting, evidence-absent, identity-heavy.
-Do not select.
+**Conclusion:** Blocked on identity and relation semantics. Rejected for now.
 
 ---
 
 ## 13. Collection Organization analysis
 
-| Need | Evidence |
-| --- | --- |
-| One Saved Vocabulary collection | Shipped; no observed management pain |
-| Multiple lists / tags / favorites / manual order | Deferred in MVP; no usage requests |
-| Collection size justifying organization | Unknown / no signal |
+Organization (lists, tags, favorites, manual order) helps manage learning
+objects; it does not itself improve recall. No collection-management pain or
+size distribution is demonstrated.
 
-> Collection organization helps users manage learning objects. It does not
-> itself improve recall.
-
-**Conclusion:** Not selected. Premature before users accumulate enough entries
-and report management friction.
+**Conclusion:** Premature before collection-management pain is demonstrated.
+Rejected for now.
 
 ---
 
@@ -447,43 +350,31 @@ and report management friction.
 
 ### Local export/import
 
-| Topic | Assessment |
-| --- | --- |
-| Backup / device replacement | Real device-local risk; no user request evidence yet |
-| JSON + schema version | Feasible smallest portability form |
-| Unresolved records | Must export identity + cache + reflection fields carefully |
-| Overwrite vs merge | Needs explicit import policy |
-| Duplicate identity | `(bundle_id, ir_id)` collision rules required |
-| Privacy | Export contains personal vocabulary behavior |
-| Bundle compatibility | Re-import may soft-orphan after dictionary change |
+Useful for backup/device transfer in theory. Higher complexity than Progress
+for weaker immediate learning-orientation value. No current request evidence.
 
-Smallest coherent step if ever chosen: local JSON export without import.
+### Cloud sync
 
-### Cloud sync (separate)
+Separate program: authentication, remote identity, merge, deletion,
+encryption, offline reconciliation, infrastructure. Must not be bundled with
+basic export/import.
 
-Requires authentication, remote identity, merge rules, concurrent reflection
-resolution, deletion propagation, encryption/privacy, offline reconciliation,
-and operational infrastructure. Must not be bundled with basic export/import.
-Do not select merely because device-local storage is a limitation.
-
-**Conclusion:** Neither local portability nor cloud sync is selected now.
+**Conclusion:** Higher complexity and weaker immediate learning value than
+Progress. Rejected for now.
 
 ---
 
 ## 15. Other evidence-supported candidate
 
 ```text
-Candidate H — none identified
+Candidate H — Progress & Return Surface (selected)
 ```
 
-MVP **Progress & Return Surface** (counts / empty states) remains a coherent
-*planning* candidate from `learning_system_mvp_definition.md`, but it is not
-supported by Learning usage evidence as higher-value than an evidence phase.
-Selecting Progress solely to finish the original MVP checklist would violate
-the LSN0 requirement to compare directions against current evidence rather
-than assume the next checklist item.
+Progress was already defined in the Learning System MVP as LS3. LS2 closure
+correctly refused to auto-select scheduling. Owner keep-building lock now
+selects Progress as the next phase.
 
-No stronger Learning candidate emerged from repository usage evidence.
+No stronger alternative emerged from repository usage evidence.
 
 ---
 
@@ -491,66 +382,107 @@ No stronger Learning candidate emerged from repository usage evidence.
 
 | Candidate | Smallest credible product-coherent step |
 | --- | --- |
-| A Scheduling | Simple due-state model without SRS scoring — **only after** usage proves queue burden and history/policy decisions |
-| B History | Append one immutable event per successful reflection — still schema debt; defer until needed by a selected consumer |
-| C Lexical support | Surface one existing authoritative example/sense more clearly — only if live data already contains it |
-| D Source objects | Define and package genuine source lexicon records first (corpus/pipeline), then Save eligibility |
-| E Translation relationships | Architecture definition only — no store until identity decision exists |
-| F Organization | One optional user tag on Learning Record — only after collection-management pain |
-| G Portability | Local JSON export with no import — only after backup/device-loss demand |
-| Evidence phase (selected) | Bounded local observation plan with explicit metrics and privacy boundary |
+| **Progress (selected)** | Derived counts + empty states + Continue/Start Review from existing fields |
+| A Scheduling | Simple due-state model without SRS — only after due-state policy + usage |
+| B History | Append one immutable event per reflection — defer until a selected consumer |
+| C Lexical support | Surface one existing authoritative example/sense more clearly |
+| D Source objects | Package genuine source lexicon records first |
+| E Translation relationships | Architecture definition only |
+| F Organization | One optional user tag — only after management pain |
+| G Portability | Local JSON export with no import — only after backup demand |
 
-No fake MVP that creates irreversible schema debt is recommended.
+### Progress MVP field set
+
+Use only existing fields:
+
+```text
+status
+last_reviewed
+review_count
+created_at
+```
+
+May provide:
+
+- total saved entries;
+- number not yet reviewed;
+- number Still learning;
+- number Remembered;
+- number currently unavailable (unresolved / soft orphan);
+- clear **Continue review** or **Start review** action;
+- simple return cue based on existing queue order;
+- empty states for no saved vocabulary and no reviewable vocabulary;
+- active-bundle scope only.
+
+Must not add:
+
+- due dates;
+- review scheduling;
+- spaced repetition;
+- streaks;
+- scores;
+- mastery percentages;
+- immutable review history;
+- charts implying learning performance;
+- daily goals;
+- notifications;
+- new IndexedDB fields;
+- cross-bundle aggregation;
+- source-language or translation-pair objects.
 
 ---
 
 ## 17. Dependency graph
 
 ```text
-[Real Learning usage evidence]
-  → prerequisite for selecting A/B/C/F/G as product next
-  → may reveal corpus-limited Review failure → corpus work before Learning UI
+LS1 Learning Records
+  → enables LS2 Review and Reflect
+  → enables LS3 Progress & Return Surface (derived counts)
 
-Learning History (optional enhancement → later prerequisite)
+LS3 Progress
+  → optional later enhancement path to return habit measurement
+  → does not require History
+  → does not require Scheduling
+
+Learning History (later optional)
   → may enable defensible Scheduling
   → may enable analytics
   → may support future sync reconciliation
 
-Source-language lexicon data (prerequisite)
-  → enables source-language saving
-  → enables source-language Review
+Source-language lexicon data (prerequisite for D)
+  → enables source-language saving / Review
   → may enable translation-relationship objects
 
 Lexical-content quality (constraint)
   → constrains Review quality
   → constrains usefulness of Scheduling
-  → if insufficient, corpus pipeline precedes Learning feature work
-
-Local export (optional)
-  → may later feed sync design, but is not sync
-
-Progress counts (optional enhancement)
-  → can derive from existing Learning Records
-  → does not require History or Scheduling
+  → does not block Progress counts
 ```
 
-Distinguish:
-
-- **Prerequisite:** evidence phase before feature selection; source lexicon
-  data before D/E; responsible history before strong scheduling claims.
-- **Optional enhancement:** Progress counts, tags, export — useful later, not
-  forced now.
+Progress is an **optional enhancement** relative to Save/Review correctness, and
+the **selected next product slice** relative to competing Learning directions.
 
 ---
 
 ## 18. Selected direction
 
 ```text
-Bounded Learning System usage-evidence gathering
+LS3 — Progress & Return Surface
 ```
 
-Primary direction only: gather enough real Learning usage signal to re-run a
-feature decision. Do **not** implement a Learning feature in the next slice.
+### Architectural constraint
+
+> Progress is a derived presentation of current Learning Records, not a new
+> source of truth.
+
+### Truthfulness rules
+
+- Do not describe Remembered as mastered.
+- Counts are current collection state, not proof of long-term retention.
+- Never-reviewed remains derived (`review_count === 0` and
+  `last_reviewed === null`), not a third stored status.
+- Unavailable / unresolved rows may be counted separately; they must not be
+  treated as reviewable progress.
 
 ---
 
@@ -558,90 +490,70 @@ feature decision. Do **not** implement a Learning feature in the next slice.
 
 | Candidate | Why not now |
 | --- | --- |
-| A Review Scheduling | No longitudinal Learning usage; LS2 fields insufficient for responsible scheduling; high model/clock/offline risk; theory must not override evidence |
-| B Learning History | Architecturally attractive; no consumer demand yet; schema/privacy cost without selected user value |
-| C Richer Lexical Support | Review already uses live content; remaining gaps are largely source-data; no Learning Review content complaints |
-| D Source-language objects | No genuine source lexicon records |
-| E Translation relationships | No separate identity decision and no demand evidence |
-| F Collection organization | No collection-management pain; does not improve recall |
-| G Portability / sync | No backup/transfer requests; sync is a larger privacy/merge program |
-| H Other | None evidence-supported |
+| Review Scheduling | Premature without due-state policy and longitudinal evidence |
+| Learning History | Adds infrastructure without a current user-facing consumer |
+| Richer lexical support | Valuable, but primarily constrained by authoritative corpus data |
+| Source-language objects | Blocked until genuine source lexicon records exist |
+| Translation relationships | Blocked on identity and relation semantics |
+| Organization | Premature before collection-management pain is demonstrated |
+| Portability / sync | Higher complexity and weaker immediate learning value |
 
 ---
 
 ## 20. Preconditions
 
-Before any next Learning **feature** implementation:
+Before LS3 implementation:
 
-1. Evidence maturity rises above `NO_USAGE_EVIDENCE` (at least
-   `EARLY_USAGE_EVIDENCE` with Learning-specific observations).
-2. LS1/LS2 invariants remain intact.
-3. Query-log consent is not reused for Learning analytics.
-4. If telemetry is proposed, a separate privacy decision exists first.
-5. Corpus-limited failures are classified as corpus work, not Learning UI
-   work, when that is the true bottleneck.
-6. Scheduling, if ever chosen, has explicit due-state, clock, offline backlog,
-   unresolved, and history policies — not silent reinterpretation of LS2
-   fields as mastery.
-
-Before the evidence phase itself:
-
-1. Owner confirms observation method (manual field notes, local aggregate
-   inspection concept, and/or separately consented Learning export).
-2. Metrics list is fixed and bounded.
-3. No automatic upload path is introduced.
+1. `LS3D0 — Progress & Return Surface Product Definition` is complete.
+2. Exact metrics, empty states, placement, return action, and terminology are
+   defined.
+3. Boundary between truthful orientation and misleading gamification is locked.
+4. Progress remains derived from existing Learning Record fields only.
+5. No new IndexedDB fields or stores are introduced for Progress MVP.
+6. Active-bundle scope only.
+7. LS1/LS2 invariants remain intact.
+8. Query-log consent is not reused for Learning analytics.
+9. Remembered is never presented as mastered.
 
 ---
 
 ## 21. Stop conditions
 
-Stop or refuse Learning feature implementation if:
+Stop or refuse Progress implementation if work attempts to:
 
-- evidence remains `NO_USAGE_EVIDENCE`;
-- proposed work is scheduling “because LS2 exists”;
-- proposed work is history “because it is clean”;
-- lexical enrichment requires inventing authoritative content;
-- source-language Save is attempted via `index_mapping`;
-- translation pairs overload `(bundle_id, ir_id)`;
-- sync is selected without privacy/merge model;
-- organization is selected without collection-size pain;
-- a feature is selected mainly because it is easy;
-- Learning telemetry is added under query-log consent;
-- unrelated featured-anchor / search work is mixed into the Learning slice.
+- add due dates, scheduling, or SRS;
+- add streaks, scores, mastery percentages, or performance charts;
+- add immutable Review Events as a Progress dependency;
+- add new IndexedDB Learning fields for Progress;
+- aggregate across bundles;
+- invent source-language or translation-pair learning objects;
+- treat `display_cache` as lexical authority;
+- silently reinterpret LS2 fields as objective mastery;
+- mix unrelated featured-anchor / search work into the Progress slice;
+- add Learning telemetry under query-log consent.
 
 ---
 
 ## 22. Smallest next slice
 
 ```text
-LSN0E1 — Learning System Usage Evidence Plan
+LS3D0 — Progress & Return Surface Product Definition
 ```
 
-Decision/research slice (documentation), not implementation.
+Definition-only slice. It must define:
 
-Define:
+- exact metrics and derivation rules from `status`, `last_reviewed`,
+  `review_count`, and `created_at`;
+- empty states for no saved vocabulary and no reviewable vocabulary;
+- placement (Saved Vocabulary and/or related return surfaces);
+- **Continue review** / **Start review** action semantics;
+- return cue based on existing deterministic queue order;
+- terminology (especially Still learning vs Remembered vs not yet reviewed);
+- accessibility and EN/FR parity expectations;
+- the boundary between truthful orientation and misleading gamification;
+- explicit non-goals matching this LSN0 lock.
 
-- observation window and owner/tester protocol;
-- metrics (see below);
-- privacy boundary and consent separation;
-- classification thresholds for moving from `NO_USAGE_EVIDENCE` to
-  `EARLY_USAGE_EVIDENCE` / `SUFFICIENT_DIRECTIONAL_EVIDENCE`;
-- re-decision checkpoint that re-evaluates candidates A–G.
-
-### Suggested evidence targets (conceptual; no telemetry added here)
-
-- saved entries per active learner;
-- Review sessions started / completed;
-- repeat Review sessions across days;
-- completion rate;
-- Still learning vs Remembered outcomes;
-- Remembered → Still learning frequency;
-- unresolved-row frequency;
-- average queue size;
-- abandonment position (if observable without invasive instrumentation);
-- qualitative feedback on missing lexical support during Review.
-
-Prefer local-only manual or consented export methods over automatic analytics.
+No runtime implementation in LS3D0.
 
 ---
 
@@ -650,34 +562,28 @@ Prefer local-only manual or consented export methods over automatic analytics.
 Current query-logging consent must **not** silently authorize Learning
 analytics.
 
+Progress MVP uses on-device derived counts from existing Learning Records. It
+does not add telemetry.
+
 If future usage evidence requires Learning telemetry, a separate decision must
-cover:
-
-- local-only versus exportable;
-- consent;
-- exact fields;
-- retention;
-- deletion;
-- no automatic upload;
-- sensitivity of vocabulary and learning behavior.
-
-LSN0 does not implement telemetry. Local aggregate inspection may be evaluated
-conceptually in LSN0E1 but is not added here.
+cover local-only versus exportable data, consent, exact fields, retention,
+deletion, no automatic upload, and sensitivity of vocabulary and learning
+behavior.
 
 ---
 
 ## 24. Open issues
 
-1. Does owner-held out-of-repo Learning usage already exist?
-2. What observation method is acceptable without Learning telemetry?
-3. Should MVP Progress counts be reconsidered after early usage, independently
-   of scheduling?
-4. When do search/content Class B findings become corpus milestones rather
-   than Learning milestones?
-5. If evidence later supports scheduling, should History precede any
-   `next_review_at` field?
-6. Naming: reserve “LS3” carefully so Progress and Scheduling are not
-   conflated.
+1. Exact placement of Progress relative to Saved Vocabulary chrome.
+2. Whether `review_count` is ever shown numerically, or only used as derivation
+   input for never-reviewed.
+3. Wording for unavailable / unresolved counts without alarming soft orphans.
+4. Whether a “last reviewed” collection-level cue is shown in addition to
+   per-row dates already present.
+5. How Continue vs Start Review labels switch when a session was just completed.
+6. Naming reservation: future scheduling must not reuse “LS3” ambiguously.
+
+These belong to LS3D0, not this decision.
 
 ---
 
@@ -685,6 +591,7 @@ conceptually in LSN0E1 but is not added here.
 
 This slice does **not** implement:
 
+- Progress UI or derived-count runtime;
 - scheduling, due dates, SRS;
 - Review Events / history store;
 - analytics or telemetry;
@@ -696,7 +603,6 @@ This slice does **not** implement:
 - morphology or audio;
 - corpus changes;
 - schema migration;
-- UI changes;
 - IndexedDB changes;
 - Playwright tests;
 - runtime code.
@@ -716,8 +622,9 @@ closures). Canonical status lives in this report:
 
 ```text
 LS2 — Closed
-LSN0 — Decided: MORE_USAGE_EVIDENCE_REQUIRED
-LSN0E1 — Learning System Usage Evidence Plan — Next
+LSN0 — Decided: NEXT_PHASE_SELECTED
+LS3 — Progress & Return Surface — Selected
+LS3D0 — Progress & Return Surface Product Definition — Next
 ```
 
 Unrelated featured-anchor / search work must remain unstaged:
@@ -741,8 +648,9 @@ catalog, sources, packages, CSS, or i18n were modified.
 
 | Field | Value |
 | --- | --- |
-| Decision | `LSN0_MORE_USAGE_EVIDENCE_REQUIRED` |
-| Evidence maturity | `NO_USAGE_EVIDENCE` |
-| Selected direction | Bounded Learning usage-evidence gathering |
-| Next slice | `LSN0E1 — Learning System Usage Evidence Plan` |
+| Decision | `LSN0_NEXT_PHASE_SELECTED` |
+| Selected direction | `LS3 — Progress & Return Surface` |
+| Evidence maturity | `NO_USAGE_EVIDENCE` (unchanged; constrains scheduling, not Progress) |
+| Architectural rule | Progress is derived presentation, not a new source of truth |
+| Next slice | `LS3D0 — Progress & Return Surface Product Definition` |
 | Code changes | None |
