@@ -1705,6 +1705,11 @@ clearDbBtn.addEventListener("click", () => {
     importProgress.textContent = t("db.deleting");
     try {
       await deleteSiralexDb();
+      // Drop Saved Vocabulary / Review hosts and focus intent before refresh.
+      invalidateCollectionAndReviewContexts();
+      resultsHostContext = "search";
+      searchResults.innerHTML = "";
+      lastKnownActiveBundleId = undefined;
       importProgress.textContent = t("db.deleted");
     } catch (e) {
       importProgress.textContent += t("db.deleteFailed", { error: String(e) });
@@ -2040,13 +2045,17 @@ let entryDetailGeneration = 0;
 let savedVocabularyGeneration = 0;
 let reviewGeneration = 0;
 let activeReviewHost: ReturnType<typeof createReviewSurfaceHost> | undefined;
-/** One-use intent: focus Start Review after returning from Review. */
-let focusStartReviewOnce = false;
+/**
+ * One-use intent: focus the enabled Start/Continue Review action after returning
+ * from Review (LS3I3). Falls back to the Saved Vocabulary heading when the
+ * action is missing or disabled.
+ */
+let focusReviewActionOnce = false;
 let lastSearchResults: ResultDisplayContext[] = [];
 /** Track active bundle id so switches invalidate collection/Review contexts. */
 let lastKnownActiveBundleId: string | undefined;
 
-/** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4). */
+/** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4 / LS3I3). */
 type ResultsHostContext =
   | "search"
   | "saved_vocabulary"
@@ -2065,7 +2074,7 @@ function invalidateCollectionAndReviewContexts() {
   disposeActiveReviewHost();
   savedVocabularyGeneration += 1;
   entryDetailGeneration += 1;
-  focusStartReviewOnce = false;
+  focusReviewActionOnce = false;
 }
 function cancelPendingSettledQueryLog() {
   if (queryLoggingSettleTimer !== undefined) {
@@ -2148,8 +2157,9 @@ function showResultsList() {
 }
 
 /**
- * Open Review from Saved Vocabulary (LS2I4). Ephemeral session; Back returns
- * to Saved Vocabulary with one-use Start Review focus restoration.
+ * Open Review from Saved Vocabulary (LS2I4 / LS3I3).
+ * Start and Continue share this path: one fresh ephemeral LS2 Review session.
+ * Back returns to Saved Vocabulary with one-use Review-action focus restoration.
  */
 function showReviewSurface() {
   disposeActiveReviewHost();
@@ -2157,7 +2167,7 @@ function showReviewSurface() {
   resultsHostContext = "review";
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
-  focusStartReviewOnce = false;
+  focusReviewActionOnce = false;
   searchResults.innerHTML = "";
 
   const host = createReviewSurfaceHost({
@@ -2168,10 +2178,11 @@ function showReviewSurface() {
       generation === reviewGeneration && resultsHostContext === "review",
     onBack: () => {
       disposeActiveReviewHost();
-      focusStartReviewOnce = true;
+      focusReviewActionOnce = true;
       showSavedVocabulary();
     },
   });
+  // Ownership: only this host may present while active; dispose before replace.
   activeReviewHost = host;
   host.start();
 }
@@ -2184,8 +2195,8 @@ function showSavedVocabulary() {
   searchResults.innerHTML = "";
 
   let lastFocusTarget: HTMLElement | null = null;
-  const restoreStartReviewFocus = focusStartReviewOnce;
-  focusStartReviewOnce = false;
+  const restoreReviewActionFocus = focusReviewActionOnce;
+  focusReviewActionOnce = false;
   let didRestoreFocus = false;
 
   const applyModel = (model: SavedVocabularyModel) => {
@@ -2212,7 +2223,7 @@ function showSavedVocabulary() {
         if (generation !== savedVocabularyGeneration || resultsHostContext !== "saved_vocabulary") {
           return;
         }
-        // Application-owned suppression: one Review host at a time (no second Start Review).
+        // Application-owned suppression: one Review host at a time (Start or Continue).
         if (activeReviewHost?.isActive()) return;
         showReviewSurface();
       },
@@ -2221,7 +2232,7 @@ function showSavedVocabulary() {
     searchResults.appendChild(view.root);
     lastFocusTarget = view.focusAfterRemove;
 
-    if (restoreStartReviewFocus && !didRestoreFocus && model.surface !== "loading") {
+    if (restoreReviewActionFocus && !didRestoreFocus && model.surface !== "loading") {
       didRestoreFocus = true;
       if (view.startReviewButton && !view.startReviewButton.disabled) {
         view.startReviewButton.focus();

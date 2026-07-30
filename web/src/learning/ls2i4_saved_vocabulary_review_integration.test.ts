@@ -105,7 +105,8 @@ describe("LS2I4 Saved Vocabulary ↔ Review navigation", () => {
     expect(mainSrc).not.toMatch(/id=["']startReview["']/);
     expect(mainSrc).not.toMatch(/startReviewBtn/);
     expect(mainSrc).toMatch(/onStartReview/);
-    expect(mainSrc).toMatch(/focusStartReviewOnce/);
+    expect(mainSrc).toMatch(/focusReviewActionOnce/);
+    expect(mainSrc).not.toMatch(/focusStartReviewOnce/);
   });
 
   it("runs Saved Vocabulary → Review → Back with updated statuses and no search", async () => {
@@ -129,7 +130,7 @@ describe("LS2I4 Saved Vocabulary ↔ Review navigation", () => {
       let savedGen = 0;
       let reviewGen = 0;
       let reviewHost: ReturnType<typeof createReviewSurfaceHost> | undefined;
-      let focusStartReviewOnce = false;
+      let focusReviewActionOnce = false;
 
       const showSaved = () => {
         reviewHost?.dispose();
@@ -137,8 +138,8 @@ describe("LS2I4 Saved Vocabulary ↔ Review navigation", () => {
         reviewGen += 1;
         const generation = ++savedGen;
         hostContext = "saved_vocabulary";
-        const restore = focusStartReviewOnce;
-        focusStartReviewOnce = false;
+        const restore = focusReviewActionOnce;
+        focusReviewActionOnce = false;
         let restored = false;
 
         const apply = (model: SavedVocabularyModel) => {
@@ -179,7 +180,7 @@ describe("LS2I4 Saved Vocabulary ↔ Review navigation", () => {
         const generation = ++reviewGen;
         savedGen += 1;
         hostContext = "review";
-        focusStartReviewOnce = false;
+        focusReviewActionOnce = false;
         const host = createReviewSurfaceHost({
           mount,
           getActiveMeta: () => meta(),
@@ -189,7 +190,7 @@ describe("LS2I4 Saved Vocabulary ↔ Review navigation", () => {
             reviewHost?.dispose();
             reviewHost = undefined;
             reviewGen += 1;
-            focusStartReviewOnce = true;
+            focusReviewActionOnce = true;
             showSaved();
           },
           now: () => TS,
@@ -242,7 +243,9 @@ describe("LS2I4 Saved Vocabulary ↔ Review navigation", () => {
       expect(runSearch).not.toHaveBeenCalled();
       const startBtn = mount.querySelector<HTMLButtonElement>("#saved-vocab-start-review");
       expect(startBtn?.disabled).toBe(false);
+      expect(startBtn?.textContent).toBe("Continue review");
       expect(mount.textContent).toContain("Last reviewed:");
+      expect(mount.querySelector(".saved-vocab-progress")).not.toBeNull();
       expect(
         focusSpy.mock.instances.some(
           (el) => el instanceof HTMLElement && el.id === "saved-vocab-start-review",

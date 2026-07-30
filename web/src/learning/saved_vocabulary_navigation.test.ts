@@ -47,24 +47,24 @@ describe("LS1 Saved Vocabulary navigation and stale-async guards", () => {
     expect(applied).toHaveLength(2);
   });
 
-  it("Review Back sets one-use Start Review focus intent without runSearch", () => {
+  it("Review Back sets one-use Review-action focus intent without runSearch", () => {
     const runSearch = vi.fn();
-    let focusStartReviewOnce = false;
+    let focusReviewActionOnce = false;
     let host: "review" | "saved_vocabulary" = "review";
     const showSavedVocabulary = vi.fn(() => {
-      expect(focusStartReviewOnce).toBe(true);
-      focusStartReviewOnce = false;
+      expect(focusReviewActionOnce).toBe(true);
+      focusReviewActionOnce = false;
       host = "saved_vocabulary";
     });
     const onReviewBack = () => {
-      focusStartReviewOnce = true;
+      focusReviewActionOnce = true;
       showSavedVocabulary();
     };
     onReviewBack();
     expect(showSavedVocabulary).toHaveBeenCalledTimes(1);
     expect(host).toBe("saved_vocabulary");
     expect(runSearch).not.toHaveBeenCalled();
-    expect(focusStartReviewOnce).toBe(false);
+    expect(focusReviewActionOnce).toBe(false);
   });
 
   it("stale Saved Vocabulary apply cannot redraw Review host context", () => {
