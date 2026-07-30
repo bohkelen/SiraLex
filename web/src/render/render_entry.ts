@@ -4,8 +4,8 @@
  * Renders a full enriched record: all senses, translations, variant forms,
  * examples, sub-entries, and provenance metadata.
  *
- * No styling polish, no animations — functional rendering that proves
- * the enriched records are consumable by a human.
+ * LS1I2: lexicon entries may show a Learning Save control. The renderer does
+ * not open IndexedDB; the application owns persistence and state updates.
  */
 
 import type {
@@ -15,9 +15,11 @@ import type {
   SenseRaw,
   ExampleRaw,
   SubEntry,
+  TargetEntry,
 } from "../types/records";
 import { isLexiconDisplay, isIndexMappingDisplay } from "../types/records";
 import { t } from "../i18n";
+import type { LearningSaveControlState } from "../learning/entry_learning_session";
 
 function el(tag: string, cls?: string, text?: string): HTMLElement {
   const e = document.createElement(tag);
@@ -94,7 +96,129 @@ function renderSense(sense: SenseRaw, index: number): HTMLElement {
   return wrap;
 }
 
-function renderLexiconEntry(record: EnrichedRecord, d: LexiconDisplayFields): HTMLElement {
+export type EntryLearningCallbacks = {
+  initialState: LearningSaveControlState;
+  onSave: () => void;
+  onUnsave: () => void;
+};
+
+function isBusyState(state: LearningSaveControlState): boolean {
+  return state === "loading" || state === "saving" || state === "removing";
+}
+
+function isSavedSideState(state: LearningSaveControlState): boolean {
+  return state === "saved" || state === "removing" || state === "error_saved";
+}
+
+function isUnsavedSideState(state: LearningSaveControlState): boolean {
+  return state === "not_saved" || state === "error_not_saved";
+}
+
+export function applyLearningSaveControlState(
+  button: HTMLButtonElement,
+  errorEl: HTMLElement,
+  state: LearningSaveControlState,
+): void {
+  const busy = isBusyState(state);
+  button.disabled = busy || state === "unavailable";
+  button.setAttribute("aria-busy", busy ? "true" : "false");
+
+  if (state === "unavailable") {
+    button.removeAttribute("aria-pressed");
+    button.hidden = true;
+    errorEl.hidden = true;
+    errorEl.textContent = "";
+    return;
+  }
+
+  button.hidden = false;
+  button.setAttribute("aria-pressed", isSavedSideState(state) ? "true" : "false");
+
+  switch (state) {
+    case "loading":
+      button.textContent = t("learning.checking");
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+      break;
+    case "not_saved":
+      button.textContent = t("learning.save");
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+      break;
+    case "saving":
+      button.textContent = t("learning.saving");
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+      break;
+    case "saved":
+      button.textContent = t("learning.saved");
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+      break;
+    case "removing":
+      button.textContent = t("learning.removing");
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+      break;
+    case "error_not_saved":
+      button.textContent = t("learning.save");
+      errorEl.textContent = t("learning.saveError");
+      errorEl.hidden = false;
+      break;
+    case "error_saved":
+      button.textContent = t("learning.saved");
+      errorEl.textContent = t("learning.removeError");
+      errorEl.hidden = false;
+      break;
+  }
+}
+
+function renderLearningSaveControl(learning: EntryLearningCallbacks): {
+  root: HTMLElement;
+  setState: (state: LearningSaveControlState) => void;
+} {
+  const root = el("div", "entry-learning-actions");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn entry-learning-save";
+  button.id = "entry-learning-save";
+
+  const errorEl = el("div", "entry-learning-error");
+  errorEl.id = "entry-learning-error";
+  errorEl.setAttribute("role", "status");
+  button.setAttribute("aria-describedby", errorEl.id);
+
+  let currentState = learning.initialState;
+  applyLearningSaveControlState(button, errorEl, currentState);
+
+  button.addEventListener("click", () => {
+    if (isBusyState(currentState) || currentState === "unavailable") return;
+    if (isUnsavedSideState(currentState)) {
+      learning.onSave();
+      return;
+    }
+    if (isSavedSideState(currentState)) {
+      learning.onUnsave();
+    }
+  });
+
+  root.appendChild(button);
+  root.appendChild(errorEl);
+
+  return {
+    root,
+    setState: (state: LearningSaveControlState) => {
+      currentState = state;
+      applyLearningSaveControlState(button, errorEl, state);
+    },
+  };
+}
+
+function renderLexiconEntry(
+  record: EnrichedRecord,
+  d: LexiconDisplayFields,
+  learning?: EntryLearningCallbacks,
+): { wrap: HTMLElement; setLearningSaveState?: (state: LearningSaveControlState) => void } {
   const wrap = el("div", "entry-detail entry-lexicon");
 
   const header = el("div", "entry-header");
@@ -106,6 +230,13 @@ function renderLexiconEntry(record: EnrichedRecord, d: LexiconDisplayFields): HT
     header.appendChild(el("span", "entry-pos", d.pos_hint ?? d.ps_raw ?? ""));
   }
   wrap.appendChild(header);
+
+  let setLearningSaveState: ((state: LearningSaveControlState) => void) | undefined;
+  if (learning) {
+    const control = renderLearningSaveControl(learning);
+    wrap.appendChild(control.root);
+    setLearningSaveState = control.setState;
+  }
 
   if (d.variants_raw && d.variants_raw.length > 0) {
     wrap.appendChild(el("div", "entry-variants", t("entry.variants", { value: d.variants_raw.join(", ") })));
@@ -132,14 +263,13 @@ function renderLexiconEntry(record: EnrichedRecord, d: LexiconDisplayFields): HT
     wrap.appendChild(meta);
   }
 
-  return wrap;
+  return { wrap, setLearningSaveState };
 }
 
 function renderIndexMapping(
-  record: EnrichedRecord,
   d: IndexMappingDisplayFields,
   targetEntriesLabel: string,
-  onSearch?: (query: string) => void,
+  onOpenTargetEntry?: (target: TargetEntry) => void,
 ): HTMLElement {
   const wrap = el("div", "entry-detail entry-index");
 
@@ -147,20 +277,30 @@ function renderIndexMapping(
   header.appendChild(el("h3", "entry-headword", d.source_term));
   wrap.appendChild(header);
 
+  const status = el("div", "entry-target-status");
+  status.id = "entry-target-status";
+  status.setAttribute("role", "status");
+  status.hidden = true;
+  wrap.appendChild(status);
+
   if (d.target_entries && d.target_entries.length > 0) {
     const targets = el("div", "entry-targets");
     targets.appendChild(el("div", "targets-label", targetEntriesLabel));
-    for (const t of d.target_entries) {
-      if (onSearch) {
+    for (const target of d.target_entries) {
+      if (onOpenTargetEntry) {
         const btn = document.createElement("button");
         btn.className = "target-item target-link";
         btn.type = "button";
-        btn.appendChild(el("span", "target-text", t.display_text));
-        btn.addEventListener("click", () => onSearch(t.display_text));
+        btn.setAttribute(
+          "aria-label",
+          t("entry.openTarget", { headword: target.display_text }),
+        );
+        btn.appendChild(el("span", "target-text", target.display_text));
+        btn.addEventListener("click", () => onOpenTargetEntry(target));
         targets.appendChild(btn);
       } else {
         const item = el("div", "target-item");
-        item.appendChild(el("span", "target-text", t.display_text));
+        item.appendChild(el("span", "target-text", target.display_text));
         targets.appendChild(item);
       }
     }
@@ -172,19 +312,31 @@ function renderIndexMapping(
 
 export type EntryDetailCallbacks = {
   onBack: () => void;
-  onSearch?: (query: string) => void;
+  /**
+   * Open a target lexicon entry from an index mapping by identity (anchor/ir_id).
+   * Must not perform a text search.
+   */
+  onOpenTargetEntry?: (target: TargetEntry) => void;
   targetEntriesLabel?: string;
+  /** Present only for lexicon entries when the app wants a Learning Save control. */
+  learning?: EntryLearningCallbacks;
+};
+
+export type EntryDetailView = {
+  root: HTMLElement;
+  setLearningSaveState?: (state: LearningSaveControlState) => void;
 };
 
 /**
  * Render a full entry detail view for a single enriched record.
  * Includes a "Back to results" callback button.
- * If onSearch is provided, target entries in index mappings become clickable.
+ * If onOpenTargetEntry is provided, target entries in index mappings become
+ * clickable for direct lexicon-entry navigation (not text search).
  */
 export function renderEntryDetail(
   record: EnrichedRecord,
   callbacks: EntryDetailCallbacks,
-): HTMLElement {
+): EntryDetailView {
   const container = el("div", "entry-container");
 
   const backBtn = document.createElement("button");
@@ -194,20 +346,31 @@ export function renderEntryDetail(
   backBtn.addEventListener("click", callbacks.onBack);
   container.appendChild(backBtn);
 
+  let setLearningSaveState: ((state: LearningSaveControlState) => void) | undefined;
+
   if (isLexiconDisplay(record)) {
-    container.appendChild(renderLexiconEntry(record, record.display));
+    const lexicon = renderLexiconEntry(record, record.display, callbacks.learning);
+    container.appendChild(lexicon.wrap);
+    setLearningSaveState = lexicon.setLearningSaveState;
   } else if (isIndexMappingDisplay(record)) {
     container.appendChild(
       renderIndexMapping(
-        record,
         record.display,
         callbacks.targetEntriesLabel ?? t("entry.targetEntriesDefault"),
-        callbacks.onSearch,
+        callbacks.onOpenTargetEntry,
       ),
     );
   } else {
     container.appendChild(el("div", "entry-error", t("entry.noDisplay")));
   }
 
-  return container;
+  return { root: container, setLearningSaveState };
+}
+
+/** Show a non-destructive unavailable message on an open index-mapping surface. */
+export function showTargetEntryUnavailable(root: HTMLElement): void {
+  const status = root.querySelector<HTMLElement>("#entry-target-status");
+  if (!status) return;
+  status.hidden = false;
+  status.textContent = t("entry.targetUnavailable");
 }

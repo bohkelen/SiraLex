@@ -151,13 +151,70 @@ describe("Phase 7G result rendering", () => {
 
   it("returns improved empty-state copy", () => {
     expect(getNoResultMessage("inconnu")).toBe(
-      "Aucun résultat pour « inconnu ». Vérifiez le sens de recherche ou essayez une autre forme.",
+      "Aucun résultat pour « inconnu ». Essayez une autre orthographe ou une autre forme.",
     );
   });
 
   it("returns phrase-miss copy for multi-word no-result queries", () => {
     expect(getNoResultMessage("ferme la bouche")).toBe(
-      "Aucun résultat exact pour cette expression. Essayez un mot à la fois.",
+      "Essayez de chercher un mot à la fois.",
+    );
+  });
+});
+
+describe("Phase 7N2E4J3 minimal phrase guidance", () => {
+  it("returns FR phrase guidance for phrase-like misses", () => {
+    setCurrentLocale("fr");
+    expect(getNoResultMessage("comment dit-on école")).toBe(
+      "Essayez de chercher un mot à la fois.",
+    );
+    expect(getNoResultMessage("merci beaucoup")).toBe(
+      "Essayez de chercher un mot à la fois.",
+    );
+  });
+
+  it("returns EN phrase guidance for phrase-like misses", () => {
+    setCurrentLocale("en");
+    expect(getNoResultMessage("comment dit-on école")).toBe(
+      "Try searching one word at a time.",
+    );
+  });
+
+  it("keeps single-word miss guidance (not phrase guidance)", () => {
+    setCurrentLocale("fr");
+    const singleWordMiss = getNoResultMessage("inconnu");
+    expect(singleWordMiss).toBe(
+      "Aucun résultat pour « inconnu ». Essayez une autre orthographe ou une autre forme.",
+    );
+    expect(singleWordMiss).not.toContain("un mot à la fois");
+    expect(singleWordMiss).not.toContain("sens de recherche");
+
+    setCurrentLocale("en");
+    const enSingleWordMiss = getNoResultMessage("unknownlemma");
+    expect(enSingleWordMiss).toBe(
+      'No results for "unknownlemma". Try another spelling or form.',
+    );
+    expect(enSingleWordMiss).not.toBe("Try searching one word at a time.");
+    expect(enSingleWordMiss).not.toContain("search direction");
+  });
+
+  it("does not return phrase guidance for empty or whitespace-only queries", () => {
+    setCurrentLocale("en");
+    expect(getNoResultMessage("")).not.toBe("Try searching one word at a time.");
+    expect(getNoResultMessage("   ")).not.toBe("Try searching one word at a time.");
+    setCurrentLocale("fr");
+    expect(getNoResultMessage("")).not.toBe("Essayez de chercher un mot à la fois.");
+    expect(getNoResultMessage("   ")).not.toBe("Essayez de chercher un mot à la fois.");
+  });
+
+  it("documents that phrase guidance is miss-path only (hits never call getNoResultMessage)", () => {
+    // Search hits render result cards via renderResultsList; getNoResultMessage is only
+    // used when ir_ids.length === 0. A phrase-like query that hits therefore never shows
+    // phrase guidance. This assertion keeps the miss helper contract explicit.
+    setCurrentLocale("en");
+    expect(typeof getNoResultMessage).toBe("function");
+    expect(getNoResultMessage("some multiword miss")).toBe(
+      "Try searching one word at a time.",
     );
   });
 });
@@ -170,14 +227,14 @@ describe("Phase 7G entry detail cleanup", () => {
   it("hides ordinary-user internal metadata in detail pages", () => {
     const detail = renderEntryDetail(INDEX_RECORD, { onBack: () => undefined });
 
-    expect(detail.textContent).toContain("main");
-    expect(detail.textContent).toContain("bólo");
-    expect(detail.textContent).not.toContain("ir_id");
-    expect(detail.textContent).not.toContain("record-main");
-    expect(detail.textContent).not.toContain("src-test");
-    expect(detail.textContent).not.toContain("norm-test");
-    expect(detail.querySelector(".entry-pos")).toBeNull();
-    expect(detail.textContent).not.toMatch(/\bfr\b/);
-    expect(detail.textContent).not.toContain("e1");
+    expect(detail.root.textContent).toContain("main");
+    expect(detail.root.textContent).toContain("bólo");
+    expect(detail.root.textContent).not.toContain("ir_id");
+    expect(detail.root.textContent).not.toContain("record-main");
+    expect(detail.root.textContent).not.toContain("src-test");
+    expect(detail.root.textContent).not.toContain("norm-test");
+    expect(detail.root.querySelector(".entry-pos")).toBeNull();
+    expect(detail.root.textContent).not.toMatch(/\bfr\b/);
+    expect(detail.root.textContent).not.toContain("e1");
   });
 });

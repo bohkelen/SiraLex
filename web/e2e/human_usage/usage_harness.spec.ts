@@ -227,7 +227,7 @@ async function runQuery(
   try {
     const previousSearchMetaText = (await searchMeta.innerText().catch(() => "")).trim();
     await searchInput.fill(query);
-    await waitForSettledSearchMeta(searchMeta, previousSearchMetaText, query);
+    await waitForSettledSearchMeta(searchMeta, searchInput, previousSearchMetaText, query);
 
     const searchMetaText = (await searchMeta.innerText()).trim();
     const resultExcerpt = ((await searchResults.innerText().catch(() => "")) ?? "").trim().slice(0, 500);
@@ -248,16 +248,55 @@ async function runQuery(
   }
 }
 
+/** Shared miss/phrase-miss recognition for settle + evidence classification. */
+function isNoResultMeta(searchMetaText: string): boolean {
+  return /No results|No exact result|Aucun résultat|Aucun résultat exact|Try searching one word at a time|Essayez de chercher un mot à la fois|one word at a time|un mot à la fois/i.test(
+    searchMetaText,
+  );
+}
+
 async function waitForSettledSearchMeta(
   searchMeta: Locator,
+  searchInput: Locator,
   previousSearchMetaText: string,
   query: string,
 ): Promise<void> {
   const deadline = Date.now() + queryTimeoutMs;
+  const startedAt = Date.now();
+  // Search input debounce is 150ms; require a short post-fill window before
+  // accepting an unchanged no-result/phrase-miss string as settled.
+  const minIdenticalMissSettleMs = 250;
   let latest = "";
+  let identicalMissStablePolls = 0;
+  let lastIdenticalMissText = "";
+
   while (Date.now() < deadline) {
     latest = (await searchMeta.innerText().catch(() => "")).trim();
-    if (latest.length > 0 && (latest !== previousSearchMetaText || latest.includes(query))) return;
+    const inputValue = await searchInput.inputValue().catch(() => "");
+
+    if (latest.length > 0 && (latest !== previousSearchMetaText || latest.includes(query))) {
+      return;
+    }
+
+    // Consecutive phrase-like misses can leave identical guidance that omits the query.
+    if (latest.length > 0 && inputValue === query && isNoResultMeta(latest)) {
+      if (latest === lastIdenticalMissText) {
+        identicalMissStablePolls += 1;
+      } else {
+        lastIdenticalMissText = latest;
+        identicalMissStablePolls = 1;
+      }
+      if (
+        identicalMissStablePolls >= 2 &&
+        Date.now() - startedAt >= minIdenticalMissSettleMs
+      ) {
+        return;
+      }
+    } else {
+      identicalMissStablePolls = 0;
+      lastIdenticalMissText = "";
+    }
+
     await searchMeta.page().waitForTimeout(100);
   }
   throw new Error(
@@ -272,7 +311,9 @@ function parseResultCount(searchMetaText: string): number | null {
 }
 
 function deriveObservedStatus(searchMetaText: string, resultCount: number | null): ObservedResultStatus {
-  if (/No results|No exact result|Aucun résultat|Aucun résultat exact/i.test(searchMetaText)) return "miss";
+  if (isNoResultMeta(searchMetaText)) {
+    return "miss";
+  }
   if (resultCount === 1) return "hit_single";
   if (typeof resultCount === "number" && resultCount > 1) return "hit_multi";
   return "blocked";

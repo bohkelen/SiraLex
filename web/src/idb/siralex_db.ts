@@ -1,13 +1,15 @@
 export const SIRALEX_DB_NAME = "siralex_db";
-export const SIRALEX_DB_VERSION = 3;
+export const SIRALEX_DB_VERSION = 4;
 
 export const STORE_META = "meta" as const;
 export const STORE_RECORDS = "records" as const;
 export const STORE_SEARCH_INDEX = "search_index" as const;
 export const STORE_BUNDLES_REGISTRY = "bundles_registry" as const;
 export const STORE_QUERY_LOGS = "query_logs" as const;
+export const STORE_LEARNING_RECORDS = "learning_records" as const;
 
 const INDEX_BY_BUNDLE_ID = "by_bundle_id";
+export const LEARNING_RECORD_INDEX_BY_BUNDLE_ID = "by_bundle_id" as const;
 export const QUERY_LOG_INDEX_BY_TIMESTAMP_ISO = "by_timestamp_iso" as const;
 export const QUERY_LOG_INDEX_BY_BUNDLE_ID = "by_bundle_id" as const;
 export const QUERY_LOG_INDEX_BY_STORAGE_SCOPE_ID = "by_storage_scope_id" as const;
@@ -17,7 +19,8 @@ export type SiralexObjectStoreName =
   | typeof STORE_RECORDS
   | typeof STORE_SEARCH_INDEX
   | typeof STORE_BUNDLES_REGISTRY
-  | typeof STORE_QUERY_LOGS;
+  | typeof STORE_QUERY_LOGS
+  | typeof STORE_LEARNING_RECORDS;
 
 export type BundleLanguageMeta = {
   source_lang?: string;
@@ -142,6 +145,15 @@ export async function openSiralexDb(): Promise<IDBDatabase> {
         queryLogs.createIndex(QUERY_LOG_INDEX_BY_TIMESTAMP_ISO, "timestamp_iso", { unique: false });
         queryLogs.createIndex(QUERY_LOG_INDEX_BY_BUNDLE_ID, "bundle_id", { unique: false });
         queryLogs.createIndex(QUERY_LOG_INDEX_BY_STORAGE_SCOPE_ID, "storage_scope_id", { unique: false });
+      }
+
+      // LS1: personal Learning Records (v3 → v4). Additive only — no rewrite of
+      // dictionary, catalog, registry, meta, search-index, or query-log rows.
+      if (!db.objectStoreNames.contains(STORE_LEARNING_RECORDS)) {
+        const learningRecords = db.createObjectStore(STORE_LEARNING_RECORDS, {
+          keyPath: ["bundle_id", "ir_id"],
+        });
+        learningRecords.createIndex(LEARNING_RECORD_INDEX_BY_BUNDLE_ID, "bundle_id", { unique: false });
       }
 
       if (oldVersion < 2 && tx != null) {

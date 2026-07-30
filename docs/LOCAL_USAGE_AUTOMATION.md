@@ -44,6 +44,14 @@ npm run test:e2e:usage
 
 By default, the command uses the small checked-in debug bundle at `web/public/debug-bundles/test_directional_bundle`. This keeps the local automation fast enough to run during development. The generated rows still represent structured usability smoke evidence, not demand evidence.
 
+To run the same harness against the featured 7N2B three-file bundle (`bundle_full_20260710_337619ff`) with a longer install timeout:
+
+```bash
+npm run test:e2e:usage:featured
+```
+
+This opt-in script sets `SIRALEX_USAGE_BUNDLE_DIR` to `public/bundle_full_20260710_337619ff` and `SIRALEX_USAGE_INSTALL_TIMEOUT_MS=900000` (full three-file import is much slower than the debug fixture). It does not change the debug default. Output remains structured usability evidence only, not lexical validation or demand evidence.
+
 To run the same harness against another three-file bundle directory:
 
 ```bash

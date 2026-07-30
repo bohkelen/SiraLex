@@ -95,8 +95,21 @@ import {
   renderResultsList,
   type ResultDisplayContext,
 } from "./render/render_results";
-import { renderEntryDetail } from "./render/render_entry";
-import type { EnrichedRecord } from "./types/records";
+import { renderEntryDetail, showTargetEntryUnavailable } from "./render/render_entry";
+import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
+import { createReviewSurfaceHost } from "./learning/review_surface_host";
+import {
+  canOfferLearningSave,
+  createEntryLearningSession,
+  type LearningSaveControlState,
+} from "./learning/entry_learning_session";
+import {
+  createSavedVocabularySession,
+  type SavedVocabularyModel,
+} from "./learning/saved_vocabulary_session";
+import { openTargetLexiconEntry } from "./navigation/open_target_lexicon_entry";
+import type { EnrichedRecord, TargetEntry } from "./types/records";
+import { isLexiconDisplay } from "./types/records";
 
 registerSW({ immediate: true });
 
@@ -150,7 +163,10 @@ app.innerHTML = `
       <div id="activeDictionaryRow" style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
         <div class="row" style="align-items: center; justify-content: space-between; gap: 8px">
           <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
-          <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
+          <div class="row" style="gap: 8px; flex-wrap: wrap">
+            <button id="openSavedVocabulary" class="btn" type="button">${t("learning.openSaved")}</button>
+            <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
+          </div>
         </div>
       </div>
 
@@ -323,6 +339,7 @@ function mustGetEl<T extends Element>(selector: string): T {
 const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
+const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
 const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
 const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
 const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
@@ -810,6 +827,10 @@ openManageDictionariesBtn.addEventListener("click", () => {
   manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
+openSavedVocabularyBtn.addEventListener("click", () => {
+  showSavedVocabulary();
+});
+
 catalogUrlInput.addEventListener("input", () => {
   updateCatalogControls();
 });
@@ -1005,6 +1026,21 @@ async function refreshDbStatus() {
           : undefined;
       installedBundles = bundles;
       currentActiveBundle = active;
+      const nextBundleId = active?.bundle_id;
+      if (lastKnownActiveBundleId !== nextBundleId) {
+        lastKnownActiveBundleId = nextBundleId;
+        if (
+          resultsHostContext === "review" ||
+          resultsHostContext === "saved_vocabulary" ||
+          resultsHostContext === "entry_from_saved"
+        ) {
+          invalidateCollectionAndReviewContexts();
+          resultsHostContext = "search";
+          searchResults.innerHTML = "";
+        } else {
+          invalidateCollectionAndReviewContexts();
+        }
+      }
       renderBundleSelectOptions(activeBundleId);
       renderInstalledBundleManager();
       if (active) {
@@ -2000,8 +2036,37 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 let queryLoggingSettleTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingSettledLogPayload: SettledQueryLogPayload | undefined;
 let searchSeq = 0;
+let entryDetailGeneration = 0;
+let savedVocabularyGeneration = 0;
+let reviewGeneration = 0;
+let activeReviewHost: ReturnType<typeof createReviewSurfaceHost> | undefined;
+/** One-use intent: focus Start Review after returning from Review. */
+let focusStartReviewOnce = false;
 let lastSearchResults: ResultDisplayContext[] = [];
+/** Track active bundle id so switches invalidate collection/Review contexts. */
+let lastKnownActiveBundleId: string | undefined;
 
+/** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4). */
+type ResultsHostContext =
+  | "search"
+  | "saved_vocabulary"
+  | "entry_from_search"
+  | "entry_from_saved"
+  | "review";
+let resultsHostContext: ResultsHostContext = "search";
+
+function disposeActiveReviewHost() {
+  activeReviewHost?.dispose();
+  activeReviewHost = undefined;
+  reviewGeneration += 1;
+}
+
+function invalidateCollectionAndReviewContexts() {
+  disposeActiveReviewHost();
+  savedVocabularyGeneration += 1;
+  entryDetailGeneration += 1;
+  focusStartReviewOnce = false;
+}
 function cancelPendingSettledQueryLog() {
   if (queryLoggingSettleTimer !== undefined) {
     clearTimeout(queryLoggingSettleTimer);
@@ -2050,6 +2115,8 @@ searchInput.addEventListener("input", () => {
   const query = searchInput.value;
   if (query.trim() === "") {
     searchSeq += 1;
+    invalidateCollectionAndReviewContexts();
+    resultsHostContext = "search";
     searchMeta.textContent = "";
     searchResults.innerHTML = "";
     lastSearchResults = [];
@@ -2060,35 +2127,246 @@ searchInput.addEventListener("input", () => {
   }, 150);
 });
 
+/** Origin for entry-detail Back navigation (no router). */
+type EntryNavOrigin =
+  | { kind: "search"; restoreDirection: SearchDirection }
+  | { kind: "saved_vocabulary" };
+
 function showResultsList() {
+  resultsHostContext = "search";
+  invalidateCollectionAndReviewContexts();
   searchResults.innerHTML = "";
   if (lastSearchResults.length === 0) return;
 
   const list = renderResultsList(lastSearchResults, (record) => {
-    showEntryDetail(record);
+    showEntryDetail(record, {
+      kind: "search",
+      restoreDirection: searchDirection,
+    });
   });
   if (list) searchResults.appendChild(list);
 }
 
-function triggerSearch(query: string) {
-  searchInput.value = query;
-  searchSeq += 1;
-  void runSearch(query);
+/**
+ * Open Review from Saved Vocabulary (LS2I4). Ephemeral session; Back returns
+ * to Saved Vocabulary with one-use Start Review focus restoration.
+ */
+function showReviewSurface() {
+  disposeActiveReviewHost();
+  const generation = ++reviewGeneration;
+  resultsHostContext = "review";
+  entryDetailGeneration += 1;
+  savedVocabularyGeneration += 1;
+  focusStartReviewOnce = false;
+  searchResults.innerHTML = "";
+
+  const host = createReviewSurfaceHost({
+    mount: searchResults,
+    getActiveMeta: () => currentActiveBundle,
+    openDb: openSiralexDb,
+    isHostCurrent: () =>
+      generation === reviewGeneration && resultsHostContext === "review",
+    onBack: () => {
+      disposeActiveReviewHost();
+      focusStartReviewOnce = true;
+      showSavedVocabulary();
+    },
+  });
+  activeReviewHost = host;
+  host.start();
 }
 
-function showEntryDetail(record: EnrichedRecord) {
+function showSavedVocabulary() {
+  disposeActiveReviewHost();
+  const generation = ++savedVocabularyGeneration;
+  resultsHostContext = "saved_vocabulary";
+  entryDetailGeneration += 1;
   searchResults.innerHTML = "";
-  const detail = renderEntryDetail(record, {
-    onBack: () => showResultsList(),
-    onSearch: (query) => triggerSearch(query),
+
+  let lastFocusTarget: HTMLElement | null = null;
+  const restoreStartReviewFocus = focusStartReviewOnce;
+  focusStartReviewOnce = false;
+  let didRestoreFocus = false;
+
+  const applyModel = (model: SavedVocabularyModel) => {
+    if (generation !== savedVocabularyGeneration || resultsHostContext !== "saved_vocabulary") {
+      return;
+    }
+    const view = renderSavedVocabulary(model, {
+      onBack: () => {
+        savedVocabularyGeneration += 1;
+        showResultsList();
+      },
+      onOpen: (row) => {
+        showEntryDetail(row.liveEntry, { kind: "saved_vocabulary" });
+      },
+      onRemove: (row) => {
+        void session.remove(row.bundle_id, row.ir_id).then((result) => {
+          if (generation !== savedVocabularyGeneration) return;
+          if (result === "ok" && lastFocusTarget) {
+            lastFocusTarget.focus();
+          }
+        });
+      },
+      onStartReview: () => {
+        if (generation !== savedVocabularyGeneration || resultsHostContext !== "saved_vocabulary") {
+          return;
+        }
+        // Application-owned suppression: one Review host at a time (no second Start Review).
+        if (activeReviewHost?.isActive()) return;
+        showReviewSurface();
+      },
+    });
+    searchResults.innerHTML = "";
+    searchResults.appendChild(view.root);
+    lastFocusTarget = view.focusAfterRemove;
+
+    if (restoreStartReviewFocus && !didRestoreFocus && model.surface !== "loading") {
+      didRestoreFocus = true;
+      if (view.startReviewButton && !view.startReviewButton.disabled) {
+        view.startReviewButton.focus();
+      } else if (view.heading) {
+        view.heading.focus();
+      }
+    }
+  };
+
+  const session = createSavedVocabularySession({
+    getActiveMeta: () => currentActiveBundle,
+    openDb: openSiralexDb,
+    isCurrent: () =>
+      generation === savedVocabularyGeneration && resultsHostContext === "saved_vocabulary",
+    onUpdate: applyModel,
+    confirmRemove: () => window.confirm(t("learning.removeConfirm")),
+  });
+
+  applyModel({ surface: "loading" });
+  void session.load();
+}
+
+function setSearchDirection(direction: SearchDirection) {
+  if (searchDirection === direction) {
+    updateLangToggle();
+    return;
+  }
+  searchDirection = direction;
+  updateLangToggle();
+}
+
+function handleOpenTargetLexiconEntry(target: TargetEntry, mappingRoot: HTMLElement) {
+  const pendingEntryGen = entryDetailGeneration;
+  const pendingSearchSeq = searchSeq;
+  const pendingHost = resultsHostContext;
+  const pendingBundleId = currentActiveBundle?.bundle_id;
+  const restoreDirection = searchDirection;
+  const preservedQuery = searchInput.value;
+
+  void openTargetLexiconEntry({
+    target,
+    restoreDirection,
+    getActiveMeta: () => currentActiveBundle,
+    openDb: openSiralexDb,
+    isCurrent: () =>
+      entryDetailGeneration === pendingEntryGen &&
+      searchSeq === pendingSearchSeq &&
+      resultsHostContext === pendingHost &&
+      currentActiveBundle?.bundle_id === pendingBundleId &&
+      searchInput.value === preservedQuery,
+    setDirectionTargetToSource: () => {
+      setSearchDirection("target_to_source");
+    },
+    openEntryDetail: (record, backDirection) => {
+      showEntryDetail(record, { kind: "search", restoreDirection: backDirection });
+      const headword = searchResults.querySelector<HTMLElement>(".entry-headword");
+      headword?.focus();
+    },
+    onUnavailable: () => {
+      if (
+        entryDetailGeneration !== pendingEntryGen ||
+        resultsHostContext !== pendingHost ||
+        searchSeq !== pendingSearchSeq
+      ) {
+        return;
+      }
+      showTargetEntryUnavailable(mappingRoot);
+    },
+  });
+}
+
+function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
+  const generation = ++entryDetailGeneration;
+  resultsHostContext = origin.kind === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
+  disposeActiveReviewHost();
+  if (origin.kind === "search") {
+    savedVocabularyGeneration += 1;
+  }
+  searchResults.innerHTML = "";
+
+  const offerLearning = isLexiconDisplay(record);
+  const learningAvailable = offerLearning && canOfferLearningSave(record, currentActiveBundle);
+
+  let setLearningSaveState: ((state: LearningSaveControlState) => void) | undefined;
+
+  const session = offerLearning
+    ? createEntryLearningSession({
+        record,
+        getActiveMeta: () => currentActiveBundle,
+        openDb: openSiralexDb,
+        isCurrent: () => generation === entryDetailGeneration,
+        setState: (state) => {
+          if (generation !== entryDetailGeneration) return;
+          setLearningSaveState?.(state);
+        },
+      })
+    : undefined;
+
+  let entryRoot: HTMLElement | null = null;
+  const view = renderEntryDetail(record, {
+    onBack: () => {
+      if (origin.kind === "saved_vocabulary") {
+        showSavedVocabulary();
+        return;
+      }
+      setSearchDirection(origin.restoreDirection);
+      showResultsList();
+    },
+    onOpenTargetEntry: (target) => {
+      if (entryRoot) handleOpenTargetLexiconEntry(target, entryRoot);
+    },
     targetEntriesLabel: getTargetEntriesLabel(
       currentActiveBundle?.language_meta,
       t("language.target"),
       (label) => t("entry.targetEntries", { label }),
       getCurrentLocale(),
     ),
+    learning: offerLearning
+      ? {
+          initialState: learningAvailable ? "loading" : "unavailable",
+          onSave: () => {
+            void session?.save();
+          },
+          onUnsave: () => {
+            void session?.unsave();
+          },
+        }
+      : undefined,
   });
-  searchResults.appendChild(detail);
+
+  entryRoot = view.root;
+  setLearningSaveState = view.setLearningSaveState;
+  searchResults.appendChild(view.root);
+
+  const headword = view.root.querySelector<HTMLElement>(".entry-headword");
+  if (headword && !headword.hasAttribute("tabindex")) {
+    headword.tabIndex = -1;
+  }
+  headword?.focus();
+
+  if (offerLearning && learningAvailable && session) {
+    void session.loadInitial();
+  } else if (offerLearning && !learningAvailable) {
+    view.setLearningSaveState?.("unavailable");
+  }
 }
 
 async function runSearch(query: string) {
@@ -2125,6 +2403,8 @@ async function runSearch(query: string) {
 
     if (result.ir_ids.length === 0) {
       searchMeta.textContent = getNoResultMessage(query);
+      invalidateCollectionAndReviewContexts();
+      resultsHostContext = "search";
       searchResults.innerHTML = "";
       lastSearchResults = [];
       scheduleSettledQueryLog({
