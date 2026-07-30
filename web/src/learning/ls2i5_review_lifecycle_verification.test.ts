@@ -22,6 +22,7 @@ import {
 } from "../idb/siralex_db";
 import { setCurrentLocale } from "../i18n";
 import { appendQueryLog } from "../query_logging/query_log_store";
+import { renderSavedVocabulary } from "../render/render_saved_vocabulary";
 import { buildDisplayCache } from "./build_display_cache";
 import {
   getLearningRecord,
@@ -32,11 +33,11 @@ import {
 import { LEARNING_RECORD_SCHEMA_VERSION } from "./learning_record_types";
 import { buildReviewQueue } from "./review_queue";
 import { createReviewSurfaceHost } from "./review_surface_host";
+import { deriveSavedVocabularyProgress } from "./saved_vocabulary_progress";
 import {
   createSavedVocabularySession,
   type SavedVocabularyModel,
 } from "./saved_vocabulary_session";
-import { renderSavedVocabulary } from "../render/render_saved_vocabulary";
 import type { EnrichedRecord } from "../types/records";
 
 const BUNDLE_A = "bundle_ls2i5_a";
@@ -581,32 +582,34 @@ describe("LS2I5 review lifecycle verification", () => {
 
   it("French smoke copy for Start Review and status labels", () => {
     setCurrentLocale("fr");
-    const model: SavedVocabularyModel = {
-      surface: "populated",
-      rows: [
-        {
-          state: "resolved",
+    const rows = [
+      {
+        state: "resolved" as const,
+        bundle_id: BUNDLE_A,
+        ir_id: "f1",
+        learningRecord: {
+          schema_version: LEARNING_RECORD_SCHEMA_VERSION,
           bundle_id: BUNDLE_A,
           ir_id: "f1",
-          learningRecord: {
-            schema_version: LEARNING_RECORD_SCHEMA_VERSION,
-            bundle_id: BUNDLE_A,
-            ir_id: "f1",
-            ir_kind: "lexicon_entry",
-            content_sha256: HASH_1,
-            storage_scope_id: SCOPE_1,
-            status: "still_learning",
-            created_at: TS1,
-            display_cache: { headword_latin: "f1" },
-            last_reviewed: null,
-            review_count: 0,
-          },
-          liveEntry: makeLexicon("f1", "f1", "fg"),
-          primaryText: "f1",
-          reviewStatus: { state: "not_reviewed", labelKey: "review.notReviewed" },
+          ir_kind: "lexicon_entry" as const,
+          content_sha256: HASH_1,
+          storage_scope_id: SCOPE_1,
+          status: "still_learning" as const,
+          created_at: TS1,
+          display_cache: { headword_latin: "f1" },
+          last_reviewed: null,
+          review_count: 0,
         },
-      ],
+        liveEntry: makeLexicon("f1", "f1", "fg"),
+        primaryText: "f1",
+        reviewStatus: { state: "not_reviewed" as const, labelKey: "review.notReviewed" as const },
+      },
+    ];
+    const model: SavedVocabularyModel = {
+      surface: "populated",
+      rows,
       rowErrors: {},
+      progress: deriveSavedVocabularyProgress(rows).progress,
       canStartReview: true,
     };
     const { root } = renderSavedVocabulary(model, {

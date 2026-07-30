@@ -11,8 +11,21 @@ import type {
   SavedVocabularyRowVm,
 } from "../learning/saved_vocabulary_session";
 import { rowKey } from "../learning/saved_vocabulary_session";
+import { deriveSavedVocabularyProgress } from "../learning/saved_vocabulary_progress";
 import type { EnrichedRecord } from "../types/records";
 import { formatReviewTimestamp, renderSavedVocabulary } from "./render_saved_vocabulary";
+
+function withProgress(
+  model: Omit<
+    Extract<SavedVocabularyModel, { surface: "populated" | "removing" }>,
+    "progress"
+  >,
+): SavedVocabularyModel {
+  return {
+    ...model,
+    progress: deriveSavedVocabularyProgress(model.rows).progress,
+  };
+}
 
 function makeLearningRecord(overrides: Partial<LearningRecordV1> = {}): LearningRecordV1 {
   return {
@@ -122,12 +135,12 @@ describe("LS1I3 / LS2I4 Saved Vocabulary renderer", () => {
 
   it("enables Start Review with resolved rows and fires once", () => {
     const cb = callbacks();
-    const model: SavedVocabularyModel = {
+    const model = withProgress({
       surface: "populated",
       rows: [resolvedRow()],
       rowErrors: {},
       canStartReview: true,
-    };
+    });
     const { root, startReviewButton } = renderSavedVocabulary(model, cb);
     expect(startReviewButton?.disabled).toBe(false);
     expect(root.querySelector("#saved-vocab-start-review")?.textContent).toBe("Start review");
@@ -138,12 +151,12 @@ describe("LS1I3 / LS2I4 Saved Vocabulary renderer", () => {
 
   it("disables Start Review for unresolved-only rows with explanation", () => {
     const cb = callbacks();
-    const model: SavedVocabularyModel = {
+    const model = withProgress({
       surface: "populated",
       rows: [unresolvedRow()],
       rowErrors: {},
       canStartReview: false,
-    };
+    });
     const { root, startReviewButton } = renderSavedVocabulary(model, cb);
     expect(startReviewButton?.disabled).toBe(true);
     expect(root.querySelector("#saved-vocab-start-review-hint")?.textContent).toContain(
@@ -158,19 +171,19 @@ describe("LS1I3 / LS2I4 Saved Vocabulary renderer", () => {
 
   it("disables Start Review while removing", () => {
     const key = rowKey("bundle-a", "lex-1");
-    const model: SavedVocabularyModel = {
+    const model = withProgress({
       surface: "removing",
       rows: [resolvedRow()],
       removingKey: key,
       rowErrors: {},
       canStartReview: true,
-    };
+    });
     const { startReviewButton } = renderSavedVocabulary(model, callbacks());
     expect(startReviewButton?.disabled).toBe(true);
   });
 
   it("renders not-reviewed, still-learning, and remembered statuses", () => {
-    const model: SavedVocabularyModel = {
+    const model = withProgress({
       surface: "populated",
       rows: [
         resolvedRow({
@@ -196,7 +209,7 @@ describe("LS1I3 / LS2I4 Saved Vocabulary renderer", () => {
       ],
       rowErrors: {},
       canStartReview: true,
-    };
+    });
     const { root } = renderSavedVocabulary(model, callbacks());
     expect(root.textContent).toContain("Not reviewed");
     expect(root.textContent).toContain("Still learning");
@@ -208,7 +221,7 @@ describe("LS1I3 / LS2I4 Saved Vocabulary renderer", () => {
   });
 
   it("hides last-reviewed for not-reviewed and skips unknown safely", () => {
-    const model: SavedVocabularyModel = {
+    const model = withProgress({
       surface: "populated",
       rows: [
         resolvedRow({
@@ -221,14 +234,14 @@ describe("LS1I3 / LS2I4 Saved Vocabulary renderer", () => {
       ],
       rowErrors: {},
       canStartReview: true,
-    };
+    });
     const { root } = renderSavedVocabulary(model, callbacks());
     expect(root.querySelectorAll(".saved-vocab-last-reviewed").length).toBe(0);
     expect(root.querySelectorAll("[data-review-status]").length).toBe(1);
   });
 
   it("shows review status on unresolved rows without Open", () => {
-    const model: SavedVocabularyModel = {
+    const model = withProgress({
       surface: "populated",
       rows: [
         unresolvedRow({
@@ -241,7 +254,7 @@ describe("LS1I3 / LS2I4 Saved Vocabulary renderer", () => {
       ],
       rowErrors: {},
       canStartReview: false,
-    };
+    });
     const { root } = renderSavedVocabulary(model, callbacks());
     expect(root.querySelector(".saved-vocab-open")).toBeNull();
     expect(root.textContent).toContain("Still learning");
@@ -249,12 +262,12 @@ describe("LS1I3 / LS2I4 Saved Vocabulary renderer", () => {
   });
 
   it("renders populated resolved and unresolved rows", () => {
-    const model: SavedVocabularyModel = {
+    const model = withProgress({
       surface: "populated",
       rows: [resolvedRow(), unresolvedRow()],
       rowErrors: {},
       canStartReview: true,
-    };
+    });
     const { root } = renderSavedVocabulary(model, callbacks());
     const list = root.querySelector(".saved-vocab-list");
     expect(list?.tagName).toBe("UL");
@@ -266,12 +279,12 @@ describe("LS1I3 / LS2I4 Saved Vocabulary renderer", () => {
 
   it("invokes Open only for resolved rows and Remove for both", () => {
     const cb = callbacks();
-    const model: SavedVocabularyModel = {
+    const model = withProgress({
       surface: "populated",
       rows: [resolvedRow(), unresolvedRow()],
       rowErrors: {},
       canStartReview: true,
-    };
+    });
     const { root } = renderSavedVocabulary(model, cb);
     root.querySelector<HTMLButtonElement>(".saved-vocab-open")!.click();
     expect(cb.onOpen).toHaveBeenCalledTimes(1);
@@ -281,24 +294,24 @@ describe("LS1I3 / LS2I4 Saved Vocabulary renderer", () => {
 
   it("disables row actions while removing and shows row error", () => {
     const key = rowKey("bundle-a", "lex-1");
-    const model: SavedVocabularyModel = {
+    const model = withProgress({
       surface: "removing",
       rows: [resolvedRow()],
       removingKey: key,
       rowErrors: {},
       canStartReview: true,
-    };
+    });
     const { root } = renderSavedVocabulary(model, callbacks());
     expect(root.querySelector<HTMLButtonElement>(".saved-vocab-open")!.disabled).toBe(true);
     expect(root.querySelector<HTMLButtonElement>(".saved-vocab-remove")!.disabled).toBe(true);
     expect(root.querySelector("[aria-busy='true']")).not.toBeNull();
 
-    const errored: SavedVocabularyModel = {
+    const errored = withProgress({
       surface: "populated",
       rows: [resolvedRow()],
       rowErrors: { [key]: "remove_failed" },
       canStartReview: true,
-    };
+    });
     const view = renderSavedVocabulary(errored, callbacks());
     expect(view.root.querySelector(".saved-vocab-row-error")?.textContent).toContain(
       "Couldn't remove",

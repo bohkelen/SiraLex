@@ -460,6 +460,12 @@ describe("LS1I3 Saved Vocabulary session", () => {
       if (last.surface === "populated") {
         expect(last.canStartReview).toBe(true);
         expect(canStartReviewFromSavedVocabularyModel(last)).toBe(true);
+        expect(last.progress.reviewAction).toEqual({ state: "enabled", label: "start" });
+        expect(last.progress.total_saved).toBe(2);
+        expect(last.progress.not_reviewed).toBe(2);
+        expect(last.progress.reviewable).toBe(2);
+        expect(last.progress.returnCue).toBe("review_new");
+        expect(last.canStartReview).toBe(last.progress.reviewAction.state === "enabled");
         expect(last.rows.map((r) => r.ir_id)).toEqual(["lex-b", "lex-a"]);
         expect(last.rows.every((r) => r.reviewStatus.state === "not_reviewed")).toBe(true);
       }
@@ -508,6 +514,13 @@ describe("LS1I3 Saved Vocabulary session", () => {
       if (last.surface === "populated") {
         expect(last.canStartReview).toBe(false);
         expect(canStartReviewFromSavedVocabularyModel(last)).toBe(false);
+        expect(last.progress.reviewAction).toEqual({
+          state: "disabled",
+          reason: "no_reviewable_entries",
+        });
+        expect(last.progress.unavailable).toBe(1);
+        expect(last.progress.showUnavailable).toBe(true);
+        expect(last.canStartReview).toBe(last.progress.reviewAction.state === "enabled");
       }
     } finally {
       db.close();
@@ -552,6 +565,9 @@ describe("LS1I3 Saved Vocabulary session", () => {
           labelKey: "review.remembered",
           last_reviewed: "2026-07-29T20:00:00.000Z",
         });
+        expect(last.progress.remembered).toBe(1);
+        expect(last.progress.reviewAction).toEqual({ state: "enabled", label: "continue" });
+        expect(last.progress.returnCue).toBe("review_again");
       }
     } finally {
       db.close();

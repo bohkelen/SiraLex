@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { SavedVocabularyModel } from "./saved_vocabulary_session";
+import { deriveSavedVocabularyProgress } from "./saved_vocabulary_progress";
 
 describe("LS1 Saved Vocabulary navigation and stale-async guards", () => {
   it("drops applyModel when generation or host context changes", () => {
@@ -30,7 +31,16 @@ describe("LS1 Saved Vocabulary navigation and stale-async guards", () => {
     expect(applied).toHaveLength(1);
 
     host = "entry_from_saved";
-    applyModel({ surface: "populated", rows: [], rowErrors: {}, canStartReview: false }, 2);
+    applyModel(
+      {
+        surface: "populated",
+        rows: [],
+        rowErrors: {},
+        progress: deriveSavedVocabularyProgress([]).progress,
+        canStartReview: false,
+      },
+      2,
+    );
     expect(applied).toHaveLength(1);
 
     host = "saved_vocabulary";

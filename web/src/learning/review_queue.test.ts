@@ -23,8 +23,11 @@ import {
   hasConsistentReviewFields,
   hasLearningRecordBeenReviewed,
   isNeverReviewed,
+  isResolvedLexiconReviewEligible,
   type ReviewQueueItem,
 } from "./review_queue";
+import { isSavedVocabularyRowReviewable } from "./saved_vocabulary_progress";
+import { buildSavedVocabularyRowVm } from "./saved_vocabulary_session";
 
 const BUNDLE = "bundle_ls2i2_q";
 const OTHER = "bundle_other";
@@ -408,6 +411,53 @@ describe("LS2I2 review queue", () => {
       await buildReviewQueue(db, meta());
       expect(await countStore(db, STORE_QUERY_LOGS)).toBe(logsBefore);
       expect(await countStore(db, STORE_SEARCH_INDEX)).toBe(searchBefore);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("shared eligibility helper matches queue inclusion for resolved lexicon rows", async () => {
+    const db = await openSiralexDb();
+    try {
+      await setActiveBundleMeta(db, meta());
+      await saveLearningRecord(db, saveInput("ok", "ok"));
+      await putLive(db, SCOPE, lexicon("ok", "ok"));
+      await saveLearningRecord(db, saveInput("missing", "missing"));
+      const queue = await buildReviewQueue(db, meta());
+      expect(queue.state).toBe("ready");
+      if (queue.state !== "ready") return;
+
+      const okLr = queue.items[0]!.learningRecord;
+      const okLive = queue.items[0]!.liveEntry;
+      expect(isResolvedLexiconReviewEligible(okLr, okLive)).toBe(true);
+
+      const okRow = buildSavedVocabularyRowVm({
+        state: "resolved",
+        learningRecord: okLr,
+        liveEntry: okLive,
+      });
+      expect(isSavedVocabularyRowReviewable(okRow)).toBe(true);
+
+      const ghost: LearningRecordV1 = {
+        schema_version: LEARNING_RECORD_SCHEMA_VERSION,
+        bundle_id: BUNDLE,
+        ir_id: "missing",
+        ir_kind: "lexicon_entry",
+        content_sha256: HASH,
+        storage_scope_id: SCOPE,
+        status: "still_learning",
+        created_at: "2026-07-29T00:00:00.000Z",
+        display_cache: { headword_latin: "missing" },
+        last_reviewed: null,
+        review_count: 0,
+      };
+      const unresolvedRow = buildSavedVocabularyRowVm({
+        state: "unresolved",
+        learningRecord: ghost,
+        reason: "entry_missing",
+      });
+      expect(isSavedVocabularyRowReviewable(unresolvedRow)).toBe(false);
+      expect(queue.items.some((i) => i.identity.ir_id === "missing")).toBe(false);
     } finally {
       db.close();
     }
