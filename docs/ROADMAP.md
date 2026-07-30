@@ -96,6 +96,23 @@ Status markers: **✅ Complete** · **in progress** · **deferred** · **pending
 - **Phase 6B / 6D1** — Consumer search-first UX and French-first localization **shipped** (6D1 pending review).
 - **Branch C** — Transliteration / morphology **deferred** until usage data exists.
 
+### Learning System & next product build
+
+Canonical status (see `docs/reports/pd0_next_product_build_decision.md`):
+
+```text
+LS1 — Save — Closed
+LS2 — Review and Reflect — Closed
+LS3 — Progress and Return — Closed
+LS4 — Guided Review Sessions — Defined, deferred pending demonstrated need
+LP1 — Local Learning Backup and Restore — Selected
+LP1D0 — Local Learning Backup and Restore Product Definition — Next
+```
+
+- **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
+- **Next build** after the LS1–LS3 loop is **local Learning backup/restore**, not further Review-mechanics extension by default.
+- Portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
+
 ---
 
 ## Phase 0 — Repo + infra skeleton
