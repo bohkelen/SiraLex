@@ -165,7 +165,6 @@ app.innerHTML = `
           <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
           <div class="row" style="gap: 8px; flex-wrap: wrap">
             <button id="openSavedVocabulary" class="btn" type="button">${t("learning.openSaved")}</button>
-            <button id="startReview" class="btn" type="button">${t("review.start")}</button>
             <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
           </div>
         </div>
@@ -341,7 +340,6 @@ const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
 const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
-const startReviewBtn = mustGetEl<HTMLButtonElement>("#startReview");
 const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
 const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
 const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
@@ -833,10 +831,6 @@ openSavedVocabularyBtn.addEventListener("click", () => {
   showSavedVocabulary();
 });
 
-startReviewBtn.addEventListener("click", () => {
-  showReviewSurface();
-});
-
 catalogUrlInput.addEventListener("input", () => {
   updateCatalogControls();
 });
@@ -1032,6 +1026,21 @@ async function refreshDbStatus() {
           : undefined;
       installedBundles = bundles;
       currentActiveBundle = active;
+      const nextBundleId = active?.bundle_id;
+      if (lastKnownActiveBundleId !== nextBundleId) {
+        lastKnownActiveBundleId = nextBundleId;
+        if (
+          resultsHostContext === "review" ||
+          resultsHostContext === "saved_vocabulary" ||
+          resultsHostContext === "entry_from_saved"
+        ) {
+          invalidateCollectionAndReviewContexts();
+          resultsHostContext = "search";
+          searchResults.innerHTML = "";
+        } else {
+          invalidateCollectionAndReviewContexts();
+        }
+      }
       renderBundleSelectOptions(activeBundleId);
       renderInstalledBundleManager();
       if (active) {
@@ -2031,9 +2040,13 @@ let entryDetailGeneration = 0;
 let savedVocabularyGeneration = 0;
 let reviewGeneration = 0;
 let activeReviewHost: ReturnType<typeof createReviewSurfaceHost> | undefined;
+/** One-use intent: focus Start Review after returning from Review. */
+let focusStartReviewOnce = false;
 let lastSearchResults: ResultDisplayContext[] = [];
+/** Track active bundle id so switches invalidate collection/Review contexts. */
+let lastKnownActiveBundleId: string | undefined;
 
-/** Explicit host context for #searchResults navigation (LS1I3 / LS2I3). */
+/** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4). */
 type ResultsHostContext =
   | "search"
   | "saved_vocabulary"
@@ -2046,6 +2059,13 @@ function disposeActiveReviewHost() {
   activeReviewHost?.dispose();
   activeReviewHost = undefined;
   reviewGeneration += 1;
+}
+
+function invalidateCollectionAndReviewContexts() {
+  disposeActiveReviewHost();
+  savedVocabularyGeneration += 1;
+  entryDetailGeneration += 1;
+  focusStartReviewOnce = false;
 }
 function cancelPendingSettledQueryLog() {
   if (queryLoggingSettleTimer !== undefined) {
@@ -2095,8 +2115,7 @@ searchInput.addEventListener("input", () => {
   const query = searchInput.value;
   if (query.trim() === "") {
     searchSeq += 1;
-    savedVocabularyGeneration += 1;
-    disposeActiveReviewHost();
+    invalidateCollectionAndReviewContexts();
     resultsHostContext = "search";
     searchMeta.textContent = "";
     searchResults.innerHTML = "";
@@ -2115,8 +2134,7 @@ type EntryNavOrigin =
 
 function showResultsList() {
   resultsHostContext = "search";
-  savedVocabularyGeneration += 1;
-  disposeActiveReviewHost();
+  invalidateCollectionAndReviewContexts();
   searchResults.innerHTML = "";
   if (lastSearchResults.length === 0) return;
 
@@ -2130,8 +2148,8 @@ function showResultsList() {
 }
 
 /**
- * LS2I3 — temporary chrome entry to Review. LS2I4 moves Start Review into
- * Saved Vocabulary and owns final collection integration / focus restore.
+ * Open Review from Saved Vocabulary (LS2I4). Ephemeral session; Back returns
+ * to Saved Vocabulary with one-use Start Review focus restoration.
  */
 function showReviewSurface() {
   disposeActiveReviewHost();
@@ -2139,6 +2157,7 @@ function showReviewSurface() {
   resultsHostContext = "review";
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
+  focusStartReviewOnce = false;
   searchResults.innerHTML = "";
 
   const host = createReviewSurfaceHost({
@@ -2149,6 +2168,7 @@ function showReviewSurface() {
       generation === reviewGeneration && resultsHostContext === "review",
     onBack: () => {
       disposeActiveReviewHost();
+      focusStartReviewOnce = true;
       showSavedVocabulary();
     },
   });
@@ -2164,6 +2184,9 @@ function showSavedVocabulary() {
   searchResults.innerHTML = "";
 
   let lastFocusTarget: HTMLElement | null = null;
+  const restoreStartReviewFocus = focusStartReviewOnce;
+  focusStartReviewOnce = false;
+  let didRestoreFocus = false;
 
   const applyModel = (model: SavedVocabularyModel) => {
     if (generation !== savedVocabularyGeneration || resultsHostContext !== "saved_vocabulary") {
@@ -2185,10 +2208,25 @@ function showSavedVocabulary() {
           }
         });
       },
+      onStartReview: () => {
+        if (generation !== savedVocabularyGeneration || resultsHostContext !== "saved_vocabulary") {
+          return;
+        }
+        showReviewSurface();
+      },
     });
     searchResults.innerHTML = "";
     searchResults.appendChild(view.root);
     lastFocusTarget = view.focusAfterRemove;
+
+    if (restoreStartReviewFocus && !didRestoreFocus && model.surface !== "loading") {
+      didRestoreFocus = true;
+      if (view.startReviewButton && !view.startReviewButton.disabled) {
+        view.startReviewButton.focus();
+      } else if (view.heading) {
+        view.heading.focus();
+      }
+    }
   };
 
   const session = createSavedVocabularySession({
@@ -2363,7 +2401,7 @@ async function runSearch(query: string) {
 
     if (result.ir_ids.length === 0) {
       searchMeta.textContent = getNoResultMessage(query);
-      savedVocabularyGeneration += 1;
+      invalidateCollectionAndReviewContexts();
       resultsHostContext = "search";
       searchResults.innerHTML = "";
       lastSearchResults = [];

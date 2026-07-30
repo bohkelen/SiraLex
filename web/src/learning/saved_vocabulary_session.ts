@@ -1,5 +1,5 @@
 /**
- * LS1I3 — Saved Vocabulary session: list, resolve, remove for active bundle.
+ * LS1I3 / LS2I4 — Saved Vocabulary session: list, resolve, remove for active bundle.
  * Presentation stays in render_saved_vocabulary.ts.
  */
 
@@ -11,6 +11,29 @@ import {
 } from "./learning_record_resolve";
 import { listLearningRecordsByBundle, removeLearningRecord } from "./learning_record_store";
 import type { LearningRecordUnresolvedReason, LearningRecordV1 } from "./learning_record_types";
+import {
+  hasConsistentReviewFields,
+  hasLearningRecordBeenReviewed,
+} from "./review_queue";
+
+export type SavedVocabularyReviewStatus =
+  | {
+      state: "not_reviewed";
+      labelKey: "review.notReviewed";
+    }
+  | {
+      state: "still_learning";
+      labelKey: "review.stillLearning";
+      last_reviewed: string;
+    }
+  | {
+      state: "remembered";
+      labelKey: "review.remembered";
+      last_reviewed: string;
+    }
+  | {
+      state: "unknown";
+    };
 
 export type SavedVocabularyRowVm =
   | {
@@ -22,6 +45,7 @@ export type SavedVocabularyRowVm =
       primaryText: string;
       secondaryText?: string;
       nkoText?: string;
+      reviewStatus: SavedVocabularyReviewStatus;
     }
   | {
       state: "unresolved";
@@ -32,6 +56,7 @@ export type SavedVocabularyRowVm =
       secondaryText?: string;
       nkoText?: string;
       reason: LearningRecordUnresolvedReason;
+      reviewStatus: SavedVocabularyReviewStatus;
     };
 
 export type SavedVocabularySurfaceState =
@@ -52,10 +77,52 @@ export type SavedVocabularyModel =
       rows: SavedVocabularyRowVm[];
       removingKey?: string;
       rowErrors: Record<string, string>;
+      /** Immediate UI signal: at least one resolved row. */
+      canStartReview: boolean;
     };
 
 export function rowKey(bundleId: string, irId: string): string {
   return `${bundleId}\0${irId}`;
+}
+
+/**
+ * Derive collection review status from Learning Record fields.
+ * Never derives from `status` alone; reuses LS2I2 review-field helpers.
+ */
+export function deriveSavedVocabularyReviewStatus(
+  record: LearningRecordV1,
+): SavedVocabularyReviewStatus {
+  if (!hasConsistentReviewFields(record)) {
+    return { state: "unknown" };
+  }
+  if (!hasLearningRecordBeenReviewed(record)) {
+    return { state: "not_reviewed", labelKey: "review.notReviewed" };
+  }
+  if (record.status === "still_learning" && record.last_reviewed) {
+    return {
+      state: "still_learning",
+      labelKey: "review.stillLearning",
+      last_reviewed: record.last_reviewed,
+    };
+  }
+  if (record.status === "remembered" && record.last_reviewed) {
+    return {
+      state: "remembered",
+      labelKey: "review.remembered",
+      last_reviewed: record.last_reviewed,
+    };
+  }
+  return { state: "unknown" };
+}
+
+/** Immediate Start Review eligibility from a loaded collection model. */
+export function canStartReviewFromSavedVocabularyModel(model: SavedVocabularyModel): boolean {
+  if (model.surface !== "populated") return false;
+  return model.canStartReview;
+}
+
+function countResolved(rows: SavedVocabularyRowVm[]): number {
+  return rows.reduce((n, row) => (row.state === "resolved" ? n + 1 : n), 0);
 }
 
 function firstLiveGloss(entry: EnrichedRecord): string | undefined {
@@ -76,6 +143,8 @@ function firstLiveGloss(entry: EnrichedRecord): string | undefined {
 /** Build a row VM from a resolution result. Does not mutate display_cache. */
 export function buildSavedVocabularyRowVm(resolution: LearningRecordUiResolution): SavedVocabularyRowVm {
   const lr = resolution.learningRecord;
+  const reviewStatus = deriveSavedVocabularyReviewStatus(lr);
+
   if (resolution.state === "resolved") {
     const live = resolution.liveEntry;
     let primaryText = "";
@@ -96,6 +165,7 @@ export function buildSavedVocabularyRowVm(resolution: LearningRecordUiResolution
       learningRecord: lr,
       liveEntry: live,
       primaryText,
+      reviewStatus,
       ...(nkoText ? { nkoText } : {}),
       ...(secondary ? { secondaryText: secondary } : {}),
     };
@@ -119,6 +189,7 @@ export function buildSavedVocabularyRowVm(resolution: LearningRecordUiResolution
     ir_id: lr.ir_id,
     learningRecord: lr,
     primaryText,
+    reviewStatus,
     ...(nko ? { nkoText: nko } : {}),
     ...(secondary ? { secondaryText: secondary } : {}),
     reason: resolution.reason,
@@ -154,6 +225,7 @@ export function createSavedVocabularySession(deps: SavedVocabularySessionDeps) {
       rows: [...rows],
       removingKey,
       rowErrors: { ...rowErrors },
+      canStartReview: countResolved(rows) > 0,
     });
   }
 

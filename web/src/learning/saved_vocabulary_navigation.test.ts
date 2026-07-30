@@ -30,12 +30,44 @@ describe("LS1 Saved Vocabulary navigation and stale-async guards", () => {
     expect(applied).toHaveLength(1);
 
     host = "entry_from_saved";
-    applyModel({ surface: "populated", rows: [], rowErrors: {} }, 2);
+    applyModel({ surface: "populated", rows: [], rowErrors: {}, canStartReview: false }, 2);
     expect(applied).toHaveLength(1);
 
     host = "saved_vocabulary";
     applyModel({ surface: "empty" }, 2);
     expect(applied).toHaveLength(2);
+  });
+
+  it("Review Back sets one-use Start Review focus intent without runSearch", () => {
+    const runSearch = vi.fn();
+    let focusStartReviewOnce = false;
+    let host: "review" | "saved_vocabulary" = "review";
+    const showSavedVocabulary = vi.fn(() => {
+      expect(focusStartReviewOnce).toBe(true);
+      focusStartReviewOnce = false;
+      host = "saved_vocabulary";
+    });
+    const onReviewBack = () => {
+      focusStartReviewOnce = true;
+      showSavedVocabulary();
+    };
+    onReviewBack();
+    expect(showSavedVocabulary).toHaveBeenCalledTimes(1);
+    expect(host).toBe("saved_vocabulary");
+    expect(runSearch).not.toHaveBeenCalled();
+    expect(focusStartReviewOnce).toBe(false);
+  });
+
+  it("stale Saved Vocabulary apply cannot redraw Review host context", () => {
+    let generation = 1;
+    let host: string = "review";
+    const applied: string[] = [];
+    const applySaved = (label: string, gen: number) => {
+      if (gen !== generation || host !== "saved_vocabulary") return;
+      applied.push(label);
+    };
+    applySaved("late-sv", 1);
+    expect(applied).toEqual([]);
   });
 
   it("opening Saved Vocabulary must not invoke runSearch", () => {

@@ -1,10 +1,11 @@
 /**
- * LS1I3 — Saved Vocabulary surface renderer (presentation only).
+ * LS1I3 / LS2I4 — Saved Vocabulary surface renderer (presentation only).
  */
 
-import { t } from "../i18n";
+import { getCurrentLocale, t, type Locale } from "../i18n";
 import type {
   SavedVocabularyModel,
+  SavedVocabularyReviewStatus,
   SavedVocabularyRowVm,
 } from "../learning/saved_vocabulary_session";
 import { rowKey } from "../learning/saved_vocabulary_session";
@@ -16,17 +17,95 @@ function el(tag: string, cls?: string, text?: string): HTMLElement {
   return e;
 }
 
+/** Deterministic locale-aware date for last-reviewed (no relative timers). */
+export function formatReviewTimestamp(iso: string, locale: Locale = getCurrentLocale()): string | undefined {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return undefined;
+  try {
+    return new Intl.DateTimeFormat(locale === "fr" ? "fr" : "en", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(ms));
+  } catch {
+    return undefined;
+  }
+}
+
 export type SavedVocabularyCallbacks = {
   onBack: () => void;
   onOpen: (row: SavedVocabularyRowVm & { state: "resolved" }) => void;
   onRemove: (row: SavedVocabularyRowVm) => void;
+  onStartReview: () => void;
 };
 
 export type SavedVocabularyView = {
   root: HTMLElement;
   /** Preferred focus target after a successful remove (may be null). */
   focusAfterRemove: HTMLElement | null;
+  /** Start Review control when present. */
+  startReviewButton: HTMLButtonElement | null;
+  heading: HTMLElement | null;
 };
+
+function appendReviewStatus(main: HTMLElement, status: SavedVocabularyReviewStatus): void {
+  if (status.state === "unknown") {
+    return;
+  }
+
+  const label = el("div", "saved-vocab-review-status", t(status.labelKey));
+  label.setAttribute("data-review-status", status.state);
+  main.appendChild(label);
+
+  if (status.state === "still_learning" || status.state === "remembered") {
+    const formatted = formatReviewTimestamp(status.last_reviewed);
+    if (formatted) {
+      main.appendChild(
+        el("div", "saved-vocab-last-reviewed", t("review.lastReviewed", { date: formatted })),
+      );
+    }
+  }
+}
+
+function renderStartReviewRegion(
+  model:
+    | { surface: "loading" }
+    | Extract<SavedVocabularyModel, { surface: "populated" | "removing" }>,
+  callbacks: SavedVocabularyCallbacks,
+): { region: HTMLElement; button: HTMLButtonElement } {
+  const region = el("div", "saved-vocab-start-review-region");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn saved-vocab-start-review";
+  button.id = "saved-vocab-start-review";
+  button.textContent = t("review.start");
+
+  const removing = model.surface === "removing";
+  const loading = model.surface === "loading";
+  const canStart =
+    model.surface === "populated" && model.canStartReview === true && !removing && !loading;
+  const unresolvedOnly =
+    (model.surface === "populated" || model.surface === "removing") &&
+    model.rows.length > 0 &&
+    !model.canStartReview;
+
+  button.disabled = !canStart;
+  button.addEventListener("click", () => {
+    if (button.disabled) return;
+    callbacks.onStartReview();
+  });
+  region.appendChild(button);
+
+  if (unresolvedOnly) {
+    const hint = el("p", "saved-vocab-start-review-hint", t("review.noResolved"));
+    hint.id = "saved-vocab-start-review-hint";
+    hint.setAttribute("role", "status");
+    button.setAttribute("aria-describedby", hint.id);
+    region.appendChild(hint);
+  }
+
+  return { region, button };
+}
 
 function renderRow(
   row: SavedVocabularyRowVm,
@@ -51,6 +130,8 @@ function renderRow(
   if (row.secondaryText) {
     main.appendChild(el("div", "saved-vocab-secondary", row.secondaryText));
   }
+
+  appendReviewStatus(main, row.reviewStatus);
 
   if (row.state === "unresolved") {
     const badge = el("div", "saved-vocab-unresolved", t("learning.unresolved"));
@@ -122,22 +203,27 @@ export function renderSavedVocabulary(
 
   const heading = el("h2", "saved-vocab-title", t("learning.savedVocabulary"));
   heading.id = "saved-vocab-heading";
+  heading.tabIndex = -1;
   root.appendChild(heading);
 
   let focusAfterRemove: HTMLElement | null = null;
+  let startReviewButton: HTMLButtonElement | null = null;
 
   if (model.surface === "loading") {
+    const { region, button } = renderStartReviewRegion(model, callbacks);
+    root.appendChild(region);
+    startReviewButton = button;
     const status = el("p", "saved-vocab-status", t("learning.loading"));
     status.setAttribute("role", "status");
     status.setAttribute("aria-busy", "true");
     root.appendChild(status);
-    return { root, focusAfterRemove: null };
+    return { root, focusAfterRemove: null, startReviewButton, heading };
   }
 
   if (model.surface === "unavailable") {
     root.appendChild(el("p", "saved-vocab-status", t("learning.noActiveBundle")));
     focusAfterRemove = backBtn;
-    return { root, focusAfterRemove };
+    return { root, focusAfterRemove, startReviewButton: null, heading };
   }
 
   if (model.surface === "error") {
@@ -145,14 +231,18 @@ export function renderSavedVocabulary(
     err.setAttribute("role", "alert");
     root.appendChild(err);
     focusAfterRemove = backBtn;
-    return { root, focusAfterRemove };
+    return { root, focusAfterRemove, startReviewButton: null, heading };
   }
 
   if (model.surface === "empty") {
     root.appendChild(el("p", "saved-vocab-status", t("learning.empty")));
     focusAfterRemove = backBtn;
-    return { root, focusAfterRemove };
+    return { root, focusAfterRemove, startReviewButton: null, heading };
   }
+
+  const { region, button } = renderStartReviewRegion(model, callbacks);
+  root.appendChild(region);
+  startReviewButton = button;
 
   const list = document.createElement("ul");
   list.className = "saved-vocab-list";
@@ -165,10 +255,9 @@ export function renderSavedVocabulary(
   }
   root.appendChild(list);
 
-  // Prefer focusing the next row's Open/Remove after a remove; caller may use this.
   const firstAction =
     list.querySelector<HTMLButtonElement>(".saved-vocab-open, .saved-vocab-remove") ?? backBtn;
   focusAfterRemove = firstAction;
 
-  return { root, focusAfterRemove };
+  return { root, focusAfterRemove, startReviewButton, heading };
 }

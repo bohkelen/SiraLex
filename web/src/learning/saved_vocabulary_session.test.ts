@@ -11,11 +11,16 @@ import { buildDisplayCache } from "./build_display_cache";
 import { saveLearningRecord } from "./learning_record_store";
 import {
   buildSavedVocabularyRowVm,
+  canStartReviewFromSavedVocabularyModel,
   createSavedVocabularySession,
+  deriveSavedVocabularyReviewStatus,
   type SavedVocabularyModel,
 } from "./saved_vocabulary_session";
+import { hasLearningRecordBeenReviewed, isNeverReviewed } from "./review_queue";
+import { reflectOnLearningRecord } from "./learning_record_store";
 import type { EnrichedRecord } from "../types/records";
-import { STORE_RECORDS } from "../idb/siralex_db";
+import { STORE_LEARNING_RECORDS, STORE_RECORDS } from "../idb/siralex_db";
+import { LEARNING_RECORD_SCHEMA_VERSION } from "./learning_record_types";
 
 const BUNDLE_A = "bundle_sv_a";
 const BUNDLE_B = "bundle_sv_b";
@@ -303,6 +308,7 @@ describe("LS1I3 Saved Vocabulary session", () => {
     if (resolved.state === "resolved") {
       expect(resolved.primaryText).toBe("live");
       expect(resolved.secondaryText).toBe("live-fr");
+      expect(resolved.reviewStatus.state).toBe("not_reviewed");
     }
     const unresolved = buildSavedVocabularyRowVm({
       state: "unresolved",
@@ -313,6 +319,7 @@ describe("LS1I3 Saved Vocabulary session", () => {
     if (unresolved.state === "unresolved") {
       expect(unresolved.primaryText).toBe("cached");
       expect(unresolved.secondaryText).toBe("old");
+      expect(unresolved.reviewStatus.state).toBe("not_reviewed");
     }
   });
 
@@ -334,5 +341,220 @@ describe("LS1I3 Saved Vocabulary session", () => {
     // loading may have been emitted before openDb; after current=false, no populated update
     expect(onUpdate.mock.calls.every((c) => c[0].surface !== "populated")).toBe(true);
     db.close();
+  });
+
+  it("derives review metadata without using status alone", () => {
+    const base = {
+      schema_version: LEARNING_RECORD_SCHEMA_VERSION,
+      bundle_id: BUNDLE_A,
+      ir_id: "lex-1",
+      ir_kind: "lexicon_entry" as const,
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      status: "still_learning" as const,
+      created_at: "2026-07-29T12:00:00.000Z",
+      display_cache: { headword_latin: "x" },
+      last_reviewed: null as string | null,
+      review_count: 0,
+    };
+
+    const never = deriveSavedVocabularyReviewStatus(base);
+    expect(never.state).toBe("not_reviewed");
+    expect(isNeverReviewed(base)).toBe(true);
+    expect(hasLearningRecordBeenReviewed(base)).toBe(false);
+
+    // status alone must not mark reviewed
+    const fakeRemembered = {
+      ...base,
+      status: "remembered" as const,
+      review_count: 0,
+      last_reviewed: null,
+    };
+    expect(deriveSavedVocabularyReviewStatus(fakeRemembered).state).toBe("not_reviewed");
+
+    const still = deriveSavedVocabularyReviewStatus({
+      ...base,
+      review_count: 2,
+      last_reviewed: "2026-07-29T18:00:00.000Z",
+      status: "still_learning",
+    });
+    expect(still).toEqual({
+      state: "still_learning",
+      labelKey: "review.stillLearning",
+      last_reviewed: "2026-07-29T18:00:00.000Z",
+    });
+
+    const rem = deriveSavedVocabularyReviewStatus({
+      ...base,
+      review_count: 1,
+      last_reviewed: "2026-07-29T19:00:00.000Z",
+      status: "remembered",
+    });
+    expect(rem.state).toBe("remembered");
+
+    expect(
+      deriveSavedVocabularyReviewStatus({
+        ...base,
+        review_count: 0,
+        last_reviewed: "2026-07-29T18:00:00.000Z",
+      }).state,
+    ).toBe("unknown");
+    expect(
+      deriveSavedVocabularyReviewStatus({
+        ...base,
+        review_count: 2,
+        last_reviewed: null,
+      }).state,
+    ).toBe("unknown");
+  });
+
+  it("sets canStartReview from resolved rows and preserves order with no writes", async () => {
+    const db = await openSiralexDb();
+    try {
+      const a = makeLexicon("lex-a", "a");
+      const b = makeLexicon("lex-b", "b");
+      await putDictionaryRecord(db, SCOPE_A, a);
+      await putDictionaryRecord(db, SCOPE_A, b);
+      await saveLearningRecord(db, {
+        bundle_id: BUNDLE_A,
+        ir_id: "lex-a",
+        ir_kind: "lexicon_entry",
+        content_sha256: HASH_A,
+        storage_scope_id: SCOPE_A,
+        display_cache: buildDisplayCache(a),
+      });
+      await new Promise((r) => setTimeout(r, 5));
+      await saveLearningRecord(db, {
+        bundle_id: BUNDLE_A,
+        ir_id: "lex-b",
+        ir_kind: "lexicon_entry",
+        content_sha256: HASH_A,
+        storage_scope_id: SCOPE_A,
+        display_cache: buildDisplayCache(b),
+      });
+
+      const learningCountBefore = await new Promise<number>((resolve, reject) => {
+        const tx = db.transaction(STORE_LEARNING_RECORDS, "readonly");
+        const req = tx.objectStore(STORE_LEARNING_RECORDS).count();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const recordsBefore = await new Promise<number>((resolve, reject) => {
+        const tx = db.transaction(STORE_RECORDS, "readonly");
+        const req = tx.objectStore(STORE_RECORDS).count();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      const updates: SavedVocabularyModel[] = [];
+      const session = createSavedVocabularySession({
+        getActiveMeta: () => makeMeta(),
+        openDb: async () => db,
+        isCurrent: () => true,
+        onUpdate: (m) => updates.push(m),
+        confirmRemove: () => true,
+      });
+      await session.load();
+      const last = updates.at(-1)!;
+      expect(last.surface).toBe("populated");
+      if (last.surface === "populated") {
+        expect(last.canStartReview).toBe(true);
+        expect(canStartReviewFromSavedVocabularyModel(last)).toBe(true);
+        expect(last.rows.map((r) => r.ir_id)).toEqual(["lex-b", "lex-a"]);
+        expect(last.rows.every((r) => r.reviewStatus.state === "not_reviewed")).toBe(true);
+      }
+
+      const learningCountAfter = await new Promise<number>((resolve, reject) => {
+        const tx = db.transaction(STORE_LEARNING_RECORDS, "readonly");
+        const req = tx.objectStore(STORE_LEARNING_RECORDS).count();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const recordsAfter = await new Promise<number>((resolve, reject) => {
+        const tx = db.transaction(STORE_RECORDS, "readonly");
+        const req = tx.objectStore(STORE_RECORDS).count();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      expect(learningCountAfter).toBe(learningCountBefore);
+      expect(recordsAfter).toBe(recordsBefore);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("disables Start Review eligibility for unresolved-only collections", async () => {
+    const db = await openSiralexDb();
+    try {
+      await saveLearningRecord(db, {
+        bundle_id: BUNDLE_A,
+        ir_id: "ghost",
+        ir_kind: "lexicon_entry",
+        content_sha256: HASH_A,
+        storage_scope_id: SCOPE_A,
+        display_cache: { headword_latin: "ghost" },
+      });
+      const updates: SavedVocabularyModel[] = [];
+      const session = createSavedVocabularySession({
+        getActiveMeta: () => makeMeta(),
+        openDb: async () => db,
+        isCurrent: () => true,
+        onUpdate: (m) => updates.push(m),
+        confirmRemove: () => true,
+      });
+      await session.load();
+      const last = updates.at(-1)!;
+      expect(last.surface).toBe("populated");
+      if (last.surface === "populated") {
+        expect(last.canStartReview).toBe(false);
+        expect(canStartReviewFromSavedVocabularyModel(last)).toBe(false);
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  it("reflects persisted review status after reflection", async () => {
+    const db = await openSiralexDb();
+    try {
+      const entry = makeLexicon("lex-r", "r");
+      await putDictionaryRecord(db, SCOPE_A, entry);
+      await saveLearningRecord(db, {
+        bundle_id: BUNDLE_A,
+        ir_id: "lex-r",
+        ir_kind: "lexicon_entry",
+        content_sha256: HASH_A,
+        storage_scope_id: SCOPE_A,
+        display_cache: buildDisplayCache(entry),
+      });
+      await reflectOnLearningRecord(
+        db,
+        BUNDLE_A,
+        "lex-r",
+        "remembered",
+        "2026-07-29T20:00:00.000Z",
+      );
+
+      const updates: SavedVocabularyModel[] = [];
+      const session = createSavedVocabularySession({
+        getActiveMeta: () => makeMeta(),
+        openDb: async () => db,
+        isCurrent: () => true,
+        onUpdate: (m) => updates.push(m),
+        confirmRemove: () => true,
+      });
+      await session.load();
+      const last = updates.at(-1)!;
+      expect(last.surface).toBe("populated");
+      if (last.surface === "populated") {
+        expect(last.rows[0]!.reviewStatus).toEqual({
+          state: "remembered",
+          labelKey: "review.remembered",
+          last_reviewed: "2026-07-29T20:00:00.000Z",
+        });
+      }
+    } finally {
+      db.close();
+    }
   });
 });
