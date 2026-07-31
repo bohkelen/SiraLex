@@ -355,11 +355,7 @@ export function renderLearningBackupSurface(
     actions.append(cancelBtn, confirmBtn);
     dialog.appendChild(actions);
     restoreBlock.appendChild(dialog);
-    if (typeof dialog.showModal === "function") {
-      dialog.showModal();
-    } else {
-      dialog.setAttribute("open", "");
-    }
+    // showModal requires a connected dialog — defer until host.appendChild(root) below.
   }
 
   if (phase === "success") {
@@ -440,6 +436,20 @@ export function renderLearningBackupSurface(
   root.appendChild(resultRegion);
 
   host.appendChild(root);
+
+  // HTMLDialogElement.showModal() requires a document-connected dialog.
+  const confirmDialog = root.querySelector("dialog.learning-backup-confirm-dialog");
+  if (confirmDialog instanceof HTMLDialogElement) {
+    if (confirmDialog.isConnected && typeof confirmDialog.showModal === "function") {
+      try {
+        confirmDialog.showModal();
+      } catch {
+        confirmDialog.setAttribute("open", "");
+      }
+    } else {
+      confirmDialog.setAttribute("open", "");
+    }
+  }
 
   const focusNode = applyFocus(vm.focusTarget, {
     none: null,

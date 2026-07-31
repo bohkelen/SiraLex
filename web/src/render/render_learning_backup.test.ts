@@ -100,31 +100,45 @@ describe("renderLearningBackupSurface", () => {
 
   it("opens accessible replace confirmation dialog", () => {
     const host = document.createElement("div");
-    renderLearningBackupSurface(
-      host,
-      baseVm({
-        focusTarget: "confirm_heading",
-        restore: {
-          phase: "confirming",
-          filename: "b.json",
-          selectedPolicy: "replace_all",
-          preview: {
-            package_schema: LEARNING_BACKUP_PACKAGE_SCHEMA,
-            exported_at: "2026-07-30T22:30:00.000Z",
-            record_count: 1,
-            current_local_record_count: 1,
-            local_validation: { state: "valid" },
-            bundle_compatibility: [],
-            add_missing: { state: "available", add_count: 0, skipped_existing_count: 1 },
-            replace_all: { previous_count: 1, restored_count: 1 },
+    document.body.appendChild(host);
+    try {
+      renderLearningBackupSurface(
+        host,
+        baseVm({
+          focusTarget: "confirm_heading",
+          restore: {
+            phase: "confirming",
+            filename: "b.json",
+            selectedPolicy: "replace_all",
+            preview: {
+              package_schema: LEARNING_BACKUP_PACKAGE_SCHEMA,
+              exported_at: "2026-07-30T22:30:00.000Z",
+              record_count: 1,
+              current_local_record_count: 1,
+              local_validation: { state: "valid" },
+              bundle_compatibility: [],
+              add_missing: { state: "available", add_count: 0, skipped_existing_count: 1 },
+              replace_all: { previous_count: 1, restored_count: 1 },
+            },
           },
-        },
-      }),
-      noopCallbacks,
-    );
-    const dialog = host.querySelector("dialog.learning-backup-confirm-dialog");
-    expect(dialog).toBeTruthy();
-    expect(dialog?.textContent).toContain("permanently remove the current Learning Records");
+        }),
+        noopCallbacks,
+      );
+      const dialog = host.querySelector("dialog.learning-backup-confirm-dialog");
+      expect(dialog).toBeTruthy();
+      expect(dialog?.textContent).toContain("permanently remove the current Learning Records");
+      // Must open after the dialog is connected; otherwise showModal throws and leaves the host empty.
+      expect(dialog?.isConnected).toBe(true);
+      expect(
+        dialog instanceof HTMLDialogElement
+          ? dialog.open || dialog.hasAttribute("open")
+          : dialog?.hasAttribute("open"),
+      ).toBe(true);
+      // Host must still contain the management surface after opening the dialog.
+      expect(host.querySelector("#learning-backup-heading")).toBeTruthy();
+    } finally {
+      host.remove();
+    }
   });
 
   it("renders focused French copy for heading, policies, and privacy", () => {

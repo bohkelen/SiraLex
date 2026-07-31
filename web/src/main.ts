@@ -661,8 +661,10 @@ function renderInstalledBundleManager() {
         } finally {
           db.close();
         }
+        learningBackupSurface?.invalidatePreviewForBundleChange();
         importProgress.style.display = "";
         importProgress.textContent = t("bundle.removed", { bundleId: bundle.bundle_id });
+        await refreshDbStatus();
       });
     });
 
@@ -2109,7 +2111,10 @@ function mountLearningBackupModel(
 }
 
 function createAndMountLearningBackupSurface(): NonNullable<typeof learningBackupSurface> {
-  const surface = createLearningBackupSurface(
+  // `createLearningBackupSurface` emits synchronously during construction. Do not close over a
+  // `const surface = create...` binding — that is still in the TDZ when onModel runs.
+  let surface: NonNullable<typeof learningBackupSurface> | undefined;
+  const created = createLearningBackupSurface(
     {
       openDb: openSiralexDb,
       now: () => new Date().toISOString(),
@@ -2117,7 +2122,7 @@ function createAndMountLearningBackupSurface(): NonNullable<typeof learningBacku
     },
     {
       onModel: () => {
-        if (learningBackupSurface !== surface) return;
+        if (!surface || learningBackupSurface !== surface) return;
         mountLearningBackupModel(surface);
         void updateLearningBackupDeleteReminder();
       },
@@ -2134,9 +2139,10 @@ function createAndMountLearningBackupSurface(): NonNullable<typeof learningBacku
       },
     },
   );
-  learningBackupSurface = surface;
-  mountLearningBackupModel(surface);
-  return surface;
+  surface = created;
+  learningBackupSurface = created;
+  mountLearningBackupModel(created);
+  return created;
 }
 
 async function updateLearningBackupDeleteReminder(): Promise<void> {
