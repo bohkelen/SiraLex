@@ -5,9 +5,10 @@
 
 import type { SearchDirection } from "../bundle_labels";
 import { getBundleStorageScopeId, type ActiveBundleMeta } from "../idb/siralex_db";
-import { resolveRecords } from "../search/resolve_records";
+import {
+  resolveTargetLexiconEntry,
+} from "../search/resolve_target_lexicon";
 import type { EnrichedRecord, TargetEntry } from "../types/records";
-import { isLexiconDisplay } from "../types/records";
 
 export type OpenTargetLexiconResult = "opened" | "unavailable" | "stale";
 
@@ -23,18 +24,19 @@ export type OpenTargetLexiconDeps = {
   openEntryDetail: (record: EnrichedRecord, restoreDirection: SearchDirection) => void;
   onUnavailable: () => void;
   /** Optional override for tests. */
-  resolveRecordsFn?: typeof resolveRecords;
+  resolveTargetFn?: typeof resolveTargetLexiconEntry;
 };
 
 /**
- * Resolve `target.anchor` as a lexicon-entry ir_id, then switch direction and
- * open entry detail. Does not mutate search input or call search.
+ * Resolve the mapping target to a lexicon entry (by ir_id or source_record_id),
+ * then switch direction and open entry detail. Does not mutate search input or
+ * call search.
  */
 export async function openTargetLexiconEntry(
   deps: OpenTargetLexiconDeps,
 ): Promise<OpenTargetLexiconResult> {
-  const irId = deps.target.anchor.trim();
-  if (irId === "") {
+  const anchor = deps.target.anchor.trim();
+  if (anchor === "") {
     deps.onUnavailable();
     return "unavailable";
   }
@@ -47,11 +49,11 @@ export async function openTargetLexiconEntry(
 
   const scopeId = getBundleStorageScopeId(meta);
   let db: IDBDatabase | undefined;
-  let records: EnrichedRecord[];
+  let record: EnrichedRecord | undefined;
   try {
     db = await deps.openDb();
-    const resolve = deps.resolveRecordsFn ?? resolveRecords;
-    records = await resolve(db, scopeId, [irId]);
+    const resolve = deps.resolveTargetFn ?? resolveTargetLexiconEntry;
+    record = await resolve(db, scopeId, deps.target);
   } catch {
     if (!deps.isCurrent()) return "stale";
     deps.onUnavailable();
@@ -62,8 +64,7 @@ export async function openTargetLexiconEntry(
 
   if (!deps.isCurrent()) return "stale";
 
-  const record = records[0];
-  if (!record || record.ir_kind !== "lexicon_entry" || !isLexiconDisplay(record)) {
+  if (!record) {
     deps.onUnavailable();
     return "unavailable";
   }

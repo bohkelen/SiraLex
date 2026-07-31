@@ -167,6 +167,49 @@ describe("openTargetLexiconEntry", () => {
     expect(onUnavailable).toHaveBeenCalled();
   });
 
+  it("opens featured-style target via source_record_id anchor", async () => {
+    const entry: EnrichedRecord = {
+      ir_id: "2847e86214f9f870",
+      ir_kind: "lexicon_entry",
+      source_id: "src_malipense",
+      norm_version: "norm_v3",
+      preferred_form: "bólo",
+      variant_forms: [],
+      search_keys: {},
+      display: {
+        headword_latin: "bólo",
+        senses: [{ gloss_fr: "main" }],
+      },
+      record_locator: {
+        kind: "source_record_id",
+        source_record_id: "e1385",
+      },
+    };
+    await putRecord(entry);
+
+    const setDirection = vi.fn();
+    const openDetail = vi.fn();
+
+    const result = await openTargetLexiconEntry({
+      target: {
+        lexicon_url: "../lexicon/b.htm",
+        anchor: "e1385",
+        display_text: "bólo",
+      },
+      restoreDirection: "source_to_target",
+      getActiveMeta: () => meta(),
+      openDb: openSiralexDb,
+      isCurrent: () => true,
+      setDirectionTargetToSource: setDirection,
+      openEntryDetail: openDetail,
+      onUnavailable: vi.fn(),
+    });
+
+    expect(result).toBe("opened");
+    expect(setDirection).toHaveBeenCalledTimes(1);
+    expect(openDetail.mock.calls[0]![0].ir_id).toBe("2847e86214f9f870");
+  });
+
   it("resolution failure retains direction and does not open", async () => {
     await putRecord(lexicon("other", "x"));
     const setDirection = vi.fn();

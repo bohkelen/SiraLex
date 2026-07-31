@@ -172,9 +172,23 @@ Prefer resolve-first; direction switches only after successful resolution.
 
 ## 13. Deviations / unresolved
 
-None material.
-
 `triggerSearch` was removed from the entry-detail wiring path (no remaining callers in `main.ts` for target links). Search input debounce/`runSearch` for typed queries is unchanged.
+
+### Featured-bundle anchor correction
+
+Initial implementation treated `TargetEntry.anchor` only as `ir_id`. That is
+correct for the debug directional fixture, but the featured Mali-pense bundle
+stores HTML fragment ids (e.g. `e1385`) that match
+`record_locator.source_record_id` on the lexicon entry — **not** `ir_id`
+(`anchors_ok` as ir_id = 0 in that bundle).
+
+Resolution order is now:
+
+1. treat `anchor` as `ir_id`;
+2. else find lexicon entry by `record_locator.source_record_id === anchor`
+   within the active storage scope.
+
+Still no text re-search. Still no translation-pair Learning Records.
 
 ---
 
