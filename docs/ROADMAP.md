@@ -96,6 +96,38 @@ Status markers: **✅ Complete** · **in progress** · **deferred** · **pending
 - **Phase 6B / 6D1** — Consumer search-first UX and French-first localization **shipped** (6D1 pending review).
 - **Branch C** — Transliteration / morphology **deferred** until usage data exists.
 
+### Learning System & next product build
+
+Canonical status (see `docs/reports/pd0_next_product_build_decision.md` and
+`docs/reports/lp1d0_local_learning_backup_restore_product_definition.md`):
+
+```text
+LS1 — Save — Closed
+LS2 — Review and Reflect — Closed
+LS3 — Progress and Return — Closed
+LS4 — Guided Review Sessions — Defined, deferred pending demonstrated need
+LP1 — Local Learning Backup and Restore — Closed
+LP1D0 — Defined
+LP1I1 — Learning Backup Package Model and Validator — Implemented
+LP1I2 — Deterministic Export — Implemented
+LP1I3 — Restore Preview and Atomic Policies — Implemented
+LP1I4 — Backup and Restore Surface — Implemented
+LP1I5 — Offline and Lifecycle Verification — Implemented
+LP1I6 — Closure — Complete
+PD1 — Next Product Build Decision — Next
+```
+
+- **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
+- **LP1D0** defines local versioned Learning backup/restore (`docs/reports/lp1d0_local_learning_backup_restore_product_definition.md`).
+- **LP1I1** implements the pure package model/validator (`docs/reports/lp1i1_learning_backup_package_model_report.md`).
+- **LP1I2** implements deterministic export (`docs/reports/lp1i2_deterministic_learning_export_report.md`).
+- **LP1I3** implements restore preview and atomic policies (`docs/reports/lp1i3_restore_preview_atomic_policies_report.md`).
+- **LP1I4** implements the Manage Learning Data surface (`docs/reports/lp1i4_backup_restore_surface_report.md`).
+- **LP1I5** verifies offline/lifecycle browser + integration evidence (`docs/reports/lp1i5_offline_lifecycle_verification_report.md`).
+- **LP1I6** closes Local Learning Backup and Restore (`docs/reports/lp1_local_learning_backup_restore_closure_report.md`).
+- **Next product decision:** `PD1 — Next Product Build Decision`.
+- Portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
+
 ---
 
 ## Phase 0 — Repo + infra skeleton

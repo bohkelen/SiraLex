@@ -15,6 +15,10 @@ import {
   hasConsistentReviewFields,
   hasLearningRecordBeenReviewed,
 } from "./review_queue";
+import {
+  deriveSavedVocabularyProgress,
+  type SavedVocabularyProgressVm,
+} from "./saved_vocabulary_progress";
 
 export type SavedVocabularyReviewStatus =
   | {
@@ -77,8 +81,8 @@ export type SavedVocabularyModel =
       rows: SavedVocabularyRowVm[];
       removingKey?: string;
       rowErrors: Record<string, string>;
-      /** Immediate UI signal: at least one resolved row. */
-      canStartReview: boolean;
+      /** Derived Progress & Return summary (LS3I1 / LS3I2). */
+      progress: SavedVocabularyProgressVm;
     };
 
 export function rowKey(bundleId: string, irId: string): string {
@@ -113,16 +117,6 @@ export function deriveSavedVocabularyReviewStatus(
     };
   }
   return { state: "unknown" };
-}
-
-/** Immediate Start Review eligibility from a loaded collection model. */
-export function canStartReviewFromSavedVocabularyModel(model: SavedVocabularyModel): boolean {
-  if (model.surface !== "populated") return false;
-  return model.canStartReview;
-}
-
-function countResolved(rows: SavedVocabularyRowVm[]): number {
-  return rows.reduce((n, row) => (row.state === "resolved" ? n + 1 : n), 0);
 }
 
 function firstLiveGloss(entry: EnrichedRecord): string | undefined {
@@ -220,12 +214,13 @@ export function createSavedVocabularySession(deps: SavedVocabularySessionDeps) {
       deps.onUpdate({ surface: "empty" });
       return;
     }
+    const { progress } = deriveSavedVocabularyProgress(rows);
     deps.onUpdate({
       surface,
       rows: [...rows],
       removingKey,
       rowErrors: { ...rowErrors },
-      canStartReview: countResolved(rows) > 0,
+      progress,
     });
   }
 

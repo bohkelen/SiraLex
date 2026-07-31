@@ -66,6 +66,21 @@ export function hasConsistentReviewFields(record: LearningRecordV1): boolean {
   return record.review_count === 0 && record.last_reviewed === null;
 }
 
+/**
+ * Pure LS2 Review eligibility after a Learning Record has already been resolved
+ * to a live entry. Shared by queue construction and LS3 Progress derivation.
+ * Does not access IndexedDB or mutate inputs.
+ */
+export function isResolvedLexiconReviewEligible(
+  learningRecord: LearningRecordV1,
+  liveEntry: EnrichedRecord,
+): boolean {
+  if (!hasConsistentReviewFields(learningRecord)) return false;
+  if (liveEntry.ir_kind !== "lexicon_entry" || !isLexiconDisplay(liveEntry)) return false;
+  if (liveEntry.ir_id !== learningRecord.ir_id) return false;
+  return true;
+}
+
 function reviewQueueGroup(record: LearningRecordV1): 0 | 1 | 2 {
   if (!hasLearningRecordBeenReviewed(record)) return 0;
   if (record.status === "still_learning") return 1;
@@ -171,11 +186,7 @@ export async function buildReviewQueue(
     }
 
     const live = resolution.liveEntry;
-    if (live.ir_kind !== "lexicon_entry" || !isLexiconDisplay(live)) {
-      unresolvedCount += 1;
-      continue;
-    }
-    if (live.ir_id !== record.ir_id) {
+    if (!isResolvedLexiconReviewEligible(record, live)) {
       unresolvedCount += 1;
       continue;
     }

@@ -81,6 +81,40 @@ describe("i18n translations", () => {
     setCurrentLocale(previous);
   });
 
+  it("resolves Progress keys in English and French", () => {
+    const previous = getCurrentLocale();
+
+    setCurrentLocale("en");
+    expect(t("progress.heading")).toBe("Vocabulary overview");
+    expect(t("progress.saved")).toBe("Saved");
+    expect(t("progress.notReviewed")).toBe("Not reviewed");
+    expect(t("progress.stillLearning")).toBe("Still learning");
+    expect(t("progress.remembered")).toBe("Remembered");
+    expect(t("progress.unavailable")).toBe("Unavailable");
+    expect(t("progress.startReview")).toBe("Start review");
+    expect(t("progress.continueReview")).toBe("Continue review");
+    expect(t("progress.cue.reviewNew")).toBe("Review new saved words");
+    expect(t("progress.cue.reviewStillLearning")).toBe("Review words you are still learning");
+    expect(t("progress.cue.reviewAgain")).toBe("Review saved vocabulary again");
+    expect(t("progress.unavailableExplanation")).toMatch(/not available in the current dictionary/i);
+
+    setCurrentLocale("fr");
+    expect(t("progress.heading")).toBe("Aperçu du vocabulaire");
+    expect(t("progress.saved")).toBe("Enregistrés");
+    expect(t("progress.notReviewed")).toBe("Pas encore révisés");
+    expect(t("progress.stillLearning")).toBe("Encore en apprentissage");
+    expect(t("progress.remembered")).toBe("Mémorisés");
+    expect(t("progress.unavailable")).toBe("Indisponibles");
+    expect(t("progress.startReview")).toBe("Commencer la révision");
+    expect(t("progress.continueReview")).toBe("Continuer la révision");
+    expect(t("progress.cue.reviewNew")).toBe("Réviser les nouveaux mots enregistrés");
+    expect(t("progress.cue.reviewStillLearning")).toBe("Réviser les mots encore en apprentissage");
+    expect(t("progress.cue.reviewAgain")).toBe("Réviser à nouveau le vocabulaire enregistré");
+    expect(t("progress.unavailableExplanation")).toMatch(/ne sont pas disponibles/i);
+
+    setCurrentLocale(previous);
+  });
+
   it("resolves new consent and diagnostics keys in English and French", () => {
     const previous = getCurrentLocale();
 

@@ -61,6 +61,13 @@ export type IndexMappingDisplayFields = {
   target_entries?: TargetEntry[];
 };
 
+export type RecordLocator = {
+  kind?: string;
+  url_canonical?: string;
+  source_record_id?: string;
+  anchor_names?: string[];
+};
+
 export type EnrichedRecord = {
   ir_id: string;
   ir_kind: "lexicon_entry" | "index_mapping";
@@ -70,6 +77,8 @@ export type EnrichedRecord = {
   variant_forms: string[];
   search_keys: Record<string, string[]>;
   display?: LexiconDisplayFields | IndexMappingDisplayFields;
+  /** Present on many lexicon_entry rows; used to resolve mapping target anchors. */
+  record_locator?: RecordLocator;
 };
 
 export function isLexiconDisplay(

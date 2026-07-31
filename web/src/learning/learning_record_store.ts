@@ -231,6 +231,32 @@ export async function listLearningRecordsByBundle(
 }
 
 /**
+ * Read every Learning Record across all bundles in one readonly transaction.
+ *
+ * Order is store/cursor order and is not package-canonical — callers that need
+ * deterministic ordering must sort (e.g. Learning backup export).
+ * Does not filter by active bundle, resolve dictionaries, or write.
+ */
+export async function listAllLearningRecords(db: IDBDatabase): Promise<LearningRecordV1[]> {
+  const tx = db.transaction(STORE_LEARNING_RECORDS, "readonly");
+  const rows = (await reqToPromise(
+    tx.objectStore(STORE_LEARNING_RECORDS).getAll(),
+  )) as LearningRecordV1[];
+  await txDone(tx);
+  return rows;
+}
+
+/**
+ * Count Learning Records across all bundles in one readonly transaction.
+ */
+export async function countAllLearningRecords(db: IDBDatabase): Promise<number> {
+  const tx = db.transaction(STORE_LEARNING_RECORDS, "readonly");
+  const count = await reqToPromise(tx.objectStore(STORE_LEARNING_RECORDS).count());
+  await txDone(tx);
+  return count;
+}
+
+/**
  * Delete only from learning_records.
  * @returns true if a row was present and removed; false if absent.
  */

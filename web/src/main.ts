@@ -30,6 +30,8 @@ import {
   wireManualPackageImportControls,
   type ManualPackageImportDeps,
 } from "./import/manual_package_import_flow";
+import { createLearningBackupSurface } from "./learning/learning_backup_surface";
+import { renderLearningBackupSurface } from "./render/render_learning_backup";
 import {
   deleteBundleData,
   deleteSiralexDb,
@@ -231,7 +233,9 @@ app.innerHTML = `
         </details>
 
         <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
-        <div class="row" style="margin-top: 12px">
+        <div id="learningBackupHost" class="learning-backup-host" style="margin-top: 12px"></div>
+        <div class="row" style="margin-top: 12px; flex-direction: column; align-items: flex-start; gap: 8px">
+          <p id="learningBackupDeleteReminder" class="learning-backup-delete-reminder" hidden></p>
           <button id="clearDb" class="btn">${t("db.delete")}</button>
         </div>
       </div>
@@ -360,6 +364,8 @@ const packageImportFile = mustGetEl<HTMLInputElement>("#packageImportFile");
 const cancelInstallBtn = mustGetEl<HTMLButtonElement>("#cancelInstall");
 const importProgress = mustGetEl<HTMLDivElement>("#importProgress");
 const clearDbBtn = mustGetEl<HTMLButtonElement>("#clearDb");
+const learningBackupHost = mustGetEl<HTMLDivElement>("#learningBackupHost");
+const learningBackupDeleteReminder = mustGetEl<HTMLParagraphElement>("#learningBackupDeleteReminder");
 const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
 const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
 const searchMeta = mustGetEl<HTMLDivElement>("#searchMeta");
@@ -655,8 +661,10 @@ function renderInstalledBundleManager() {
         } finally {
           db.close();
         }
+        learningBackupSurface?.invalidatePreviewForBundleChange();
         importProgress.style.display = "";
         importProgress.textContent = t("bundle.removed", { bundleId: bundle.bundle_id });
+        await refreshDbStatus();
       });
     });
 
@@ -825,6 +833,7 @@ localeSelect.addEventListener("change", () => {
 openManageDictionariesBtn.addEventListener("click", () => {
   manageDictionariesPanel.open = true;
   manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  void learningBackupSurface?.refreshCount();
 });
 
 openSavedVocabularyBtn.addEventListener("click", () => {
@@ -1029,6 +1038,7 @@ async function refreshDbStatus() {
       const nextBundleId = active?.bundle_id;
       if (lastKnownActiveBundleId !== nextBundleId) {
         lastKnownActiveBundleId = nextBundleId;
+        learningBackupSurface?.invalidatePreviewForBundleChange();
         if (
           resultsHostContext === "review" ||
           resultsHostContext === "saved_vocabulary" ||
@@ -1705,11 +1715,19 @@ clearDbBtn.addEventListener("click", () => {
     importProgress.textContent = t("db.deleting");
     try {
       await deleteSiralexDb();
+      // Drop Saved Vocabulary / Review hosts and focus intent before refresh.
+      invalidateCollectionAndReviewContexts();
+      learningBackupSurface?.dispose();
+      learningBackupSurface = createAndMountLearningBackupSurface();
+      resultsHostContext = "search";
+      searchResults.innerHTML = "";
+      lastKnownActiveBundleId = undefined;
       importProgress.textContent = t("db.deleted");
     } catch (e) {
       importProgress.textContent += t("db.deleteFailed", { error: String(e) });
     }
     await refreshDbStatus();
+    await updateLearningBackupDeleteReminder();
   });
 });
 
@@ -2040,13 +2058,18 @@ let entryDetailGeneration = 0;
 let savedVocabularyGeneration = 0;
 let reviewGeneration = 0;
 let activeReviewHost: ReturnType<typeof createReviewSurfaceHost> | undefined;
-/** One-use intent: focus Start Review after returning from Review. */
-let focusStartReviewOnce = false;
+/**
+ * One-use intent: focus the enabled Start/Continue Review action after returning
+ * from Review (LS3I3). Falls back to the Saved Vocabulary heading when the
+ * action is missing or disabled.
+ */
+let focusReviewActionOnce = false;
 let lastSearchResults: ResultDisplayContext[] = [];
 /** Track active bundle id so switches invalidate collection/Review contexts. */
 let lastKnownActiveBundleId: string | undefined;
+let learningBackupSurface: ReturnType<typeof createLearningBackupSurface> | undefined;
 
-/** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4). */
+/** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4 / LS3I3). */
 type ResultsHostContext =
   | "search"
   | "saved_vocabulary"
@@ -2065,8 +2088,87 @@ function invalidateCollectionAndReviewContexts() {
   disposeActiveReviewHost();
   savedVocabularyGeneration += 1;
   entryDetailGeneration += 1;
-  focusStartReviewOnce = false;
+  focusReviewActionOnce = false;
 }
+
+function mountLearningBackupModel(
+  surface: NonNullable<typeof learningBackupSurface>,
+): void {
+  renderLearningBackupSurface(learningBackupHost, surface.getVm(), {
+    onExport: () => {
+      void surface.startExport();
+    },
+    onFileSelected: (file) => {
+      void surface.selectRestoreFile(file);
+    },
+    onSelectPolicy: (policy) => surface.selectPolicy(policy),
+    onRequestCommit: () => surface.requestCommit(),
+    onCancelConfirm: () => surface.cancelConfirm(),
+    onConfirmReplaceAll: () => surface.confirmReplaceAll(),
+    onCancelRestore: () => surface.cancelRestore(),
+    onOpenSavedVocabulary: () => showSavedVocabulary(),
+  });
+}
+
+function createAndMountLearningBackupSurface(): NonNullable<typeof learningBackupSurface> {
+  // `createLearningBackupSurface` emits synchronously during construction. Do not close over a
+  // `const surface = create...` binding — that is still in the TDZ when onModel runs.
+  let surface: NonNullable<typeof learningBackupSurface> | undefined;
+  const created = createLearningBackupSurface(
+    {
+      openDb: openSiralexDb,
+      now: () => new Date().toISOString(),
+      appVersion: APP_VERSION,
+    },
+    {
+      onModel: () => {
+        if (!surface || learningBackupSurface !== surface) return;
+        mountLearningBackupModel(surface);
+        void updateLearningBackupDeleteReminder();
+      },
+      onAfterRestoreSuccess: () => {
+        invalidateCollectionAndReviewContexts();
+        if (
+          resultsHostContext === "review" ||
+          resultsHostContext === "saved_vocabulary" ||
+          resultsHostContext === "entry_from_saved"
+        ) {
+          resultsHostContext = "search";
+          searchResults.innerHTML = "";
+        }
+      },
+    },
+  );
+  surface = created;
+  learningBackupSurface = created;
+  mountLearningBackupModel(created);
+  return created;
+}
+
+async function updateLearningBackupDeleteReminder(): Promise<void> {
+  const count = learningBackupSurface?.getVm().recordCount ?? null;
+  if (count != null && count > 0) {
+    learningBackupDeleteReminder.hidden = false;
+    learningBackupDeleteReminder.replaceChildren();
+    learningBackupDeleteReminder.appendChild(
+      document.createTextNode(`${t("learningBackup.deleteReminder")} `),
+    );
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "btn";
+    link.textContent = t("learningBackup.deleteReminderAction");
+    link.addEventListener("click", () => {
+      manageDictionariesPanel.open = true;
+      learningBackupHost.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    learningBackupDeleteReminder.appendChild(link);
+  } else {
+    learningBackupDeleteReminder.hidden = true;
+    learningBackupDeleteReminder.replaceChildren();
+  }
+}
+
+createAndMountLearningBackupSurface();
 function cancelPendingSettledQueryLog() {
   if (queryLoggingSettleTimer !== undefined) {
     clearTimeout(queryLoggingSettleTimer);
@@ -2148,8 +2250,9 @@ function showResultsList() {
 }
 
 /**
- * Open Review from Saved Vocabulary (LS2I4). Ephemeral session; Back returns
- * to Saved Vocabulary with one-use Start Review focus restoration.
+ * Open Review from Saved Vocabulary (LS2I4 / LS3I3).
+ * Start and Continue share this path: one fresh ephemeral LS2 Review session.
+ * Back returns to Saved Vocabulary with one-use Review-action focus restoration.
  */
 function showReviewSurface() {
   disposeActiveReviewHost();
@@ -2157,7 +2260,7 @@ function showReviewSurface() {
   resultsHostContext = "review";
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
-  focusStartReviewOnce = false;
+  focusReviewActionOnce = false;
   searchResults.innerHTML = "";
 
   const host = createReviewSurfaceHost({
@@ -2168,10 +2271,11 @@ function showReviewSurface() {
       generation === reviewGeneration && resultsHostContext === "review",
     onBack: () => {
       disposeActiveReviewHost();
-      focusStartReviewOnce = true;
+      focusReviewActionOnce = true;
       showSavedVocabulary();
     },
   });
+  // Ownership: only this host may present while active; dispose before replace.
   activeReviewHost = host;
   host.start();
 }
@@ -2184,8 +2288,8 @@ function showSavedVocabulary() {
   searchResults.innerHTML = "";
 
   let lastFocusTarget: HTMLElement | null = null;
-  const restoreStartReviewFocus = focusStartReviewOnce;
-  focusStartReviewOnce = false;
+  const restoreReviewActionFocus = focusReviewActionOnce;
+  focusReviewActionOnce = false;
   let didRestoreFocus = false;
 
   const applyModel = (model: SavedVocabularyModel) => {
@@ -2212,7 +2316,7 @@ function showSavedVocabulary() {
         if (generation !== savedVocabularyGeneration || resultsHostContext !== "saved_vocabulary") {
           return;
         }
-        // Application-owned suppression: one Review host at a time (no second Start Review).
+        // Application-owned suppression: one Review host at a time (Start or Continue).
         if (activeReviewHost?.isActive()) return;
         showReviewSurface();
       },
@@ -2221,7 +2325,7 @@ function showSavedVocabulary() {
     searchResults.appendChild(view.root);
     lastFocusTarget = view.focusAfterRemove;
 
-    if (restoreStartReviewFocus && !didRestoreFocus && model.surface !== "loading") {
+    if (restoreReviewActionFocus && !didRestoreFocus && model.surface !== "loading") {
       didRestoreFocus = true;
       if (view.startReviewButton && !view.startReviewButton.disabled) {
         view.startReviewButton.focus();
