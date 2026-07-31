@@ -308,6 +308,7 @@ describe("self-validation and size", () => {
         return {
           ok: true,
           package: { ...parsed.package, record_count: parsed.package.record_count + 1 },
+          verified: parsed.verified,
         };
       },
     });

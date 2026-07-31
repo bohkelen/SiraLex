@@ -56,17 +56,6 @@ export type LearningBackupValidationError = {
   record_index?: number;
 };
 
-export type ParseLearningBackupResult =
-  | {
-      ok: true;
-      package: LearningBackupPackageV1;
-    }
-  | {
-      ok: false;
-      errors: LearningBackupValidationError[];
-      truncated?: boolean;
-    };
-
 export type LearningBackupRestorePolicy = "add_missing" | "replace_all";
 
 export type LearningBackupBundleCompatibility =
@@ -91,16 +80,83 @@ export type LearningBackupRestorePreview = {
   exported_at: string;
   record_count: number;
   current_local_record_count: number;
+  local_validation:
+    | { state: "valid" }
+    | { state: "invalid"; invalid_record_count: number };
   bundle_compatibility: LearningBackupBundleCompatibility[];
-  add_missing: {
-    add_count: number;
-    skipped_existing_count: number;
-  };
+  add_missing:
+    | {
+        state: "available";
+        add_count: number;
+        skipped_existing_count: number;
+      }
+    | {
+        state: "unavailable";
+        reason: "invalid_local_records";
+      };
   replace_all: {
     previous_count: number;
     restored_count: number;
   };
 };
+
+/**
+ * Provenance-bearing package produced only by {@link parseLearningBackupJson}.
+ * Trust is the module WeakMap token — not a public boolean field.
+ */
+export type VerifiedLearningBackupPackage = {
+  readonly package: LearningBackupPackageV1;
+};
+
+const verifiedLearningBackupPackages = new WeakMap<object, true>();
+
+function deepFreeze<T>(value: T): T {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  if (Object.isFrozen(value)) {
+    return value;
+  }
+  Object.freeze(value);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      deepFreeze(item);
+    }
+    return value;
+  }
+  for (const key of Object.keys(value as Record<string, unknown>)) {
+    deepFreeze((value as Record<string, unknown>)[key]);
+  }
+  return value;
+}
+
+function sealVerifiedLearningBackupPackage(
+  pkg: LearningBackupPackageV1,
+): VerifiedLearningBackupPackage {
+  const sealed: VerifiedLearningBackupPackage = Object.freeze({
+    package: deepFreeze(pkg),
+  });
+  verifiedLearningBackupPackages.set(sealed, true);
+  return sealed;
+}
+
+export function isVerifiedLearningBackupPackage(
+  value: unknown,
+): value is VerifiedLearningBackupPackage {
+  return typeof value === "object" && value !== null && verifiedLearningBackupPackages.has(value);
+}
+
+export type ParseLearningBackupResult =
+  | {
+      ok: true;
+      package: LearningBackupPackageV1;
+      verified: VerifiedLearningBackupPackage;
+    }
+  | {
+      ok: false;
+      errors: LearningBackupValidationError[];
+      truncated?: boolean;
+    };
 
 const PACKAGE_TOP_LEVEL_KEYS = new Set([
   "package_schema",
@@ -509,7 +565,8 @@ export function parseLearningBackupJson(
     records,
   };
 
-  return { ok: true, package: pkg };
+  const verified = sealVerifiedLearningBackupPackage(pkg);
+  return { ok: true, package: verified.package, verified };
 }
 
 export type LearningBackupBuildErrorCode =
