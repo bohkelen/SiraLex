@@ -116,15 +116,18 @@ LP1I4 — Backup and Restore Surface — Implemented
 LP1I5 — Offline and Lifecycle Verification — Implemented
 LP1I6 — Closure — Complete
 PD1 — Next Product Build Decision — Complete
-PV1 — Production and Device Validation — Selected
-PV1D0 — Production and Device Validation Definition — Next
+CF1 — Community Correction and Feedback Capture — Selected
+CF1D0 — Community Correction and Feedback Product Definition — Next
+PV1A — Production Identity and Desktop Smoke — Parallel active
+PV1B — Physical Device Validation — Parallel, hardware-gated
 ```
 
 - **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
 - **LP1** is closed (`docs/reports/lp1_local_learning_backup_restore_closure_report.md`).
-- **PD1** selects a validation milestone rather than another Learning feature or corpus runtime build (`docs/reports/pd1_next_product_build_decision.md`).
-- **PV1** confirms production-host identity and Learning-inclusive production smoke; Android/iPhone package-matrix execution remains hardware-gated.
-- **Next slice:** `PV1D0 — Production and Device Validation Definition`.
+- **PD1** selects `CF1 — Community Correction and Feedback Capture` as the next product build while keeping release validation as a parallel track (`docs/reports/pd1_next_product_build_decision.md`).
+- **CF1** is a local-first correction capture/handoff surface over Phase 1.5A/B; it does not auto-apply suggestions or replace corpus review.
+- **Next slice:** `CF1D0 — Community Correction and Feedback Product Definition`.
+- **Parallel validation:** `PV1A` production identity/desktop smoke now; `PV1B` physical-device matrix when hardware is available.
 - Prior portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
 
 ---

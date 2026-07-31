@@ -3,13 +3,20 @@
 ## 1. Decision
 
 ```text
-PD1_VALIDATION_MILESTONE_SELECTED
+PD1_NEXT_BUILD_SELECTED
 ```
 
-Selected direction:
+Selected next product build:
 
 ```text
-PV1 — Production and Device Validation
+CF1 — Community Correction and Feedback Capture
+```
+
+Parallel release-readiness track (not competing for the same slot):
+
+```text
+PV1A — Production Identity and Desktop Smoke
+PV1B — Physical Device Validation — hardware-gated
 ```
 
 This slice is documentation-only. No runtime code, tests, IndexedDB schema, UI,
@@ -19,58 +26,58 @@ featured-anchor work already committed at `b186e41` was not altered.
 
 Authoritative inputs:
 
+- owner clarification that validation and product construction are parallel tracks
 - `docs/reports/pd0_next_product_build_decision.md`
 - `docs/reports/lp1_local_learning_backup_restore_closure_report.md`
 - `docs/reports/ls4d0_guided_review_sessions_product_definition.md`
 - `docs/reports/lsn1_learning_system_post_ls3_decision.md`
-- `docs/ROADMAP.md`
+- `docs/ROADMAP.md` (Phase 1.5A/B complete; UI/moderation still out of scope)
+- `shared/specs/correction-record-schema-v1.md`
+- `shared/specs/correction-application-dry-run.md`
+- `README.md` community feedback loop posture
 - `docs/PHASE_7N1_RELEASE_DECISION.md`
-- `docs/reports/phase7n1_slice5_device_evidence_record.md`
-- `docs/reports/phase7n1r1_featured_release_candidate_package_report.md`
-- `docs/reports/phase7n2b4g13_promotion_closure_report.md`
-- `docs/reports/phase7n2l4q4_phase7n_evidence_quality_closure_report.md`
 - `docs/DEVICE_VALIDATION.md`
 - `docs/PHASE_6C_TESTER_PACKET.md`
-- `docs/QUERY_VALIDATION_ROUND_1.md`
-- `docs/RESULT_INTERPRETABILITY_FEASIBILITY_AUDIT.md`
-- `docs/PHASE_7I_PHRASE_ALIAS_REVIEW_PACKET.md`
+- Phase 7N evidence-quality closure and related search/content reports
 - current offline-first and privacy boundaries
+
+Revision note: an earlier PD1 draft selected validation alone
+(`PD1_VALIDATION_MILESTONE_SELECTED`). Owner clarification rejects treating
+validation and product construction as mutually exclusive. This document is the
+authoritative PD1 record.
 
 ---
 
 ## 2. Executive finding
 
 LP1 closed the last high-confidence personal-state gap in the Learning loop.
-What remains is not an automatic Learning-System continuation. With
-`NO_EVIDENCE` for natural Learning use and no new search `recommend_next` after
-Phase 7N evidence-quality closure, building another runtime feature would
-mostly amplify an unverified delivery path.
+SiraLex already lets users search, inspect entries, save vocabulary, review it,
+track progress, and protect that state. What it does **not** yet let them do is
+respond when the dictionary is wrong, incomplete, unclear, or missing something.
 
-The clearest current product problem is **delivery uncertainty**:
+That is not a speculative problem. A dictionary inevitably exposes spelling
+errors, missing translations, weak or misleading glosses, missing examples,
+incorrect parts of speech, missing N’Ko, ambiguous senses, and missing entries.
+The original product direction explicitly included anonymous suggestions and
+corrections. More importantly, the repository has already completed the
+**correction record schema** and **dry-run correction pipeline**. ROADMAP states
+that the missing layer is the user-facing and moderation side, not the
+foundational correction model.
 
-- the repository’s current featured identity is
-  `bundle_full_20260710_337619ff` (7N2B);
-- ROADMAP still treats production deploy verification as open and warns not to
-  treat the featured bundle as live until confirmed on the host;
-- Phase 6C cannot be sent because the tester packet still contains
-  `APP_LINK_REQUIRED_BEFORE_SENDING`;
-- Phase 7N1 package-device matrix completion is **0%**
-  (`not_ready_for_validation`);
-- Android mid-range real-device validation remains an **external blocker**
-  (hardware unavailable);
-- historical iPhone validation used an older catalog/manual path and
-  non-current bundle identity, so it does not certify the current Learning-
-  inclusive product.
+This creates a rare combination:
 
-**Lock:** continue building only where gain is concrete. A defined feature does
-not deserve implementation automatically. Operational validation may outrank
-new features when deployment uncertainty blocks real use.
+> Concrete user value + existing architectural foundation + strategic data leverage.
 
-Selecting **PV1** does not invent Learning demand, does not default to LS4, and
-does not disguise corpus work as a consumer feature. It bounds the next work as
-a validation milestone whose immediately executable core is production-host
-identity confirmation and production smoke, with Android/iPhone package-matrix
-execution gated on hardware access rather than pretended complete.
+**Lock:** continue building only where gain is concrete. Do not default to LS4
+or another Learning System milestone. Do not stop product development merely
+because production identity and Android behavior remain unverified. Validation
+proceeds in parallel as PV1A now and PV1B when hardware is available.
+
+Corrected conclusion:
+
+> Continue building, but stop extending the already broad Learning system. Build
+> the missing community-feedback bridge while production and device validation
+> proceed independently.
 
 ---
 
@@ -94,6 +101,10 @@ to confirmed production/device field proof):
 | Local opt-in query logging and export | Shipped |
 | Package-based dictionary installation (`.siralex.zip` route) | Built; device gate not started |
 | Catalog-driven featured install | Shipped in-repo |
+| Correction record schema (Phase 1.5A) | Complete |
+| Dry-run correction application pipeline (Phase 1.5B) | Complete |
+| User-facing correction / feedback capture | **Missing** |
+| Moderation dashboard / committed correction release | Out of scope for CF1 MVP |
 | Strict bundle and Learning data boundaries | Locked |
 
 Current featured local identity (repository fact):
@@ -106,6 +117,8 @@ package candidate SHA-256: sha256:f27530705132bf0fb81628f129d49d985b8456b63734bf
 ```
 
 This decision must not select a capability already shipped under another name.
+CF1 is the missing capture/handoff surface over the already-shipped correction
+foundation.
 
 ---
 
@@ -118,19 +131,25 @@ Locked for PD1:
 - Infrastructure is not a product unless it serves an immediate user-facing
   capability.
 - Corpus work and runtime-product work must be distinguished.
-- Operational validation may outrank new features when deployment uncertainty
-  blocks real use.
+- Operational validation may proceed **in parallel** with product construction;
+  it does not monopolize the next-build slot.
 - Lack of natural-use evidence lowers confidence and must narrow scope.
 - Do not default to LS4.
 - Do not default to another Learning System milestone.
 - Do not default to cloud sync, scheduling, history, AI, or analytics.
-- A valid result may be a narrowly bounded validation/deployment milestone
-  rather than new runtime functionality.
+- Validation remains active even when a runtime product build is selected.
 
 LS4 posture remains exactly:
 
 ```text
 LS4 — Guided Review Sessions — Defined, deferred pending demonstrated need
+```
+
+Parallel-track posture:
+
+```text
+Release-readiness track: PV1 — Production and Device Validation
+Product-build track: CF1 — Community Correction and Feedback Capture
 ```
 
 ---
@@ -140,29 +159,27 @@ LS4 — Guided Review Sessions — Defined, deferred pending demonstrated need
 | Finding | Label |
 | --- | --- |
 | PD0 selected LP1; LP1 is now `LP1_CLOSED` | repository fact |
-| ROADMAP status block already lists LP1 closed and PD1 next | repository fact |
-| Natural Learning Save/Review/Progress use evidence absent (`NO_USAGE_EVIDENCE` / `NO_EVIDENCE`) | repository fact |
+| Natural Learning Save/Review/Progress use evidence absent | repository fact |
 | Phase 7N evidence-quality track closed; Round 3 had zero search `recommend_next` | repository fact |
+| README / product posture includes anonymous suggestions for spelling, translations, examples, POS, N’Ko, and notes | repository fact |
+| Phase 1.5A correction schema complete (`shared/specs/correction-record-schema-v1.md`) | repository fact |
+| Phase 1.5B dry-run apply pipeline complete (`siralex-corrections-dry-run`) | repository fact |
+| ROADMAP: UI/moderation and committed correction releases still out of scope after 1.5A/B | repository fact |
+| Branch C / morphology deferred until users, logs, and correction data exist | repository fact / owner directive |
 | Current featured bundle in repo is `bundle_full_20260710_337619ff` | repository fact |
-| ROADMAP “At a glance” still names older `bundle_full_20260518_15605571` as featured | repository fact (stale doc identity; not used as current truth) |
-| Production deploy verification remains open in ROADMAP backlog | repository fact |
-| Historical production smoke exists for earlier Phase 7F/7G-era bundles on `loquacious-piroshki-be432c.netlify.app` | repository fact |
-| No repository record confirms the live host currently serves 7N2B + post-LP1 app | missing evidence |
+| Production deploy verification remains open for current identity | missing evidence |
 | Phase 6C packet still has `APP_LINK_REQUIRED_BEFORE_SENDING` | repository fact |
-| Phase 7N1 status `not_ready_for_validation`; matrix 0% executed | repository fact |
-| Android Chrome real-device validation pending hardware access (~2 months deferred in DEVICE_VALIDATION) | external blocker |
-| Historical iPhone validation used older `norm_v2` / non-7N2B identity | repository fact |
-| Automated browser evidence covers Learning offline Save/Review/Backup | repository fact |
-| Automated browser evidence is explicitly not real-device release evidence | owner directive / repository fact |
-| Controlled Phase 5b: 156 queries; 108 hits / 48 misses; not real-user telemetry | repository fact |
-| Phrase aliases: two candidates deferred pending human review; unsafe mappings rejected | repository fact |
-| Lexical residuals (`fièvre`, `poulet`, `bonjour`, Son/`prix` validation) blocked on owner validation data | repository fact / external blocker |
-| Phase 7G interpretability UI shipped; deeper multi-target summaries deferred pending 6C | repository fact |
-| Multi-target French mappings were ~36% on older featured audit bundle | repository fact |
+| Phase 7N1 package matrix 0% / `not_ready_for_validation` | repository fact |
+| Android Chrome real-device validation pending hardware access | external blocker |
+| Historical iPhone validation used older non-7N2B identity | repository fact |
+| Controlled Phase 5b search gaps and deferred phrase aliases remain | repository fact |
+| Lexical residuals (`fièvre`, `poulet`, `bonjour`, etc.) blocked on owner validation data | repository fact / external blocker |
+| Phase 7G interpretability UI shipped | repository fact |
 | Source-language Learning objects remain architecture/corpus blocked | repository fact |
-| Owner continues building after LP1 via PD1 comparison, not via LS4 default | owner directive |
-| Selecting validation now prevents building on an unverified delivery path | inference |
-| Backup demand was inferred risk; LP1 closed that risk without proving restore requests | repository fact |
+| Owner directive: validation and product construction are parallel tracks | owner directive |
+| Owner directive: select CF1 as next product build; PV1A/PV1B remain active | owner directive |
+| A dictionary will expose content defects to users even without measured complaint volume | inference |
+| CF1 drafts are not authoritative lexical evidence until human review | owner directive |
 
 Do not turn an inference into an observed user need. Absence of Learning usage
 evidence continues to defer LS4, scheduling, history-as-product, and collection
@@ -179,11 +196,13 @@ organization.
 | Search behavior (controlled / harness) | `STRUCTURED_TESTER_EVIDENCE` + `AUTOMATED_PRODUCT_EVIDENCE` |
 | First-install friction | `STRUCTURED_TESTER_EVIDENCE` (historical/partial); current package route `NO_EVIDENCE` on device |
 | Result interpretation | `AUTOMATED_PRODUCT_EVIDENCE` + architectural audit; natural confirmation `NO_EVIDENCE` |
-| Offline/device behavior | Desktop automation `AUTOMATED_PRODUCT_EVIDENCE`; current Android `NO_EVIDENCE`; historical iPhone on old identity only |
-| Dictionary-management behavior | `AUTOMATED_PRODUCT_EVIDENCE` + historical device notes; current `.siralex.zip` gate `NO_EVIDENCE` |
+| Offline/device behavior | Desktop automation `AUTOMATED_PRODUCT_EVIDENCE`; current Android `NO_EVIDENCE` |
+| Dictionary-management behavior | `AUTOMATED_PRODUCT_EVIDENCE` + historical device notes |
 | Lexical/content deficiencies | `ARCHITECTURAL_EVIDENCE` + controlled misses; natural demand `NO_EVIDENCE` |
+| Correction capture demand | `ARCHITECTURAL_EVIDENCE` + product-direction evidence; natural complaint volume `NO_EVIDENCE` |
+| Correction pipeline readiness | `AUTOMATED_PRODUCT_EVIDENCE` / architectural completeness for schema + dry-run |
 | Backup demand | Risk closed by LP1; observed restore requests still `NO_EVIDENCE` |
-| Deployment reliability | `MISSING` for current featured identity on live host; older smoke exists for prior bundles |
+| Deployment reliability | Missing for current featured identity on live host; older smoke exists for prior bundles |
 
 Do not collapse automated correctness evidence into user-demand evidence.
 
@@ -193,9 +212,9 @@ Do not collapse automated correctness evidence into user-demand evidence.
 
 | Blocker | Affects | Status |
 | --- | --- | --- |
-| Physical Android hardware unavailable | Android mid-range install/offline/package matrix; Phase 5b Android completion | external blocker |
-| Confirmed deploy URL for Phase 6C | Natural-use / structured field feedback program | missing evidence / operational gap (solvable by production verification) |
-| Owner validation data for lexical residuals (`fièvre`, `poulet`, `bonjour`, etc.) | Bounded lexical packet approval | external blocker / missing evidence |
+| Physical Android hardware unavailable | PV1B Android matrix; Phase 5b Android completion | external blocker |
+| Confirmed deploy URL for Phase 6C | Natural-use field program | missing evidence / operational gap (PV1A) |
+| Owner validation data for lexical residuals | Direct corpus packet approval | external blocker / missing evidence |
 | Human reviewer for deferred Phase 7I phrase aliases | Phrase-retrieval alias promotion | missing evidence |
 | Genuine independently authoritative source lexicon + identity | Source-language Learning objects | architecture prerequisite |
 
@@ -205,21 +224,18 @@ Separate:
 validation that can be executed immediately
 ```
 
-- fetch live `/catalog.json` and featured-bundle identity on the intended host;
-- compare to in-repo 7N2B hashes and `VITE_FEATURED_BUNDLE_ID`;
-- desktop browser production smoke: install, search, offline reopen, Save,
-  Review, Progress, Learning backup/restore;
-- record defects with candidate identity and rerun evidence;
-- only after host confirmation, fill Phase 6C `APP_LINK`.
+- PV1A: live host `/catalog.json` and featured-bundle identity checks;
+- desktop browser production smoke including Learning paths;
+- defect logging with identity hashes.
 
 ```text
 externally blocked validation
 ```
 
-- Android Chrome mid-range package/catalog matrix;
-- iPhone Safari package matrix for current `.siralex.zip` candidate, unless a
-  tester/device is available now;
-- any claim that desktop automation certifies mobile reliability.
+- PV1B: Android/iPhone physical-device matrix until hardware/tester access.
+
+These blockers constrain PV1B. They do **not** block CF1 definition or local
+offline correction-capture implementation.
 
 ---
 
@@ -227,19 +243,21 @@ externally blocked validation
 
 | ID | Candidate | Classification |
 | --- | --- | --- |
-| A | Production Deployment and Device Validation | deployment/validation milestone |
-| B | Lexical Content Quality Program | corpus/data program |
+| A | Production Deployment and Device Validation | deployment/validation milestone (parallel track) |
+| B | Lexical Content Quality Program | corpus/data program (fed by CF1 exports) |
 | C | Search and Discovery Improvement | runtime product capability (evidence-gated) |
-| D | Result Interpretation Follow-up | runtime product capability (or corpus if data-absent) |
+| D | Result Interpretation Follow-up | runtime product capability |
 | E | Dictionary Distribution and Installation UX | runtime product capability |
 | F | LS4 Guided Review Sessions | runtime product capability |
 | G | Local Learning Organization | runtime product capability |
 | H | Learning Scheduling or History | runtime product capability / research decision |
 | I | Genuine Source-Language Lexical Objects | architecture prerequisite (+ corpus) |
 | J | Local Data Portability Beyond Learning | operational tooling / runtime capability |
-| K | Another repository-supported need | none stronger than A found |
+| **CF1** | Community Correction and Feedback Capture | **runtime product capability** |
+| K | Sentence analysis / Branch C linguistic depth | research decision / deferred linguistic program |
 
-A corpus or operational program must not be disguised as a consumer feature.
+CF1 is a capture-and-handoff product, not a moderation ecosystem and not a
+corpus-edit feature.
 
 ---
 
@@ -258,7 +276,7 @@ Score each candidate **1–5**.
 7. Ability to validate without fabricated demand
 8. Time to meaningful user outcome
 9. Breadth of users helped
-10. Whether the work unlocks real-world adoption
+10. Whether the work unlocks real-world adoption / later evidence
 
 ### Unfavorable-high (higher is worse)
 
@@ -269,38 +287,42 @@ Score each candidate **1–5**.
 15. Operational burden
 16. Opportunity cost
 17. Risk of misleading language or learning claims
-18. Reversibility *inverted in narrative*: high reversibility is favorable; scored
-    separately as Reversibility↑ where 5 = easy to stop/undo
 
-No raw aggregate without weighting. Decisive weights for PD1:
+Decisive weights for revised PD1:
 
-1. truthful evidence of current pain;
-2. unlock of real-world adoption / natural-use evidence;
-3. bounded MVP;
+1. concrete user-facing gain that is not another Learning extension;
+2. reuse of existing architectural foundation;
+3. strategic leverage into lexical/search evidence;
 4. offline fit and low semantic risk;
-5. avoid fabricating Learning demand.
+5. independence from Android hardware;
+6. parallel compatibility with PV1.
+
+Validation is scored as a parallel necessity, not as the sole winner of the
+product-build slot.
 
 ---
 
 ## 10. Candidate comparison matrix
 
-| Candidate | Gain↑ | Pain↑ | Leverage↑ | Offline↑ | Fit↑ | MVP↑ | No fabricate↑ | Time↑ | Reach↑ | Adoption↑ | Corpus dep.↓ | Hw dep.↓ | Schema↓ | Privacy↓ | Ops↓ | Opp. cost↓ | Misleading↓ | Net reading |
+| Candidate | Gain↑ | Pain↑ | Leverage↑ | Offline↑ | Fit↑ | MVP↑ | No fabricate↑ | Time↑ | Reach↑ | Adoption/evidence↑ | Corpus dep.↓ | Hw dep.↓ | Schema↓ | Privacy↓ | Ops↓ | Opp. cost↓ | Misleading↓ | Net reading |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **A Validation (selected)** | 4 | 5 | 5 | 5 | 5 | 4 | 5 | 5* | 5 | 5 | 1 | 4† | 1 | 1 | 3 | 2 | 1 | Best now: closes delivery uncertainty; unlocks evidence |
-| B Lexical quality | 5 | 4 | 5 | 5 | 4 | 2 | 3 | 2 | 5 | 3 | 5 | 1 | 2 | 1 | 4 | 3 | 2 | Strategic; needs bounded packet + human review |
-| C Search/discovery | 3 | 3 | 3 | 5 | 3 | 2 | 2 | 2 | 4 | 3 | 4 | 1 | 3 | 1 | 3 | 3 | 3 | Phrase path deferred; fuzzy/rank rejected |
-| D Result interpretation | 3 | 2 | 3 | 5 | 4 | 3 | 2 | 3 | 3 | 2 | 3 | 1 | 2 | 1 | 2 | 3 | 2 | 7G shipped highest-value layer; 6C not run |
-| E Install UX | 3 | 3 | 3 | 5 | 4 | 3 | 3 | 3 | 4 | 4 | 1 | 4† | 2 | 1 | 3 | 3 | 1 | Package path untested on device; redesign premature |
-| F LS4 | 2 | 1 | 5 | 5 | 5 | 5 | 1 | 4 | 1 | 1 | 1 | 1 | 1 | 1 | 2 | 4 | 2 | Defined; deferred; no demonstrated need |
+| **CF1 (selected build)** | 5 | 4* | 5 | 5 | 5 | 4 | 4 | 4 | 4 | 5 | 1 | 1 | 3 | 3 | 3 | 2 | 2 | Best product build: capture bridge over Phase 1.5 |
+| A PV1 (parallel) | 4 | 5 | 5 | 5 | 5 | 4 | 5 | 5† | 5 | 5 | 1 | 4‡ | 1 | 1 | 3 | 2 | 1 | Required release-readiness track; not exclusive |
+| B Lexical quality | 5 | 4 | 5 | 5 | 4 | 2 | 3 | 2 | 5 | 3 | 5 | 1 | 2 | 1 | 4 | 3 | 2 | Strategic corpus program; CF1 feeds it |
+| C Search/discovery | 3 | 3 | 3 | 5 | 3 | 2 | 2 | 2 | 4 | 3 | 4 | 1 | 3 | 1 | 3 | 3 | 3 | Needs correction/log evidence first |
+| D Result interpretation | 3 | 2 | 3 | 5 | 4 | 3 | 2 | 3 | 3 | 2 | 3 | 1 | 2 | 1 | 2 | 3 | 2 | 7G shipped; remaining needs better data |
+| E Install UX | 3 | 3 | 3 | 5 | 4 | 3 | 3 | 3 | 4 | 4 | 1 | 4‡ | 2 | 1 | 3 | 3 | 1 | Observe under PV1 first |
+| F LS4 | 2 | 1 | 5 | 5 | 5 | 5 | 1 | 4 | 1 | 1 | 1 | 1 | 1 | 1 | 2 | 4 | 2 | Deferred pending demonstrated need |
 | G Organization | 2 | 1 | 3 | 5 | 4 | 2 | 1 | 3 | 1 | 1 | 1 | 1 | 3 | 2 | 2 | 4 | 1 | No collection-scale evidence |
-| H Scheduling/History | 2 | 1 | 2 | 4 | 2 | 1 | 1 | 2 | 1 | 1 | 1 | 1 | 5 | 4 | 4 | 5 | 5 | Deferred; mastery claims risk |
+| H Scheduling/History | 2 | 1 | 2 | 4 | 2 | 1 | 1 | 2 | 1 | 1 | 1 | 1 | 5 | 4 | 4 | 5 | 5 | Deferred; mastery-claim risk |
 | I Source objects | 3 | 2 | 1 | 4 | 1 | 1 | 2 | 1 | 2 | 1 | 5 | 1 | 5 | 1 | 4 | 5 | 3 | Architecture-blocked |
-| J Broader portability | 2 | 1 | 3 | 5 | 3 | 2 | 2 | 2 | 1 | 1 | 1 | 1 | 3 | 4 | 3 | 4 | 2 | Boundaries already correct; no demand |
+| J Broader portability | 2 | 1 | 3 | 5 | 3 | 2 | 2 | 2 | 1 | 1 | 1 | 1 | 3 | 4 | 3 | 4 | 2 | No demand beyond LP1 |
+| K Sentence analysis | 2 | 1 | 1 | 3 | 1 | 1 | 1 | 1 | 2 | 1 | 5 | 1 | 4 | 1 | 5 | 5 | 5 | Deferred linguistic depth |
 
-\* Immediate production-host verification is fast; full Android matrix is not.
-† Hardware dependency is high for the device half; the selected MVP therefore
-front-loads host/desktop verification and treats Android as a gated sub-track,
-not a silent assumption of completion.
+\* Pain is the inevitable inability to report dictionary defects, grounded in
+product direction and content-defect classes, not measured complaint volume.
+† PV1A is immediately executable.
+‡ Hardware dependency applies to PV1B / install-device proof, not to CF1.
 
 ---
 
@@ -310,130 +332,84 @@ not a silent assumption of completion.
 
 | Question | Answer | Label |
 | --- | --- | --- |
-| Is current public deployment confirmed to serve intended bundle and app version? | **No confirmed record for 7N2B + post-LP1 app** | missing evidence |
+| Is current public deployment confirmed for intended bundle/app? | No confirmed record for 7N2B + post-LP1 app | missing evidence |
 | Does production installation work on intended browsers? | Older smokes exist; current identity unverified | missing evidence |
-| Is Android real-device offline behavior still unverified for current product? | **Yes** | external blocker + missing evidence |
-| Are automated browser tests sufficient to infer mobile reliability? | **No** (explicitly disallowed as release evidence) | owner directive |
-| Are storage and performance acceptable on constrained devices? | Unknown for current Learning-inclusive product | missing evidence |
-| Does a production failure prevent every other feature from delivering value? | **Yes** — users cannot benefit from shipped work they never receive | inference grounded in delivery chain |
-| Can required validation be performed now? | Host identity + desktop production smoke: **yes**. Android matrix: **no** until hardware | mixed |
-| Is deployment verification a bounded milestone with clear exit criteria? | **Yes** if scoped as PV1 | owner directive / this decision |
-| Would it produce actionable defects rather than another report? | Yes, if exit criteria require defect logs, identity hashes, and rerun evidence | inference |
+| Is Android real-device offline behavior still unverified? | Yes | external blocker + missing evidence |
+| Are automated browser tests sufficient to infer mobile reliability? | No | owner directive |
+| Does production failure prevent every other feature from delivering value? | It reduces real-user reach; it does not freeze all local product construction | owner directive (revised) |
+| Can required validation be performed now? | PV1A yes; PV1B no until hardware | mixed |
+| Is deployment verification a bounded milestone? | Yes, as PV1A/PV1B | this decision |
 
 ### Conclusion
 
-Building another feature before answering “is the intended product actually
-reachable?” would be irrational for adoption and evidence quality. Selecting a
-**hardware-only** milestone would violate the rule against choosing blocked
-hardware work with no substitute. PV1 therefore:
+PV1 remains necessary and active. It does **not** justify stopping product
+development while desktop validation proceeds or Android hardware is
+unavailable. Split:
 
-1. executes production-host and desktop production smoke **immediately**;
-2. records Android/iPhone package/device matrix as **externally blocked** until
-   access exists;
-3. treats defects as first-class outputs;
-4. unlocks Phase 6C only after a confirmed URL and identity.
+```text
+PV1A — Production Identity and Desktop Smoke
+PV1B — Physical Device Validation — hardware-gated
+```
 
 ---
 
 ## 12. Lexical content quality
 
-Repository evidence shows:
+Lexical quality has very high leverage because it improves search, entries,
+Saved Vocabulary, and Review. Repository evidence shows lemma gaps, sparse
+examples, sense ambiguity, deferred residuals, and blocked owner-data items.
 
-- controlled misses and lemma gaps (`fièvre`, `poulet`, `bonjour` lexical-
-  blocked);
-- sparse examples / sense ambiguity / limited audio-morphology as source
-  constraints;
-- approved 7N2B content shipped (`moto`, `prix → Son`);
-- phrase aliases deferred, not approved;
-- N’Ko searchable where source-provided; deterministic generation deferred
-  (Branch C).
-
-Distinguish:
-
-| Class | Examples |
-| --- | --- |
-| content absent | `fièvre` miss; deferred lemmas without owner data |
-| content exists but is not surfaced | some lexicon sense/example richness not on index cards |
-| search index does not retrieve existing content | phrase/inflection misses where canonical forms exist |
-| result presentation does not explain existing content | residual multi-target ambiguity after 7G |
+But “improve the dictionary” is not a bounded software feature. Authoritative
+content review remains the bottleneck. Earlier portfolio analysis reached the
+same conclusion.
 
 ### Conclusion
 
-Lexical quality remains strategically vital and improves every surface, but
-“improve the dictionary” is unbounded. No owner-approved bounded packet is
-ready now for the blocked residuals. Classify as standing **corpus/data
-program**, not the primary PD1 selection. Reopen when a reviewed semantic
-domain, ambiguity set, or missing-entry packet is approved.
+Keep lexical quality as **Track C — Corpus improvement**. CF1 is the product
+mechanism that can feed that program through exported, human-reviewed
+correction packets rather than guessing content in the runtime.
 
 ---
 
 ## 13. Search and discovery
 
-| Question | Answer |
-| --- | --- |
-| What failures remain evidenced? | Controlled phrase/partial/inflection misses; deferred aliases; plain `Kun` policy memo |
-| Natural-use, controlled, or theoretical? | Mostly controlled / harness; natural-use absent |
-| Is phrase retrieval still a leading problem? | Leading in controlled evidence; not authorized as demand |
-| Approved phrase aliases available? | **No** — two deferred; seven unsafe rejected |
-| Runtime decomposition authority? | Insufficient without reviewed data |
-| False-positive risk of search change? | High for fuzzy/AI/embeddings/morphology |
-| Deterministic offline possible? | Yes, if data-reviewed |
-| New index vs reviewed data? | Prefer reviewed aliases/data over heuristics |
-| First-hit ordering change? | Avoid unless measured against fixed corpus |
-| Measurable against fixed query set? | Yes |
-| More valuable than fixing content? | Not without approved alias/content packet |
+Controlled search gaps remain, especially phrases and inflections. Several
+proposed changes remain blocked by review or risk false positives. ROADMAP keeps
+linguistic inference and morphology deferred until users, logs, and correction
+data exist.
 
 ### Conclusion
 
-Do **not** select fuzzy search, AI query interpretation, embeddings, ranking
-scores, or automatic morphology. Search improvement remains evidence-gated and
-secondary to confirming delivery + obtaining natural-use signals.
+Do not select fuzzy search, AI query interpretation, embeddings, ranking
+scores, or automatic morphology. CF1 helps generate the missing evidence instead
+of inventing new search rules.
 
 ---
 
 ## 14. Result interpretation
 
-Phase 7G already shipped the highest-value presentation layer:
-
-- French-first labels;
-- neutral query hint;
-- `Pourquoi ce résultat ?`;
-- safer miss guidance;
-- no ranking/alias claims.
-
-Remaining gaps are either content scarcity or compact target-sense summaries
-that the audit said not to implement before Phase 6C priority confirmation.
-There is architectural evidence of multi-target mappings, but **no direct
-tester confirmation** that residual ambiguity outranks delivery/validation.
+Phase 7G already implemented the first major interpretability layer. Remaining
+ambiguity likely requires stronger sense data and usage examples, not merely
+more interface labels. ROADMAP identifies unresolved multi-result
+differentiation but says it needs further confirmation.
 
 ### Conclusion
 
-Reject RI2 as primary next build. Reconsider after Phase 6C or natural-use
-reports that a specific already-authoritative field would resolve competing
-results.
+Reject RI2 as the primary next build. Better correction/example data from CF1
+and later corpus review is the higher-leverage path.
 
 ---
 
 ## 15. Installation and management
 
-| Question | Answer |
-| --- | --- |
-| Ordinary-user first install confusing? | Historical notes suggest technical surfaces; current field confirmation missing |
-| Single-file package sufficient? | Built; device matrix not run |
-| Update/removal understandable? | Not re-proven on current product |
-| Interrupted-install recovery? | Designed; device-unproven for package route |
-| Storage warnings clear? | Not established as current top pain |
-| Catalog install offline after completion? | Automation yes; production/device current identity unverified |
-| Sideload vs catalog? | Both exist; catalog is ordinary path; package is alternate gate |
-| Management complexity block search? | Possible historically; not proven primary now |
-| Browser file-picker problems? | Historical iPhone `.jsonl` issues resolved; package picker untested on Android/iPhone |
-| Manage dictionaries too technical? | Possible; redesign without measured failure is speculative |
+Installation and package/catalog paths should be observed under PV1. Building
+another installation redesign before testing the current package and catalog
+paths would be premature.
 
 ### Conclusion
 
-Do not rebuild already-shipped import paths. Installation problems that matter
-most are currently **validation/evidence** problems under Candidate A, not a
-separate UX rewrite.
+Not selected as the product-build track. Defects discovered in PV1A/PV1B may
+later justify a bounded DX slice.
 
 ---
 
@@ -445,177 +421,152 @@ Exact posture:
 LS4 — Guided Review Sessions — Defined, deferred pending demonstrated need
 ```
 
-| Question | Answer |
-| --- | --- |
-| Evidence full-queue Review is burdensome? | No |
-| Collections large enough to require filtering? | No measured sizes |
-| Users asked for New / Still learning / Remembered isolation? | No |
-| Current queue satisfactory default? | Unknown; no contrary evidence |
-| Chooser friction for small collections? | Plausible risk |
-| More valuable than deployment/search/content? | No under current evidence |
+The existing Learning system is broad enough and requires real use before more
+Review controls are added. Existence of LS4D0 is not evidence.
 
-Existence of LS4D0 is not evidence. LS4 does **not** win PD1.
+### Conclusion
+
+LS4 remains deferred. CF1 does not implement Guided Sessions.
 
 ---
 
 ## 17. Learning scheduling / history
 
-| Question | Answer |
-| --- | --- |
-| Repeated longitudinal Learning use? | No |
-| Users forget to return? | No evidence |
-| All-item Review inefficient? | No evidence |
-| Transparent scheduling supportable? | Not with current latest-status model alone |
-| Immutable history first? | Would be a large prerequisite |
-| User-facing consumer for history? | Undefined |
-| Clock policy? | Undefined |
-| Privacy data created? | Yes — longitudinal personal learning trails |
-| Retention/mastery claims risk? | High |
+No longitudinal Learning use evidence. Latest status, count, and timestamp are
+not proof that due-state is needed. Privacy and mastery-claim risks remain high.
 
-Default disposition remains **deferred**. Latest status, count, and timestamp
-are not proof that due-state is needed.
+### Conclusion
+
+Default disposition remains deferred.
 
 ---
 
 ## 18. Source-language objects
 
-Nothing material changed since PD0/LSN1:
-
-- no genuine independently authoritative EN/FR lexicon object;
-- no stable source-entry Learning identity;
-- `index_mapping` is not a source lexicon;
-- Save/Review ownership for source objects undefined.
-
-Keep **blocked**.
+Nothing material changed since PD0/LSN1. Keep blocked. Do not use
+`index_mapping` as a source lexicon. CF1 attaches to genuine dictionary entries
+already addressable by `bundle_id` + `ir_id`.
 
 ---
 
 ## 19. Broader portability
 
-LP1 correctly separated Learning backup from dictionary packages and query logs.
-
-| Need | Evidence |
-| --- | --- |
-| Full app backup | None |
-| Dictionary installation backup | Packages already are distribution artifacts |
-| Query-log backup | Separate consent; diagnostic, not Learning |
-| Settings migration | No demand |
-| Device-to-device transfer beyond Learning backup | No demand |
-
-Do not select full-database export for convenience.
+LP1 already covers Learning backup. CF1 export is a **correction packet**, not
+a full-database backup, not a dictionary package, and not a query-log export.
+Keep those boundaries strict.
 
 ---
 
 ## 20. Other repository-supported candidate
 
-No Candidate K outranks PV1. Closest runners-up:
+### Sentence analysis / Branch C
 
-- bounded lexical packet (blocked on owner data);
-- Phase 6C field program (blocked on confirmed app link — solved by PV1);
-- Phase 7N1 device matrix (subset of PV1; Android externally blocked).
+Sentence analysis remains part of the broad original vision, but it is not the
+responsible next build. Producing “best-guess” Maninka sentences requires phrase
+authority, morphology, compositional rules, uncertainty semantics, and
+significantly stronger language evidence. ROADMAP keeps that linguistic depth
+deferred rather than allowing the runtime to invent language.
 
-Unrelated featured-anchor navigation (`b186e41`) is outside this decision and
-must not be mixed into the PD1 commit.
+### CF1 as Candidate K / selected build
+
+CF1 is the strongest repository-supported next **runtime product** because:
+
+- product direction already names the feedback loop;
+- Phase 1.5A/B foundation exists;
+- UI/moderation gap is explicitly recorded;
+- offline local capture can ship without Android hardware;
+- exports feed later lexical/search work without claiming authority.
 
 ---
 
 ## 21. Candidate MVPs
 
-### A — selected
+### CF1 — selected
 
 ```text
-Confirm current production build serves the intended app and featured 7N2B
-identity; complete desktop production smoke for catalog install, offline
-reopen, Save, Review, Progress, and Learning backup/restore; document
-Android/iPhone package and mid-range device matrix as externally blocked
-until hardware access; record defects with identity hashes and rerun evidence
+From a genuine dictionary entry, capture a structured local correction
+suggestion with issue type, current/proposed values, explanation, and stable
+entry context; allow pending review/edit/delete; export a deterministic
+correction packet for external human review into the existing correction
+pipeline — without modifying the installed dictionary
 ```
 
-### B — lexical
+Loop:
 
 ```text
-Review and enrich one bounded ambiguity or missing-entry set with
-authoritative owner-approved data and rebuild the bundle
+Entry detail
+  → Suggest a correction
+  → choose issue type
+  → enter proposed correction and explanation
+  → save locally
+  → review pending suggestions
+  → export correction packet
+  → external human review
+  → existing correction pipeline
 ```
 
-Rejected as primary: no approved packet ready.
-
-### C — search
+### PV1 — parallel
 
 ```text
-Implement one reviewed phrase-retrieval mechanism over approved phrase data
-with fixed regression corpus
+PV1A: confirm production identity and complete desktop production smoke
+PV1B: execute physical-device matrix when hardware is available
 ```
 
-Rejected as primary: approved phrase data unavailable.
+### Rejected primary MVPs
 
-### D — result interpretation
+- Lexical: one reviewed domain/packet — corpus track, not CF1 substitute
+- Search: one reviewed phrase mechanism — blocked on approved data
+- Result interpretation: surface one authoritative distinguishing field — premature
+- Install UX: resolve one measured failure — observe under PV1 first
+- LS4: status-filtered Review — deferred
+- Sentence analysis: rejected as inventing language under current evidence
 
-```text
-Surface one already-authoritative context field that materially distinguishes
-competing results
-```
-
-Rejected as primary: 7G shipped; 6C priority unconfirmed.
-
-### E — installation UX
-
-```text
-Resolve one measured first-install or recovery failure through the current
-package/catalog path
-```
-
-Rejected as primary: failures not yet measured on current route; measurement
-belongs to PV1.
-
-### F — LS4
-
-```text
-Status-filtered fresh Review sessions using existing queue groups
-```
-
-Rejected: deferred pending demonstrated need.
-
-### G–J
-
-Rejected: no evidence / architecture-blocked / boundary-violating convenience.
-
-Rejected MVP shapes include “improve UX”, “improve content”, “make search
-smarter”, “add AI”, “build analytics”, and “prepare for sync.”
+Rejected vague MVP shapes: “improve UX”, “improve content”, “make search
+smarter”, “add AI”, “build analytics”, “prepare for sync.”
 
 ---
 
 ## 22. Dependency graph
 
 ```text
-Production deployment
-  → enables real-user access                    [hard prerequisite]
-  → enables natural-use evidence                [evidence prerequisite]
-  → informs search/content/Learning priorities  [evidence prerequisite]
+Production deployment (PV1A)
+  → enables real-user access                         [hard prerequisite for field use]
+  → enables natural-use evidence                     [evidence prerequisite]
+  → informs search/content/Learning priorities       [evidence prerequisite]
+  → independent of CF1 local implementation          [independent]
+
+Physical device validation (PV1B)
+  → hard prerequisite: hardware access               [hard prerequisite / external]
+  → independent of CF1 definition/implementation     [independent]
+
+CF1 local correction capture
+  → optional foundation for later lexical packets    [optional foundation]
+  → evidence prerequisite for many search rule changes [evidence prerequisite]
+  → does not auto-apply to dictionary                [independent constraint]
+  → hard fit: genuine lexicon_entry identity         [hard prerequisite]
 
 Authoritative corpus enrichment
-  → improves search results                     [optional foundation]
-  → improves entry detail                       [optional foundation]
-  → improves Saved Vocabulary                   [optional foundation]
-  → improves Review cards                       [optional foundation]
-
-Reviewed search evidence
-  → may justify index/data changes              [evidence prerequisite]
-  → does not automatically justify runtime heuristics [independent constraint]
+  → improves search results                          [optional foundation]
+  → improves entry detail                            [optional foundation]
+  → improves Saved Vocabulary / Review cards         [optional foundation]
+  → hard need: human review of CF1 exports           [hard prerequisite]
 
 Natural Learning use
-  → may justify LS4                             [evidence prerequisite]
-  → may justify History or Scheduling later     [evidence prerequisite]
+  → may justify LS4                                  [evidence prerequisite]
+  → may justify History or Scheduling later          [evidence prerequisite]
 
 Source-language corpus + identity
   → prerequisite for source-language Learning objects [hard prerequisite]
+```
 
-Desktop production smoke
-  → partial substitute for host identity questions [optional foundation]
-  → not a substitute for Android reliability      [independent constraint]
+Reinforcing loop:
 
-Android hardware access
-  → hard prerequisite for Android matrix          [hard prerequisite / external]
+```text
+Production access
+  → real use
+  → correction submissions and query evidence
+  → reviewed lexical improvements
+  → better search, entries, Saved Vocabulary, and Review
 ```
 
 ---
@@ -624,85 +575,76 @@ Android hardware access
 
 | If selected | Delayed | Trade-off |
 | --- | --- | --- |
-| **PV1 (selected)** | Immediate runtime feature coding; corpus packet execution | Prevents building on an unverified delivery path; unlocks Phase 6C and truthful prioritization |
-| Lexical quality | Validation and any runtime polish | Improves every surface but waits on human linguistic/owner review; does not prove users can reach the app |
-| Search improvement | Validation + content authority | Risks false positives without approved data |
-| Result interpretation | Validation / content | Likely duplicates 7G value without 6C confirmation |
-| Install UX rewrite | Validation | Speculative without measured current failures |
-| LS4 | Broader dictionary value and delivery proof | Improves control for an unproven problem |
-| Scheduling/history | Almost everything valuable | High schema/privacy/claim risk for zero evidenced pain |
-| Source objects | All nearer gains | Architecture-blocked |
-| Broader portability | User-facing dictionary value | Convenience infrastructure without consumer demand |
+| **CF1 (selected build)** | Immediate LS4/search/RI coding; direct corpus edits without capture path | Builds the feedback bridge; feeds Track C; does not extend Learning by default |
+| PV1 alone as exclusive next work | All product construction | Rejected: too restrictive; validation remains parallel instead |
+| Lexical quality as sole build | Capture surface + validation attention | Improves content but lacks a bounded runtime consumer and owner-packet readiness |
+| Search improvement | CF1 evidence generation | Risks false positives without correction/log evidence |
+| Result interpretation | Data enrichment | Likely duplicates 7G without stronger sense/example data |
+| Install UX rewrite | Measured PV1 defects | Premature before package/catalog observation |
+| LS4 | Broader dictionary value | Improves control for an unproven problem |
+| Sentence analysis | Almost all nearer gains | High invention risk; deferred linguistic depth |
 
 ---
 
 ## 24. Selected direction
 
 ```text
-PD1_VALIDATION_MILESTONE_SELECTED
-PV1 — Production and Device Validation
+PD1_NEXT_BUILD_SELECTED
+CF1 — Community Correction and Feedback Capture
 ```
 
-Classification: **deployment/validation milestone** (not a runtime product
-feature, not a corpus program).
+Classification: **runtime product capability** (capture and handoff).
+
+Parallel validation:
+
+```text
+PV1A — Production Identity and Desktop Smoke
+PV1B — Physical Device Validation — hardware-gated
+```
 
 ---
 
 ## 25. User problem
 
-Users (and Phase 6C testers) cannot be honestly directed to a confirmed current
-production build. Without host identity confirmation and production smoke for
-the Learning-inclusive 7N2B product, every shipped capability — search, Save,
-Review, Progress, backup — may fail to deliver real-world value. Android
-reliability for the intended mid-range audience remains unverified and
-externally blocked, which further prevents truthful adoption claims.
+Users can discover dictionary defects while searching and reading entries, but
+they have no local, offline, structured way to propose a correction or note
+missing information. The backend correction model already exists; the missing
+product surface prevents both immediate user agency and disciplined later
+lexical improvement.
 
 ---
 
 ## 26. Evidence and confidence
 
-Evidence supporting the problem:
+Evidence supporting the problem and selection:
 
-- ROADMAP production deploy verification still open / “do not treat as live”;
-- Phase 6C blocked on missing app link;
-- Phase 7N1 package matrix 0% / `not_ready_for_validation`;
-- DEVICE_VALIDATION Android pending hardware;
-- no confirmed live-host record for current featured 7N2B + post-LP1 app;
-- historical production smokes and iPhone validation refer to older identities.
+- README / product direction names anonymous suggestions/corrections;
+- ROADMAP Phase 1.5A/B complete with UI/moderation still missing;
+- correction schema and dry-run pipeline are implemented;
+- Branch C explicitly waits for correction data among other prerequisites;
+- controlled lexical/search gaps show content defects exist even without
+  natural-use complaint volume;
+- Learning natural-use evidence remains absent, so LS4 stays deferred;
+- owner directive establishes parallel validation rather than exclusive
+  validation.
 
 ```text
 Confidence: HIGH
 ```
 
-for selecting validation over another Learning feature or speculative search UI.
-
-```text
-Confidence: MODERATE
-```
-
-that production is actually broken — the gap is **unverified**, not proven
-failed. Uncertainty narrows PV1 to verification-first work with explicit pass/
-fail identity checks rather than assumed redeploy churn.
-
-Overall decision confidence:
-
-```text
-HIGH
-```
+Uncertainty narrows CF1 to local non-authoritative capture/export, not
+auto-apply, upload, moderation UI, or linguistic judgment.
 
 ---
 
 ## 27. Why now
 
-- LP1 closed the last concrete Learning personal-state gap.
-- No natural-use Learning evidence appears after LP1; LS4 remains deferred.
-- Phase 7N closed without a new search implementation candidate.
-- Delivery uncertainty now outranks adjacent feature design as the clearest
-  gain-to-cost problem.
-- Production-host verification can start immediately and unlocks the evidence
-  programs every other candidate needs.
-- Selecting LS4/search/lexical runtime work now would prefer convenience or
-  documentation adjacency over truthful adoption leverage.
+- LS1–LS3 and LP1 already cover a broad Learning loop.
+- Extending Learning further would prefer adjacency over unmet dictionary agency.
+- Phase 1.5 foundation makes CF1 unusually low-waste relative to greenfield work.
+- CF1 can proceed offline without Android hardware.
+- PV1A/PV1B can proceed in parallel without freezing construction.
+- CF1 produces the evidence later lexical/search work claims to need.
 
 ---
 
@@ -710,25 +652,31 @@ HIGH
 
 Visible / product gains:
 
-- confirmed production URL and bundle/app identity;
-- actionable defect list or green smoke for the Learning-inclusive product;
-- Phase 6C packet unblocked once URL is confirmed;
-- honest status for Android/iPhone gates (executed or explicitly blocked);
-- portfolio clarity so later search/content/Learning choices rest on real use.
+- users can record structured correction suggestions offline;
+- pending suggestions remain editable before export;
+- exports hand off into the existing correction pipeline after human review;
+- installed dictionary remains unchanged by suggestions;
+- later lexical, search, N’Ko, and interpretability work gain reviewed inputs;
+- production/device validation continues independently toward real adoption.
 
 ---
 
 ## 29. Scope constraint
 
-Uncertainty narrows the MVP to:
+Uncertainty and owner posture narrow CF1 MVP to:
 
-- identity verification before feature invention;
-- desktop production smoke as the immediate executable core;
-- Android/iPhone matrix as a gated sub-track, not a fake completion claim;
-- no runtime feature implementation inside PV1 definition;
-- no corpus edits disguised as validation;
-- no Learning scheduling/history/LS4 work;
-- defects must be reproducible against recorded hashes.
+- local-first capture only;
+- non-authoritative suggestions;
+- genuine dictionary entries only;
+- structured issue categories;
+- deterministic export packet;
+- explicit “does not modify installed dictionary” warning;
+- no server upload, accounts, cloud sync, voting, AI generation, or moderation
+  dashboard in CF1;
+- no automatic application to IR/bundles;
+- no Learning-system expansion.
+
+PV1 remains split so hardware unavailability cannot block PV1A or CF1.
 
 ---
 
@@ -736,76 +684,83 @@ Uncertainty narrows the MVP to:
 
 | Candidate | Disposition | Reason | Missing evidence | Prerequisite | Trigger for reconsideration |
 | --- | --- | --- | --- | --- | --- |
-| B Lexical quality | Standing corpus program; not primary | No bounded approved packet ready; owner data blocked for key misses | Owner-validated entries / domain packet | Authoritative review + rebuild path | Approved LQ packet with exit criteria |
-| C Search/discovery | Deferred | Phrase aliases not approved; fuzzy/rank forbidden without evidence | Natural-use misses; approved aliases | Reviewed data + fixed regression corpus | Approved phrase/data packet or repeated natural misses |
-| D Result interpretation follow-up | Deferred | Phase 7G shipped top layer; 6C unrun | Tester “which result?” reports | Phase 6C or natural-use confirmation | Confirmed ambiguity pain for an existing field |
-| E Install UX | Deferred as rewrite | Current package/catalog failures not measured | Measured first-install/recovery defects | PV1 measurements | Specific reproducible install failure on current path |
-| F LS4 | Defined, deferred pending demonstrated need | No selective-Review need; chooser may add friction | Large collections or user requests | Natural Learning use | Real collections large or explicit status-filter requests |
-| G Organization | Deferred | No retrieval/scale pain | Collection-size / findability complaints | Natural Learning use | Users cannot find saved items at measured scale |
-| H Scheduling | Deferred | No longitudinal use; mastery-claim risk | Return/forget evidence; due-state decision | History/clock/privacy decisions | Longitudinal Review usage + explicit due-state decision |
-| H History | Deferred | No consumer; privacy expansion | Product consumer definition | Immutable event model decision | Explicit consumer + privacy review |
+| A PV1 as exclusive next build | Active parallel track; not exclusive | Validation matters but must not freeze construction | Current host identity; Android runs | PV1A now; hardware for PV1B | Defects may spawn bounded DX work later |
+| B Lexical quality as primary runtime build | Standing corpus Track C | Unbounded without approved packet; CF1 feeds it | Owner-approved domain/packet | Human review + rebuild path | Approved LQ packet with exit criteria |
+| C Search/discovery | Deferred | Alias/review blockers; false-positive risk | Natural-use misses; approved aliases | Reviewed data + fixed corpus | Approved phrase/data packet or repeated natural misses |
+| D Result interpretation follow-up | Deferred | 7G shipped; remaining needs data/confirmation | Tester ambiguity reports | Stronger sense/example data or 6C | Confirmed residual ambiguity for existing fields |
+| E Install UX | Deferred as rewrite | Observe under PV1 first | Measured current-path failures | PV1A/PV1B observations | Specific reproducible install failure |
+| F LS4 | Defined, deferred pending demonstrated need | Learning already broad; no selective-Review need | Large collections or user requests | Natural Learning use | Real collections large or explicit status-filter requests |
+| G Organization | Deferred | No retrieval/scale pain | Collection-size complaints | Natural Learning use | Users cannot find saved items at measured scale |
+| H Scheduling/History | Deferred | No longitudinal use; claim risk | Return/forget evidence; due-state decision | History/clock/privacy decisions | Longitudinal Review usage + explicit due-state decision |
 | I Source objects | Blocked | No authoritative source lexicon/identity | Source corpus + identity semantics | Architecture + corpus program | Authoritative source lexicon and identity architecture exist |
-| J Broader portability | Deferred | Boundaries already correct; no demand | Migration/backup requests beyond Learning | Keep package/log/settings separation | Concrete device-migration need not solved by LP1 + packages |
-| Evidence-only pause with no access plan | Rejected | Owner continues; PV1 is the access plan | — | — | — |
+| J Broader portability | Deferred | LP1 boundaries sufficient | Migration needs beyond Learning | Keep package/log/settings/correction separation | Concrete transfer need not solved by existing artifacts |
+| K Sentence analysis / Branch C | Deferred | Would invent language under weak evidence | Users, logs, correction data | Stronger linguistic authority | Explicit Branch C entry criteria met |
 
 ---
 
 ## 31. Preconditions
 
-Before PV1 execution slices beyond definition:
+Before CF1 implementation beyond definition:
 
-1. `PV1D0` defines exact host URL(s), identity fields to compare, smoke script,
-   pass/fail criteria, and Android/iPhone gate handling.
-2. In-repo featured identity remains the comparison baseline unless a newer
-   promotion supersedes it before execution.
-3. Desktop production smoke includes Learning paths now that LP1 exists.
-4. Android work does not silently claim completion without hardware.
-5. Phase 6C is not sent until `APP_LINK` is a confirmed deployed URL.
-6. LS4 remains deferred; PV1 must not implement Guided Sessions.
-7. No corpus/bundle rebuild is required merely to “look busy” during
-   validation.
-8. Unrelated featured-anchor work stays out of PV1 commits unless a validation
-   defect specifically implicates it.
+1. `CF1D0` defines draft model, categories, local store, export packet contract,
+   privacy warnings, offline behavior, EN/FR copy, and non-goals.
+2. Suggestions attach only to genuine `lexicon_entry` records with stable
+   `bundle_id` / `ir_id` / content hash or storage-scope context.
+3. Export format relationship to `correction_record_v1` / correctionset handoff
+   is explicit; CF1 drafts are not silently treated as `approved`.
+4. Installed dictionary mutation is forbidden in CF1.
+5. Query-log consent remains separate from correction export.
+6. Learning backup remains a separate package family.
+7. LS4 remains deferred; CF1 must not implement Guided Sessions.
+8. PV1A/PV1B remain active parallel tracks and are not redefined as CF1 work.
+9. No anonymous server upload is introduced without a separate decision.
 
 ---
 
 ## 32. Stop conditions
 
-Block or halt PV1 implementation/execution expansion if:
+Block or halt CF1 implementation if:
 
-1. no deployable host/access exists and none can be created — then escalate as
-   external blocker, not as feature coding;
-2. validation is redefined into unbounded redesign without defects;
-3. unit/Playwright-only results are treated as device release evidence;
-4. Android is marked passed without real-device runs;
-5. Learning analytics, cloud sync, or telemetry are smuggled in;
-6. LS4/scheduling/history starts under a validation label;
-7. corpus fabrication is used to “fix” validation misses.
+1. suggestions would mutate installed dictionary authority;
+2. exported drafts are treated as approved lexical evidence without human review;
+3. cloud upload/sync/accounts are introduced without a separate decision;
+4. AI-generated corrections or automatic linguistic judgment are added;
+5. moderation dashboard scope expands CF1 beyond capture/handoff;
+6. Learning identity or Review mechanics are redefined without necessity;
+7. privacy warnings / local-only constraints are dropped;
+8. CF1 is used as a vehicle to start LS4, scheduling, or sentence analysis.
 
 ---
 
 ## 33. Smallest next slice
 
 ```text
-PV1D0 — Production and Device Validation Definition
+CF1D0 — Community Correction and Feedback Product Definition
 ```
 
-PV1D0 must define:
+CF1D0 must define:
 
-- production host URL(s) under test;
-- exact identity checks (`catalog.json`, featured `bundle_id`,
-  `content_sha256`, app/build markers if available);
-- desktop smoke scenarios including catalog install, offline reopen, search,
-  Save, Review, Progress, Learning backup/restore;
-- Phase 7N1 package-matrix relationship and status vocabulary;
-- Android/iPhone external-blocker handling and exit criteria when hardware
-  returns;
-- defect logging format and rerun rules;
-- Phase 6C unblocking rule after confirmed URL;
-- explicit non-goals (no feature coding, no corpus edits, no LS4).
+- issue-type taxonomy;
+- draft suggestion fields and validation;
+- local persistence model and identity;
+- pending-list edit/delete semantics;
+- export packet schema and determinism;
+- relationship to Phase 1.5 correction records / correctionsets;
+- non-authoritative boundary and user-facing warnings;
+- offline behavior;
+- EN/FR copy constraints;
+- privacy boundary;
+- explicit non-goals;
+- proposed implementation slices CF1I1–CF1I6.
 
-Do not implement deployment changes or device testing inside PV1D0 if that
-slice is definition-only.
+Do not implement capture/export UI in CF1D0 if that slice is definition-only.
+
+Parallel validation naming remains:
+
+```text
+PV1A — Production Identity and Desktop Smoke
+PV1B — Physical Device Validation — hardware-gated
+```
 
 ---
 
@@ -828,38 +783,94 @@ PD1 does not implement:
 - telemetry;
 - scheduling;
 - LS4;
-- source objects.
+- source objects;
+- moderation dashboard;
+- automatic correction application.
 
 This slice decides only.
+
+### CF1 MVP inclusions (for later implementation; not done here)
+
+- Suggest correction from a genuine dictionary entry.
+- Structured categories: spelling; translation/gloss; example; part of speech;
+  N’Ko; missing information; other note.
+- Stable context: `bundle_id`; `ir_id`; content hash/storage scope; field or
+  sense challenged; current displayed value; proposed value; explanation;
+  timestamp.
+- Local pending suggestions list with edit/delete before export.
+- Deterministic JSONL or versioned correction packet export.
+- Full offline operation.
+- Warning that a suggestion does not modify the installed dictionary.
+- EN/FR interface.
+
+### CF1 MVP exclusions
+
+- automatic application;
+- anonymous server upload;
+- accounts;
+- cloud synchronization;
+- public comments;
+- voting;
+- AI-generated corrections;
+- automatic linguistic judgment;
+- moderation dashboard;
+- changing the live dictionary directly;
+- treating user suggestions as authoritative evidence.
 
 ---
 
 ## 35. Repository hygiene
 
-This slice stages only:
+This revision stages only:
 
 ```text
 docs/reports/pd1_next_product_build_decision.md
 docs/ROADMAP.md
 ```
 
-Roadmap update is limited to:
+Roadmap update records:
 
-- LP1 closed (already recorded; retained);
-- selected next direction PV1;
-- exact next slice PV1D0.
+- LP1 closed;
+- PD1 complete with CF1 selected;
+- CF1D0 next;
+- PV1A/PV1B parallel validation status.
 
-Unrelated featured-anchor work at `b186e41` is excluded from this decision’s
-file set and must not be reopened here.
+Unrelated featured-anchor work at `b186e41` remains excluded.
 
-Locked status strings after PD1:
+### Revised portfolio structure
+
+```text
+Track A — Product construction
+CF1 — Community Correction and Feedback Capture
+  CF1D0 — Product Definition
+  CF1I1 — Correction Draft Model and Validation
+  CF1I2 — Local Correction Store
+  CF1I3 — Entry Suggestion Surface
+  CF1I4 — Pending Suggestions and Export
+  CF1I5 — Offline Lifecycle Verification
+  CF1I6 — Closure
+
+Track B — Release readiness
+PV1A — Production Identity and Desktop Smoke
+PV1B — Physical Device Validation when hardware is available
+
+Track C — Corpus improvement
+Human review of exported corrections
+  → approved correction artifacts
+  → dry-run application
+  → reviewed bundle release
+```
+
+Locked status strings after revised PD1:
 
 ```text
 LS4 — Guided Review Sessions — Defined, deferred pending demonstrated need
 LP1 — Local Learning Backup and Restore — Closed
 PD1 — Next Product Build Decision — Complete
-PV1 — Production and Device Validation — Selected
-PV1D0 — Production and Device Validation Definition — Next
+CF1 — Community Correction and Feedback Capture — Selected
+CF1D0 — Community Correction and Feedback Product Definition — Next
+PV1A — Production Identity and Desktop Smoke — Parallel active
+PV1B — Physical Device Validation — Parallel, hardware-gated
 ```
 
 ---
@@ -868,7 +879,8 @@ PV1D0 — Production and Device Validation Definition — Next
 
 This slice changes only documentation (this report and a narrow roadmap status
 update). No runtime, corpus, deployment, test, schema, or UI implementation
-occurred. LS4I1 was not started.
+occurred. LS4I1 was not started. PV1 remains active in parallel and was not
+abandoned.
 
 ---
 
@@ -876,11 +888,12 @@ occurred. LS4I1 was not started.
 
 | Field | Value |
 | --- | --- |
-| Decision | `PD1_VALIDATION_MILESTONE_SELECTED` |
-| Selected direction | `PV1 — Production and Device Validation` |
-| Classification | deployment/validation milestone |
+| Decision | `PD1_NEXT_BUILD_SELECTED` |
+| Selected product build | `CF1 — Community Correction and Feedback Capture` |
+| Classification | runtime product capability (capture/handoff) |
+| Parallel validation | `PV1A` now; `PV1B` hardware-gated |
 | LS4 posture | Defined, deferred pending demonstrated need |
 | Evidence maturity (Learning natural use) | `NO_EVIDENCE` |
 | Confidence | `HIGH` |
-| Next slice | `PV1D0 — Production and Device Validation Definition` |
+| Next slice | `CF1D0 — Community Correction and Feedback Product Definition` |
 | Code changes | None |
