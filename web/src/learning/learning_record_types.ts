@@ -84,11 +84,52 @@ export function isValidIsoTimestamp(value: unknown): value is string {
   return Date.parse(parsed.toISOString()) === ms;
 }
 
+/** Exact top-level keys allowed on `LearningRecordV1` (write + backup). */
+export const LEARNING_RECORD_V1_KEYS = [
+  "schema_version",
+  "bundle_id",
+  "ir_id",
+  "ir_kind",
+  "content_sha256",
+  "storage_scope_id",
+  "status",
+  "created_at",
+  "display_cache",
+  "last_reviewed",
+  "review_count",
+] as const;
+
+const LEARNING_RECORD_V1_KEY_SET: ReadonlySet<string> = new Set(LEARNING_RECORD_V1_KEYS);
+
+/** Exact keys allowed on `display_cache`. */
+export const LEARNING_RECORD_DISPLAY_CACHE_KEYS = [
+  "headword_latin",
+  "headword_nko",
+  "gloss_short",
+] as const;
+
+const LEARNING_RECORD_DISPLAY_CACHE_KEY_SET: ReadonlySet<string> = new Set(
+  LEARNING_RECORD_DISPLAY_CACHE_KEYS,
+);
+
+function assertExactKeys(
+  value: Record<string, unknown>,
+  allowed: ReadonlySet<string>,
+  label: string,
+): void {
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new Error(`${label}: unknown field "${key}"`);
+    }
+  }
+}
+
 function assertDisplayCache(cache: unknown, label: string): asserts cache is LearningRecordDisplayCache {
-  if (typeof cache !== "object" || cache === null) {
+  if (typeof cache !== "object" || cache === null || Array.isArray(cache)) {
     throw new Error(`${label}: display_cache must be an object`);
   }
   const c = cache as Record<string, unknown>;
+  assertExactKeys(c, LEARNING_RECORD_DISPLAY_CACHE_KEY_SET, `${label}.display_cache`);
   if (!isNonEmptyString(c.headword_latin)) {
     throw new Error(`${label}: display_cache.headword_latin must be a non-empty string`);
   }
@@ -103,12 +144,14 @@ function assertDisplayCache(cache: unknown, label: string): asserts cache is Lea
 /**
  * Validate a complete Learning Record before persist.
  * Throws; callers must not write on failure.
+ * Rejects unknown top-level and display_cache fields (exact supported shape).
  */
 export function validateLearningRecordForWrite(record: unknown, label = "learning_record"): asserts record is LearningRecordV1 {
-  if (typeof record !== "object" || record === null) {
+  if (typeof record !== "object" || record === null || Array.isArray(record)) {
     throw new Error(`${label}: must be an object`);
   }
   const r = record as Record<string, unknown>;
+  assertExactKeys(r, LEARNING_RECORD_V1_KEY_SET, label);
 
   if (r.schema_version !== LEARNING_RECORD_SCHEMA_VERSION) {
     throw new Error(`${label}: schema_version must be "${LEARNING_RECORD_SCHEMA_VERSION}"`);
