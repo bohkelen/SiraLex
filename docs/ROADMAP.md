@@ -98,8 +98,9 @@ Status markers: **✅ Complete** · **in progress** · **deferred** · **pending
 
 ### Learning System & next product build
 
-Canonical status (see `docs/reports/pd0_next_product_build_decision.md` and
-`docs/reports/lp1d0_local_learning_backup_restore_product_definition.md`):
+Canonical status (see `docs/reports/pd1_next_product_build_decision.md`,
+`docs/reports/pd0_next_product_build_decision.md`, and
+`docs/reports/lp1_local_learning_backup_restore_closure_report.md`):
 
 ```text
 LS1 — Save — Closed
@@ -114,19 +115,17 @@ LP1I3 — Restore Preview and Atomic Policies — Implemented
 LP1I4 — Backup and Restore Surface — Implemented
 LP1I5 — Offline and Lifecycle Verification — Implemented
 LP1I6 — Closure — Complete
-PD1 — Next Product Build Decision — Next
+PD1 — Next Product Build Decision — Complete
+PV1 — Production and Device Validation — Selected
+PV1D0 — Production and Device Validation Definition — Next
 ```
 
 - **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
-- **LP1D0** defines local versioned Learning backup/restore (`docs/reports/lp1d0_local_learning_backup_restore_product_definition.md`).
-- **LP1I1** implements the pure package model/validator (`docs/reports/lp1i1_learning_backup_package_model_report.md`).
-- **LP1I2** implements deterministic export (`docs/reports/lp1i2_deterministic_learning_export_report.md`).
-- **LP1I3** implements restore preview and atomic policies (`docs/reports/lp1i3_restore_preview_atomic_policies_report.md`).
-- **LP1I4** implements the Manage Learning Data surface (`docs/reports/lp1i4_backup_restore_surface_report.md`).
-- **LP1I5** verifies offline/lifecycle browser + integration evidence (`docs/reports/lp1i5_offline_lifecycle_verification_report.md`).
-- **LP1I6** closes Local Learning Backup and Restore (`docs/reports/lp1_local_learning_backup_restore_closure_report.md`).
-- **Next product decision:** `PD1 — Next Product Build Decision`.
-- Portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
+- **LP1** is closed (`docs/reports/lp1_local_learning_backup_restore_closure_report.md`).
+- **PD1** selects a validation milestone rather than another Learning feature or corpus runtime build (`docs/reports/pd1_next_product_build_decision.md`).
+- **PV1** confirms production-host identity and Learning-inclusive production smoke; Android/iPhone package-matrix execution remains hardware-gated.
+- **Next slice:** `PV1D0 — Production and Device Validation Definition`.
+- Prior portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
 
 ---
 
