@@ -109,13 +109,15 @@ LS4 — Guided Review Sessions — Defined, deferred pending demonstrated need
 LP1 — Local Learning Backup and Restore — Selected
 LP1D0 — Defined
 LP1I1 — Learning Backup Package Model and Validator — Implemented
-LP1I2 — Deterministic Export — Next
+LP1I2 — Deterministic Export — Implemented
+LP1I3 — Restore Preview and Atomic Policies — Next
 ```
 
 - **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
 - **LP1D0** defines local versioned Learning backup/restore (`docs/reports/lp1d0_local_learning_backup_restore_product_definition.md`).
 - **LP1I1** implements the pure package model/validator (`docs/reports/lp1i1_learning_backup_package_model_report.md`).
-- **Next implementation slice:** `LP1I2 — Deterministic Export`.
+- **LP1I2** implements deterministic export (`docs/reports/lp1i2_deterministic_learning_export_report.md`).
+- **Next implementation slice:** `LP1I3 — Restore Preview and Atomic Policies`.
 - Portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
 
 ---

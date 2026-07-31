@@ -512,6 +512,32 @@ export function parseLearningBackupJson(
   return { ok: true, package: pkg };
 }
 
+export type LearningBackupBuildErrorCode =
+  | "empty_records"
+  | "invalid_record"
+  | "inconsistent_review_fields"
+  | "duplicate_identity"
+  | "invalid_exported_at"
+  | "invalid_app_version";
+
+/**
+ * Typed failure from {@link buildLearningBackupPackage}.
+ * Messages are structural; they must not include vocabulary content.
+ */
+export class LearningBackupBuildError extends Error {
+  readonly code: LearningBackupBuildErrorCode;
+  readonly recordIndex?: number;
+
+  constructor(code: LearningBackupBuildErrorCode, message: string, recordIndex?: number) {
+    super(message);
+    this.name = "LearningBackupBuildError";
+    this.code = code;
+    if (recordIndex !== undefined) {
+      this.recordIndex = recordIndex;
+    }
+  }
+}
+
 /**
  * Build a validated, canonically ordered Learning backup package.
  * Caller supplies `exportedAt`. Does not access the clock or IndexedDB.
@@ -524,26 +550,51 @@ export function buildLearningBackupPackage(
   },
 ): LearningBackupPackageV1 {
   if (!Array.isArray(records) || records.length === 0) {
-    throw new Error("buildLearningBackupPackage: records must be a non-empty array");
+    throw new LearningBackupBuildError(
+      "empty_records",
+      "buildLearningBackupPackage: records must be a non-empty array",
+    );
   }
   if (!isValidIsoTimestamp(options.exportedAt)) {
-    throw new Error("buildLearningBackupPackage: exportedAt must be a valid ISO-8601 timestamp");
+    throw new LearningBackupBuildError(
+      "invalid_exported_at",
+      "buildLearningBackupPackage: exportedAt must be a valid ISO-8601 timestamp",
+    );
   }
   if (options.appVersion !== undefined && !isNonEmptyString(options.appVersion)) {
-    throw new Error("buildLearningBackupPackage: appVersion must be a non-empty string when present");
+    throw new LearningBackupBuildError(
+      "invalid_app_version",
+      "buildLearningBackupPackage: appVersion must be a non-empty string when present",
+    );
   }
 
   const cloned: LearningRecordV1[] = [];
   const seen = new Map<string, number>();
   for (let i = 0; i < records.length; i += 1) {
     const input = records[i];
-    validateLearningRecordForWrite(input, `records[${i}]`);
+    try {
+      validateLearningRecordForWrite(input, `records[${i}]`);
+    } catch {
+      throw new LearningBackupBuildError(
+        "invalid_record",
+        `records[${i}]: invalid learning record`,
+        i,
+      );
+    }
     if (!hasConsistentReviewFields(input)) {
-      throw new Error(`records[${i}]: inconsistent review fields`);
+      throw new LearningBackupBuildError(
+        "inconsistent_review_fields",
+        `records[${i}]: inconsistent review fields`,
+        i,
+      );
     }
     const key = learningBackupRecordKey(input.bundle_id, input.ir_id);
     if (seen.has(key)) {
-      throw new Error(`records[${i}]: duplicate learning identity`);
+      throw new LearningBackupBuildError(
+        "duplicate_identity",
+        `records[${i}]: duplicate learning identity`,
+        i,
+      );
     }
     seen.set(key, i);
     cloned.push(cloneLearningRecord(input));
