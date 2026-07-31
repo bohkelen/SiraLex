@@ -98,7 +98,8 @@ Status markers: **✅ Complete** · **in progress** · **deferred** · **pending
 
 ### Learning System & next product build
 
-Canonical status (see `docs/reports/pd0_next_product_build_decision.md`):
+Canonical status (see `docs/reports/pd0_next_product_build_decision.md` and
+`docs/reports/lp1d0_local_learning_backup_restore_product_definition.md`):
 
 ```text
 LS1 — Save — Closed
@@ -106,11 +107,13 @@ LS2 — Review and Reflect — Closed
 LS3 — Progress and Return — Closed
 LS4 — Guided Review Sessions — Defined, deferred pending demonstrated need
 LP1 — Local Learning Backup and Restore — Selected
-LP1D0 — Local Learning Backup and Restore Product Definition — Next
+LP1D0 — Defined
+LP1I1 — Learning Backup Package Model and Validator — Next
 ```
 
 - **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
-- **Next build** after the LS1–LS3 loop is **local Learning backup/restore**, not further Review-mechanics extension by default.
+- **LP1D0** defines local versioned Learning backup/restore (`docs/reports/lp1d0_local_learning_backup_restore_product_definition.md`).
+- **Next implementation slice:** `LP1I1 — Learning Backup Package Model and Validator`.
 - Portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
 
 ---
