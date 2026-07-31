@@ -477,10 +477,24 @@ describe("cloning, equality, ordering, and write assert", () => {
 });
 
 describe("helpers", () => {
-  it("validates hash and timestamp shapes", () => {
+  it("validates exact lowercase 64-hex SHA-256 digests", () => {
     expect(isValidCanonicalContentSha256(HASH)).toBe(true);
-    expect(isValidCanonicalContentSha256("sha256:abc")).toBe(true);
+    expect(isValidCanonicalContentSha256("sha256:abc")).toBe(false);
+    expect(
+      isValidCanonicalContentSha256("sha256:" + "a".repeat(63)),
+    ).toBe(false);
+    expect(
+      isValidCanonicalContentSha256("sha256:" + "a".repeat(65)),
+    ).toBe(false);
+    expect(
+      isValidCanonicalContentSha256(
+        "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      ),
+    ).toBe(false);
     expect(isValidCanonicalContentSha256("abc")).toBe(false);
+    expect(isValidCanonicalContentSha256("missing-prefix" + "a".repeat(64))).toBe(
+      false,
+    );
     expect(isValidCorrectionIsoTimestamp(TS)).toBe(true);
     expect(isValidCorrectionIsoTimestamp("2026-07-31T18:00:00+00:00")).toBe(false);
   });

@@ -250,14 +250,16 @@ export function isValidCorrectionIsoTimestamp(value: unknown): value is string {
 }
 
 /**
- * Canonical content-hash shape used by installed bundles / Learning provenance:
- * `sha256:` + one or more hexadecimal digits. Installation is not resolved here.
+ * Canonical content-hash shape for correction provenance:
+ * `sha256:` + exactly 64 lowercase hexadecimal characters.
+ * Uppercase digests are rejected (no silent normalization).
+ * Installation is not resolved here.
  */
 export function isValidCanonicalContentSha256(value: unknown): value is string {
   if (typeof value !== "string") return false;
   if (value.trim() === "" || value !== value.trim()) return false;
   if (countUnicodeCharacters(value) > CORRECTION_CONTENT_SHA256_MAX_CHARS) return false;
-  return /^sha256:[0-9a-fA-F]+$/.test(value);
+  return /^sha256:[0-9a-f]{64}$/.test(value);
 }
 
 function isValidBoundedId(value: unknown, maxChars: number): value is string {

@@ -12,6 +12,7 @@ import {
 import {
   CORRECTION_FEEDBACK_AUTHORITY_LABEL,
   CORRECTION_FEEDBACK_MAX_BYTES,
+  CORRECTION_FEEDBACK_MAX_VALIDATION_ERRORS,
   CORRECTION_FEEDBACK_PACKAGE_SCHEMA,
   CorrectionFeedbackBuildError,
   buildCorrectionFeedbackFilename,
@@ -123,6 +124,30 @@ describe("package validation", () => {
     expect(
       parseCorrectionFeedbackJson("{}", { byteLength: CORRECTION_FEEDBACK_MAX_BYTES + 1 }).ok,
     ).toBe(false);
+  });
+
+  it("caps validation errors at 100 with error_limit_reached sentinel", () => {
+    const secret = "SECRET_USER_VOCABULARY_SHOULD_NOT_LEAK";
+    const invalidDrafts = Array.from({ length: 120 }, (_, i) => ({
+      ...makeDraft({ draft_id: `draft-${i}` }),
+      problem_description: "",
+      display_snapshot: { headword_latin: secret },
+    }));
+    const payload = {
+      package_schema: CORRECTION_FEEDBACK_PACKAGE_SCHEMA,
+      exported_at: EXPORTED_AT,
+      authority_label: CORRECTION_FEEDBACK_AUTHORITY_LABEL,
+      draft_count: invalidDrafts.length,
+      drafts: invalidDrafts,
+    };
+    const parsed = parseCorrectionFeedbackJson(JSON.stringify(payload));
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.errors.length).toBe(CORRECTION_FEEDBACK_MAX_VALIDATION_ERRORS);
+    expect(parsed.errors.length).toBe(100);
+    expect(parsed.errors[parsed.errors.length - 1]?.code).toBe("error_limit_reached");
+    expect(parsed.truncated).toBe(true);
+    expect(JSON.stringify(parsed.errors)).not.toContain(secret);
   });
 
   it("accepts noncanonical draft order from parser", () => {

@@ -130,19 +130,28 @@ type ErrorCollector = {
   truncated: boolean;
 };
 
+/**
+ * Bounded accumulation:
+ * at most 99 structural errors + final `error_limit_reached` = 100 total.
+ * Never exceeds CORRECTION_FEEDBACK_MAX_VALIDATION_ERRORS.
+ */
 function pushError(
   collector: ErrorCollector,
   error: CorrectionFeedbackPackageValidationError,
 ): boolean {
+  if (collector.truncated) {
+    return false;
+  }
   if (collector.errors.length >= CORRECTION_FEEDBACK_MAX_VALIDATION_ERRORS) {
-    if (!collector.truncated) {
-      collector.truncated = true;
-      collector.errors.push({ code: "error_limit_reached" });
-    }
+    return false;
+  }
+  if (collector.errors.length === CORRECTION_FEEDBACK_MAX_VALIDATION_ERRORS - 1) {
+    collector.errors.push({ code: "error_limit_reached" });
+    collector.truncated = true;
     return false;
   }
   collector.errors.push(error);
-  return collector.errors.length < CORRECTION_FEEDBACK_MAX_VALIDATION_ERRORS;
+  return true;
 }
 
 function fail(collector: ErrorCollector): ParseCorrectionFeedbackResult {

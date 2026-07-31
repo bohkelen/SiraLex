@@ -111,7 +111,7 @@ Limits: 500 Unicode code points per snapshot field.
 | `ir_id` | 1–500 chars |
 | `ir_kind` | exactly `lexicon_entry` |
 | `status` | exactly `draft` |
-| `content_sha256` | canonical `/^sha256:[0-9a-fA-F]+$/`, max 200 chars |
+| `content_sha256` | canonical `/^sha256:[0-9a-f]{64}$/` (exactly 64 lowercase hex); uppercase rejected without normalization |
 | `storage_scope_id` | 1–1000 chars |
 
 Installation and IR resolution are not performed. `bundle_id` is never parsed
@@ -168,9 +168,11 @@ parseCorrectionDraft(value)
 validateCorrectionDraftForWrite(value, label?)
 ```
 
-Error codes are structural only. Accumulation bounded at
-`CORRECTION_MAX_VALIDATION_ERRORS = 100`. Errors never include user text,
-headwords, or proposed corrections.
+Error codes are structural only. Draft accumulation is bounded at
+`CORRECTION_MAX_VALIDATION_ERRORS = 100` structural errors with
+`truncated: true` and no sentinel code (draft taxonomy has no
+`error_limit_reached`). Errors never include user text, headwords, or
+proposed corrections.
 
 ---
 
@@ -237,7 +239,9 @@ parseCorrectionFeedbackJson(text, options?: { byteLength? })
 - no partial success;
 - no dictionary resolution;
 - no Phase 1.5 conversion;
-- preserves validated input draft order.
+- preserves validated input draft order;
+- error accumulation capped at exactly 100:
+  99 structural errors + final `error_limit_reached`, with `truncated: true`.
 
 ---
 
@@ -319,34 +323,36 @@ npx vitest run \
   src/corrections/correction_draft_types.test.ts \
   src/corrections/correction_feedback_package.test.ts
 → Test Files  2 passed (2)
-→ Tests  39 passed (39)
+→ Tests  40 passed (40)
 ```
 
 Coverage includes valid drafts, invalid shapes, mode rules, target strictness,
-text limits with astral characters, control characters, package validation,
-deterministic serialization, filename/UTF-8 sizing, and Phase 1.5 boundary.
+text limits with astral characters, control characters, exact SHA-256
+provenance, package validation including the 100-error cap, deterministic
+serialization, filename/UTF-8 sizing, and Phase 1.5 boundary.
 
-Shared regressions:
+Shared regressions and full-suite/build results for CF1I1A are recorded at
+commit time in the amendment execution notes below.
+
+### CF1I1A validation rerun
 
 ```text
+npx vitest run \
+  src/corrections/correction_draft_types.test.ts \
+  src/corrections/correction_feedback_package.test.ts
+→ Test Files  2 passed (2)
+→ Tests  40 passed (40)
+
 npx vitest run \
   src/learning/learning_backup_package.test.ts \
   src/learning/learning_record_persistence.test.ts
 → Test Files  2 passed (2)
 → Tests  49 passed (49)
-```
 
-Full suite:
-
-```text
 npm run test:run
 → Test Files  56 passed (56)
-→ Tests  613 passed (613)
-```
+→ Tests  614 passed (614)
 
-Build:
-
-```text
 npm run build
 → pass (tsc + vite + PWA generateSW)
 ```
@@ -358,10 +364,27 @@ npm run build
 - Timestamp validation is implemented inside the corrections module (UTC `Z`
   required) rather than extracting Learning’s looser helper, to avoid Learning
   coupling and to match CF1D0’s stricter UTC-Z rule.
-- Content-hash validation requires `sha256:` + hex (compatible with installed /
-  Learning provenance shapes) rather than inventing a new hash scheme.
+- Content-hash validation requires `sha256:` + exactly 64 lowercase hex digits
+  (`/^sha256:[0-9a-f]{64}$/`). Uppercase is rejected without normalization.
+  An earlier permissive `/^sha256:[0-9a-fA-F]+$/` acceptance (including
+  `sha256:abc`) was corrected in CF1I1A.
+- Package error accumulation previously could reach 101 by appending
+  `error_limit_reached` after 100 structural errors; CF1I1A enforces
+  99 structural + `error_limit_reached` = 100 total.
 - No deviations from CF1D0 schema, taxonomy, export package identity, or
   authority label.
+
+### CF1I1A amendment
+
+```text
+CF1I1A — Correction Validator Boundary Fixes
+```
+
+Decision remains:
+
+```text
+CF1_CORRECTION_DRAFT_MODEL_IMPLEMENTED
+```
 
 ---
 
