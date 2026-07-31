@@ -111,7 +111,8 @@ LP1D0 — Defined
 LP1I1 — Learning Backup Package Model and Validator — Implemented
 LP1I2 — Deterministic Export — Implemented
 LP1I3 — Restore Preview and Atomic Policies — Implemented
-LP1I4 — Backup and Restore Surface — Next
+LP1I4 — Backup and Restore Surface — Implemented
+LP1I5 — Offline and Lifecycle Verification — Next
 ```
 
 - **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
@@ -119,7 +120,8 @@ LP1I4 — Backup and Restore Surface — Next
 - **LP1I1** implements the pure package model/validator (`docs/reports/lp1i1_learning_backup_package_model_report.md`).
 - **LP1I2** implements deterministic export (`docs/reports/lp1i2_deterministic_learning_export_report.md`).
 - **LP1I3** implements restore preview and atomic policies (`docs/reports/lp1i3_restore_preview_atomic_policies_report.md`).
-- **Next implementation slice:** `LP1I4 — Backup and Restore Surface`.
+- **LP1I4** implements the Manage Learning Data surface (`docs/reports/lp1i4_backup_restore_surface_report.md`).
+- **Next implementation slice:** `LP1I5 — Offline and Lifecycle Verification`.
 - Portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
 
 ---

@@ -30,6 +30,8 @@ import {
   wireManualPackageImportControls,
   type ManualPackageImportDeps,
 } from "./import/manual_package_import_flow";
+import { createLearningBackupSurface } from "./learning/learning_backup_surface";
+import { renderLearningBackupSurface } from "./render/render_learning_backup";
 import {
   deleteBundleData,
   deleteSiralexDb,
@@ -231,7 +233,9 @@ app.innerHTML = `
         </details>
 
         <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
-        <div class="row" style="margin-top: 12px">
+        <div id="learningBackupHost" class="learning-backup-host" style="margin-top: 12px"></div>
+        <div class="row" style="margin-top: 12px; flex-direction: column; align-items: flex-start; gap: 8px">
+          <p id="learningBackupDeleteReminder" class="learning-backup-delete-reminder" hidden></p>
           <button id="clearDb" class="btn">${t("db.delete")}</button>
         </div>
       </div>
@@ -360,6 +364,8 @@ const packageImportFile = mustGetEl<HTMLInputElement>("#packageImportFile");
 const cancelInstallBtn = mustGetEl<HTMLButtonElement>("#cancelInstall");
 const importProgress = mustGetEl<HTMLDivElement>("#importProgress");
 const clearDbBtn = mustGetEl<HTMLButtonElement>("#clearDb");
+const learningBackupHost = mustGetEl<HTMLDivElement>("#learningBackupHost");
+const learningBackupDeleteReminder = mustGetEl<HTMLParagraphElement>("#learningBackupDeleteReminder");
 const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
 const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
 const searchMeta = mustGetEl<HTMLDivElement>("#searchMeta");
@@ -825,6 +831,7 @@ localeSelect.addEventListener("change", () => {
 openManageDictionariesBtn.addEventListener("click", () => {
   manageDictionariesPanel.open = true;
   manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  void learningBackupSurface?.refreshCount();
 });
 
 openSavedVocabularyBtn.addEventListener("click", () => {
@@ -1029,6 +1036,7 @@ async function refreshDbStatus() {
       const nextBundleId = active?.bundle_id;
       if (lastKnownActiveBundleId !== nextBundleId) {
         lastKnownActiveBundleId = nextBundleId;
+        learningBackupSurface?.invalidatePreviewForBundleChange();
         if (
           resultsHostContext === "review" ||
           resultsHostContext === "saved_vocabulary" ||
@@ -1707,6 +1715,8 @@ clearDbBtn.addEventListener("click", () => {
       await deleteSiralexDb();
       // Drop Saved Vocabulary / Review hosts and focus intent before refresh.
       invalidateCollectionAndReviewContexts();
+      learningBackupSurface?.dispose();
+      learningBackupSurface = createAndMountLearningBackupSurface();
       resultsHostContext = "search";
       searchResults.innerHTML = "";
       lastKnownActiveBundleId = undefined;
@@ -1715,6 +1725,7 @@ clearDbBtn.addEventListener("click", () => {
       importProgress.textContent += t("db.deleteFailed", { error: String(e) });
     }
     await refreshDbStatus();
+    await updateLearningBackupDeleteReminder();
   });
 });
 
@@ -2054,6 +2065,7 @@ let focusReviewActionOnce = false;
 let lastSearchResults: ResultDisplayContext[] = [];
 /** Track active bundle id so switches invalidate collection/Review contexts. */
 let lastKnownActiveBundleId: string | undefined;
+let learningBackupSurface: ReturnType<typeof createLearningBackupSurface> | undefined;
 
 /** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4 / LS3I3). */
 type ResultsHostContext =
@@ -2076,6 +2088,81 @@ function invalidateCollectionAndReviewContexts() {
   entryDetailGeneration += 1;
   focusReviewActionOnce = false;
 }
+
+function mountLearningBackupModel(
+  surface: NonNullable<typeof learningBackupSurface>,
+): void {
+  renderLearningBackupSurface(learningBackupHost, surface.getVm(), {
+    onExport: () => {
+      void surface.startExport();
+    },
+    onFileSelected: (file) => {
+      void surface.selectRestoreFile(file);
+    },
+    onSelectPolicy: (policy) => surface.selectPolicy(policy),
+    onRequestCommit: () => surface.requestCommit(),
+    onCancelConfirm: () => surface.cancelConfirm(),
+    onConfirmReplaceAll: () => surface.confirmReplaceAll(),
+    onCancelRestore: () => surface.cancelRestore(),
+    onOpenSavedVocabulary: () => showSavedVocabulary(),
+  });
+}
+
+function createAndMountLearningBackupSurface(): NonNullable<typeof learningBackupSurface> {
+  const surface = createLearningBackupSurface(
+    {
+      openDb: openSiralexDb,
+      now: () => new Date().toISOString(),
+      appVersion: APP_VERSION,
+    },
+    {
+      onModel: () => {
+        if (learningBackupSurface !== surface) return;
+        mountLearningBackupModel(surface);
+        void updateLearningBackupDeleteReminder();
+      },
+      onAfterRestoreSuccess: () => {
+        invalidateCollectionAndReviewContexts();
+        if (
+          resultsHostContext === "review" ||
+          resultsHostContext === "saved_vocabulary" ||
+          resultsHostContext === "entry_from_saved"
+        ) {
+          resultsHostContext = "search";
+          searchResults.innerHTML = "";
+        }
+      },
+    },
+  );
+  learningBackupSurface = surface;
+  mountLearningBackupModel(surface);
+  return surface;
+}
+
+async function updateLearningBackupDeleteReminder(): Promise<void> {
+  const count = learningBackupSurface?.getVm().recordCount ?? null;
+  if (count != null && count > 0) {
+    learningBackupDeleteReminder.hidden = false;
+    learningBackupDeleteReminder.replaceChildren();
+    learningBackupDeleteReminder.appendChild(
+      document.createTextNode(`${t("learningBackup.deleteReminder")} `),
+    );
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "btn";
+    link.textContent = t("learningBackup.deleteReminderAction");
+    link.addEventListener("click", () => {
+      manageDictionariesPanel.open = true;
+      learningBackupHost.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    learningBackupDeleteReminder.appendChild(link);
+  } else {
+    learningBackupDeleteReminder.hidden = true;
+    learningBackupDeleteReminder.replaceChildren();
+  }
+}
+
+createAndMountLearningBackupSurface();
 function cancelPendingSettledQueryLog() {
   if (queryLoggingSettleTimer !== undefined) {
     clearTimeout(queryLoggingSettleTimer);

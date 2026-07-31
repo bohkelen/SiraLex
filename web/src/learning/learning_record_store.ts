@@ -247,6 +247,16 @@ export async function listAllLearningRecords(db: IDBDatabase): Promise<LearningR
 }
 
 /**
+ * Count Learning Records across all bundles in one readonly transaction.
+ */
+export async function countAllLearningRecords(db: IDBDatabase): Promise<number> {
+  const tx = db.transaction(STORE_LEARNING_RECORDS, "readonly");
+  const count = await reqToPromise(tx.objectStore(STORE_LEARNING_RECORDS).count());
+  await txDone(tx);
+  return count;
+}
+
+/**
  * Delete only from learning_records.
  * @returns true if a row was present and removed; false if absent.
  */

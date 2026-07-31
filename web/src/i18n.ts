@@ -365,6 +365,82 @@ const MESSAGES = {
     "queryLogs.exported.many": "Exported {count} logs.",
     "queryLogs.exportFailed": "Export failed: {error}",
     "queryLogs.clearFailed": "Clear failed: {error}",
+    "learningBackup.heading": "Manage Learning Data",
+    "learningBackup.localOnly":
+      "Learning backups stay on this device and in any files you choose to keep. They are not synced to an account.",
+    "learningBackup.privacy.contains":
+      "This backup contains your saved vocabulary and learning progress.",
+    "learningBackup.privacy.store":
+      "Anyone with this file may be able to see the words you saved and your learning progress. Store it somewhere you trust.",
+    "learningBackup.privacy.trust":
+      "Only restore files you trust. SiraLex validates the file structure but cannot verify who created or edited it.",
+    "learningBackup.export.title": "Export Learning Backup",
+    "learningBackup.export.button": "Export Learning Backup",
+    "learningBackup.export.loading": "Checking Learning Records…",
+    "learningBackup.export.empty": "No learning data to back up.",
+    "learningBackup.export.count": "{count} Learning Records on this device",
+    "learningBackup.export.created": "Backup created",
+    "learningBackup.export.createdDetail": "Backup created with {count} records as {filename}.",
+    "learningBackup.export.failed": "Export failed. No learning data was changed.",
+    "learningBackup.export.failedHeading": "Export failed",
+    "learningBackup.restore.title": "Restore Learning Backup",
+    "learningBackup.restore.chooseFile": "Choose backup file",
+    "learningBackup.restore.reading": "Reading {filename}…",
+    "learningBackup.restore.validating": "Validating {filename}…",
+    "learningBackup.restore.selectedFile": "Selected file: {filename}",
+    "learningBackup.restore.invalidHeading": "Backup file is invalid",
+    "learningBackup.restore.restoring": "Restoring Learning backup…",
+    "learningBackup.restore.completed": "Restore completed",
+    "learningBackup.restore.failedHeading": "Restore failed",
+    "learningBackup.restore.failed": "Restore failed. No learning data was changed.",
+    "learningBackup.restore.noDataChanged":
+      "Dictionary data was not changed.",
+    "learningBackup.restore.successAdd": "Added: {added}. Existing records kept: {kept}.",
+    "learningBackup.restore.successReplace":
+      "Previous Learning Records: {previous}. Restored Learning Records: {restored}.",
+    "learningBackup.preview.heading": "Restore preview",
+    "learningBackup.preview.exportedAt": "Backup created at {value}",
+    "learningBackup.preview.schema": "Package version: {value}",
+    "learningBackup.preview.counts":
+      "Backup records: {backup}. Local records: {local}. Bundles in backup: {bundles}.",
+    "learningBackup.compat.heading": "Dictionary compatibility",
+    "learningBackup.compat.colBundle": "Bundle",
+    "learningBackup.compat.colRecords": "Records",
+    "learningBackup.compat.colState": "Status",
+    "learningBackup.compat.matching": "Installed and matching",
+    "learningBackup.compat.mismatch": "Installed with different dictionary content",
+    "learningBackup.compat.notInstalled": "Dictionary not installed",
+    "learningBackup.policy.legend": "Restore policy",
+    "learningBackup.policy.addMissing": "Add missing records",
+    "learningBackup.policy.addMissingHelp":
+      "Adds identities that are absent locally. Existing local records stay unchanged, including identical and conflicting identities.",
+    "learningBackup.policy.addMissingCounts":
+      "Records to add: {add}. Existing identities to keep: {skip}.",
+    "learningBackup.policy.replaceAll": "Replace all learning records",
+    "learningBackup.policy.replaceAllHelp":
+      "Removes all current Learning Records and restores exactly the backup contents. Dictionary data, query logs, and settings remain unchanged.",
+    "learningBackup.policy.replaceAllCounts":
+      "Previous Learning Records: {previous}. Restored Learning Records: {restored}.",
+    "learningBackup.localInvalid.explanation":
+      "Existing Learning data is inconsistent ({count} invalid records) and cannot be safely combined with this backup.",
+    "learningBackup.localInvalid.addUnavailable":
+      "Add missing is unavailable. Replace all remains available because it removes the current Learning Records before restoring the validated backup.",
+    "learningBackup.confirm.heading": "Confirm replace all",
+    "learningBackup.confirm.replaceWarning":
+      "Replace all will permanently remove the current Learning Records on this device and replace them with the selected backup. Dictionary data will not be changed.",
+    "learningBackup.confirm.replaceAction": "Replace all learning records",
+    "learningBackup.cancel": "Cancel",
+    "learningBackup.openSaved": "Open saved vocabulary",
+    "learningBackup.deleteReminder":
+      "Before deleting the database, you can export a Learning backup.",
+    "learningBackup.deleteReminderAction": "Manage Learning Data",
+    "learningBackup.error.fileTooLarge": "This backup file is too large to restore.",
+    "learningBackup.error.invalidUtf8": "This backup file is not valid UTF-8 text.",
+    "learningBackup.error.invalidJson": "This backup file is not valid JSON.",
+    "learningBackup.error.unsupportedSchema":
+      "This Learning backup version is not supported by this version of SiraLex.",
+    "learningBackup.error.invalidPackage": "Backup file is invalid.",
+    "learningBackup.error.readFailed": "Could not read the selected backup file.",
   },
   fr: {
     "app.subtitle": "Un dictionnaire utilisable hors ligne",
@@ -669,6 +745,85 @@ const MESSAGES = {
     "queryLogs.exported.many": "{count} journaux exportés.",
     "queryLogs.exportFailed": "Échec d'export : {error}",
     "queryLogs.clearFailed": "Échec d'effacement : {error}",
+    "learningBackup.heading": "Gérer les données d’apprentissage",
+    "learningBackup.localOnly":
+      "Les sauvegardes d’apprentissage restent sur cet appareil et dans les fichiers que vous choisissez de conserver. Elles ne sont pas synchronisées avec un compte.",
+    "learningBackup.privacy.contains":
+      "Cette sauvegarde contient votre vocabulaire enregistré et votre progression d’apprentissage.",
+    "learningBackup.privacy.store":
+      "Toute personne disposant de ce fichier pourra éventuellement voir les mots que vous avez enregistrés et votre progression. Conservez-le dans un endroit de confiance.",
+    "learningBackup.privacy.trust":
+      "Restaurez uniquement des fichiers auxquels vous faites confiance. SiraLex valide la structure du fichier, mais ne peut pas vérifier qui l’a créé ou modifié.",
+    "learningBackup.export.title": "Exporter la sauvegarde d’apprentissage",
+    "learningBackup.export.button": "Exporter la sauvegarde d’apprentissage",
+    "learningBackup.export.loading": "Vérification des enregistrements d’apprentissage…",
+    "learningBackup.export.empty": "Aucune donnée d’apprentissage à sauvegarder.",
+    "learningBackup.export.count": "{count} enregistrements d’apprentissage sur cet appareil",
+    "learningBackup.export.created": "Sauvegarde créée",
+    "learningBackup.export.createdDetail":
+      "Sauvegarde créée avec {count} enregistrements sous le nom {filename}.",
+    "learningBackup.export.failed":
+      "Échec de l’exportation. Aucune donnée d’apprentissage n’a été modifiée.",
+    "learningBackup.export.failedHeading": "Échec de l’exportation",
+    "learningBackup.restore.title": "Restaurer la sauvegarde d’apprentissage",
+    "learningBackup.restore.chooseFile": "Choisir un fichier de sauvegarde",
+    "learningBackup.restore.reading": "Lecture de {filename}…",
+    "learningBackup.restore.validating": "Validation de {filename}…",
+    "learningBackup.restore.selectedFile": "Fichier sélectionné : {filename}",
+    "learningBackup.restore.invalidHeading": "Le fichier de sauvegarde est invalide",
+    "learningBackup.restore.restoring": "Restauration de la sauvegarde d’apprentissage…",
+    "learningBackup.restore.completed": "Restauration terminée",
+    "learningBackup.restore.failedHeading": "Échec de la restauration",
+    "learningBackup.restore.failed":
+      "Échec de la restauration. Aucune donnée d’apprentissage n’a été modifiée.",
+    "learningBackup.restore.noDataChanged": "Les données du dictionnaire n’ont pas été modifiées.",
+    "learningBackup.restore.successAdd":
+      "Ajoutés : {added}. Enregistrements existants conservés : {kept}.",
+    "learningBackup.restore.successReplace":
+      "Enregistrements d’apprentissage précédents : {previous}. Enregistrements restaurés : {restored}.",
+    "learningBackup.preview.heading": "Aperçu de la restauration",
+    "learningBackup.preview.exportedAt": "Sauvegarde créée le {value}",
+    "learningBackup.preview.schema": "Version du paquet : {value}",
+    "learningBackup.preview.counts":
+      "Enregistrements de la sauvegarde : {backup}. Enregistrements locaux : {local}. Dictionnaires dans la sauvegarde : {bundles}.",
+    "learningBackup.compat.heading": "Compatibilité des dictionnaires",
+    "learningBackup.compat.colBundle": "Dictionnaire",
+    "learningBackup.compat.colRecords": "Enregistrements",
+    "learningBackup.compat.colState": "État",
+    "learningBackup.compat.matching": "Installé et correspondant",
+    "learningBackup.compat.mismatch": "Installé avec un contenu de dictionnaire différent",
+    "learningBackup.compat.notInstalled": "Dictionnaire non installé",
+    "learningBackup.policy.legend": "Politique de restauration",
+    "learningBackup.policy.addMissing": "Ajouter les enregistrements manquants",
+    "learningBackup.policy.addMissingHelp":
+      "Ajoute les identités absentes localement. Les enregistrements locaux existants restent inchangés, y compris les identités identiques ou conflictuelles.",
+    "learningBackup.policy.addMissingCounts":
+      "Enregistrements à ajouter : {add}. Identités existantes à conserver : {skip}.",
+    "learningBackup.policy.replaceAll": "Remplacer tous les enregistrements d’apprentissage",
+    "learningBackup.policy.replaceAllHelp":
+      "Supprime tous les enregistrements d’apprentissage actuels et restaure exactement le contenu de la sauvegarde. Les données du dictionnaire, les journaux de requêtes et les réglages restent inchangés.",
+    "learningBackup.policy.replaceAllCounts":
+      "Enregistrements d’apprentissage précédents : {previous}. Enregistrements restaurés : {restored}.",
+    "learningBackup.localInvalid.explanation":
+      "Les données d’apprentissage existantes sont incohérentes ({count} enregistrements invalides) et ne peuvent pas être combinées en toute sécurité avec cette sauvegarde.",
+    "learningBackup.localInvalid.addUnavailable":
+      "L’ajout des manquants est indisponible. Remplacer tout reste disponible, car cela supprime les enregistrements actuels avant de restaurer la sauvegarde validée.",
+    "learningBackup.confirm.heading": "Confirmer le remplacement total",
+    "learningBackup.confirm.replaceWarning":
+      "Remplacer tout supprimera définitivement les enregistrements d’apprentissage actuels sur cet appareil et les remplacera par la sauvegarde sélectionnée. Les données du dictionnaire ne seront pas modifiées.",
+    "learningBackup.confirm.replaceAction": "Remplacer tous les enregistrements d’apprentissage",
+    "learningBackup.cancel": "Annuler",
+    "learningBackup.openSaved": "Ouvrir le vocabulaire enregistré",
+    "learningBackup.deleteReminder":
+      "Avant de supprimer la base de données, vous pouvez exporter une sauvegarde d’apprentissage.",
+    "learningBackup.deleteReminderAction": "Gérer les données d’apprentissage",
+    "learningBackup.error.fileTooLarge": "Ce fichier de sauvegarde est trop volumineux pour être restauré.",
+    "learningBackup.error.invalidUtf8": "Ce fichier de sauvegarde n’est pas un texte UTF-8 valide.",
+    "learningBackup.error.invalidJson": "Ce fichier de sauvegarde n’est pas un JSON valide.",
+    "learningBackup.error.unsupportedSchema":
+      "Cette version de sauvegarde d’apprentissage n’est pas prise en charge par cette version de SiraLex.",
+    "learningBackup.error.invalidPackage": "Le fichier de sauvegarde est invalide.",
+    "learningBackup.error.readFailed": "Impossible de lire le fichier de sauvegarde sélectionné.",
   },
 } as const;
 
