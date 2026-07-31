@@ -118,7 +118,8 @@ LP1I6 — Closure — Complete
 PD1 — Next Product Build Decision — Complete
 CF1 — Community Correction and Feedback Capture — Selected
 CF1D0 — Defined
-CF1I1 — Correction Draft Model and Validation — Next
+CF1I1 — Correction Draft Model and Validation — Implemented
+CF1I2 — Local Correction Draft Store — Next
 PV1A — Production Identity and Desktop Smoke — Parallel active
 PV1B — Physical Device Validation — Parallel, hardware-gated
 ```
@@ -127,7 +128,8 @@ PV1B — Physical Device Validation — Parallel, hardware-gated
 - **LP1** is closed (`docs/reports/lp1_local_learning_backup_restore_closure_report.md`).
 - **PD1** selects `CF1 — Community Correction and Feedback Capture` as the next product build while keeping release validation as a parallel track (`docs/reports/pd1_next_product_build_decision.md`).
 - **CF1D0** defines the local offline non-authoritative correction-capture and handoff-export product (`docs/reports/cf1d0_community_correction_feedback_product_definition.md`).
-- **Next slice:** `CF1I1 — Correction Draft Model and Validation`.
+- **CF1I1** implements the pure draft/package model and validators (`docs/reports/cf1i1_correction_draft_model_validation_report.md`).
+- **Next slice:** `CF1I2 — Local Correction Draft Store`.
 - **Parallel validation:** `PV1A` production identity/desktop smoke now; `PV1B` physical-device matrix when hardware is available.
 - Prior portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
 
