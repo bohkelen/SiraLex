@@ -122,7 +122,8 @@ CF1I1 — Correction Draft Model and Validation — Implemented
 CF1I1A — Correction Validator Boundary Fixes — Complete
 CF1I2 — Local Correction Draft Store — Implemented
 CF1I2A — Correction Draft ID Generation Boundary — Complete
-CF1I3 — Entry Suggestion Surface — Next
+CF1I3 — Entry Suggestion Surface — Implemented
+CF1I4 — Pending Corrections and Export — Next
 PV1A — Production Identity and Desktop Smoke — Parallel active
 PV1B — Physical Device Validation — Parallel, hardware-gated
 ```
@@ -135,7 +136,8 @@ PV1B — Physical Device Validation — Parallel, hardware-gated
 - **CF1I1A** tightens SHA-256 provenance to exactly 64 lowercase hex digits and caps package validation errors at 100 with `error_limit_reached`.
 - **CF1I2** persists validated drafts in IndexedDB `correction_drafts` (v5) with stale-edit protection and bundle-lifecycle retention (`docs/reports/cf1i2_local_correction_draft_store_report.md`).
 - **CF1I2A** requires secure draft IDs (`randomUUID` / `getRandomValues`) and fails closed when secure randomness is unavailable; never `Math.random()`.
-- **Next slice:** `CF1I3 — Entry Suggestion Surface`.
+- **CF1I3** adds the entry-detail suggestion form that creates one local non-authoritative draft (`docs/reports/cf1i3_entry_suggestion_surface_report.md`).
+- **Next slice:** `CF1I4 — Pending Corrections and Export`.
 - **Parallel validation:** `PV1A` production identity/desktop smoke now; `PV1B` physical-device matrix when hardware is available.
 - Prior portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
 

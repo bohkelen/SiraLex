@@ -98,6 +98,7 @@ import {
   type ResultDisplayContext,
 } from "./render/render_results";
 import { renderEntryDetail, showTargetEntryUnavailable } from "./render/render_entry";
+import { renderCorrectionForm } from "./render/render_correction_form";
 import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
 import { createReviewSurfaceHost } from "./learning/review_surface_host";
 import {
@@ -109,6 +110,14 @@ import {
   createSavedVocabularySession,
   type SavedVocabularyModel,
 } from "./learning/saved_vocabulary_session";
+import {
+  createCorrectionFormController,
+  type CorrectionFormController,
+} from "./corrections/correction_form_controller";
+import {
+  buildCorrectionEntryContext,
+  canOfferCorrectionSuggestion,
+} from "./corrections/correction_form_model";
 import { openTargetLexiconEntry } from "./navigation/open_target_lexicon_entry";
 import type { EnrichedRecord, TargetEntry } from "./types/records";
 import { isLexiconDisplay } from "./types/records";
@@ -1036,19 +1045,29 @@ async function refreshDbStatus() {
       installedBundles = bundles;
       currentActiveBundle = active;
       const nextBundleId = active?.bundle_id;
-      if (lastKnownActiveBundleId !== nextBundleId) {
+      const nextContentSha = active?.expected_content_sha256;
+      if (
+        lastKnownActiveBundleId !== nextBundleId ||
+        lastKnownActiveContentSha !== nextContentSha
+      ) {
+        const bundleIdentityChanged = lastKnownActiveBundleId !== nextBundleId;
         lastKnownActiveBundleId = nextBundleId;
+        lastKnownActiveContentSha = nextContentSha;
         learningBackupSurface?.invalidatePreviewForBundleChange();
-        if (
-          resultsHostContext === "review" ||
-          resultsHostContext === "saved_vocabulary" ||
-          resultsHostContext === "entry_from_saved"
-        ) {
-          invalidateCollectionAndReviewContexts();
-          resultsHostContext = "search";
-          searchResults.innerHTML = "";
-        } else {
-          invalidateCollectionAndReviewContexts();
+        activeCorrectionForm?.notifyBundleLifecycleChanged();
+        if (bundleIdentityChanged) {
+          if (
+            resultsHostContext === "review" ||
+            resultsHostContext === "saved_vocabulary" ||
+            resultsHostContext === "entry_from_saved"
+          ) {
+            invalidateCollectionAndReviewContexts();
+            resultsHostContext = "search";
+            searchResults.innerHTML = "";
+            disposeActiveCorrectionForm();
+          } else {
+            invalidateCollectionAndReviewContexts();
+          }
         }
       }
       renderBundleSelectOptions(activeBundleId);
@@ -2067,7 +2086,13 @@ let focusReviewActionOnce = false;
 let lastSearchResults: ResultDisplayContext[] = [];
 /** Track active bundle id so switches invalidate collection/Review contexts. */
 let lastKnownActiveBundleId: string | undefined;
+/** Track content hash so dictionary updates invalidate live correction forms. */
+let lastKnownActiveContentSha: string | undefined;
 let learningBackupSurface: ReturnType<typeof createLearningBackupSurface> | undefined;
+/** CF1I4 seam: bump when a local correction draft is created. */
+let correctionManagementGeneration = 0;
+let correctionFormGeneration = 0;
+let activeCorrectionForm: CorrectionFormController | undefined;
 
 /** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4 / LS3I3). */
 type ResultsHostContext =
@@ -2084,11 +2109,23 @@ function disposeActiveReviewHost() {
   reviewGeneration += 1;
 }
 
+function disposeActiveCorrectionForm() {
+  activeCorrectionForm?.dispose();
+  activeCorrectionForm = undefined;
+  correctionFormGeneration += 1;
+}
+
+function invalidateCorrectionManagementGeneration() {
+  correctionManagementGeneration += 1;
+}
+
 function invalidateCollectionAndReviewContexts() {
   disposeActiveReviewHost();
   savedVocabularyGeneration += 1;
   entryDetailGeneration += 1;
   focusReviewActionOnce = false;
+  // Keep mounted correction form; mark it stale so Save cannot retarget.
+  activeCorrectionForm?.notifyHostInvalidated();
 }
 
 function mountLearningBackupModel(
@@ -2236,6 +2273,7 @@ type EntryNavOrigin =
 
 function showResultsList() {
   resultsHostContext = "search";
+  disposeActiveCorrectionForm();
   invalidateCollectionAndReviewContexts();
   searchResults.innerHTML = "";
   if (lastSearchResults.length === 0) return;
@@ -2256,6 +2294,7 @@ function showResultsList() {
  */
 function showReviewSurface() {
   disposeActiveReviewHost();
+  disposeActiveCorrectionForm();
   const generation = ++reviewGeneration;
   resultsHostContext = "review";
   entryDetailGeneration += 1;
@@ -2282,6 +2321,7 @@ function showReviewSurface() {
 
 function showSavedVocabulary() {
   disposeActiveReviewHost();
+  disposeActiveCorrectionForm();
   const generation = ++savedVocabularyGeneration;
   resultsHostContext = "saved_vocabulary";
   entryDetailGeneration += 1;
@@ -2397,10 +2437,70 @@ function handleOpenTargetLexiconEntry(target: TargetEntry, mappingRoot: HTMLElem
   });
 }
 
+function showCorrectionForm(record: EnrichedRecord, origin: EntryNavOrigin): void {
+  const context = currentActiveBundle
+    ? buildCorrectionEntryContext(record, currentActiveBundle)
+    : null;
+  if (!context) return;
+
+  disposeActiveCorrectionForm();
+  disposeActiveReviewHost();
+  entryDetailGeneration += 1;
+  const generation = ++correctionFormGeneration;
+  resultsHostContext = origin.kind === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
+  searchResults.innerHTML = "";
+
+  let viewUpdate: ((vm: ReturnType<CorrectionFormController["getViewModel"]>) => void) | undefined;
+
+  const controller = createCorrectionFormController({
+    context,
+    openDb: openSiralexDb,
+    getActiveMeta: () => currentActiveBundle,
+    isCurrent: () => generation === correctionFormGeneration,
+    onModel: (vm) => {
+      viewUpdate?.(vm);
+    },
+    onCancel: () => {
+      disposeActiveCorrectionForm();
+      showEntryDetail(record, origin);
+    },
+    onBackToEntry: () => {
+      disposeActiveCorrectionForm();
+      showEntryDetail(record, origin);
+    },
+    onDraftSaved: () => {
+      invalidateCorrectionManagementGeneration();
+    },
+  });
+  activeCorrectionForm = controller;
+
+  const formView = renderCorrectionForm(controller.getViewModel(), {
+    onIssueTypeChange: (value) => controller.setIssueType(value),
+    onTargetChange: (key) => controller.setTargetKey(key),
+    onModeChange: (mode) => controller.setMode(mode),
+    onProblemDescriptionChange: (value) => controller.setProblemDescription(value),
+    onProposedValueChange: (value) => controller.setProposedValue(value),
+    onOtherFieldLabelChange: (value) => controller.setOtherFieldLabel(value),
+    onSave: () => {
+      void controller.save();
+    },
+    onCancel: () => controller.cancel(),
+    onBackToEntry: () => controller.backToEntry(),
+  });
+  viewUpdate = formView.update;
+  searchResults.appendChild(formView.root);
+  controller.start();
+
+  const heading = formView.root.querySelector<HTMLElement>("#correction-form-heading");
+  heading?.setAttribute("tabindex", "-1");
+  heading?.focus();
+}
+
 function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
   const generation = ++entryDetailGeneration;
   resultsHostContext = origin.kind === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
   disposeActiveReviewHost();
+  disposeActiveCorrectionForm();
   if (origin.kind === "search") {
     savedVocabularyGeneration += 1;
   }
@@ -2408,6 +2508,8 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
 
   const offerLearning = isLexiconDisplay(record);
   const learningAvailable = offerLearning && canOfferLearningSave(record, currentActiveBundle);
+  const offerCorrection =
+    offerLearning && canOfferCorrectionSuggestion(record, currentActiveBundle);
 
   let setLearningSaveState: ((state: LearningSaveControlState) => void) | undefined;
 
@@ -2452,6 +2554,12 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
           onUnsave: () => {
             void session?.unsave();
           },
+        }
+      : undefined,
+    onSuggestCorrection: offerCorrection
+      ? () => {
+          if (generation !== entryDetailGeneration) return;
+          showCorrectionForm(record, origin);
         }
       : undefined,
   });

@@ -136,5 +136,26 @@ describe("i18n translations", () => {
 
     setCurrentLocale(previous);
   });
+
+  it("resolves correction feedback form keys in English and French", () => {
+    const previous = getCurrentLocale();
+
+    setCurrentLocale("en");
+    expect(t("correctionFeedback.form.suggestAction")).toBe("Suggest a correction");
+    expect(t("correctionFeedback.form.save")).toBe("Save correction draft");
+    expect(t("correctionFeedback.form.success.body1")).toMatch(/saved on this device/i);
+    expect(t("correctionFeedback.form.success.body2")).toMatch(/not been submitted/i);
+    expect(t("correctionFeedback.form.privacy.localOnly")).toMatch(/does not change the dictionary/i);
+
+    setCurrentLocale("fr");
+    expect(t("correctionFeedback.form.suggestAction")).toBe("Suggérer une correction");
+    expect(t("correctionFeedback.form.save")).toBe("Enregistrer le brouillon de correction");
+    expect(t("correctionFeedback.form.success.body1")).toMatch(/enregistré sur cet appareil/i);
+    expect(t("correctionFeedback.form.success.body2")).toMatch(/pas été envoyé/i);
+    expect(t("correctionFeedback.form.privacy.localOnly")).toMatch(/brouillon local/i);
+    expect(t("correctionFeedback.form.suggestAction")).not.toBe("Suggest a correction");
+
+    setCurrentLocale(previous);
+  });
 });
 

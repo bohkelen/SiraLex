@@ -218,6 +218,7 @@ function renderLexiconEntry(
   record: EnrichedRecord,
   d: LexiconDisplayFields,
   learning?: EntryLearningCallbacks,
+  onSuggestCorrection?: () => void,
 ): { wrap: HTMLElement; setLearningSaveState?: (state: LearningSaveControlState) => void } {
   const wrap = el("div", "entry-detail entry-lexicon");
 
@@ -255,6 +256,21 @@ function renderLexiconEntry(
     const sensesWrap = el("div", "entry-senses");
     d.senses.forEach((sense, i) => sensesWrap.appendChild(renderSense(sense, i)));
     wrap.appendChild(sensesWrap);
+  }
+
+  // After core lexical content; before technical/debug metadata. Separate from Learning Save.
+  if (onSuggestCorrection) {
+    const actions = el("div", "entry-correction-actions");
+    const suggestBtn = document.createElement("button");
+    suggestBtn.type = "button";
+    suggestBtn.className = "btn entry-suggest-correction";
+    suggestBtn.id = "entry-suggest-correction";
+    suggestBtn.textContent = t("correctionFeedback.form.suggestAction");
+    suggestBtn.addEventListener("click", () => {
+      onSuggestCorrection();
+    });
+    actions.appendChild(suggestBtn);
+    wrap.appendChild(actions);
   }
 
   if (d.corpus_count != null) {
@@ -320,6 +336,11 @@ export type EntryDetailCallbacks = {
   targetEntriesLabel?: string;
   /** Present only for lexicon entries when the app wants a Learning Save control. */
   learning?: EntryLearningCallbacks;
+  /**
+   * Open the correction suggestion form for this live lexicon entry.
+   * Owner supplies fully resolved context; renderer does not invent provenance.
+   */
+  onSuggestCorrection?: () => void;
 };
 
 export type EntryDetailView = {
@@ -349,7 +370,12 @@ export function renderEntryDetail(
   let setLearningSaveState: ((state: LearningSaveControlState) => void) | undefined;
 
   if (isLexiconDisplay(record)) {
-    const lexicon = renderLexiconEntry(record, record.display, callbacks.learning);
+    const lexicon = renderLexiconEntry(
+      record,
+      record.display,
+      callbacks.learning,
+      callbacks.onSuggestCorrection,
+    );
     container.appendChild(lexicon.wrap);
     setLearningSaveState = lexicon.setLearningSaveState;
   } else if (isIndexMappingDisplay(record)) {
