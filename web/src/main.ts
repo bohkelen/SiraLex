@@ -2454,7 +2454,9 @@ function showCorrectionForm(record: EnrichedRecord, origin: EntryNavOrigin): voi
 
   const controller = createCorrectionFormController({
     context,
+    // Production: controller opens fresh connections and closes them in finally (CF1I3A).
     openDb: openSiralexDb,
+    dbOwnership: "controller_owned",
     getActiveMeta: () => currentActiveBundle,
     isCurrent: () => generation === correctionFormGeneration,
     onModel: (vm) => {

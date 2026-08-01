@@ -147,6 +147,7 @@ describe("CF1I3 correction form integration", () => {
     const controller = createCorrectionFormController({
       context,
       openDb: async () => db,
+      dbOwnership: "caller_owned",
       getActiveMeta: () => active,
       isCurrent: () => true,
       onModel: (vm) => {
@@ -219,6 +220,7 @@ describe("CF1I3 correction form integration", () => {
     const controller = createCorrectionFormController({
       context,
       openDb: async () => db,
+      dbOwnership: "caller_owned",
       getActiveMeta: () => currentMeta,
       isCurrent: () => true,
       onModel: (vm) => {
@@ -247,6 +249,7 @@ describe("CF1I3 correction form integration", () => {
     const controller2 = createCorrectionFormController({
       context,
       openDb: async () => db,
+      dbOwnership: "caller_owned",
       getActiveMeta: () => currentMeta,
       isCurrent: () => true,
       onModel: (vm) => {

@@ -59,7 +59,28 @@ function lexicon(): EnrichedRecord {
   };
 }
 
-let db: IDBDatabase;
+type TrackedDb = {
+  db: IDBDatabase;
+  closed: boolean;
+};
+
+function trackDb(db: IDBDatabase): TrackedDb {
+  const tracked: TrackedDb = { db, closed: false };
+  const originalClose = db.close.bind(db);
+  db.close = () => {
+    tracked.closed = true;
+    originalClose();
+  };
+  return tracked;
+}
+
+async function productionOpenDb(opened: TrackedDb[]): Promise<IDBDatabase> {
+  const tracked = trackDb(await openSiralexDb());
+  opened.push(tracked);
+  return tracked.db;
+}
+
+let sharedDb: IDBDatabase;
 
 beforeEach(async () => {
   try {
@@ -67,11 +88,15 @@ beforeEach(async () => {
   } catch {
     // ok
   }
-  db = await openSiralexDb();
+  sharedDb = await openSiralexDb();
 });
 
 afterEach(() => {
-  db.close();
+  try {
+    sharedDb.close();
+  } catch {
+    // already closed in controller-owned tests that reopen
+  }
 });
 
 describe("correction form controller", () => {
@@ -86,7 +111,8 @@ describe("correction form controller", () => {
     const onCancel = vi.fn();
     const controller = createCorrectionFormController({
       context,
-      openDb: async () => db,
+      openDb: async () => sharedDb,
+      dbOwnership: "caller_owned",
       getActiveMeta: () => active,
       isCurrent: () => true,
       onModel: (vm) => {
@@ -122,7 +148,7 @@ describe("correction form controller", () => {
     expect(input.display_snapshot.selected_gloss).toBe("tête");
     expect(input.problem_description).toBe("Gloss looks wrong");
     expect(input.proposed_value).toBe("crâne");
-    expect(await countCorrectionDrafts(db)).toBe(1);
+    expect(await countCorrectionDrafts(sharedDb)).toBe(1);
     expect(models.some((m) => m.state === "saved")).toBe(true);
     expect(onDraftSaved).toHaveBeenCalledTimes(1);
 
@@ -168,7 +194,8 @@ describe("correction form controller", () => {
     let last: CorrectionFormViewModel | undefined;
     const controller = createCorrectionFormController({
       context,
-      openDb: async () => db,
+      openDb: async () => sharedDb,
+      dbOwnership: "caller_owned",
       getActiveMeta: () => active,
       isCurrent: () => true,
       onModel: (vm) => {
@@ -203,7 +230,8 @@ describe("correction form controller", () => {
     let last: CorrectionFormViewModel | undefined;
     const controller = createCorrectionFormController({
       context,
-      openDb: async () => db,
+      openDb: async () => sharedDb,
+      dbOwnership: "caller_owned",
       getActiveMeta: () => active,
       isCurrent: () => true,
       onModel: (vm) => {
@@ -233,7 +261,8 @@ describe("correction form controller", () => {
     let last: CorrectionFormViewModel | undefined;
     const controller = createCorrectionFormController({
       context,
-      openDb: async () => db,
+      openDb: async () => sharedDb,
+      dbOwnership: "caller_owned",
       getActiveMeta: () => undefined,
       isCurrent: () => true,
       onModel: (vm) => {
@@ -259,7 +288,8 @@ describe("correction form controller", () => {
     let last: CorrectionFormViewModel | undefined;
     const controller = createCorrectionFormController({
       context,
-      openDb: async () => db,
+      openDb: async () => sharedDb,
+      dbOwnership: "caller_owned",
       getActiveMeta: () => active,
       isCurrent: () => current,
       onModel: (vm) => {
@@ -280,14 +310,16 @@ describe("correction form controller", () => {
     expect(last?.state).toBe("stale_context");
   });
 
-  it("leaves caller-owned DB open and succeeds when context unchanged", async () => {
+  it("leaves caller-owned DB open when explicitly configured", async () => {
     const active = meta();
-    await putInstalledBundleMeta(db, active);
+    await putInstalledBundleMeta(sharedDb, active);
     const context = buildCorrectionEntryContext(lexicon(), active)!;
+    const tracked = trackDb(sharedDb);
     let last: CorrectionFormViewModel | undefined;
     const controller = createCorrectionFormController({
       context,
-      openDb: async () => db,
+      openDb: async () => tracked.db,
+      dbOwnership: "caller_owned",
       getActiveMeta: () => active,
       isCurrent: () => true,
       onModel: (vm) => {
@@ -302,7 +334,180 @@ describe("correction form controller", () => {
     controller.setProblemDescription("N’Ko form issue");
     await controller.save();
     expect(last?.state).toBe("saved");
-    expect(db.name).toBeTruthy();
-    expect(await countCorrectionDrafts(db)).toBe(1);
+    expect(tracked.closed).toBe(false);
+    expect(await countCorrectionDrafts(tracked.db)).toBe(1);
+  });
+});
+
+describe("CF1I3A database ownership", () => {
+  it("closes fresh verification and save connections under controller_owned", async () => {
+    const active = meta();
+    const context = buildCorrectionEntryContext(lexicon(), active)!;
+    const opened: TrackedDb[] = [];
+    const controller = createCorrectionFormController({
+      context,
+      openDb: () => productionOpenDb(opened),
+      dbOwnership: "controller_owned",
+      getActiveMeta: () => active,
+      isCurrent: () => true,
+      onModel: () => undefined,
+      onCancel: () => undefined,
+      onBackToEntry: () => undefined,
+      resolveLiveEntry: async () => lexicon(),
+    });
+    controller.setIssueType("other");
+    controller.setProblemDescription("note");
+    await controller.save();
+
+    // One connection for verify + one for save.
+    expect(opened.length).toBe(2);
+    expect(opened.every((entry) => entry.closed)).toBe(true);
+  });
+
+  it("closes save connection after store failure", async () => {
+    const active = meta();
+    const context = buildCorrectionEntryContext(lexicon(), active)!;
+    const opened: TrackedDb[] = [];
+    const controller = createCorrectionFormController({
+      context,
+      openDb: () => productionOpenDb(opened),
+      dbOwnership: "controller_owned",
+      getActiveMeta: () => active,
+      isCurrent: () => true,
+      onModel: () => undefined,
+      onCancel: () => undefined,
+      onBackToEntry: () => undefined,
+      createDraft: async () => ({ ok: false, code: "database_write_failed" }),
+      resolveLiveEntry: async () => lexicon(),
+    });
+    controller.setIssueType("other");
+    controller.setProblemDescription("note");
+    await controller.save();
+    expect(opened.length).toBe(2);
+    expect(opened.every((entry) => entry.closed)).toBe(true);
+  });
+
+  it("closes save connection after thrown error", async () => {
+    const active = meta();
+    const context = buildCorrectionEntryContext(lexicon(), active)!;
+    const opened: TrackedDb[] = [];
+    const controller = createCorrectionFormController({
+      context,
+      openDb: () => productionOpenDb(opened),
+      dbOwnership: "controller_owned",
+      getActiveMeta: () => active,
+      isCurrent: () => true,
+      onModel: () => undefined,
+      onCancel: () => undefined,
+      onBackToEntry: () => undefined,
+      createDraft: async () => {
+        throw new Error("boom");
+      },
+      resolveLiveEntry: async () => lexicon(),
+    });
+    controller.setIssueType("other");
+    controller.setProblemDescription("note");
+    await controller.save();
+    expect(opened.length).toBe(2);
+    expect(opened.every((entry) => entry.closed)).toBe(true);
+  });
+
+  it("closes verification connection when live entry is stale/missing", async () => {
+    const active = meta();
+    const context = buildCorrectionEntryContext(lexicon(), active)!;
+    const opened: TrackedDb[] = [];
+    const controller = createCorrectionFormController({
+      context,
+      openDb: () => productionOpenDb(opened),
+      dbOwnership: "controller_owned",
+      getActiveMeta: () => active,
+      isCurrent: () => true,
+      onModel: () => undefined,
+      onCancel: () => undefined,
+      onBackToEntry: () => undefined,
+      resolveLiveEntry: async () => undefined,
+    });
+    controller.setIssueType("other");
+    controller.setProblemDescription("note");
+    await controller.save();
+    expect(opened.length).toBe(1);
+    expect(opened[0]!.closed).toBe(true);
+  });
+});
+
+describe("CF1I3A post-commit invalidation", () => {
+  it("invokes onDraftSaved once when host goes stale after successful commit", async () => {
+    const active = meta();
+    const context = buildCorrectionEntryContext(lexicon(), active)!;
+    let current = true;
+    const onDraftSaved = vi.fn();
+    const models: CorrectionFormViewModel[] = [];
+    const createDraft = vi.fn(
+      async (...args: Parameters<typeof createCorrectionDraft>) => {
+        const result = await createCorrectionDraft(...args);
+        current = false; // host invalidated after IndexedDB commit returns
+        return result;
+      },
+    );
+    const controller = createCorrectionFormController({
+      context,
+      openDb: async () => sharedDb,
+      dbOwnership: "caller_owned",
+      getActiveMeta: () => active,
+      isCurrent: () => current,
+      onModel: (vm) => {
+        models.push(vm);
+      },
+      onCancel: () => undefined,
+      onBackToEntry: () => undefined,
+      onDraftSaved,
+      createDraft,
+      resolveLiveEntry: async () => lexicon(),
+    });
+    controller.setIssueType("other");
+    controller.setProblemDescription("persisted note");
+    await controller.save();
+
+    expect(createDraft).toHaveBeenCalledTimes(1);
+    expect(onDraftSaved).toHaveBeenCalledTimes(1);
+    expect(models.some((m) => m.state === "saved")).toBe(false);
+    expect(await countCorrectionDrafts(sharedDb)).toBe(1);
+  });
+
+  it("invokes onDraftSaved once when disposed after successful commit", async () => {
+    const active = meta();
+    const context = buildCorrectionEntryContext(lexicon(), active)!;
+    const onDraftSaved = vi.fn();
+    const models: CorrectionFormViewModel[] = [];
+    let controller: ReturnType<typeof createCorrectionFormController>;
+    const createDraft = vi.fn(
+      async (...args: Parameters<typeof createCorrectionDraft>) => {
+        const result = await createCorrectionDraft(...args);
+        controller.dispose();
+        return result;
+      },
+    );
+    controller = createCorrectionFormController({
+      context,
+      openDb: async () => sharedDb,
+      dbOwnership: "caller_owned",
+      getActiveMeta: () => active,
+      isCurrent: () => true,
+      onModel: (vm) => {
+        models.push(vm);
+      },
+      onCancel: () => undefined,
+      onBackToEntry: () => undefined,
+      onDraftSaved,
+      createDraft,
+      resolveLiveEntry: async () => lexicon(),
+    });
+    controller.setIssueType("other");
+    controller.setProblemDescription("persisted after dispose");
+    await controller.save();
+
+    expect(onDraftSaved).toHaveBeenCalledTimes(1);
+    expect(models.some((m) => m.state === "saved")).toBe(false);
+    expect(await countCorrectionDrafts(sharedDb)).toBe(1);
   });
 });

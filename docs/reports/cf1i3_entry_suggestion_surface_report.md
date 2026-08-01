@@ -164,6 +164,13 @@ or Unicode normalization.
 Validate → verify context → busy → one `createCorrectionDraft` → await completion
 → invalidate correction-management generation seam → success with Back to entry.
 
+### CF1I3A commit invalidation
+
+Successful store commit always invokes `onDraftSaved` exactly once, even when the
+host becomes stale or the controller is disposed before UI result handling.
+UI success rendering remains suppressed in those cases; persisted drafts still
+invalidate dependent management generation.
+
 ---
 
 ## 18. Duplicate activation
@@ -243,7 +250,7 @@ npx vitest run src/corrections src/render/render_entry \
   src/learning/learning_record_persistence.test.ts \
   src/navigation
 → Test Files  15 passed (15)
-→ Tests  153 passed (153)
+→ Tests  159 passed (159)
 ```
 
 Full suite:
@@ -251,7 +258,7 @@ Full suite:
 ```text
 npm run test:run
 → Test Files  62 passed (62)
-→ Tests  658 passed (658)
+→ Tests  664 passed (664)
 ```
 
 Build:
@@ -271,6 +278,16 @@ npm run build
 - `correctionManagementGeneration` is an invalidation seam for CF1I4 (no Manage
   Corrections UI yet).
 - Russian target label exists only to identify existing live Russian content.
+- **CF1I3A:** production DB ownership is explicitly `controller_owned`
+  (`openDb` → close in `finally`). Tests that inject a shared connection must set
+  `dbOwnership: "caller_owned"` so the controller does not close them.
+
+### Database ownership (CF1I3A)
+
+| Mode | Behavior |
+| --- | --- |
+| `controller_owned` (default / production) | Every connection from `openDb` is closed in `finally` after verify or save |
+| `caller_owned` | Shared injected connection is never closed by the controller |
 
 ---
 
@@ -283,7 +300,7 @@ Changed/added:
 - `web/src/corrections/correction_form_integration.test.ts`
 - `web/src/render/render_correction_form.ts` (+ tests)
 - `web/src/render/render_entry.ts` / `render_entry_correction.test.ts`
-- `web/src/main.ts` (narrow host wiring)
+- `web/src/main.ts` (narrow host wiring; explicit `dbOwnership: "controller_owned"`)
 - `web/src/i18n.ts` / `i18n.test.ts`
 - `web/src/style.css`
 - `docs/reports/cf1i3_entry_suggestion_surface_report.md`
