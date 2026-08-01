@@ -1,5 +1,5 @@
 export const SIRALEX_DB_NAME = "siralex_db";
-export const SIRALEX_DB_VERSION = 4;
+export const SIRALEX_DB_VERSION = 5;
 
 export const STORE_META = "meta" as const;
 export const STORE_RECORDS = "records" as const;
@@ -7,6 +7,7 @@ export const STORE_SEARCH_INDEX = "search_index" as const;
 export const STORE_BUNDLES_REGISTRY = "bundles_registry" as const;
 export const STORE_QUERY_LOGS = "query_logs" as const;
 export const STORE_LEARNING_RECORDS = "learning_records" as const;
+export const STORE_CORRECTION_DRAFTS = "correction_drafts" as const;
 
 const INDEX_BY_BUNDLE_ID = "by_bundle_id";
 export const LEARNING_RECORD_INDEX_BY_BUNDLE_ID = "by_bundle_id" as const;
@@ -20,7 +21,8 @@ export type SiralexObjectStoreName =
   | typeof STORE_SEARCH_INDEX
   | typeof STORE_BUNDLES_REGISTRY
   | typeof STORE_QUERY_LOGS
-  | typeof STORE_LEARNING_RECORDS;
+  | typeof STORE_LEARNING_RECORDS
+  | typeof STORE_CORRECTION_DRAFTS;
 
 export type BundleLanguageMeta = {
   source_lang?: string;
@@ -154,6 +156,13 @@ export async function openSiralexDb(): Promise<IDBDatabase> {
           keyPath: ["bundle_id", "ir_id"],
         });
         learningRecords.createIndex(LEARNING_RECORD_INDEX_BY_BUNDLE_ID, "bundle_id", { unique: false });
+      }
+
+      // CF1I2: correction drafts (v4 → v5). Additive only — no rewrite of
+      // dictionary, Learning, query-log, catalog, registry, meta, or search-index rows.
+      // No indexes: key lookup, full list, and count cover current CF1 queries.
+      if (!db.objectStoreNames.contains(STORE_CORRECTION_DRAFTS)) {
+        db.createObjectStore(STORE_CORRECTION_DRAFTS, { keyPath: "draft_id" });
       }
 
       if (oldVersion < 2 && tx != null) {
