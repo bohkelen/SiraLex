@@ -1088,6 +1088,97 @@ button.target-link .target-text {
   color: var(--muted);
 }
 
+.correction-manage-delete-reminder {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.correction-manage {
+  display: grid;
+  gap: 12px;
+}
+
+.correction-manage-heading:focus,
+.correction-manage-status:focus,
+.correction-manage-error-summary:focus,
+.correction-manage-delete-confirm:focus,
+.correction-manage-list:focus {
+  outline: 2px solid color-mix(in oklab, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.correction-manage-status {
+  min-height: 1.25em;
+}
+
+.correction-manage-export-warning {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.correction-manage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.correction-manage-row-button {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--muted) 35%, var(--panel));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--panel) 96%, var(--accent) 4%);
+  color: inherit;
+  cursor: pointer;
+}
+
+.correction-manage-row-headword {
+  font-weight: 600;
+}
+
+.correction-manage-row-meta,
+.correction-manage-row-updated,
+.correction-manage-availability {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.correction-manage-availability[data-state="dictionary_unavailable"]::before,
+.correction-manage-availability[data-state="entry_unavailable"]::before,
+.correction-manage-availability[data-state="dictionary_content_differs"]::before {
+  content: "· ";
+}
+
+.correction-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.correction-manage-provenance {
+  font-size: 13px;
+}
+
+.correction-manage-delete-confirm {
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--muted) 40%, var(--panel));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--panel) 94%, var(--accent) 6%);
+}
+
+.correction-manage-help,
+.correction-manage-timestamps {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 @media (max-width: 640px) {
   .container {
     padding: 12px;

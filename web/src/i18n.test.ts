@@ -157,5 +157,35 @@ describe("i18n translations", () => {
 
     setCurrentLocale(previous);
   });
+
+  it("resolves correction feedback manage/export keys in English and French", () => {
+    const previous = getCurrentLocale();
+
+    setCurrentLocale("en");
+    expect(t("correctionFeedback.manage.open")).toBe("Manage Corrections");
+    expect(t("correctionFeedback.manage.heading")).toBe("Pending corrections");
+    expect(t("correctionFeedback.manage.export.authority")).toBe(
+      "This file contains unreviewed user suggestions. It must not be applied automatically.",
+    );
+    expect(t("correctionFeedback.manage.deleteReminder")).toBe(
+      "Before deleting the database, export your correction drafts if you want to keep them.",
+    );
+    expect(t("correctionFeedback.manage.export.success", {
+      filename: "x.json",
+      count: 2,
+    })).toContain("x.json");
+    expect(t("correctionFeedback.manage.export.button")).not.toMatch(/submit/i);
+
+    setCurrentLocale("fr");
+    expect(t("correctionFeedback.manage.open")).toBe("Gérer les corrections");
+    expect(t("correctionFeedback.manage.heading")).toBe("Corrections en attente");
+    expect(t("correctionFeedback.manage.export.authority")).toBe(
+      "Ce fichier contient des suggestions utilisateur non révisées. Il ne doit pas être appliqué automatiquement.",
+    );
+    expect(t("correctionFeedback.manage.deleteReminder")).toMatch(/Avant de supprimer/i);
+    expect(t("correctionFeedback.manage.open")).not.toBe("Manage Corrections");
+
+    setCurrentLocale(previous);
+  });
 });
 

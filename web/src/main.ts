@@ -118,6 +118,12 @@ import {
   buildCorrectionEntryContext,
   canOfferCorrectionSuggestion,
 } from "./corrections/correction_form_model";
+import {
+  createCorrectionManagementSession,
+  type CorrectionManagementSession,
+} from "./corrections/correction_management_session";
+import { countCorrectionDrafts } from "./corrections/correction_draft_store";
+import { renderCorrectionManagement } from "./render/render_correction_management";
 import { openTargetLexiconEntry } from "./navigation/open_target_lexicon_entry";
 import type { EnrichedRecord, TargetEntry } from "./types/records";
 import { isLexiconDisplay } from "./types/records";
@@ -176,6 +182,7 @@ app.innerHTML = `
           <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
           <div class="row" style="gap: 8px; flex-wrap: wrap">
             <button id="openSavedVocabulary" class="btn" type="button">${t("learning.openSaved")}</button>
+            <button id="openManageCorrections" class="btn" type="button">${t("correctionFeedback.manage.open")}</button>
             <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
           </div>
         </div>
@@ -245,6 +252,7 @@ app.innerHTML = `
         <div id="learningBackupHost" class="learning-backup-host" style="margin-top: 12px"></div>
         <div class="row" style="margin-top: 12px; flex-direction: column; align-items: flex-start; gap: 8px">
           <p id="learningBackupDeleteReminder" class="learning-backup-delete-reminder" hidden></p>
+          <p id="correctionFeedbackDeleteReminder" class="correction-manage-delete-reminder" hidden></p>
           <button id="clearDb" class="btn">${t("db.delete")}</button>
         </div>
       </div>
@@ -353,6 +361,7 @@ const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
 const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
+const openManageCorrectionsBtn = mustGetEl<HTMLButtonElement>("#openManageCorrections");
 const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
 const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
 const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
@@ -375,6 +384,9 @@ const importProgress = mustGetEl<HTMLDivElement>("#importProgress");
 const clearDbBtn = mustGetEl<HTMLButtonElement>("#clearDb");
 const learningBackupHost = mustGetEl<HTMLDivElement>("#learningBackupHost");
 const learningBackupDeleteReminder = mustGetEl<HTMLParagraphElement>("#learningBackupDeleteReminder");
+const correctionFeedbackDeleteReminder = mustGetEl<HTMLParagraphElement>(
+  "#correctionFeedbackDeleteReminder",
+);
 const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
 const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
 const searchMeta = mustGetEl<HTMLDivElement>("#searchMeta");
@@ -843,10 +855,15 @@ openManageDictionariesBtn.addEventListener("click", () => {
   manageDictionariesPanel.open = true;
   manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   void learningBackupSurface?.refreshCount();
+  void updateCorrectionFeedbackDeleteReminder();
 });
 
 openSavedVocabularyBtn.addEventListener("click", () => {
   showSavedVocabulary();
+});
+
+openManageCorrectionsBtn.addEventListener("click", () => {
+  showCorrectionManagement();
 });
 
 catalogUrlInput.addEventListener("input", () => {
@@ -1734,7 +1751,9 @@ clearDbBtn.addEventListener("click", () => {
     importProgress.textContent = t("db.deleting");
     try {
       await deleteSiralexDb();
-      // Drop Saved Vocabulary / Review hosts and focus intent before refresh.
+      // Drop Saved Vocabulary / Review / correction hosts and focus intent before refresh.
+      disposeActiveCorrectionManagement();
+      disposeActiveCorrectionForm();
       invalidateCollectionAndReviewContexts();
       learningBackupSurface?.dispose();
       learningBackupSurface = createAndMountLearningBackupSurface();
@@ -1747,6 +1766,7 @@ clearDbBtn.addEventListener("click", () => {
     }
     await refreshDbStatus();
     await updateLearningBackupDeleteReminder();
+    await updateCorrectionFeedbackDeleteReminder();
   });
 });
 
@@ -2089,10 +2109,11 @@ let lastKnownActiveBundleId: string | undefined;
 /** Track content hash so dictionary updates invalidate live correction forms. */
 let lastKnownActiveContentSha: string | undefined;
 let learningBackupSurface: ReturnType<typeof createLearningBackupSurface> | undefined;
-/** CF1I4 seam: bump when a local correction draft is created. */
+/** CF1I4 seam: bump when a local correction draft is created/edited/deleted. */
 let correctionManagementGeneration = 0;
 let correctionFormGeneration = 0;
 let activeCorrectionForm: CorrectionFormController | undefined;
+let activeCorrectionManagement: CorrectionManagementSession | undefined;
 
 /** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4 / LS3I3). */
 type ResultsHostContext =
@@ -2117,6 +2138,112 @@ function disposeActiveCorrectionForm() {
 
 function invalidateCorrectionManagementGeneration() {
   correctionManagementGeneration += 1;
+  // Stale async results from a mounted management session are ignored via isCurrent.
+}
+
+function disposeActiveCorrectionManagement() {
+  activeCorrectionManagement?.dispose();
+  activeCorrectionManagement = undefined;
+  correctionManagementGeneration += 1;
+}
+
+async function updateCorrectionFeedbackDeleteReminder(): Promise<void> {
+  try {
+    const db = await openSiralexDb();
+    try {
+      const count = await countCorrectionDrafts(db);
+      if (count > 0) {
+        correctionFeedbackDeleteReminder.hidden = false;
+        correctionFeedbackDeleteReminder.replaceChildren();
+        correctionFeedbackDeleteReminder.appendChild(
+          document.createTextNode(`${t("correctionFeedback.manage.deleteReminder")} `),
+        );
+        const link = document.createElement("button");
+        link.type = "button";
+        link.className = "btn";
+        link.textContent = t("correctionFeedback.manage.deleteReminderAction");
+        link.addEventListener("click", () => {
+          showCorrectionManagement();
+        });
+        correctionFeedbackDeleteReminder.appendChild(link);
+      } else {
+        correctionFeedbackDeleteReminder.hidden = true;
+        correctionFeedbackDeleteReminder.replaceChildren();
+      }
+    } finally {
+      db.close();
+    }
+  } catch {
+    correctionFeedbackDeleteReminder.hidden = true;
+    correctionFeedbackDeleteReminder.replaceChildren();
+  }
+}
+
+function showCorrectionManagement(): void {
+  disposeActiveReviewHost();
+  disposeActiveCorrectionForm();
+  disposeActiveCorrectionManagement();
+  const generation = ++correctionManagementGeneration;
+  resultsHostContext = "search";
+  entryDetailGeneration += 1;
+  savedVocabularyGeneration += 1;
+  searchResults.innerHTML = "";
+
+  let viewUpdate: ((vm: ReturnType<CorrectionManagementSession["getVm"]>) => void) | undefined;
+  const session = createCorrectionManagementSession({
+    openDb: openSiralexDb,
+    dbOwnership: "controller_owned",
+    now: () => new Date().toISOString(),
+    appVersion: APP_VERSION,
+    isCurrent: () =>
+      generation === correctionManagementGeneration && activeCorrectionManagement === session,
+    onModel: (vm) => {
+      viewUpdate?.(vm);
+    },
+    onDraftsChanged: () => {
+      // Do not bump generation here — this session is the live host.
+      void updateCorrectionFeedbackDeleteReminder();
+    },
+  });
+  activeCorrectionManagement = session;
+
+  const view = renderCorrectionManagement(session.getVm(), {
+    onOpenDetail: (draftId) => {
+      void session.openDetail(draftId);
+    },
+    onBackToList: () => session.backToList(),
+    onStartEdit: () => session.startEdit(),
+    onCancelEdit: () => session.cancelEdit(),
+    onSaveEdit: () => {
+      void session.saveEdit();
+    },
+    onIssueTypeChange: (value) => session.setEditIssueType(value),
+    onModeChange: (mode) => session.setEditMode(mode),
+    onTargetChange: (key) => session.setEditTargetKey(key),
+    onProblemDescriptionChange: (value) => session.setEditProblemDescription(value),
+    onProposedValueChange: (value) => session.setEditProposedValue(value),
+    onOtherFieldLabelChange: (value) => session.setEditOtherFieldLabel(value),
+    onRequestDelete: () => session.requestDelete(),
+    onCancelDelete: () => session.cancelDelete(),
+    onConfirmDelete: () => {
+      void session.confirmDelete();
+    },
+    onExport: () => {
+      void session.exportAll();
+    },
+    onAcknowledgeExport: () => session.acknowledgeExport(),
+    onBack: () => {
+      disposeActiveCorrectionManagement();
+      if (lastSearchResults.length > 0) {
+        showResultsList();
+      } else {
+        searchResults.innerHTML = "";
+      }
+    },
+  });
+  viewUpdate = view.update;
+  searchResults.appendChild(view.root);
+  void session.load();
 }
 
 function invalidateCollectionAndReviewContexts() {
@@ -2206,6 +2333,8 @@ async function updateLearningBackupDeleteReminder(): Promise<void> {
 }
 
 createAndMountLearningBackupSurface();
+void updateCorrectionFeedbackDeleteReminder();
+
 function cancelPendingSettledQueryLog() {
   if (queryLoggingSettleTimer !== undefined) {
     clearTimeout(queryLoggingSettleTimer);
@@ -2274,6 +2403,7 @@ type EntryNavOrigin =
 function showResultsList() {
   resultsHostContext = "search";
   disposeActiveCorrectionForm();
+  disposeActiveCorrectionManagement();
   invalidateCollectionAndReviewContexts();
   searchResults.innerHTML = "";
   if (lastSearchResults.length === 0) return;
@@ -2295,6 +2425,7 @@ function showResultsList() {
 function showReviewSurface() {
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
+  disposeActiveCorrectionManagement();
   const generation = ++reviewGeneration;
   resultsHostContext = "review";
   entryDetailGeneration += 1;
@@ -2322,6 +2453,7 @@ function showReviewSurface() {
 function showSavedVocabulary() {
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
+  disposeActiveCorrectionManagement();
   const generation = ++savedVocabularyGeneration;
   resultsHostContext = "saved_vocabulary";
   entryDetailGeneration += 1;
@@ -2471,7 +2603,9 @@ function showCorrectionForm(record: EnrichedRecord, origin: EntryNavOrigin): voi
       showEntryDetail(record, origin);
     },
     onDraftSaved: () => {
+      // Invalidate any mounted management session; refresh deletion reminder.
       invalidateCorrectionManagementGeneration();
+      void updateCorrectionFeedbackDeleteReminder();
     },
   });
   activeCorrectionForm = controller;
@@ -2503,6 +2637,7 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
   resultsHostContext = origin.kind === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
+  disposeActiveCorrectionManagement();
   if (origin.kind === "search") {
     savedVocabularyGeneration += 1;
   }

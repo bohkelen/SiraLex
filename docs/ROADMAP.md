@@ -124,7 +124,8 @@ CF1I2 — Local Correction Draft Store — Implemented
 CF1I2A — Correction Draft ID Generation Boundary — Complete
 CF1I3 — Entry Suggestion Surface — Implemented
 CF1I3A — Correction Form Commit and Database Lifecycle — Complete
-CF1I4 — Pending Corrections and Export — Next
+CF1I4 — Pending Corrections and Export — Implemented
+CF1I5 — Offline Correction Lifecycle Verification — Next
 PV1A — Production Identity and Desktop Smoke — Parallel active
 PV1B — Physical Device Validation — Parallel, hardware-gated
 ```
@@ -139,7 +140,8 @@ PV1B — Physical Device Validation — Parallel, hardware-gated
 - **CF1I2A** requires secure draft IDs (`randomUUID` / `getRandomValues`) and fails closed when secure randomness is unavailable; never `Math.random()`.
 - **CF1I3** adds the entry-detail suggestion form that creates one local non-authoritative draft (`docs/reports/cf1i3_entry_suggestion_surface_report.md`).
 - **CF1I3A** closes controller-owned IndexedDB connections and always invalidates management generation after a successful commit, even if the form host is already stale.
-- **Next slice:** `CF1I4 — Pending Corrections and Export`.
+- **CF1I4** adds Manage Corrections list/detail/edit/delete, deterministic export-all, and the database-deletion reminder (`docs/reports/cf1i4_pending_corrections_export_report.md`).
+- **Next slice:** `CF1I5 — Offline Correction Lifecycle Verification`.
 - **Parallel validation:** `PV1A` production identity/desktop smoke now; `PV1B` physical-device matrix when hardware is available.
 - Prior portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
 
