@@ -52,18 +52,27 @@ export type UpdateCorrectionDraftInput = {
 export type CreateCorrectionDraftDeps = {
   now?: () => string;
   generateDraftId?: () => string;
-  /** @internal Test-only: invoked after add is queued, before tx completion. */
+  /**
+   * @internal Test-only and must remain immediate.
+   * Do not introduce production async work while a transaction is open.
+   */
   afterWriteQueued?: () => void | Promise<void>;
 };
 
 export type UpdateCorrectionDraftDeps = {
   now?: () => string;
-  /** @internal Test-only: invoked after put is queued, before tx completion. */
+  /**
+   * @internal Test-only and must remain immediate.
+   * Do not introduce production async work while a transaction is open.
+   */
   afterWriteQueued?: () => void | Promise<void>;
 };
 
 export type DeleteCorrectionDraftDeps = {
-  /** @internal Test-only: invoked after delete is queued, before tx completion. */
+  /**
+   * @internal Test-only and must remain immediate.
+   * Do not introduce production async work while a transaction is open.
+   */
   afterDeleteQueued?: () => void | Promise<void>;
 };
 
@@ -71,6 +80,7 @@ export type CorrectionDraftStoreErrorCode =
   | "invalid_input"
   | "invalid_timestamp"
   | "invalid_draft_id"
+  | "id_generation_failed"
   | "draft_id_conflict"
   | "not_found"
   | "stale_draft"
@@ -98,6 +108,7 @@ export type CreateCorrectionDraftResult =
       code:
         | "invalid_input"
         | "invalid_timestamp"
+        | "id_generation_failed"
         | "draft_id_conflict"
         | "database_write_failed";
     };
@@ -160,23 +171,31 @@ function defaultNow(): string {
   return new Date().toISOString();
 }
 
-function defaultGenerateDraftId(): string {
+/**
+ * Production draft ID policy (CF1I2A):
+ * 1. Prefer crypto.randomUUID()
+ * 2. Else construct a UUID-compatible ID via crypto.getRandomValues()
+ * 3. If neither secure API exists, fail closed (never Math.random / timestamp IDs)
+ */
+function tryDefaultGenerateDraftId():
+  | { ok: true; draftId: string }
+  | { ok: false; code: "id_generation_failed" } {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+    return { ok: true, draftId: crypto.randomUUID() };
   }
-  // Collision-resistant fallback when randomUUID is unavailable.
-  const bytes = new Uint8Array(16);
   if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
     crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < bytes.length; i += 1) {
-      bytes[i] = Math.floor(Math.random() * 256);
-    }
+    // RFC 4122 version 4 / variant 1 layout for UUID-compatible identifiers.
+    bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+    bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+    const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+    return {
+      ok: true,
+      draftId: `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`,
+    };
   }
-  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
-  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
-  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  return { ok: false, code: "id_generation_failed" };
 }
 
 function isValidDraftIdInput(value: unknown): value is string {
@@ -256,14 +275,22 @@ export async function createCorrectionDraft(
   deps?: CreateCorrectionDraftDeps,
 ): Promise<CreateCorrectionDraftResult> {
   const nowFn = deps?.now ?? defaultNow;
-  const idFn = deps?.generateDraftId ?? defaultGenerateDraftId;
 
   const timestamp = nowFn();
   if (!isValidCorrectionIsoTimestamp(timestamp)) {
     return { ok: false, code: "invalid_timestamp" };
   }
 
-  const draftId = idFn();
+  let draftId: string;
+  if (deps?.generateDraftId) {
+    draftId = deps.generateDraftId();
+  } else {
+    const generated = tryDefaultGenerateDraftId();
+    if (!generated.ok) {
+      return { ok: false, code: "id_generation_failed" };
+    }
+    draftId = generated.draftId;
+  }
   if (!isValidDraftIdInput(draftId)) {
     return { ok: false, code: "invalid_input" };
   }

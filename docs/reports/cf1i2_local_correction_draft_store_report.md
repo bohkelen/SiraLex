@@ -12,6 +12,10 @@ bundle-lifecycle retention, and isolation from dictionary, Learning, and
 query-log stores. No UI, i18n, CSS, `main.ts`, Playwright, export orchestration,
 Phase 1.5 conversion, or corpus mutation was added.
 
+**CF1I2A amendment:** production `draft_id` generation uses only secure randomness
+(`crypto.randomUUID` or `crypto.getRandomValues`) and fails closed with
+`id_generation_failed` when neither is available. `Math.random()` is never used.
+
 ---
 
 ## 2. Database version
@@ -59,11 +63,21 @@ Excludes system fields: `schema_version`, `draft_id`, `created_at`,
 
 ## 6. ID generation
 
-Injectable `generateDraftId` (default `crypto.randomUUID()`, with tested
-collision-resistant fallback).
+Production policy (CF1I2A):
+
+1. Prefer `crypto.randomUUID()`.
+2. Otherwise construct a UUID-compatible identifier with `crypto.getRandomValues()`.
+3. If neither secure API exists, fail closed with `id_generation_failed`.
+4. Never use `Math.random()`.
+5. Never use timestamp-only identity.
+
+Injectable `generateDraftId` remains available for deterministic tests and bypasses
+the production generator.
 
 Create uses `objectStore.add` (not `put`). Duplicate key →
 `draft_id_conflict`. No silent overwrite. No retry loop.
+
+`id_generation_failed` performs no IndexedDB transaction or write.
 
 ---
 
@@ -302,7 +316,7 @@ npx vitest run \
   src/corrections/correction_feedback_package.test.ts \
   src/learning/learning_record_persistence.test.ts
 → Test Files  4 passed (4)
-→ Tests  84 passed (84)
+→ Tests  88 passed (88)
 ```
 
 Full suite:
@@ -310,8 +324,9 @@ Full suite:
 ```text
 npm run test:run
 → Test Files  57 passed (57)
-→ Tests  630 passed (630)
+→ Tests  634 passed (634)
 ```
+
 
 Build:
 
@@ -330,6 +345,9 @@ npm run build
 - Learning persistence tests updated for DB v5 version assertions only
   (additive schema change), without Learning behavior changes.
 - No deviations from CF1D0 immutable provenance / retention locks.
+- **CF1I2A:** removed the non-cryptographic `Math.random()` ID fallback that
+  incorrectly claimed collision resistance; production ID generation now fails
+  closed when secure randomness is unavailable.
 
 ---
 
@@ -353,6 +371,7 @@ Roadmap status:
 CF1I1 — Implemented
 CF1I1A — Complete
 CF1I2 — Local Correction Draft Store — Implemented
+CF1I2A — Correction Draft ID Generation Boundary — Complete
 CF1I3 — Entry Suggestion Surface — Next
 PV1A — Parallel active
 PV1B — Hardware-gated

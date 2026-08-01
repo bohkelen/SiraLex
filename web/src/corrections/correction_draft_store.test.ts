@@ -4,7 +4,7 @@
 
 import "fake-indexeddb/auto";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   SIRALEX_DB_NAME,
@@ -26,6 +26,7 @@ import { LEARNING_RECORD_SCHEMA_VERSION, type LearningRecordV1 } from "../learni
 import { saveLearningRecord } from "../learning/learning_record_store";
 import {
   CORRECTION_DRAFT_SCHEMA_VERSION,
+  validateCorrectionDraftForWrite,
   type CorrectionDraftV1,
 } from "./correction_draft_types";
 import {
@@ -234,6 +235,11 @@ beforeEach(async () => {
   }
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
 describe("schema upgrade", () => {
   it("fresh v5 database creates correction_drafts without indexes", async () => {
     expect(SIRALEX_DB_VERSION).toBe(5);
@@ -394,6 +400,111 @@ describe("create", () => {
     expect(second).toEqual({ ok: false, code: "draft_id_conflict" });
     expect(await countCorrectionDrafts(db)).toBe(1);
     db.close();
+  });
+
+  it("uses crypto.randomUUID when available", async () => {
+    const db = await openSiralexDb();
+    try {
+      const uuid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+      const randomUUID = vi.fn(() => uuid);
+      const getRandomValues = vi.fn();
+      vi.stubGlobal("crypto", {
+        ...globalThis.crypto,
+        randomUUID,
+        getRandomValues,
+      });
+      const mathSpy = vi.spyOn(Math, "random");
+
+      const result = await createCorrectionDraft(db, makeInput(), { now: () => TS_1 });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.draft.draft_id).toBe(uuid);
+      expect(randomUUID).toHaveBeenCalledTimes(1);
+      expect(getRandomValues).not.toHaveBeenCalled();
+      expect(mathSpy).not.toHaveBeenCalled();
+      expect(() => validateCorrectionDraftForWrite(result.draft)).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
+  it("uses getRandomValues UUID path when randomUUID is unavailable", async () => {
+    const db = await openSiralexDb();
+    try {
+      const getRandomValues = vi.fn((bytes: Uint8Array) => {
+        for (let i = 0; i < bytes.length; i += 1) {
+          bytes[i] = (i * 17 + 3) % 256;
+        }
+        return bytes;
+      });
+      vi.stubGlobal("crypto", {
+        getRandomValues,
+      });
+      const mathSpy = vi.spyOn(Math, "random");
+
+      const result = await createCorrectionDraft(db, makeInput(), { now: () => TS_1 });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(getRandomValues).toHaveBeenCalledTimes(1);
+      expect(mathSpy).not.toHaveBeenCalled();
+      expect(result.draft.draft_id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+      expect(() => validateCorrectionDraftForWrite(result.draft)).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
+  it("fails closed with id_generation_failed when no secure API exists", async () => {
+    const db = await openSiralexDb();
+    try {
+      const before = await countCorrectionDrafts(db);
+      // Empty crypto: no secure ID APIs. Create must fail before any transaction.
+      vi.stubGlobal("crypto", {});
+      const mathSpy = vi.spyOn(Math, "random");
+      const txSpy = vi.spyOn(db, "transaction");
+
+      const result = await createCorrectionDraft(db, makeInput(), { now: () => TS_1 });
+      expect(result).toEqual({ ok: false, code: "id_generation_failed" });
+      expect(txSpy).not.toHaveBeenCalled();
+      expect(mathSpy).not.toHaveBeenCalled();
+
+      vi.unstubAllGlobals();
+      expect(await countCorrectionDrafts(db)).toBe(before);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("injected generateDraftId still works when crypto is unavailable", async () => {
+    const db = await openSiralexDb();
+    try {
+      // Hide secure ID APIs but keep the rest of crypto for IndexedDB.
+      const base = globalThis.crypto;
+      vi.stubGlobal(
+        "crypto",
+        new Proxy(base, {
+          get(target, prop, receiver) {
+            if (prop === "randomUUID" || prop === "getRandomValues") return undefined;
+            const value = Reflect.get(target, prop, receiver);
+            return typeof value === "function" ? value.bind(target) : value;
+          },
+        }),
+      );
+      const mathSpy = vi.spyOn(Math, "random");
+      const id = "inj00000-0000-4000-8000-000000000001";
+      const result = await createCorrectionDraft(db, makeInput(), {
+        now: () => TS_1,
+        generateDraftId: () => id,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.draft.draft_id).toBe(id);
+      expect(mathSpy).not.toHaveBeenCalled();
+    } finally {
+      db.close();
+    }
   });
 
   it("failed create after write queue leaves no draft", async () => {
