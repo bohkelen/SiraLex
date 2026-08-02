@@ -116,7 +116,7 @@ LP1I4 — Backup and Restore Surface — Implemented
 LP1I5 — Offline and Lifecycle Verification — Implemented
 LP1I6 — Closure — Complete
 PD1 — Next Product Build Decision — Complete
-CF1 — Community Correction and Feedback Capture — Selected
+CF1 — Community Correction and Feedback Capture — CLOSED
 CF1D0 — Defined
 CF1I1 — Correction Draft Model and Validation — Implemented
 CF1I1A — Correction Validator Boundary Fixes — Complete
@@ -126,24 +126,17 @@ CF1I3 — Entry Suggestion Surface — Implemented
 CF1I3A — Correction Form Commit and Database Lifecycle — Complete
 CF1I4 — Pending Corrections and Export — Implemented
 CF1I5 — Offline Correction Lifecycle Verification — Implemented
-CF1I6 — Correction Feedback Closure — Next
+CF1I6 — Closure — Complete
 PV1A — Production Identity and Desktop Smoke — Parallel active
 PV1B — Physical Device Validation — Parallel, hardware-gated
 ```
 
 - **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
 - **LP1** is closed (`docs/reports/lp1_local_learning_backup_restore_closure_report.md`).
-- **PD1** selects `CF1 — Community Correction and Feedback Capture` as the next product build while keeping release validation as a parallel track (`docs/reports/pd1_next_product_build_decision.md`).
-- **CF1D0** defines the local offline non-authoritative correction-capture and handoff-export product (`docs/reports/cf1d0_community_correction_feedback_product_definition.md`).
-- **CF1I1** implements the pure draft/package model and validators (`docs/reports/cf1i1_correction_draft_model_validation_report.md`).
-- **CF1I1A** tightens SHA-256 provenance to exactly 64 lowercase hex digits and caps package validation errors at 100 with `error_limit_reached`.
-- **CF1I2** persists validated drafts in IndexedDB `correction_drafts` (v5) with stale-edit protection and bundle-lifecycle retention (`docs/reports/cf1i2_local_correction_draft_store_report.md`).
-- **CF1I2A** requires secure draft IDs (`randomUUID` / `getRandomValues`) and fails closed when secure randomness is unavailable; never `Math.random()`.
-- **CF1I3** adds the entry-detail suggestion form that creates one local non-authoritative draft (`docs/reports/cf1i3_entry_suggestion_surface_report.md`).
-- **CF1I3A** closes controller-owned IndexedDB connections and always invalidates management generation after a successful commit, even if the form host is already stale.
-- **CF1I4** adds Manage Corrections list/detail/edit/delete, deterministic export-all, and the database-deletion reminder (`docs/reports/cf1i4_pending_corrections_export_report.md`).
-- **CF1I5** verifies the offline correction lifecycle in Playwright + Vitest with local evidence artifacts (`docs/reports/cf1i5_offline_correction_lifecycle_verification_report.md`).
-- **Next slice:** `CF1I6 — Correction Feedback Closure`.
+- **PD1** selected `CF1` as the product build while keeping release validation parallel (`docs/reports/pd1_next_product_build_decision.md`).
+- **CF1** is closed (`docs/reports/cf1i6_correction_feedback_closure_report.md`): users can capture, retain, manage, and export local non-authoritative correction drafts offline from genuine lexicon entries without changing dictionary authority.
+- **CF1 delivered:** `correction_draft_v1` + `siralex_correction_feedback_v1`; IndexedDB `correction_drafts` (v5); entry Suggest form; Manage Corrections; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
+- **Do not assume CF2 next.** Next product-build slice should be selected from the broader SiraLex roadmap; **PV1** remains the active parallel release-validation track.
 - **Parallel validation:** `PV1A` production identity/desktop smoke now; `PV1B` physical-device matrix when hardware is available.
 - Prior portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
 
