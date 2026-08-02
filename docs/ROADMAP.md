@@ -98,8 +98,9 @@ Status markers: **✅ Complete** · **in progress** · **deferred** · **pending
 
 ### Learning System & next product build
 
-Canonical status (see `docs/reports/pd0_next_product_build_decision.md` and
-`docs/reports/lp1d0_local_learning_backup_restore_product_definition.md`):
+Canonical status (see `docs/reports/pd1_next_product_build_decision.md`,
+`docs/reports/pd0_next_product_build_decision.md`, and
+`docs/reports/lp1_local_learning_backup_restore_closure_report.md`):
 
 ```text
 LS1 — Save — Closed
@@ -114,19 +115,30 @@ LP1I3 — Restore Preview and Atomic Policies — Implemented
 LP1I4 — Backup and Restore Surface — Implemented
 LP1I5 — Offline and Lifecycle Verification — Implemented
 LP1I6 — Closure — Complete
-PD1 — Next Product Build Decision — Next
+PD1 — Next Product Build Decision — Complete
+CF1 — Community Correction and Feedback Capture — CLOSED
+CF1D0 — Defined
+CF1I1 — Correction Draft Model and Validation — Implemented
+CF1I1A — Correction Validator Boundary Fixes — Complete
+CF1I2 — Local Correction Draft Store — Implemented
+CF1I2A — Correction Draft ID Generation Boundary — Complete
+CF1I3 — Entry Suggestion Surface — Implemented
+CF1I3A — Correction Form Commit and Database Lifecycle — Complete
+CF1I4 — Pending Corrections and Export — Implemented
+CF1I5 — Offline Correction Lifecycle Verification — Implemented
+CF1I6 — Closure — Complete
+PV1A — Production Identity and Desktop Smoke — Parallel active
+PV1B — Physical Device Validation — Parallel, hardware-gated
 ```
 
 - **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
-- **LP1D0** defines local versioned Learning backup/restore (`docs/reports/lp1d0_local_learning_backup_restore_product_definition.md`).
-- **LP1I1** implements the pure package model/validator (`docs/reports/lp1i1_learning_backup_package_model_report.md`).
-- **LP1I2** implements deterministic export (`docs/reports/lp1i2_deterministic_learning_export_report.md`).
-- **LP1I3** implements restore preview and atomic policies (`docs/reports/lp1i3_restore_preview_atomic_policies_report.md`).
-- **LP1I4** implements the Manage Learning Data surface (`docs/reports/lp1i4_backup_restore_surface_report.md`).
-- **LP1I5** verifies offline/lifecycle browser + integration evidence (`docs/reports/lp1i5_offline_lifecycle_verification_report.md`).
-- **LP1I6** closes Local Learning Backup and Restore (`docs/reports/lp1_local_learning_backup_restore_closure_report.md`).
-- **Next product decision:** `PD1 — Next Product Build Decision`.
-- Portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
+- **LP1** is closed (`docs/reports/lp1_local_learning_backup_restore_closure_report.md`).
+- **PD1** selected `CF1` as the product build while keeping release validation parallel (`docs/reports/pd1_next_product_build_decision.md`).
+- **CF1** is closed (`docs/reports/cf1i6_correction_feedback_closure_report.md`): users can capture, retain, manage, and export local non-authoritative correction drafts offline from genuine lexicon entries without changing dictionary authority.
+- **CF1 delivered:** `correction_draft_v1` + `siralex_correction_feedback_v1`; IndexedDB `correction_drafts` (v5); entry Suggest form; Manage Corrections; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
+- **Do not assume CF2 next.** Next product-build slice should be selected from the broader SiraLex roadmap; **PV1** remains the active parallel release-validation track.
+- **Parallel validation:** `PV1A` production identity/desktop smoke now; `PV1B` physical-device matrix when hardware is available.
+- Prior portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
 
 ---
 

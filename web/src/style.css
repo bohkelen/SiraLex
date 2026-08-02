@@ -368,6 +368,106 @@ a {
   min-height: 1.2em;
 }
 
+.entry-correction-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.entry-suggest-correction {
+  font-size: 13px;
+  padding: 6px 10px;
+  min-height: 32px;
+}
+
+.entry-suggest-correction:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 55%, white 10%);
+  outline-offset: 2px;
+}
+
+/* --- Correction suggestion form (CF1I3) --- */
+
+.correction-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.correction-form-heading {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.correction-form-entry-summary {
+  margin: 0;
+  font-weight: 600;
+}
+
+.correction-form-entry-nko {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.correction-form-privacy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.92rem;
+  opacity: 0.92;
+}
+
+.correction-form-privacy p {
+  margin: 0;
+}
+
+.correction-form-help,
+.correction-form-counter,
+.correction-form-target-preview {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+}
+
+.correction-form-counter-over,
+.correction-form-field-error,
+.correction-form-stale,
+.correction-form-error-summary {
+  color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
+}
+
+.correction-form-error-summary {
+  border: 1px solid color-mix(in oklab, var(--text) 35%, #f87171 40%);
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.correction-form-error-summary-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.correction-form-mode {
+  border: 1px solid color-mix(in oklab, var(--text) 18%, transparent);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.correction-form-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.correction-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* --- Saved vocabulary (LS1I3) --- */
 
 .saved-vocab-surface {
@@ -984,6 +1084,97 @@ button.target-link .target-text {
 
 .learning-backup-delete-reminder {
   margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.correction-manage-delete-reminder {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.correction-manage {
+  display: grid;
+  gap: 12px;
+}
+
+.correction-manage-heading:focus,
+.correction-manage-status:focus,
+.correction-manage-error-summary:focus,
+.correction-manage-delete-confirm:focus,
+.correction-manage-list:focus {
+  outline: 2px solid color-mix(in oklab, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.correction-manage-status {
+  min-height: 1.25em;
+}
+
+.correction-manage-export-warning {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.correction-manage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.correction-manage-row-button {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--muted) 35%, var(--panel));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--panel) 96%, var(--accent) 4%);
+  color: inherit;
+  cursor: pointer;
+}
+
+.correction-manage-row-headword {
+  font-weight: 600;
+}
+
+.correction-manage-row-meta,
+.correction-manage-row-updated,
+.correction-manage-availability {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.correction-manage-availability[data-state="dictionary_unavailable"]::before,
+.correction-manage-availability[data-state="entry_unavailable"]::before,
+.correction-manage-availability[data-state="dictionary_content_differs"]::before {
+  content: "· ";
+}
+
+.correction-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.correction-manage-provenance {
+  font-size: 13px;
+}
+
+.correction-manage-delete-confirm {
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--muted) 40%, var(--panel));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--panel) 94%, var(--accent) 6%);
+}
+
+.correction-manage-help,
+.correction-manage-timestamps {
   font-size: 13px;
   color: var(--muted);
 }

@@ -136,5 +136,56 @@ describe("i18n translations", () => {
 
     setCurrentLocale(previous);
   });
+
+  it("resolves correction feedback form keys in English and French", () => {
+    const previous = getCurrentLocale();
+
+    setCurrentLocale("en");
+    expect(t("correctionFeedback.form.suggestAction")).toBe("Suggest a correction");
+    expect(t("correctionFeedback.form.save")).toBe("Save correction draft");
+    expect(t("correctionFeedback.form.success.body1")).toMatch(/saved on this device/i);
+    expect(t("correctionFeedback.form.success.body2")).toMatch(/not been submitted/i);
+    expect(t("correctionFeedback.form.privacy.localOnly")).toMatch(/does not change the dictionary/i);
+
+    setCurrentLocale("fr");
+    expect(t("correctionFeedback.form.suggestAction")).toBe("Suggérer une correction");
+    expect(t("correctionFeedback.form.save")).toBe("Enregistrer le brouillon de correction");
+    expect(t("correctionFeedback.form.success.body1")).toMatch(/enregistré sur cet appareil/i);
+    expect(t("correctionFeedback.form.success.body2")).toMatch(/pas été envoyé/i);
+    expect(t("correctionFeedback.form.privacy.localOnly")).toMatch(/brouillon local/i);
+    expect(t("correctionFeedback.form.suggestAction")).not.toBe("Suggest a correction");
+
+    setCurrentLocale(previous);
+  });
+
+  it("resolves correction feedback manage/export keys in English and French", () => {
+    const previous = getCurrentLocale();
+
+    setCurrentLocale("en");
+    expect(t("correctionFeedback.manage.open")).toBe("Manage Corrections");
+    expect(t("correctionFeedback.manage.heading")).toBe("Pending corrections");
+    expect(t("correctionFeedback.manage.export.authority")).toBe(
+      "This file contains unreviewed user suggestions. It must not be applied automatically.",
+    );
+    expect(t("correctionFeedback.manage.deleteReminder")).toBe(
+      "Before deleting the database, export your correction drafts if you want to keep them.",
+    );
+    expect(t("correctionFeedback.manage.export.success", {
+      filename: "x.json",
+      count: 2,
+    })).toContain("x.json");
+    expect(t("correctionFeedback.manage.export.button")).not.toMatch(/submit/i);
+
+    setCurrentLocale("fr");
+    expect(t("correctionFeedback.manage.open")).toBe("Gérer les corrections");
+    expect(t("correctionFeedback.manage.heading")).toBe("Corrections en attente");
+    expect(t("correctionFeedback.manage.export.authority")).toBe(
+      "Ce fichier contient des suggestions utilisateur non révisées. Il ne doit pas être appliqué automatiquement.",
+    );
+    expect(t("correctionFeedback.manage.deleteReminder")).toMatch(/Avant de supprimer/i);
+    expect(t("correctionFeedback.manage.open")).not.toBe("Manage Corrections");
+
+    setCurrentLocale(previous);
+  });
 });
 
