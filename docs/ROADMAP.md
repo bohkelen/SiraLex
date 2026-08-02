@@ -98,7 +98,8 @@ Status markers: **✅ Complete** · **in progress** · **deferred** · **pending
 
 ### Learning System & next product build
 
-Canonical status (see `docs/reports/pd2_post_cf1_product_build_decision.md`,
+Canonical status (see `docs/reports/cf2d0_missing_entry_search_failure_feedback_product_definition.md`,
+`docs/reports/pd2_post_cf1_product_build_decision.md`,
 `docs/reports/pd1_next_product_build_decision.md`,
 `docs/reports/pd0_next_product_build_decision.md`, and
 `docs/reports/lp1_local_learning_backup_restore_closure_report.md`):
@@ -129,10 +130,13 @@ CF1I4 — Pending Corrections and Export — Implemented
 CF1I5 — Offline Correction Lifecycle Verification — Implemented
 CF1I6 — Closure — Complete
 PD2 — Post-CF1 Product Build Decision — Complete
-PD2 disposition — PRODUCT_BUILD_DEFERRED
-Leading deferred product candidate — CF2 — Missing Entry and Search Failure Feedback
-PV1A — Production Identity and Desktop Smoke — Parallel active / near-term focus
-PV1B — Physical Device Validation — Parallel, hardware-gated
+PD2 original disposition — PRODUCT_BUILD_DEFERRED
+PD2 owner override — PD2_OWNER_OVERRIDE_CF2_SELECTED
+CF2 — Missing Entry and Search Failure Feedback — DEFINITION
+CF2D0 — Defined
+CF2I1 — Search Feedback Model and Validation — Next
+PV1A — Production Identity and Desktop Smoke — Parallel active
+PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 ```
 
 - **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
@@ -140,11 +144,12 @@ PV1B — Physical Device Validation — Parallel, hardware-gated
 - **PD1** selected `CF1` as the product build while keeping release validation parallel (`docs/reports/pd1_next_product_build_decision.md`).
 - **CF1** is closed (`docs/reports/cf1i6_correction_feedback_closure_report.md`): users can capture, retain, manage, and export local non-authoritative correction drafts offline from genuine lexicon entries without changing dictionary authority.
 - **CF1 delivered:** `correction_draft_v1` + `siralex_correction_feedback_v1`; IndexedDB `correction_drafts` (v5); entry Suggest form; Manage Corrections; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
-- **PD2** deferred further product construction (`docs/reports/pd2_post_cf1_product_build_decision.md`): no new runtime capability is authorized now; **CF2 is not started**.
-- **Leading resume candidate:** `CF2 — Missing Entry and Search Failure Feedback`, only after a reopen trigger (miss-demand evidence, measured PV1 defect slice, approved content surface, Learning need, or explicit owner selection).
-- **Near-term focus:** `PV1A` production identity/desktop smoke; `PV1B` physical-device matrix when hardware is available.
-- Rejected as immediate next builds under current gates: interpretability follow-up after Phase 7G, phrase/sentence runtime, Branch C, LS4, and content-depth UI without approved packets.
-- Prior portfolio decision records: `docs/reports/pd1_next_product_build_decision.md`, `docs/reports/pd0_next_product_build_decision.md`.
+- **PD2** originally deferred construction (`docs/reports/pd2_post_cf1_product_build_decision.md`) because real-use miss-demand evidence was scarce. That evidence assessment remains historically valid.
+- **Owner override:** `PD2_OWNER_OVERRIDE_CF2_SELECTED` reopens the product-build track and selects CF2 without claiming new empirical proof that miss demand is already demonstrated. CF2 is built to **capture** that evidence.
+- **CF2D0** defines local offline search-failure feedback (`docs/reports/cf2d0_missing_entry_search_failure_feedback_product_definition.md`): `no_result` / `results_not_useful` evidence against search-event provenance; dedicated store/export; not CF1 entry corrections; not automatic missing-entry truth; not Phase 1.5 patches.
+- **Next product slice:** `CF2I1 — Search Feedback Model and Validation`. Do not implement CF2 surfaces in CF2D0.
+- **Parallel validation:** `PV1A` production identity/desktop smoke remains active; `PV1B` physical-device matrix remains hardware-gated / not run and must not be displaced by CF2. Phase 7N1 candidate identity may be recorded while device scenarios remain `not_run`.
+- Prior portfolio decision records: `docs/reports/pd2_post_cf1_product_build_decision.md`, `docs/reports/pd1_next_product_build_decision.md`, `docs/reports/pd0_next_product_build_decision.md`.
 
 ---
 

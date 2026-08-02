@@ -714,3 +714,51 @@ active. CF1 remains closed and was not reopened.
 | Confidence | `MODERATE-HIGH` |
 | Next slice | PV1A execution; CF2D0 only after reopen trigger |
 | Code changes | None |
+
+---
+
+## Governance addendum — owner override
+
+```text
+PD2_OWNER_OVERRIDE_CF2_SELECTED
+```
+
+This addendum does **not** rewrite or invalidate the original PD2 evidence
+assessment above. PD2 deferred construction because real-use miss-demand
+evidence was scarce and no candidate cleared the post-CF1 bar without either
+linguistic-gate violations or CF1-adjacency risk.
+
+The owner has subsequently explicitly selected:
+
+```text
+CF2 — Missing Entry and Search Failure Feedback
+```
+
+Under PD2 reopen rule 5 (owner override / explicit owner selection), that is
+sufficient to resume the product-build track.
+
+Portfolio state after override:
+
+```text
+Release-readiness:
+PV1A — Production Identity and Desktop Smoke — ACTIVE
+PV1B — Physical Device Validation — HARDWARE-GATED / NOT RUN
+
+Product-build:
+CF2 — Missing Entry and Search Failure Feedback — SELECTED
+Next slice:
+CF2D0 — Missing Entry and Search Failure Feedback Product Definition
+```
+
+Rationale lock:
+
+> PD2 originally deferred product construction because real-use miss-demand
+> evidence was scarce. The owner has now explicitly authorized CF2. This is a
+> governance override, not new empirical evidence that CF2 demand has already
+> been proven.
+
+Therefore CF2 must be built to **capture the missing evidence**, not as if that
+evidence already exists. The original PD2 decision record remains the historical
+evidence judgment; this addendum records only the later governance selection.
+Product definition continues in
+`docs/reports/cf2d0_missing_entry_search_failure_feedback_product_definition.md`.
