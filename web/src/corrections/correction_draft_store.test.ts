@@ -241,10 +241,10 @@ afterEach(() => {
 });
 
 describe("schema upgrade", () => {
-  it("fresh v5 database creates correction_drafts without indexes", async () => {
-    expect(SIRALEX_DB_VERSION).toBe(5);
+  it("fresh database creates correction_drafts without indexes", async () => {
+    expect(SIRALEX_DB_VERSION).toBe(6);
     const db = await openSiralexDb();
-    expect(db.version).toBe(5);
+    expect(db.version).toBe(6);
     expect(db.objectStoreNames.contains(STORE_CORRECTION_DRAFTS)).toBe(true);
     const tx = db.transaction(STORE_CORRECTION_DRAFTS, "readonly");
     const store = tx.objectStore(STORE_CORRECTION_DRAFTS);
@@ -253,10 +253,10 @@ describe("schema upgrade", () => {
     db.close();
   });
 
-  it("v4 → v5 creates correction_drafts and preserves existing data", async () => {
+  it("v4 → current creates correction_drafts and preserves existing data", async () => {
     await openLegacyV4DbWithData();
     const db = await openSiralexDb();
-    expect(db.version).toBe(5);
+    expect(db.version).toBe(6);
     expect(db.objectStoreNames.contains(STORE_CORRECTION_DRAFTS)).toBe(true);
     expect(db.objectStoreNames.contains(STORE_LEARNING_RECORDS)).toBe(true);
 
@@ -312,7 +312,7 @@ describe("schema upgrade", () => {
     db.close();
 
     const db2 = await openSiralexDb();
-    expect(db2.version).toBe(5);
+    expect(db2.version).toBe(6);
     expect(db2.objectStoreNames.contains(STORE_CORRECTION_DRAFTS)).toBe(true);
     db2.close();
   });
@@ -350,7 +350,7 @@ describe("create", () => {
       if (key === STORE_CORRECTION_DRAFTS) continue;
       expect(after[key]).toBe(before[key]);
     }
-    expect(db.version).toBe(5);
+    expect(db.version).toBe(6);
     db.close();
   });
 
@@ -837,7 +837,7 @@ describe("bundle lifecycle and database deletion", () => {
     db.close();
   });
 
-  it("full database deletion clears correction drafts and reopens at v5", async () => {
+  it("full database deletion clears correction drafts and reopens at current version", async () => {
     const db = await openSiralexDb();
     const created = await createCorrectionDraft(db, makeInput(), {
       now: () => TS_1,
@@ -848,7 +848,7 @@ describe("bundle lifecycle and database deletion", () => {
 
     await deleteSiralexDb();
     const reopened = await openSiralexDb();
-    expect(reopened.version).toBe(5);
+    expect(reopened.version).toBe(6);
     expect(reopened.objectStoreNames.contains(STORE_CORRECTION_DRAFTS)).toBe(true);
     expect(await countCorrectionDrafts(reopened)).toBe(0);
     reopened.close();
