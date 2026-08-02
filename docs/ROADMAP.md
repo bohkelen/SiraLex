@@ -98,7 +98,8 @@ Status markers: **✅ Complete** · **in progress** · **deferred** · **pending
 
 ### Learning System & next product build
 
-Canonical status (see `docs/reports/pd1_next_product_build_decision.md`,
+Canonical status (see `docs/reports/pd2_post_cf1_product_build_decision.md`,
+`docs/reports/pd1_next_product_build_decision.md`,
 `docs/reports/pd0_next_product_build_decision.md`, and
 `docs/reports/lp1_local_learning_backup_restore_closure_report.md`):
 
@@ -127,7 +128,10 @@ CF1I3A — Correction Form Commit and Database Lifecycle — Complete
 CF1I4 — Pending Corrections and Export — Implemented
 CF1I5 — Offline Correction Lifecycle Verification — Implemented
 CF1I6 — Closure — Complete
-PV1A — Production Identity and Desktop Smoke — Parallel active
+PD2 — Post-CF1 Product Build Decision — Complete
+PD2 disposition — PRODUCT_BUILD_DEFERRED
+Leading deferred product candidate — CF2 — Missing Entry and Search Failure Feedback
+PV1A — Production Identity and Desktop Smoke — Parallel active / near-term focus
 PV1B — Physical Device Validation — Parallel, hardware-gated
 ```
 
@@ -136,9 +140,11 @@ PV1B — Physical Device Validation — Parallel, hardware-gated
 - **PD1** selected `CF1` as the product build while keeping release validation parallel (`docs/reports/pd1_next_product_build_decision.md`).
 - **CF1** is closed (`docs/reports/cf1i6_correction_feedback_closure_report.md`): users can capture, retain, manage, and export local non-authoritative correction drafts offline from genuine lexicon entries without changing dictionary authority.
 - **CF1 delivered:** `correction_draft_v1` + `siralex_correction_feedback_v1`; IndexedDB `correction_drafts` (v5); entry Suggest form; Manage Corrections; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
-- **Do not assume CF2 next.** Next product-build slice should be selected from the broader SiraLex roadmap; **PV1** remains the active parallel release-validation track.
-- **Parallel validation:** `PV1A` production identity/desktop smoke now; `PV1B` physical-device matrix when hardware is available.
-- Prior portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
+- **PD2** deferred further product construction (`docs/reports/pd2_post_cf1_product_build_decision.md`): no new runtime capability is authorized now; **CF2 is not started**.
+- **Leading resume candidate:** `CF2 — Missing Entry and Search Failure Feedback`, only after a reopen trigger (miss-demand evidence, measured PV1 defect slice, approved content surface, Learning need, or explicit owner selection).
+- **Near-term focus:** `PV1A` production identity/desktop smoke; `PV1B` physical-device matrix when hardware is available.
+- Rejected as immediate next builds under current gates: interpretability follow-up after Phase 7G, phrase/sentence runtime, Branch C, LS4, and content-depth UI without approved packets.
+- Prior portfolio decision records: `docs/reports/pd1_next_product_build_decision.md`, `docs/reports/pd0_next_product_build_decision.md`.
 
 ---
 
