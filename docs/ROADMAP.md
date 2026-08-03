@@ -136,7 +136,8 @@ CF2 — Missing Entry and Search Failure Feedback — DEFINITION
 CF2D0 — Defined
 CF2I1 — Search Feedback Model and Validation — Implemented
 CF2I2 — Local Search Feedback Store — Implemented
-CF2I3 — Search Failure Capture Surface — Next
+CF2I3 — Search Failure Capture Surface — Implemented
+CF2I4 — Manage Search Feedback and Export — Next
 PV1A — Production Identity and Desktop Smoke — Parallel active
 PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 ```
@@ -151,7 +152,8 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **CF2D0** defines local offline search-failure feedback (`docs/reports/cf2d0_missing_entry_search_failure_feedback_product_definition.md`): `no_result` / `results_not_useful` evidence against search-event provenance; dedicated store/export; not CF1 entry corrections; not automatic missing-entry truth; not Phase 1.5 patches.
 - **CF2I1** implements pure draft + package validation (`docs/reports/cf2i1_search_feedback_model_validation_report.md`): `search_failure_feedback_draft_v1`, `siralex_search_feedback_v1`, unmet-need evidence semantics.
 - **CF2I2** implements IndexedDB persistence (`docs/reports/cf2i2_local_search_feedback_store_report.md`): DB v6 `search_failure_feedback`; secure IDs; immutable search-event provenance; editable user explanation only; bundle retention; isolation from CF1/Learning/query logs.
-- **Next product slice:** `CF2I3 — Search Failure Capture Surface`.
+- **CF2I3** implements the local capture surface (`docs/reports/cf2i3_search_failure_capture_surface_report.md`): Report this search for `no_result` / `results_not_useful`; frozen executed-search snapshot; stale protection; query-log/CF1/Learning isolation; create-only (no manage/export).
+- **Next product slice:** `CF2I4 — Manage Search Feedback and Export`.
 - **Parallel validation:** `PV1A` production identity/desktop smoke remains active; `PV1B` physical-device matrix remains hardware-gated / not run and must not be displaced by CF2. Phase 7N1 candidate identity may be recorded while device scenarios remain `not_run`.
 - Prior portfolio decision records: `docs/reports/pd2_post_cf1_product_build_decision.md`, `docs/reports/pd1_next_product_build_decision.md`, `docs/reports/pd0_next_product_build_decision.md`.
 

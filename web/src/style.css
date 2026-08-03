@@ -468,6 +468,95 @@ a {
   gap: 8px;
 }
 
+/* --- Search failure feedback capture (CF2I3) --- */
+
+.search-feedback-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.search-feedback-entry-message,
+.search-feedback-entry-prompt {
+  margin: 0;
+}
+
+.search-feedback-report-btn {
+  align-self: flex-start;
+}
+
+.search-feedback-capture {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-feedback-capture-heading {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.search-feedback-capture-query {
+  margin: 4px 0 0;
+  font-weight: 600;
+  white-space: pre-wrap;
+}
+
+.search-feedback-capture-search-meta {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.search-feedback-capture-privacy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.92rem;
+  opacity: 0.92;
+}
+
+.search-feedback-capture-privacy p {
+  margin: 0;
+}
+
+.search-feedback-capture-help,
+.search-feedback-capture-counter {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+}
+
+.search-feedback-capture-counter-over,
+.search-feedback-capture-field-error,
+.search-feedback-capture-stale,
+.search-feedback-capture-error-summary {
+  color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
+}
+
+.search-feedback-capture-error-summary {
+  border: 1px solid color-mix(in oklab, var(--text) 35%, #f87171 40%);
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.search-feedback-capture-error-summary-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.search-feedback-capture-field textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+}
+
+.search-feedback-capture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* --- Saved vocabulary (LS1I3) --- */
 
 .saved-vocab-surface {

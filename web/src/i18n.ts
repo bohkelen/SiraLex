@@ -563,6 +563,52 @@ const MESSAGES = {
     "correctionFeedback.manage.error.exportInvalidPackage": "The generated export file was invalid.",
     "correctionFeedback.manage.deleteReminder": "Before deleting the database, export your correction drafts if you want to keep them.",
     "correctionFeedback.manage.deleteReminderAction": "Manage Corrections",
+    "searchFeedback.capture.zeroResultMessage": "No results for “{query}”",
+    "searchFeedback.capture.resultsNotUsefulPrompt": "Didn't find what you needed?",
+    "searchFeedback.capture.reportAction": "Report this search",
+    "searchFeedback.capture.heading": "Report this search",
+    "searchFeedback.capture.searchLabel": "Search",
+    "searchFeedback.capture.searchState": "{direction} · {state} · {count} result(s)",
+    "searchFeedback.capture.direction.sourceToTarget": "Source → target",
+    "searchFeedback.capture.direction.targetToSource": "Target → source",
+    "searchFeedback.capture.resultState.noResult": "No results",
+    "searchFeedback.capture.resultState.resultsNotUseful": "Results shown",
+    "searchFeedback.capture.meaningLabel": "What were you trying to find?",
+    "searchFeedback.capture.meaningHelp": "Optional. Describe the meaning or word you hoped to find.",
+    "searchFeedback.capture.detailsLabel": "Additional details",
+    "searchFeedback.capture.detailsHelp": "Optional. Add any extra context that may help later review.",
+    "searchFeedback.capture.optional": "optional",
+    "searchFeedback.capture.counter": "{count} / {max}",
+    "searchFeedback.capture.privacy.authority":
+      "This saves a local report about this search. It does not add a word to the dictionary or determine why the search did not meet your need.",
+    "searchFeedback.capture.privacy.localOnly":
+      "Your exact search text will be stored on this device as part of the report. Nothing is sent online.",
+    "searchFeedback.capture.save": "Save search feedback",
+    "searchFeedback.capture.saving": "Saving…",
+    "searchFeedback.capture.cancel": "Cancel",
+    "searchFeedback.capture.backToSearch": "Back to search",
+    "searchFeedback.capture.success.heading": "Search feedback saved",
+    "searchFeedback.capture.success.body1": "Search feedback saved on this device.",
+    "searchFeedback.capture.success.body2":
+      "It has not been sent online and does not change the dictionary.",
+    "searchFeedback.capture.error.summary": "Could not save the search feedback.",
+    "searchFeedback.capture.error.reviewFields": "Review the feedback fields.",
+    "searchFeedback.capture.error.meaningTooLong": "Requested meaning is too long.",
+    "searchFeedback.capture.error.meaningInvalid":
+      "Requested meaning contains invalid characters.",
+    "searchFeedback.capture.error.detailsTooLong": "Additional details are too long.",
+    "searchFeedback.capture.error.detailsInvalid":
+      "Additional details contain invalid characters.",
+    "searchFeedback.capture.error.staleContext":
+      "This search has changed. Return to the current results and report it again.",
+    "searchFeedback.capture.error.invalidTimestamp":
+      "The report could not be saved because the local device time is invalid.",
+    "searchFeedback.capture.error.idGenerationFailed":
+      "A secure local report ID could not be created.",
+    "searchFeedback.capture.error.feedbackIdConflict":
+      "The report could not be saved because of a local ID conflict. Try again.",
+    "searchFeedback.capture.error.databaseWriteFailed":
+      "The report could not be saved on this device.",
   },
   fr: {
     "app.subtitle": "Un dictionnaire utilisable hors ligne",
@@ -1071,6 +1117,60 @@ const MESSAGES = {
     "correctionFeedback.manage.error.exportInvalidPackage": "Le fichier d’export généré était invalide.",
     "correctionFeedback.manage.deleteReminder": "Avant de supprimer la base de données, exportez vos brouillons de correction si vous souhaitez les conserver.",
     "correctionFeedback.manage.deleteReminderAction": "Gérer les corrections",
+    "searchFeedback.capture.zeroResultMessage": "Aucun résultat pour « {query} »",
+    "searchFeedback.capture.resultsNotUsefulPrompt":
+      "Vous n’avez pas trouvé ce que vous cherchiez ?",
+    "searchFeedback.capture.reportAction": "Signaler cette recherche",
+    "searchFeedback.capture.heading": "Signaler cette recherche",
+    "searchFeedback.capture.searchLabel": "Recherche",
+    "searchFeedback.capture.searchState": "{direction} · {state} · {count} résultat(s)",
+    "searchFeedback.capture.direction.sourceToTarget": "Source → cible",
+    "searchFeedback.capture.direction.targetToSource": "Cible → source",
+    "searchFeedback.capture.resultState.noResult": "Aucun résultat",
+    "searchFeedback.capture.resultState.resultsNotUseful": "Résultats affichés",
+    "searchFeedback.capture.meaningLabel": "Que cherchiez-vous à trouver ?",
+    "searchFeedback.capture.meaningHelp":
+      "Facultatif. Décrivez le sens ou le mot que vous espériez trouver.",
+    "searchFeedback.capture.detailsLabel": "Détails supplémentaires",
+    "searchFeedback.capture.detailsHelp":
+      "Facultatif. Ajoutez tout contexte utile pour une revue ultérieure.",
+    "searchFeedback.capture.optional": "facultatif",
+    "searchFeedback.capture.counter": "{count} / {max}",
+    "searchFeedback.capture.privacy.authority":
+      "Cela enregistre un rapport local sur cette recherche. Cela n’ajoute pas de mot au dictionnaire et ne détermine pas pourquoi la recherche n’a pas répondu à votre besoin.",
+    "searchFeedback.capture.privacy.localOnly":
+      "Le texte exact de votre recherche sera stocké sur cet appareil dans le rapport. Rien n’est envoyé en ligne.",
+    "searchFeedback.capture.save": "Enregistrer le retour sur la recherche",
+    "searchFeedback.capture.saving": "Enregistrement…",
+    "searchFeedback.capture.cancel": "Annuler",
+    "searchFeedback.capture.backToSearch": "Retour à la recherche",
+    "searchFeedback.capture.success.heading": "Retour sur la recherche enregistré",
+    "searchFeedback.capture.success.body1":
+      "Retour sur la recherche enregistré sur cet appareil.",
+    "searchFeedback.capture.success.body2":
+      "Il n’a pas été envoyé en ligne et ne modifie pas le dictionnaire.",
+    "searchFeedback.capture.error.summary":
+      "Impossible d’enregistrer le retour sur la recherche.",
+    "searchFeedback.capture.error.reviewFields":
+      "Vérifiez les champs du retour.",
+    "searchFeedback.capture.error.meaningTooLong":
+      "Le sens recherché est trop long.",
+    "searchFeedback.capture.error.meaningInvalid":
+      "Le sens recherché contient des caractères invalides.",
+    "searchFeedback.capture.error.detailsTooLong":
+      "Les détails supplémentaires sont trop longs.",
+    "searchFeedback.capture.error.detailsInvalid":
+      "Les détails supplémentaires contiennent des caractères invalides.",
+    "searchFeedback.capture.error.staleContext":
+      "Cette recherche a changé. Revenez aux résultats actuels et signalez-la à nouveau.",
+    "searchFeedback.capture.error.invalidTimestamp":
+      "Le rapport n’a pas pu être enregistré car l’heure de l’appareil est invalide.",
+    "searchFeedback.capture.error.idGenerationFailed":
+      "Un identifiant local sécurisé de rapport n’a pas pu être créé.",
+    "searchFeedback.capture.error.feedbackIdConflict":
+      "Le rapport n’a pas pu être enregistré en raison d’un conflit d’identifiant local. Réessayez.",
+    "searchFeedback.capture.error.databaseWriteFailed":
+      "Le rapport n’a pas pu être enregistré sur cet appareil.",
   },
 } as const;
 

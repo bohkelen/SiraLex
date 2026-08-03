@@ -99,7 +99,22 @@ import {
 } from "./render/render_results";
 import { renderEntryDetail, showTargetEntryUnavailable } from "./render/render_entry";
 import { renderCorrectionForm } from "./render/render_correction_form";
+import {
+  renderNoResultSearchFeedbackEntry,
+  renderResultsNotUsefulSearchFeedbackEntry,
+  renderSearchFeedbackCapture,
+} from "./render/render_search_feedback_capture";
 import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
+import {
+  createSearchFeedbackCaptureController,
+  type SearchFeedbackCaptureController,
+} from "./search_feedback/search_feedback_capture_controller";
+import {
+  buildSearchFeedbackCaptureContext,
+  canOfferSearchFeedbackCapture,
+  deriveMatchedIrIdsFromRecords,
+  type ExecutedSearchSnapshot,
+} from "./search_feedback/search_feedback_capture_model";
 import { createReviewSurfaceHost } from "./learning/review_surface_host";
 import {
   canOfferLearningSave,
@@ -1072,6 +1087,7 @@ async function refreshDbStatus() {
         lastKnownActiveContentSha = nextContentSha;
         learningBackupSurface?.invalidatePreviewForBundleChange();
         activeCorrectionForm?.notifyBundleLifecycleChanged();
+        activeSearchFeedbackForm?.notifyBundleLifecycleChanged();
         if (bundleIdentityChanged) {
           if (
             resultsHostContext === "review" ||
@@ -2072,6 +2088,19 @@ recentQueryLogsRefreshBtn.addEventListener("click", () => {
 langToggle.addEventListener("click", () => {
   searchDirection = searchDirection === "source_to_target" ? "target_to_source" : "source_to_target";
   updateLangToggle();
+  // Direction change invalidates any prior executed-search capture context.
+  clearExecutedSearchSnapshot();
+  activeSearchFeedbackForm?.notifySearchChanged();
+  if (
+    resultsHostContext === "search" &&
+    !activeSearchFeedbackForm &&
+    lastSearchResults.length > 0
+  ) {
+    showResultsList();
+  } else if (resultsHostContext === "search" && !activeSearchFeedbackForm) {
+    const entry = searchResults.querySelector("[data-testid^='search-feedback-entry']");
+    entry?.remove();
+  }
 });
 
 // --- Search + results ---
@@ -2114,6 +2143,12 @@ let correctionManagementGeneration = 0;
 let correctionFormGeneration = 0;
 let activeCorrectionForm: CorrectionFormController | undefined;
 let activeCorrectionManagement: CorrectionManagementSession | undefined;
+/** Settled search-event snapshot for CF2 capture (cleared when a new search starts). */
+let lastExecutedSearch: ExecutedSearchSnapshot | undefined;
+let searchFeedbackFormGeneration = 0;
+let activeSearchFeedbackForm: SearchFeedbackCaptureController | undefined;
+/** CF2I4 seam: bump when local search feedback is created. */
+let searchFeedbackManagementGeneration = 0;
 
 /** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4 / LS3I3). */
 type ResultsHostContext =
@@ -2136,9 +2171,27 @@ function disposeActiveCorrectionForm() {
   correctionFormGeneration += 1;
 }
 
+function disposeActiveSearchFeedbackForm() {
+  activeSearchFeedbackForm?.dispose();
+  activeSearchFeedbackForm = undefined;
+  searchFeedbackFormGeneration += 1;
+}
+
 function invalidateCorrectionManagementGeneration() {
   correctionManagementGeneration += 1;
   // Stale async results from a mounted management session are ignored via isCurrent.
+}
+
+function invalidateSearchFeedbackManagementGeneration() {
+  searchFeedbackManagementGeneration += 1;
+}
+
+function clearExecutedSearchSnapshot(): void {
+  lastExecutedSearch = undefined;
+}
+
+function getCurrentExecutedSearch(): ExecutedSearchSnapshot | undefined {
+  return lastExecutedSearch;
 }
 
 function disposeActiveCorrectionManagement() {
@@ -2182,6 +2235,7 @@ async function updateCorrectionFeedbackDeleteReminder(): Promise<void> {
 function showCorrectionManagement(): void {
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
   disposeActiveCorrectionManagement();
   const generation = ++correctionManagementGeneration;
   resultsHostContext = "search";
@@ -2251,8 +2305,9 @@ function invalidateCollectionAndReviewContexts() {
   savedVocabularyGeneration += 1;
   entryDetailGeneration += 1;
   focusReviewActionOnce = false;
-  // Keep mounted correction form; mark it stale so Save cannot retarget.
+  // Keep mounted correction / search-feedback forms; mark stale so Save cannot retarget.
   activeCorrectionForm?.notifyHostInvalidated();
+  activeSearchFeedbackForm?.notifyHostInvalidated();
 }
 
 function mountLearningBackupModel(
@@ -2383,6 +2438,9 @@ searchInput.addEventListener("input", () => {
   const query = searchInput.value;
   if (query.trim() === "") {
     searchSeq += 1;
+    clearExecutedSearchSnapshot();
+    activeSearchFeedbackForm?.notifySearchChanged();
+    disposeActiveSearchFeedbackForm();
     invalidateCollectionAndReviewContexts();
     resultsHostContext = "search";
     searchMeta.textContent = "";
@@ -2400,10 +2458,140 @@ type EntryNavOrigin =
   | { kind: "search"; restoreDirection: SearchDirection }
   | { kind: "saved_vocabulary" };
 
+function showNoResultSearchSurface(query: string): void {
+  resultsHostContext = "search";
+  disposeActiveCorrectionForm();
+  disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackForm();
+  searchResults.innerHTML = "";
+  if (!canOfferSearchFeedbackCapture(lastExecutedSearch)) return;
+  searchResults.appendChild(
+    renderNoResultSearchFeedbackEntry(query, () => {
+      showSearchFeedbackCapture();
+    }),
+  );
+}
+
+function restoreSearchSurfaceAfterFeedback(): void {
+  // Detach controller without bumping host generation twice via surface restore helpers.
+  activeSearchFeedbackForm?.dispose();
+  activeSearchFeedbackForm = undefined;
+  searchFeedbackFormGeneration += 1;
+  if (!lastExecutedSearch) {
+    searchResults.innerHTML = "";
+    return;
+  }
+  if (lastExecutedSearch.result_state === "no_result") {
+    searchMeta.textContent = getNoResultMessage(lastExecutedSearch.query_raw);
+    // Avoid disposeActiveSearchFeedbackForm again inside showNoResultSearchSurface —
+    // generation already advanced above; rebuild surface directly.
+    resultsHostContext = "search";
+    disposeActiveCorrectionForm();
+    disposeActiveCorrectionManagement();
+    searchResults.innerHTML = "";
+    if (canOfferSearchFeedbackCapture(lastExecutedSearch)) {
+      searchResults.appendChild(
+        renderNoResultSearchFeedbackEntry(lastExecutedSearch.query_raw, () => {
+          showSearchFeedbackCapture();
+        }),
+      );
+    }
+    return;
+  }
+  if (lastSearchResults.length > 0) {
+    // showResultsList disposes search-feedback form; keep results + CTA.
+    resultsHostContext = "search";
+    disposeActiveCorrectionForm();
+    disposeActiveCorrectionManagement();
+    invalidateCollectionAndReviewContexts();
+    searchResults.innerHTML = "";
+    const list = renderResultsList(lastSearchResults, (record) => {
+      showEntryDetail(record, {
+        kind: "search",
+        restoreDirection: searchDirection,
+      });
+    });
+    if (list) searchResults.appendChild(list);
+    if (canOfferSearchFeedbackCapture(lastExecutedSearch)) {
+      searchResults.appendChild(
+        renderResultsNotUsefulSearchFeedbackEntry(() => {
+          showSearchFeedbackCapture();
+        }),
+      );
+    }
+    return;
+  }
+  searchResults.innerHTML = "";
+}
+
+function showSearchFeedbackCapture(): void {
+  const context = lastExecutedSearch
+    ? buildSearchFeedbackCaptureContext(lastExecutedSearch)
+    : undefined;
+  if (!context) return;
+
+  disposeActiveSearchFeedbackForm();
+  disposeActiveCorrectionForm();
+  disposeActiveCorrectionManagement();
+  disposeActiveReviewHost();
+  const generation = ++searchFeedbackFormGeneration;
+  resultsHostContext = "search";
+  entryDetailGeneration += 1;
+  searchResults.innerHTML = "";
+
+  let viewUpdate:
+    | ((vm: ReturnType<SearchFeedbackCaptureController["getViewModel"]>) => void)
+    | undefined;
+
+  const controller = createSearchFeedbackCaptureController({
+    context,
+    openDb: openSiralexDb,
+    dbOwnership: "controller_owned",
+    getActiveMeta: () => currentActiveBundle,
+    getCurrentExecutedSearch,
+    isCurrent: () =>
+      generation === searchFeedbackFormGeneration &&
+      activeSearchFeedbackForm === controller,
+    onModel: (vm) => {
+      viewUpdate?.(vm);
+    },
+    onCancel: () => {
+      restoreSearchSurfaceAfterFeedback();
+    },
+    onBackToSearch: () => {
+      restoreSearchSurfaceAfterFeedback();
+    },
+    onFeedbackSaved: () => {
+      invalidateSearchFeedbackManagementGeneration();
+    },
+  });
+  activeSearchFeedbackForm = controller;
+
+  const formView = renderSearchFeedbackCapture(controller.getViewModel(), {
+    onRequestedMeaningChange: (value) => controller.setRequestedMeaning(value),
+    onUserDescriptionChange: (value) => controller.setUserDescription(value),
+    onSave: () => {
+      void controller.save();
+    },
+    onCancel: () => controller.cancel(),
+    onBackToSearch: () => controller.backToSearch(),
+  });
+  viewUpdate = formView.update;
+  searchResults.appendChild(formView.root);
+  controller.start();
+
+  const heading = formView.root.querySelector<HTMLElement>(
+    "#search-feedback-capture-heading",
+  );
+  heading?.setAttribute("tabindex", "-1");
+  heading?.focus();
+}
+
 function showResultsList() {
   resultsHostContext = "search";
   disposeActiveCorrectionForm();
   disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackForm();
   invalidateCollectionAndReviewContexts();
   searchResults.innerHTML = "";
   if (lastSearchResults.length === 0) return;
@@ -2415,6 +2603,14 @@ function showResultsList() {
     });
   });
   if (list) searchResults.appendChild(list);
+
+  if (canOfferSearchFeedbackCapture(lastExecutedSearch)) {
+    searchResults.appendChild(
+      renderResultsNotUsefulSearchFeedbackEntry(() => {
+        showSearchFeedbackCapture();
+      }),
+    );
+  }
 }
 
 /**
@@ -2425,6 +2621,7 @@ function showResultsList() {
 function showReviewSurface() {
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
   disposeActiveCorrectionManagement();
   const generation = ++reviewGeneration;
   resultsHostContext = "review";
@@ -2453,6 +2650,7 @@ function showReviewSurface() {
 function showSavedVocabulary() {
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
   disposeActiveCorrectionManagement();
   const generation = ++savedVocabularyGeneration;
   resultsHostContext = "saved_vocabulary";
@@ -2576,6 +2774,7 @@ function showCorrectionForm(record: EnrichedRecord, origin: EntryNavOrigin): voi
   if (!context) return;
 
   disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
   disposeActiveReviewHost();
   entryDetailGeneration += 1;
   const generation = ++correctionFormGeneration;
@@ -2637,6 +2836,7 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
   resultsHostContext = origin.kind === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
   disposeActiveCorrectionManagement();
   if (origin.kind === "search") {
     savedVocabularyGeneration += 1;
@@ -2728,6 +2928,10 @@ async function runSearch(query: string) {
     return;
   }
   const seq = ++searchSeq;
+  // New execution invalidates any prior capture context immediately.
+  clearExecutedSearchSnapshot();
+  activeSearchFeedbackForm?.notifySearchChanged();
+  const executedDirection = searchDirection;
   const t0 = performance.now();
   let db: IDBDatabase | undefined;
   try {
@@ -2744,7 +2948,7 @@ async function runSearch(query: string) {
     const result = await searchQuery(
       db,
       activeStorageScopeId,
-      searchDirection,
+      executedDirection,
       query,
       activeBundleMeta.search_index_directional === true,
     );
@@ -2754,12 +2958,25 @@ async function runSearch(query: string) {
       searchMeta.textContent = getNoResultMessage(query);
       invalidateCollectionAndReviewContexts();
       resultsHostContext = "search";
-      searchResults.innerHTML = "";
       lastSearchResults = [];
+      const contentSha = activeBundleMeta.expected_content_sha256;
+      if (contentSha) {
+        lastExecutedSearch = {
+          generation: seq,
+          query_raw: query,
+          search_direction: executedDirection,
+          result_state: "no_result",
+          result_count: 0,
+          bundle_id: activeBundleMeta.bundle_id,
+          content_sha256: contentSha,
+          storage_scope_id: activeStorageScopeId,
+        };
+      }
+      showNoResultSearchSurface(query);
       scheduleSettledQueryLog({
         seq,
         query,
-        direction: searchDirection,
+        direction: executedDirection,
         result,
         activeBundleMeta,
         storageScopeId: activeStorageScopeId,
@@ -2779,18 +2996,33 @@ async function runSearch(query: string) {
 
     lastSearchResults = records.map((record) => ({
       rawQuery: query,
-      searchDirection,
+      searchDirection: executedDirection,
       matched_key_type: result.matched_key_type,
       matched_key: result.matched_key,
       sourceLabel: getLocalizedSourceLabel(activeBundleMeta.language_meta),
       targetLabel: getLocalizedTargetLabel(activeBundleMeta.language_meta),
       record,
     }));
+    const matchedIrIds = deriveMatchedIrIdsFromRecords(records);
+    const contentSha = activeBundleMeta.expected_content_sha256;
+    if (contentSha) {
+      lastExecutedSearch = {
+        generation: seq,
+        query_raw: query,
+        search_direction: executedDirection,
+        result_state: "results_not_useful",
+        result_count: records.length,
+        ...(matchedIrIds !== undefined ? { matched_ir_ids: matchedIrIds } : {}),
+        bundle_id: activeBundleMeta.bundle_id,
+        content_sha256: contentSha,
+        storage_scope_id: activeStorageScopeId,
+      };
+    }
     showResultsList();
     scheduleSettledQueryLog({
       seq,
       query,
-      direction: searchDirection,
+      direction: executedDirection,
       result,
       activeBundleMeta,
       storageScopeId: activeStorageScopeId,
@@ -2802,6 +3034,7 @@ async function runSearch(query: string) {
     searchMeta.textContent = t("search.error", { error: String(e) });
     searchResults.innerHTML = "";
     lastSearchResults = [];
+    clearExecutedSearchSnapshot();
   } finally {
     db?.close();
   }
