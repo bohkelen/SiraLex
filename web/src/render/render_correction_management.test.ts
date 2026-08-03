@@ -209,6 +209,43 @@ describe("renderCorrectionManagement", () => {
     );
   });
 
+  it("shows configured review email in EN/FR handoff confirmation", () => {
+    const email = "review@example.org";
+    setCurrentLocale("en");
+    const en = renderCorrectionManagement(
+      baseVm({
+        phase: "confirm_handoff",
+        sendForReviewAvailable: true,
+        reviewEmail: email,
+      }),
+      callbacks(),
+    ).root;
+    expect(en.textContent).toContain("Send this feedback to SiraLex review");
+    expect(en.textContent).toContain(email);
+    expect(en.textContent).toContain("stored only on this device");
+    expect(en.textContent).toMatch(/choose your email app/i);
+    expect(en.querySelector(`a.feedback-handoff-email[href="mailto:${email}"]`)?.textContent).toBe(
+      email,
+    );
+    expect(en.textContent).not.toMatch(/submitted|received|sent to SiraLex/i);
+
+    setCurrentLocale("fr");
+    const fr = renderCorrectionManagement(
+      baseVm({
+        phase: "confirm_handoff",
+        sendForReviewAvailable: true,
+        reviewEmail: email,
+      }),
+      callbacks(),
+    ).root;
+    expect(fr.textContent).toContain("Envoyer ce retour pour révision");
+    expect(fr.textContent).toContain(email);
+    expect(fr.textContent).toContain("uniquement sur cet appareil");
+    expect(fr.querySelector(`a.feedback-handoff-email[href="mailto:${email}"]`)?.textContent).toBe(
+      email,
+    );
+  });
+
   it("wires keyboard-accessible row open and supports focus targets", async () => {
     const cbs = callbacks();
     const { root, update } = renderCorrectionManagement(baseVm({ focusTarget: "heading" }), cbs);

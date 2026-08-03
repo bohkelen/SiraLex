@@ -138,9 +138,14 @@ describe("handoffFeedbackForReview", () => {
     const download = vi.fn();
     const openMailto = vi.fn();
     const text = artifact().text;
+    const shareCopy: FeedbackHandoffCopy = {
+      ...COPY,
+      shareText:
+        "SiraLex correction feedback for review.\nPlease send this file to review@example.org.",
+    };
     const result = await handoffFeedbackForReview(artifact({ text }), {
       feedbackEmail: "review@example.org",
-      copy: COPY,
+      copy: shareCopy,
       confirmPrivacy: () => true,
       shareNavigator: { share, canShare: () => true },
       downloadArtifact: download,
@@ -150,6 +155,7 @@ describe("handoffFeedbackForReview", () => {
     expect(share).toHaveBeenCalledTimes(1);
     const data = share.mock.calls[0]![0];
     expect(data.files).toHaveLength(1);
+    expect(data.text).toContain("review@example.org");
     const file = data.files![0]!;
     expect(file.name).toBe(artifact().filename);
     expect(file.type).toBe("application/json");
@@ -216,5 +222,19 @@ describe("handoffFeedbackForReview", () => {
       }),
     );
     expect(openMailto).toHaveBeenCalled();
+    expect(String(openMailto.mock.calls[0]?.[0])).toContain("mailto:review%40example.org");
+  });
+
+  it("does not treat share success as delivery to the review inbox", async () => {
+    const share = vi.fn(async (_data: ShareData) => undefined);
+    const result = await handoffFeedbackForReview(artifact(), {
+      feedbackEmail: "review@example.org",
+      copy: COPY,
+      confirmPrivacy: () => true,
+      shareNavigator: { share, canShare: () => true },
+    });
+    // method:"share" means the OS share sheet completed — not "sent to SiraLex".
+    expect(result).toEqual({ ok: true, method: "share" });
+    expect(result).not.toMatchObject({ method: "submitted" });
   });
 });

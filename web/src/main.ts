@@ -193,22 +193,25 @@ async function performConfiguredFeedbackHandoff(
   if (!bridged) {
     return { ok: false, reason: "invalid_artifact" };
   }
+  const email = FEEDBACK_EMAIL ?? "";
   const copy =
     kind === "correction_feedback"
       ? {
           shareTitle: t("correctionFeedback.manage.send.shareTitle"),
-          shareText: t("correctionFeedback.manage.send.shareText"),
+          shareText: t("correctionFeedback.manage.send.shareText", { email }),
           mailtoSubject: t("correctionFeedback.manage.send.mailtoSubject"),
           mailtoBody: t("correctionFeedback.manage.send.mailtoBody", {
             filename: bridged.filename,
+            email,
           }),
         }
       : {
           shareTitle: t("searchFeedback.manage.send.shareTitle"),
-          shareText: t("searchFeedback.manage.send.shareText"),
+          shareText: t("searchFeedback.manage.send.shareText", { email }),
           mailtoSubject: t("searchFeedback.manage.send.mailtoSubject"),
           mailtoBody: t("searchFeedback.manage.send.mailtoBody", {
             filename: bridged.filename,
+            email,
           }),
         };
   return handoffFeedbackForReview(bridged, {
@@ -2406,6 +2409,7 @@ function showSearchFeedbackManagement(): void {
     now: () => new Date().toISOString(),
     appVersion: APP_VERSION,
     sendForReviewAvailable: FEEDBACK_HANDOFF_AVAILABLE,
+    reviewEmail: FEEDBACK_EMAIL,
     performHandoff: (artifact) =>
       performConfiguredFeedbackHandoff(artifact, "search_feedback"),
     isCurrent: () =>
@@ -2482,6 +2486,7 @@ function showCorrectionManagement(): void {
     now: () => new Date().toISOString(),
     appVersion: APP_VERSION,
     sendForReviewAvailable: FEEDBACK_HANDOFF_AVAILABLE,
+    reviewEmail: FEEDBACK_EMAIL,
     performHandoff: (artifact) =>
       performConfiguredFeedbackHandoff(artifact, "correction_feedback"),
     isCurrent: () =>

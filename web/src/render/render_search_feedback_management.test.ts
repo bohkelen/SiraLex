@@ -110,6 +110,39 @@ describe("renderSearchFeedbackManagement", () => {
     expect(fr.textContent).not.toContain("Search feedback");
   });
 
+  it("shows configured review email in EN/FR handoff confirmation", () => {
+    const email = "review@example.org";
+    setCurrentLocale("en");
+    const en = renderSearchFeedbackManagement(
+      baseVm({
+        phase: "confirm_handoff",
+        sendForReviewAvailable: true,
+        reviewEmail: email,
+      }),
+      callbacks(),
+    ).root;
+    expect(en.textContent).toContain("Send this feedback to SiraLex review");
+    expect(en.textContent).toContain(email);
+    expect(en.querySelector(`a.feedback-handoff-email[href="mailto:${email}"]`)?.textContent).toBe(
+      email,
+    );
+
+    setCurrentLocale("fr");
+    const fr = renderSearchFeedbackManagement(
+      baseVm({
+        phase: "confirm_handoff",
+        sendForReviewAvailable: true,
+        reviewEmail: email,
+      }),
+      callbacks(),
+    ).root;
+    expect(fr.textContent).toContain("Envoyer ce retour pour révision");
+    expect(fr.textContent).toContain(email);
+    expect(fr.querySelector(`a.feedback-handoff-email[href="mailto:${email}"]`)?.textContent).toBe(
+      email,
+    );
+  });
+
   it("renders loading, empty, availability, detail, edit, stale, delete, export states", async () => {
     const cb = callbacks();
     const { root, update } = renderSearchFeedbackManagement(

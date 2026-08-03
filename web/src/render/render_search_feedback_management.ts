@@ -70,6 +70,36 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/** Render copy that includes a configured email as a mailto link (address from config, not translations). */
+function appendTextWithEmailLink(
+  parent: HTMLElement,
+  text: string,
+  email: string,
+  className?: string,
+): void {
+  const p = el("p", className);
+  if (!email) {
+    p.textContent = text;
+    parent.appendChild(p);
+    return;
+  }
+  const idx = text.indexOf(email);
+  if (idx < 0) {
+    p.textContent = text;
+    parent.appendChild(p);
+    return;
+  }
+  if (idx > 0) p.append(text.slice(0, idx));
+  const link = document.createElement("a");
+  link.href = `mailto:${email}`;
+  link.textContent = email;
+  link.rel = "noopener";
+  link.className = "feedback-handoff-email";
+  p.append(link);
+  if (idx + email.length < text.length) p.append(text.slice(idx + email.length));
+  parent.appendChild(p);
+}
+
 function looksLikeNko(text: string): boolean {
   return /[\u07C0-\u07FF]/.test(text);
 }
@@ -244,7 +274,22 @@ export function renderSearchFeedbackManagement(
     if (vm.phase === "confirm_handoff") {
       const box = el("div", "search-feedback-manage-handoff-confirm");
       box.id = "search-feedback-manage-handoff-confirm";
+      const email = vm.reviewEmail ?? "";
+      box.appendChild(
+        el(
+          "h3",
+          "search-feedback-manage-handoff-heading",
+          t("searchFeedback.manage.send.confirmHeading"),
+        ),
+      );
       box.appendChild(el("p", undefined, t("searchFeedback.manage.send.privacy")));
+      appendTextWithEmailLink(
+        box,
+        t("searchFeedback.manage.send.destination", { email }),
+        email,
+        "search-feedback-manage-handoff-destination",
+      );
+      box.appendChild(el("p", undefined, t("searchFeedback.manage.send.destinationHint")));
       const row = el("div", "row");
       const cancel = el("button", "btn", t("searchFeedback.manage.send.cancel"));
       cancel.type = "button";
@@ -270,7 +315,9 @@ export function renderSearchFeedbackManagement(
           "p",
           undefined,
           vm.handoffMethod === "download_mailto"
-            ? t("searchFeedback.manage.send.successFallback")
+            ? t("searchFeedback.manage.send.successFallback", {
+                email: vm.reviewEmail ?? "",
+              })
             : t("searchFeedback.manage.send.successShare"),
         ),
       );

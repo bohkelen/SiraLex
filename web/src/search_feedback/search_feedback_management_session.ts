@@ -117,6 +117,8 @@ export type SearchFeedbackManagementVm = {
   exportFilename?: string;
   exportFeedbackCount?: number;
   sendForReviewAvailable: boolean;
+  /** Configured review inbox when handoff is available; never from translations. */
+  reviewEmail?: string;
   handoffMethod?: FeedbackHandoffSuccessMethod;
   focusTarget:
     | "none"
@@ -140,6 +142,8 @@ export type SearchFeedbackManagementSessionDeps = {
   downloadAdapter?: SearchFeedbackDownloadAdapter;
   createExport?: typeof createSearchFeedbackExport;
   sendForReviewAvailable?: boolean;
+  /** Configured review inbox (from VITE_FEEDBACK_EMAIL). Shown in handoff UI. */
+  reviewEmail?: string;
   performHandoff?: (
     artifact: SearchFeedbackExportArtifact,
   ) => Promise<FeedbackHandoffResult>;
@@ -268,6 +272,10 @@ export function createSearchFeedbackManagementSession(
   const download = deps.downloadArtifact ?? downloadSearchFeedbackArtifact;
   const getInstalled = deps.getInstalledMeta ?? getInstalledBundleMeta;
   const sendForReviewAvailable = deps.sendForReviewAvailable === true;
+  const reviewEmail =
+    sendForReviewAvailable && typeof deps.reviewEmail === "string" && deps.reviewEmail.trim() !== ""
+      ? deps.reviewEmail.trim()
+      : undefined;
   const performHandoff = deps.performHandoff;
 
   let generation = 0;
@@ -310,6 +318,7 @@ export function createSearchFeedbackManagementSession(
       exportFilename,
       exportFeedbackCount,
       sendForReviewAvailable,
+      reviewEmail,
       handoffMethod,
       focusTarget,
     });
@@ -404,6 +413,7 @@ export function createSearchFeedbackManagementSession(
         exportFilename,
         exportFeedbackCount,
         sendForReviewAvailable,
+        reviewEmail,
         handoffMethod,
         focusTarget,
       };

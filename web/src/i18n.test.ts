@@ -81,6 +81,22 @@ describe("i18n translations", () => {
     setCurrentLocale(previous);
   });
 
+  it("interpolates configured review email into handoff copy without hardcoding it", () => {
+    const previous = getCurrentLocale();
+    const email = "inbox@example.org";
+    setCurrentLocale("en");
+    expect(t("correctionFeedback.manage.send.destination", { email })).toContain(email);
+    expect(t("correctionFeedback.manage.send.shareText", { email })).toContain(email);
+    expect(t("searchFeedback.manage.send.shareText", { email })).toContain(email);
+    expect(t("correctionFeedback.manage.send.shareText", { email })).not.toContain(
+      "diabilasekou@gmail.com",
+    );
+    setCurrentLocale("fr");
+    expect(t("correctionFeedback.manage.send.destination", { email })).toContain(email);
+    expect(t("correctionFeedback.manage.send.shareText", { email })).toContain(email);
+    setCurrentLocale(previous);
+  });
+
   it("resolves Theme labels in English and French", () => {
     const previous = getCurrentLocale();
     setCurrentLocale("en");

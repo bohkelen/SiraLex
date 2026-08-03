@@ -117,6 +117,8 @@ export type CorrectionManagementVm = {
   exportFilename?: string;
   exportDraftCount?: number;
   sendForReviewAvailable: boolean;
+  /** Configured review inbox when handoff is available; never from translations. */
+  reviewEmail?: string;
   handoffMethod?: FeedbackHandoffSuccessMethod;
   focusTarget:
     | "none"
@@ -141,6 +143,8 @@ export type CorrectionManagementSessionDeps = {
   createExport?: typeof createCorrectionFeedbackExport;
   /** When false/omitted, Send for review stays unavailable. */
   sendForReviewAvailable?: boolean;
+  /** Configured review inbox (from VITE_FEEDBACK_EMAIL). Shown in handoff UI. */
+  reviewEmail?: string;
   /**
    * Transport handoff for a governed export artifact.
    * Must not mutate drafts. Privacy confirmation is handled by the UI before calling sendForReview.
@@ -255,6 +259,10 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
   const getInstalled = deps.getInstalledMeta ?? getInstalledBundleMeta;
   const resolveLive = deps.resolveLiveEntry ?? defaultResolveLive;
   const sendForReviewAvailable = deps.sendForReviewAvailable === true;
+  const reviewEmail =
+    sendForReviewAvailable && typeof deps.reviewEmail === "string" && deps.reviewEmail.trim() !== ""
+      ? deps.reviewEmail.trim()
+      : undefined;
   const performHandoff = deps.performHandoff;
 
   let generation = 0;
@@ -300,6 +308,7 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
       exportFilename,
       exportDraftCount,
       sendForReviewAvailable,
+      reviewEmail,
       handoffMethod,
       focusTarget,
     });
@@ -398,6 +407,7 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
         exportFilename,
         exportDraftCount,
         sendForReviewAvailable,
+        reviewEmail,
         handoffMethod,
         focusTarget,
       };

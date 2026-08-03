@@ -61,4 +61,12 @@ describe("bundle language labels", () => {
       "French ↔ Maninka",
     );
   });
+
+  it("does not leak English catalog source labels into French UI", () => {
+    // Simulate Intl missing a useful name by relying on static fallback for fr/fr.
+    expect(getSourceLabel(LANGUAGE_META, "Source", "fr")).toBe("Français");
+    expect(getBundleDisplayName("bundle-id", LANGUAGE_META, "Source", "Cible", "fr")).toBe(
+      "Français ↔ Maninka",
+    );
+  });
 });

@@ -14,18 +14,34 @@ function titleCaseLanguageName(value: string, locale: string): string {
   return `${value.slice(0, 1).toLocaleUpperCase(locale)}${value.slice(1)}`;
 }
 
+/**
+ * Minimal UI-locale fallbacks for product language codes when Intl has no useful
+ * display name (or is unavailable). Keeps French UI from leaking English catalog
+ * labels like "French" for source_lang "fr".
+ */
+const UI_LANGUAGE_NAME_FALLBACKS: Record<string, Record<string, string>> = {
+  en: { en: "English", fr: "French" },
+  fr: { en: "Anglais", fr: "Français" },
+};
+
 function getLocaleLanguageName(code: string | undefined, locale: string | undefined): string | undefined {
-  if (!code || !locale || typeof Intl.DisplayNames !== "function") return undefined;
+  if (!code || !locale) return undefined;
   const normalizedCode = code.trim().toLowerCase();
   if (normalizedCode === "") return undefined;
+  const localeBase = locale.trim().toLowerCase().split("-")[0] ?? "";
 
-  try {
-    const name = new Intl.DisplayNames([locale], { type: "language" }).of(normalizedCode);
-    if (!name || name.trim().toLowerCase() === normalizedCode) return undefined;
-    return titleCaseLanguageName(name.trim(), locale);
-  } catch {
-    return undefined;
+  if (typeof Intl.DisplayNames === "function") {
+    try {
+      const name = new Intl.DisplayNames([locale], { type: "language" }).of(normalizedCode);
+      if (name && name.trim().toLowerCase() !== normalizedCode) {
+        return titleCaseLanguageName(name.trim(), locale);
+      }
+    } catch {
+      // Fall through to static UI fallbacks.
+    }
   }
+
+  return UI_LANGUAGE_NAME_FALLBACKS[localeBase]?.[normalizedCode];
 }
 
 export function buildLanguageMetaFromManifest(manifest: BundleManifestV1): BundleLanguageMeta | undefined {

@@ -55,12 +55,18 @@ test.describe("FH1 feedback handoff", () => {
     await expect(page.locator("#search-feedback-manage-send")).toBeEnabled({ timeout: 15_000 });
     await expect(page.locator("#search-feedback-manage-export")).toBeEnabled();
 
-    // Privacy confirmation EN
+    // Privacy + explicit destination EN (address from VITE_FEEDBACK_EMAIL)
     await page.locator("#search-feedback-manage-send").click();
     await expect(page.locator("#search-feedback-manage-handoff-confirm")).toBeVisible();
     await expect(page.locator("#search-feedback-manage-handoff-confirm")).toContainText(
       /stored only on this device/i,
     );
+    await expect(page.locator("#search-feedback-manage-handoff-confirm")).toContainText(
+      "review@example.org",
+    );
+    await expect(
+      page.locator('#search-feedback-manage-handoff-confirm a.feedback-handoff-email'),
+    ).toHaveAttribute("href", "mailto:review@example.org");
     await expect(page.locator("#search-feedback-manage-handoff-cancel")).toHaveText("Cancel");
     await expect(page.locator("#search-feedback-manage-handoff-continue")).toHaveText("Continue");
 
@@ -83,12 +89,14 @@ test.describe("FH1 feedback handoff", () => {
         callCount: calls.length,
         name: file?.name ?? "",
         type: file?.type ?? "",
+        text: calls[0]?.text ?? "",
         body: file ? await file.text() : "",
       };
     });
     expect(shared.callCount).toBe(1);
     expect(shared.name).toMatch(/^siralex-search-feedback-.+\.json$/);
     expect(shared.type).toBe("application/json");
+    expect(shared.text).toContain("review@example.org");
     expect(shared.body).toContain("siralex_search_feedback_v1");
     expect(shared.body).toMatch(/"status"\s*:\s*"draft"/);
 
@@ -102,6 +110,9 @@ test.describe("FH1 feedback handoff", () => {
     await page.locator("#search-feedback-manage-send").click();
     await expect(page.locator("#search-feedback-manage-handoff-confirm")).toContainText(
       /uniquement sur cet appareil/i,
+    );
+    await expect(page.locator("#search-feedback-manage-handoff-confirm")).toContainText(
+      "review@example.org",
     );
     await expect(page.locator("#search-feedback-manage-handoff-cancel")).toHaveText("Annuler");
     await expect(page.locator("#search-feedback-manage-handoff-continue")).toHaveText("Continuer");
@@ -142,6 +153,9 @@ test.describe("FH1 feedback handoff", () => {
     await expect(page.locator("#correction-manage-handoff-confirm")).toContainText(
       /stored only on this device/i,
     );
+    await expect(page.locator("#correction-manage-handoff-confirm")).toContainText(
+      "review@example.org",
+    );
     await page.locator("#correction-manage-handoff-continue").click();
     await expect(page.getByText("Feedback prepared for sharing.")).toBeVisible({
       timeout: 15_000,
@@ -149,13 +163,16 @@ test.describe("FH1 feedback handoff", () => {
 
     const shared = await page.evaluate(async () => {
       const calls = (window as unknown as { __fh1ShareCalls?: ShareData[] }).__fh1ShareCalls ?? [];
-      const file = calls[calls.length - 1]?.files?.[0];
+      const last = calls[calls.length - 1];
+      const file = last?.files?.[0];
       return {
         name: file?.name ?? "",
+        text: last?.text ?? "",
         body: file ? await file.text() : "",
       };
     });
     expect(shared.name).toMatch(/^siralex-correction-feedback-.+\.json$/);
+    expect(shared.text).toContain("review@example.org");
     expect(shared.body).toContain("siralex_correction_feedback_v1");
     expect(shared.body).toMatch(/"status"\s*:\s*"draft"/);
   });

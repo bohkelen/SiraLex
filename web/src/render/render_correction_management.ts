@@ -91,6 +91,36 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/** Render copy that includes a configured email as a mailto link (address from config, not translations). */
+function appendTextWithEmailLink(
+  parent: HTMLElement,
+  text: string,
+  email: string,
+  className?: string,
+): void {
+  const p = el("p", className);
+  if (!email) {
+    p.textContent = text;
+    parent.appendChild(p);
+    return;
+  }
+  const idx = text.indexOf(email);
+  if (idx < 0) {
+    p.textContent = text;
+    parent.appendChild(p);
+    return;
+  }
+  if (idx > 0) p.append(text.slice(0, idx));
+  const link = document.createElement("a");
+  link.href = `mailto:${email}`;
+  link.textContent = email;
+  link.rel = "noopener";
+  link.className = "feedback-handoff-email";
+  p.append(link);
+  if (idx + email.length < text.length) p.append(text.slice(idx + email.length));
+  parent.appendChild(p);
+}
+
 /** Do not overwrite an actively edited control (preserves caret/IME). */
 function syncTextControl(
   control: HTMLTextAreaElement | HTMLInputElement,
@@ -219,10 +249,12 @@ export function renderCorrectionManagement(
     } else if (vm.phase === "handoff_prepared") {
       status.textContent =
         vm.handoffMethod === "download_mailto"
-          ? t("correctionFeedback.manage.send.successFallback")
+          ? t("correctionFeedback.manage.send.successFallback", {
+              email: vm.reviewEmail ?? "",
+            })
           : t("correctionFeedback.manage.send.successShare");
     } else if (vm.phase === "confirm_handoff") {
-      status.textContent = t("correctionFeedback.manage.send.privacy");
+      status.textContent = t("correctionFeedback.manage.send.confirmHeading");
     }
 
     if (
@@ -249,7 +281,7 @@ export function renderCorrectionManagement(
       paintDeleteConfirm();
     }
     if (vm.phase === "confirm_handoff") {
-      paintHandoffConfirm();
+      paintHandoffConfirm(vm);
     }
     if (vm.phase === "exported") {
       const ack = document.createElement("button");
@@ -313,11 +345,22 @@ export function renderCorrectionManagement(
     }
   }
 
-  function paintHandoffConfirm(): void {
+  function paintHandoffConfirm(vm: CorrectionManagementVm): void {
     const box = el("div", "correction-manage-delete-confirm");
     box.id = "correction-manage-handoff-confirm";
+    const email = vm.reviewEmail ?? "";
     box.appendChild(
-      el("p", undefined, t("correctionFeedback.manage.send.privacy")),
+      el("h3", "correction-manage-handoff-heading", t("correctionFeedback.manage.send.confirmHeading")),
+    );
+    box.appendChild(el("p", undefined, t("correctionFeedback.manage.send.privacy")));
+    appendTextWithEmailLink(
+      box,
+      t("correctionFeedback.manage.send.destination", { email }),
+      email,
+      "correction-manage-handoff-destination",
+    );
+    box.appendChild(
+      el("p", undefined, t("correctionFeedback.manage.send.destinationHint")),
     );
     const row = el("div", "row");
     const cancel = document.createElement("button");

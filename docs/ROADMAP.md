@@ -142,7 +142,8 @@ CF2I5 — Offline Search Feedback Lifecycle Verification — Implemented
 CF2I6 — Closure — Complete
 CF2I6A — Feedback Renderer Input Stability Amendment — Complete
 UXT1 — Appearance / Theme Preference — Complete
-FH1 — Feedback Review Handoff — Complete
+FH1 — Feedback Review Handoff — Complete (Accepted)
+FH1A — Explicit Review Destination Amendment — Complete
 PV1A — Production Identity and Desktop Smoke — VERIFIED
 PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 ```
@@ -158,8 +159,9 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **CF2 delivered:** `search_failure_feedback_draft_v1` + `siralex_search_feedback_v1`; IndexedDB `search_failure_feedback` (v6); Report this search capture; Manage Search Feedback; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
 - **CF2I6A** post-closure amendment (`docs/reports/cf2i6a_feedback_input_stability_amendment_report.md`): renderer input lifecycle fix so ordinary CF1/CF2 typing preserves textarea DOM nodes/focus; product contracts unchanged; CF1/CF2 remain CLOSED.
 - **UXT1** complete (`docs/reports/uxt1_appearance_preference_report.md`, `UXT1_APPEARANCE_PREFERENCE_IMPLEMENTED`): System / Light / Dark theme preference via `siralex.ui_theme`, CSS variables, offline local persistence, no-reload apply; System follows OS `prefers-color-scheme`. UI label Theme/Thème (dropdown).
-- **FH1** complete (`docs/reports/fh1_feedback_review_handoff_report.md`, `FH1_FEEDBACK_REVIEW_HANDOFF_IMPLEMENTED`): transport-only “Send for review” on CF1/CF2 manage surfaces; reuses `siralex_correction_feedback_v1` / `siralex_search_feedback_v1`; `VITE_FEEDBACK_EMAIL`; Web Share or download+mailto fallback; draft status remains `draft`.
-- **Product-build track after FH1:** no automatic next build selected; set `VITE_FEEDBACK_EMAIL` for production handoff, then deploy amended candidate and run narrow UXT1+FH1 production smoke before PV1B.
+- **FH1** accepted (`docs/reports/fh1_feedback_review_handoff_report.md`, `FH1_FEEDBACK_REVIEW_HANDOFF_IMPLEMENTED`): transport-only “Send for review”; reuses CF1/CF2 governed packages; Web Share or download+mailto; drafts stay `draft`.
+- **FH1A** complete (`docs/reports/fh1a_review_destination_amendment_report.md`, `FH1_REVIEW_DESTINATION_AMENDMENT_IMPLEMENTED`): configured `VITE_FEEDBACK_EMAIL` shown in confirm UI and Web Share text; mailto remains pre-addressed. Production handoff remains `FH1_PRODUCTION_HANDOFF_NOT_YET_OPERATIONAL` until deploy + one real inbox delivery proof.
+- **Product-build track after FH1A:** deploy amended candidate; narrow production re-smoke (Theme + Send for review + real email arrival); then PV1B.
 - **Parallel validation:** `PV1A` is **VERIFIED** (`PV1A_PRODUCTION_DESKTOP_SMOKE_VERIFIED`, `docs/reports/pv1a_production_alignment_rerun_report.md`). Original blocked probe retained in `docs/reports/pv1a_production_identity_desktop_smoke_report.md` (`DEPLOYMENT_BEHIND_REPOSITORY`). Aligned rerun confirmed production host serves featured `bundle_full_20260710_337619ff` with CF1/CF2/Learning shell and full desktop smoke matrix PASS. `PV1B` remains hardware-gated / not run.
 - Prior portfolio decision records: `docs/reports/pd2_post_cf1_product_build_decision.md`, `docs/reports/pd1_next_product_build_decision.md`, `docs/reports/pd0_next_product_build_decision.md`.
 
