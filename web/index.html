@@ -4,10 +4,38 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SiraLex</title>
+    <script>
+      (function () {
+        // Inability to read a saved preference means "no override" (= system),
+        // not "force light". System detection must still run.
+        var pref = "system";
+        try {
+          var raw = localStorage.getItem("siralex.ui_theme");
+          if (raw === "light" || raw === "dark" || raw === "system") {
+            pref = raw;
+          }
+        } catch (e) {
+          // Keep default system.
+        }
+
+        var prefersDark = false;
+        try {
+          prefersDark =
+            typeof window.matchMedia === "function" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches;
+        } catch (e2) {
+          // Treat as light OS preference if media query is unavailable.
+        }
+
+        var theme =
+          pref === "light" ? "light" : pref === "dark" ? "dark" : prefersDark ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
-

@@ -78,6 +78,12 @@ import {
   t,
 } from "./i18n";
 import {
+  getCurrentUiThemePreference,
+  initUiTheme,
+  setUiThemePreferenceWithPersistence,
+  type UiThemePreference,
+} from "./theme";
+import {
   recentLogMatchedKeyDisplay,
   recentLogMatchedKeyTypeDisplay,
   recentLogResultCount,
@@ -161,6 +167,8 @@ const DEFAULT_LOCALE = resolveDefaultLocale(
   typeof navigator !== "undefined" ? navigator.language : undefined,
 );
 setCurrentLocale(DEFAULT_LOCALE);
+initUiTheme();
+const DEFAULT_UI_THEME = getCurrentUiThemePreference();
 
 const FEATURED_CATALOG_URL =
   import.meta.env.VITE_FEATURED_CATALOG_URL?.trim() || "/catalog.json";
@@ -174,12 +182,22 @@ app.innerHTML = `
           <h1 class="title">SiraLex</h1>
           <p class="subtitle">${t("app.subtitle")}</p>
         </div>
-        <div class="field locale-control">
-          <div class="label">${t("locale.selectorLabel")}</div>
-          <select id="localeSelect">
-            <option value="fr" ${DEFAULT_LOCALE === "fr" ? "selected" : ""}>${t("locale.french")}</option>
-            <option value="en" ${DEFAULT_LOCALE === "en" ? "selected" : ""}>${t("locale.english")}</option>
-          </select>
+        <div class="header-prefs">
+          <div class="field theme-control">
+            <div class="label" id="themeSelectorLabel">${t("theme.selectorLabel")}</div>
+            <select id="themeSelect" aria-labelledby="themeSelectorLabel">
+              <option value="system" ${DEFAULT_UI_THEME === "system" ? "selected" : ""}>${t("theme.system")}</option>
+              <option value="light" ${DEFAULT_UI_THEME === "light" ? "selected" : ""}>${t("theme.light")}</option>
+              <option value="dark" ${DEFAULT_UI_THEME === "dark" ? "selected" : ""}>${t("theme.dark")}</option>
+            </select>
+          </div>
+          <div class="field locale-control">
+            <div class="label">${t("locale.selectorLabel")}</div>
+            <select id="localeSelect">
+              <option value="fr" ${DEFAULT_LOCALE === "fr" ? "selected" : ""}>${t("locale.french")}</option>
+              <option value="en" ${DEFAULT_LOCALE === "en" ? "selected" : ""}>${t("locale.english")}</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -381,6 +399,7 @@ function mustGetEl<T extends Element>(selector: string): T {
 
 // Primary UI elements
 const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
+const themeSelect = mustGetEl<HTMLSelectElement>("#themeSelect");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
 const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
@@ -878,6 +897,13 @@ localeSelect.addEventListener("change", () => {
   if (typeof window !== "undefined") {
     window.location.reload();
   }
+});
+
+themeSelect.addEventListener("change", () => {
+  const nextTheme = themeSelect.value;
+  if (nextTheme !== "system" && nextTheme !== "light" && nextTheme !== "dark") return;
+  if (nextTheme === getCurrentUiThemePreference()) return;
+  setUiThemePreferenceWithPersistence(nextTheme as UiThemePreference);
 });
 
 openManageDictionariesBtn.addEventListener("click", () => {

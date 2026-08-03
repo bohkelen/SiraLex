@@ -81,6 +81,21 @@ describe("i18n translations", () => {
     setCurrentLocale(previous);
   });
 
+  it("resolves Theme labels in English and French", () => {
+    const previous = getCurrentLocale();
+    setCurrentLocale("en");
+    expect(t("theme.selectorLabel")).toBe("Theme");
+    expect(t("theme.system")).toBe("System");
+    expect(t("theme.light")).toBe("Light");
+    expect(t("theme.dark")).toBe("Dark");
+    setCurrentLocale("fr");
+    expect(t("theme.selectorLabel")).toBe("Thème");
+    expect(t("theme.system")).toBe("Système");
+    expect(t("theme.light")).toBe("Clair");
+    expect(t("theme.dark")).toBe("Sombre");
+    setCurrentLocale(previous);
+  });
+
   it("resolves Progress keys in English and French", () => {
     const previous = getCurrentLocale();
 
