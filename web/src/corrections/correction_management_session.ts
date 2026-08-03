@@ -34,6 +34,7 @@ import {
 } from "./correction_feedback_export";
 import {
   downloadCorrectionFeedbackArtifact,
+  type CorrectionFeedbackExportArtifact,
   type DownloadCorrectionFeedbackDeps,
 } from "./correction_feedback_file";
 import {
@@ -47,6 +48,10 @@ import {
   type CorrectionFormFields,
   type CorrectionTargetOption,
 } from "./correction_form_model";
+import type {
+  FeedbackHandoffResult,
+  FeedbackHandoffSuccessMethod,
+} from "../feedback/feedback_handoff";
 
 export type CorrectionAvailabilityState =
   | "matching_live_content"
@@ -61,8 +66,11 @@ export type CorrectionManagementPhase =
   | "detail"
   | "editing"
   | "confirm_delete"
+  | "confirm_handoff"
   | "exporting"
   | "exported"
+  | "handoff_preparing"
+  | "handoff_prepared"
   | "error";
 
 export type CorrectionManagementErrorCode =
@@ -78,7 +86,9 @@ export type CorrectionManagementErrorCode =
   | "invalid_local_draft"
   | "duplicate_draft_id"
   | "generated_package_too_large"
-  | "generated_package_invalid";
+  | "generated_package_invalid"
+  | "send_failed"
+  | "send_unavailable";
 
 export type CorrectionManagementListItem = {
   draft_id: string;
@@ -106,6 +116,8 @@ export type CorrectionManagementVm = {
   errorCode?: CorrectionManagementErrorCode;
   exportFilename?: string;
   exportDraftCount?: number;
+  sendForReviewAvailable: boolean;
+  handoffMethod?: FeedbackHandoffSuccessMethod;
   focusTarget:
     | "none"
     | "heading"
@@ -127,6 +139,15 @@ export type CorrectionManagementSessionDeps = {
   downloadArtifact?: typeof downloadCorrectionFeedbackArtifact;
   downloadDeps?: DownloadCorrectionFeedbackDeps;
   createExport?: typeof createCorrectionFeedbackExport;
+  /** When false/omitted, Send for review stays unavailable. */
+  sendForReviewAvailable?: boolean;
+  /**
+   * Transport handoff for a governed export artifact.
+   * Must not mutate drafts. Privacy confirmation is handled by the UI before calling sendForReview.
+   */
+  performHandoff?: (
+    artifact: CorrectionFeedbackExportArtifact,
+  ) => Promise<FeedbackHandoffResult>;
   getInstalledMeta?: (
     db: IDBDatabase,
     bundleId: string,
@@ -233,6 +254,8 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
   const download = deps.downloadArtifact ?? downloadCorrectionFeedbackArtifact;
   const getInstalled = deps.getInstalledMeta ?? getInstalledBundleMeta;
   const resolveLive = deps.resolveLiveEntry ?? defaultResolveLive;
+  const sendForReviewAvailable = deps.sendForReviewAvailable === true;
+  const performHandoff = deps.performHandoff;
 
   let generation = 0;
   let phase: CorrectionManagementPhase = "loading";
@@ -249,6 +272,7 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
   let errorCode: CorrectionManagementErrorCode | undefined;
   let exportFilename: string | undefined;
   let exportDraftCount: number | undefined;
+  let handoffMethod: FeedbackHandoffSuccessMethod | undefined;
   let focusTarget: CorrectionManagementVm["focusTarget"] = "heading";
   let disposed = false;
   let loadPromise: Promise<void> | null = null;
@@ -275,6 +299,8 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
       errorCode,
       exportFilename,
       exportDraftCount,
+      sendForReviewAvailable,
+      handoffMethod,
       focusTarget,
     });
   }
@@ -311,6 +337,7 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
     errorCode = undefined;
     exportFilename = undefined;
     exportDraftCount = undefined;
+    handoffMethod = undefined;
     focusTarget = options?.focus ?? "heading";
     emit();
 
@@ -370,6 +397,8 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
         errorCode,
         exportFilename,
         exportDraftCount,
+        sendForReviewAvailable,
+        handoffMethod,
         focusTarget,
       };
     },
@@ -812,6 +841,115 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
       phase = draftCount === 0 ? "empty" : "list";
       exportFilename = undefined;
       exportDraftCount = undefined;
+      focusTarget = "list";
+      emit();
+    },
+
+    requestSendForReview(): void {
+      if (busy || writePromise || draftCount === 0) return;
+      if (!sendForReviewAvailable || typeof performHandoff !== "function") {
+        errorCode = "send_unavailable";
+        focusTarget = "status";
+        emit();
+        return;
+      }
+      if (phase !== "list" && phase !== "empty" && phase !== "exported" && phase !== "handoff_prepared") {
+        return;
+      }
+      phase = "confirm_handoff";
+      errorCode = undefined;
+      focusTarget = "status";
+      emit();
+    },
+
+    cancelSendForReview(): void {
+      if (phase !== "confirm_handoff") return;
+      phase = draftCount === 0 ? "empty" : "list";
+      focusTarget = "list";
+      emit();
+    },
+
+    async confirmSendForReview(): Promise<void> {
+      if (phase !== "confirm_handoff" || busy || writePromise || draftCount === 0) return;
+      if (!sendForReviewAvailable || typeof performHandoff !== "function") {
+        errorCode = "send_unavailable";
+        phase = draftCount === 0 ? "empty" : "list";
+        focusTarget = "status";
+        emit();
+        return;
+      }
+      writePromise = (async () => {
+        busy = true;
+        phase = "handoff_preparing";
+        errorCode = undefined;
+        exportFilename = undefined;
+        exportDraftCount = undefined;
+        handoffMethod = undefined;
+        emit();
+        try {
+          await withDb(async (db) => {
+            if (!deps.isCurrent()) return;
+            const result = await createExport(db, {
+              exportedAt: deps.now(),
+              appVersion: deps.appVersion,
+            });
+            if (!deps.isCurrent()) return;
+            if (!result.ok) {
+              busy = false;
+              phase = items.length === 0 ? "empty" : "list";
+              errorCode = mapExportFailure(result);
+              focusTarget = "status";
+              emit();
+              return;
+            }
+            // Privacy already confirmed in confirm_handoff UI.
+            const handoff = await performHandoff(result.artifact);
+            if (!deps.isCurrent()) return;
+            if (!handoff.ok) {
+              busy = false;
+              phase = items.length === 0 ? "empty" : "list";
+              if (handoff.reason === "cancelled") {
+                errorCode = undefined;
+              } else if (handoff.reason === "unavailable_email") {
+                errorCode = "send_unavailable";
+              } else {
+                errorCode = "send_failed";
+              }
+              focusTarget = "status";
+              emit();
+              return;
+            }
+            const after = await listCorrectionDrafts(db);
+            if (!deps.isCurrent()) return;
+            busy = false;
+            phase = "handoff_prepared";
+            handoffMethod = handoff.method;
+            exportFilename = result.artifact.filename;
+            exportDraftCount = result.artifact.draftCount;
+            draftCount = after.length;
+            focusTarget = "status";
+            emit();
+          });
+        } catch {
+          if (!deps.isCurrent()) return;
+          busy = false;
+          phase = items.length === 0 ? "empty" : "list";
+          errorCode = "send_failed";
+          focusTarget = "status";
+          emit();
+        }
+      })().finally(() => {
+        writePromise = null;
+      });
+      return writePromise;
+    },
+
+    acknowledgeHandoff(): void {
+      if (phase !== "handoff_prepared") return;
+      phase = draftCount === 0 ? "empty" : "list";
+      exportFilename = undefined;
+      exportDraftCount = undefined;
+      handoffMethod = undefined;
       focusTarget = "list";
       emit();
     },

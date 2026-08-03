@@ -27,6 +27,10 @@ export type SearchFeedbackManagementRendererCallbacks = {
   onConfirmDelete: () => void;
   onExport: () => void;
   onAcknowledgeExport: () => void;
+  onRequestSendForReview: () => void;
+  onCancelSendForReview: () => void;
+  onConfirmSendForReview: () => void;
+  onAcknowledgeHandoff: () => void;
   onBack: () => void;
 };
 
@@ -51,6 +55,8 @@ const ERROR_KEYS: Partial<Record<SearchFeedbackManagementErrorCode, TranslationK
   duplicate_feedback_id: "searchFeedback.manage.error.exportDuplicate",
   generated_package_too_large: "searchFeedback.manage.error.exportTooLarge",
   generated_package_invalid: "searchFeedback.manage.error.exportInvalidPackage",
+  send_failed: "searchFeedback.manage.error.sendFailed",
+  send_unavailable: "searchFeedback.manage.send.unavailable",
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -159,6 +165,7 @@ export function renderSearchFeedbackManagement(
     warning.textContent = t("searchFeedback.manage.export.authority");
     root.appendChild(warning);
 
+    const actions = el("div", "row search-feedback-manage-transport-actions");
     const exportBtn = el(
       "button",
       "btn search-feedback-manage-export",
@@ -168,9 +175,45 @@ export function renderSearchFeedbackManagement(
     );
     exportBtn.type = "button";
     exportBtn.id = "search-feedback-manage-export";
-    exportBtn.disabled = vm.feedbackCount === 0 || vm.busy || vm.phase === "error";
+    exportBtn.disabled =
+      vm.feedbackCount === 0 ||
+      vm.busy ||
+      vm.phase === "error" ||
+      vm.phase === "handoff_preparing" ||
+      vm.phase === "confirm_handoff";
     exportBtn.addEventListener("click", () => callbacks.onExport());
-    root.appendChild(exportBtn);
+    actions.appendChild(exportBtn);
+
+    const sendBtn = el(
+      "button",
+      "btn search-feedback-manage-send",
+      vm.phase === "handoff_preparing"
+        ? t("searchFeedback.manage.send.progress")
+        : t("searchFeedback.manage.send.button"),
+    );
+    sendBtn.type = "button";
+    sendBtn.id = "search-feedback-manage-send";
+    sendBtn.disabled =
+      !vm.sendForReviewAvailable ||
+      vm.feedbackCount === 0 ||
+      vm.busy ||
+      vm.phase === "error" ||
+      vm.phase === "exporting" ||
+      vm.phase === "handoff_preparing" ||
+      vm.phase === "confirm_handoff";
+    sendBtn.addEventListener("click", () => callbacks.onRequestSendForReview());
+    actions.appendChild(sendBtn);
+    root.appendChild(actions);
+
+    if (!vm.sendForReviewAvailable) {
+      root.appendChild(
+        el(
+          "p",
+          "search-feedback-manage-send-unavailable",
+          t("searchFeedback.manage.send.unavailable"),
+        ),
+      );
+    }
 
     if (vm.phase === "exported") {
       const success = el("div", "search-feedback-manage-export-success");
@@ -194,6 +237,47 @@ export function renderSearchFeedbackManagement(
       );
       ack.type = "button";
       ack.addEventListener("click", () => callbacks.onAcknowledgeExport());
+      success.appendChild(ack);
+      root.appendChild(success);
+    }
+
+    if (vm.phase === "confirm_handoff") {
+      const box = el("div", "search-feedback-manage-handoff-confirm");
+      box.id = "search-feedback-manage-handoff-confirm";
+      box.appendChild(el("p", undefined, t("searchFeedback.manage.send.privacy")));
+      const row = el("div", "row");
+      const cancel = el("button", "btn", t("searchFeedback.manage.send.cancel"));
+      cancel.type = "button";
+      cancel.id = "search-feedback-manage-handoff-cancel";
+      cancel.addEventListener("click", () => callbacks.onCancelSendForReview());
+      const cont = el("button", "btn", t("searchFeedback.manage.send.continue"));
+      cont.type = "button";
+      cont.id = "search-feedback-manage-handoff-continue";
+      cont.addEventListener("click", () => callbacks.onConfirmSendForReview());
+      row.appendChild(cancel);
+      row.appendChild(cont);
+      box.appendChild(row);
+      root.appendChild(box);
+    }
+
+    if (vm.phase === "handoff_prepared") {
+      const success = el("div", "search-feedback-manage-handoff-success");
+      success.setAttribute("role", "status");
+      success.id = "search-feedback-manage-status";
+      success.tabIndex = -1;
+      success.appendChild(
+        el(
+          "p",
+          undefined,
+          vm.handoffMethod === "download_mailto"
+            ? t("searchFeedback.manage.send.successFallback")
+            : t("searchFeedback.manage.send.successShare"),
+        ),
+      );
+      const ack = el("button", "btn", t("searchFeedback.manage.send.acknowledge"));
+      ack.type = "button";
+      ack.id = "search-feedback-manage-handoff-acknowledge";
+      ack.addEventListener("click", () => callbacks.onAcknowledgeHandoff());
       success.appendChild(ack);
       root.appendChild(success);
     }
@@ -579,9 +663,18 @@ export function renderSearchFeedbackManagement(
       vm.phase === "list" ||
       vm.phase === "empty" ||
       vm.phase === "exporting" ||
-      vm.phase === "exported"
+      vm.phase === "exported" ||
+      vm.phase === "confirm_handoff" ||
+      vm.phase === "handoff_preparing" ||
+      vm.phase === "handoff_prepared"
     ) {
-      if (vm.errorCode && vm.phase !== "exported") paintError(vm);
+      if (
+        vm.errorCode &&
+        vm.phase !== "exported" &&
+        vm.phase !== "handoff_prepared"
+      ) {
+        paintError(vm);
+      }
       paintList(vm);
     } else {
       paintDetail(vm);

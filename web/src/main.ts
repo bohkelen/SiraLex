@@ -84,6 +84,15 @@ import {
   type UiThemePreference,
 } from "./theme";
 import {
+  handoffFeedbackForReview,
+  isFeedbackHandoffConfigured,
+  resolveFeedbackEmailFromEnv,
+  toFeedbackHandoffArtifact,
+  type FeedbackHandoffKind,
+} from "./feedback/feedback_handoff";
+import { downloadCorrectionFeedbackArtifact } from "./corrections/correction_feedback_file";
+import { downloadSearchFeedbackArtifact } from "./search_feedback/search_feedback_export";
+import {
   recentLogMatchedKeyDisplay,
   recentLogMatchedKeyTypeDisplay,
   recentLogResultCount,
@@ -173,6 +182,63 @@ const DEFAULT_UI_THEME = getCurrentUiThemePreference();
 const FEATURED_CATALOG_URL =
   import.meta.env.VITE_FEATURED_CATALOG_URL?.trim() || "/catalog.json";
 const FEATURED_BUNDLE_ID = import.meta.env.VITE_FEATURED_BUNDLE_ID?.trim() || undefined;
+const FEEDBACK_EMAIL = resolveFeedbackEmailFromEnv();
+const FEEDBACK_HANDOFF_AVAILABLE = isFeedbackHandoffConfigured(FEEDBACK_EMAIL);
+
+async function performConfiguredFeedbackHandoff(
+  artifact: { filename: string; mediaType: "application/json"; text: string },
+  kind: FeedbackHandoffKind,
+): Promise<Awaited<ReturnType<typeof handoffFeedbackForReview>>> {
+  const bridged = toFeedbackHandoffArtifact(artifact, kind);
+  if (!bridged) {
+    return { ok: false, reason: "invalid_artifact" };
+  }
+  const copy =
+    kind === "correction_feedback"
+      ? {
+          shareTitle: t("correctionFeedback.manage.send.shareTitle"),
+          shareText: t("correctionFeedback.manage.send.shareText"),
+          mailtoSubject: t("correctionFeedback.manage.send.mailtoSubject"),
+          mailtoBody: t("correctionFeedback.manage.send.mailtoBody", {
+            filename: bridged.filename,
+          }),
+        }
+      : {
+          shareTitle: t("searchFeedback.manage.send.shareTitle"),
+          shareText: t("searchFeedback.manage.send.shareText"),
+          mailtoSubject: t("searchFeedback.manage.send.mailtoSubject"),
+          mailtoBody: t("searchFeedback.manage.send.mailtoBody", {
+            filename: bridged.filename,
+          }),
+        };
+  return handoffFeedbackForReview(bridged, {
+    feedbackEmail: FEEDBACK_EMAIL,
+    // Privacy confirmation is handled by the management confirm_handoff UI.
+    confirmPrivacy: () => true,
+    copy,
+    downloadArtifact: (handoffArtifact) => {
+      if (kind === "correction_feedback") {
+        downloadCorrectionFeedbackArtifact({
+          filename: handoffArtifact.filename,
+          mediaType: "application/json",
+          text: handoffArtifact.text,
+          byteLength: new TextEncoder().encode(handoffArtifact.text).byteLength,
+          draftCount: 0,
+          exportedAt: new Date(0).toISOString(),
+        });
+        return;
+      }
+      downloadSearchFeedbackArtifact({
+        filename: handoffArtifact.filename,
+        mediaType: "application/json",
+        text: handoffArtifact.text,
+        byteLength: new TextEncoder().encode(handoffArtifact.text).byteLength,
+        feedbackCount: 0,
+        exportedAt: new Date(0).toISOString(),
+      });
+    },
+  });
+}
 
 app.innerHTML = `
   <div class="container">
@@ -2339,6 +2405,9 @@ function showSearchFeedbackManagement(): void {
     dbOwnership: "controller_owned",
     now: () => new Date().toISOString(),
     appVersion: APP_VERSION,
+    sendForReviewAvailable: FEEDBACK_HANDOFF_AVAILABLE,
+    performHandoff: (artifact) =>
+      performConfiguredFeedbackHandoff(artifact, "search_feedback"),
     isCurrent: () =>
       generation === searchFeedbackManagementGeneration &&
       activeSearchFeedbackManagement === session,
@@ -2372,6 +2441,12 @@ function showSearchFeedbackManagement(): void {
       void session.exportAll();
     },
     onAcknowledgeExport: () => session.acknowledgeExport(),
+    onRequestSendForReview: () => session.requestSendForReview(),
+    onCancelSendForReview: () => session.cancelSendForReview(),
+    onConfirmSendForReview: () => {
+      void session.confirmSendForReview();
+    },
+    onAcknowledgeHandoff: () => session.acknowledgeHandoff(),
     onBack: () => {
       disposeActiveSearchFeedbackManagement();
       if (lastSearchResults.length > 0) {
@@ -2406,6 +2481,9 @@ function showCorrectionManagement(): void {
     dbOwnership: "controller_owned",
     now: () => new Date().toISOString(),
     appVersion: APP_VERSION,
+    sendForReviewAvailable: FEEDBACK_HANDOFF_AVAILABLE,
+    performHandoff: (artifact) =>
+      performConfiguredFeedbackHandoff(artifact, "correction_feedback"),
     isCurrent: () =>
       generation === correctionManagementGeneration && activeCorrectionManagement === session,
     onModel: (vm) => {
@@ -2443,6 +2521,12 @@ function showCorrectionManagement(): void {
       void session.exportAll();
     },
     onAcknowledgeExport: () => session.acknowledgeExport(),
+    onRequestSendForReview: () => session.requestSendForReview(),
+    onCancelSendForReview: () => session.cancelSendForReview(),
+    onConfirmSendForReview: () => {
+      void session.confirmSendForReview();
+    },
+    onAcknowledgeHandoff: () => session.acknowledgeHandoff(),
     onBack: () => {
       disposeActiveCorrectionManagement();
       if (lastSearchResults.length > 0) {

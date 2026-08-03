@@ -55,6 +55,7 @@ function baseVm(overrides: Partial<CorrectionManagementVm> = {}): CorrectionMana
     ],
     editRetargetAllowed: false,
     busy: false,
+    sendForReviewAvailable: false,
     focusTarget: "heading",
     ...overrides,
   };
@@ -78,6 +79,10 @@ function callbacks() {
     onConfirmDelete: vi.fn(),
     onExport: vi.fn(),
     onAcknowledgeExport: vi.fn(),
+    onRequestSendForReview: vi.fn(),
+    onCancelSendForReview: vi.fn(),
+    onConfirmSendForReview: vi.fn(),
+    onAcknowledgeHandoff: vi.fn(),
     onBack: vi.fn(),
   };
 }

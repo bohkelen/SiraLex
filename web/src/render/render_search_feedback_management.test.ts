@@ -50,6 +50,7 @@ function baseVm(overrides: Partial<SearchFeedbackManagementVm> = {}): SearchFeed
     requestedMeaningCount: 0,
     userDescriptionCount: 0,
     busy: false,
+    sendForReviewAvailable: false,
     focusTarget: "heading",
     ...overrides,
   };
@@ -68,6 +69,10 @@ const callbacks = () => ({
   onConfirmDelete: vi.fn(),
   onExport: vi.fn(),
   onAcknowledgeExport: vi.fn(),
+  onRequestSendForReview: vi.fn(),
+  onCancelSendForReview: vi.fn(),
+  onConfirmSendForReview: vi.fn(),
+  onAcknowledgeHandoff: vi.fn(),
   onBack: vi.fn(),
 });
 
@@ -85,10 +90,11 @@ describe("renderSearchFeedbackManagement", () => {
       "Search feedback",
     );
     expect(root.textContent).toContain("No results");
-    expect(root.textContent).toContain("Export all search feedback");
+    expect(root.textContent).toContain("Export");
+    expect(root.textContent).toContain("Send for review");
     expect(root.textContent).toContain("unreviewed search feedback");
     expect(root.textContent).toContain("plain JSON");
-    expect(root.textContent).not.toMatch(/missing entry|Submit|Send/i);
+    expect(root.textContent).not.toMatch(/missing entry|Submit|submitted successfully/i);
     const row = root.querySelector("[data-testid='search-feedback-manage-row']");
     expect(row?.textContent).toContain('"  kùn  "');
     expect(row?.textContent).not.toContain(HASH);

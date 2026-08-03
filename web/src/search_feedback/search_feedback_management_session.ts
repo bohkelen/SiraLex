@@ -17,6 +17,7 @@ import {
   downloadSearchFeedbackArtifact,
   type CreateSearchFeedbackExportResult,
   type SearchFeedbackDownloadAdapter,
+  type SearchFeedbackExportArtifact,
 } from "./search_feedback_export";
 import {
   SearchFeedbackStoreError,
@@ -36,6 +37,10 @@ import {
   type SearchFeedbackDraftV1,
   type SearchFeedbackResultState,
 } from "./search_feedback_types";
+import type {
+  FeedbackHandoffResult,
+  FeedbackHandoffSuccessMethod,
+} from "../feedback/feedback_handoff";
 
 export type SearchFeedbackAvailabilityState =
   | "dictionary_current"
@@ -49,8 +54,11 @@ export type SearchFeedbackManagementPhase =
   | "detail"
   | "editing"
   | "confirm_delete"
+  | "confirm_handoff"
   | "exporting"
   | "exported"
+  | "handoff_preparing"
+  | "handoff_prepared"
   | "error"
   | "stale_edit"
   | "stale_delete";
@@ -69,7 +77,9 @@ export type SearchFeedbackManagementErrorCode =
   | "invalid_local_feedback"
   | "duplicate_feedback_id"
   | "generated_package_too_large"
-  | "generated_package_invalid";
+  | "generated_package_invalid"
+  | "send_failed"
+  | "send_unavailable";
 
 export type SearchFeedbackEditFields = {
   requested_meaning: string;
@@ -106,6 +116,8 @@ export type SearchFeedbackManagementVm = {
   errorCode?: SearchFeedbackManagementErrorCode;
   exportFilename?: string;
   exportFeedbackCount?: number;
+  sendForReviewAvailable: boolean;
+  handoffMethod?: FeedbackHandoffSuccessMethod;
   focusTarget:
     | "none"
     | "heading"
@@ -127,6 +139,10 @@ export type SearchFeedbackManagementSessionDeps = {
   downloadArtifact?: typeof downloadSearchFeedbackArtifact;
   downloadAdapter?: SearchFeedbackDownloadAdapter;
   createExport?: typeof createSearchFeedbackExport;
+  sendForReviewAvailable?: boolean;
+  performHandoff?: (
+    artifact: SearchFeedbackExportArtifact,
+  ) => Promise<FeedbackHandoffResult>;
   getInstalledMeta?: (
     db: IDBDatabase,
     bundleId: string,
@@ -251,6 +267,8 @@ export function createSearchFeedbackManagementSession(
   const createExport = deps.createExport ?? createSearchFeedbackExport;
   const download = deps.downloadArtifact ?? downloadSearchFeedbackArtifact;
   const getInstalled = deps.getInstalledMeta ?? getInstalledBundleMeta;
+  const sendForReviewAvailable = deps.sendForReviewAvailable === true;
+  const performHandoff = deps.performHandoff;
 
   let generation = 0;
   let phase: SearchFeedbackManagementPhase = "loading";
@@ -264,6 +282,7 @@ export function createSearchFeedbackManagementSession(
   let errorCode: SearchFeedbackManagementErrorCode | undefined;
   let exportFilename: string | undefined;
   let exportFeedbackCount: number | undefined;
+  let handoffMethod: FeedbackHandoffSuccessMethod | undefined;
   let focusTarget: SearchFeedbackManagementVm["focusTarget"] = "heading";
   let disposed = false;
   let loadPromise: Promise<void> | null = null;
@@ -290,6 +309,8 @@ export function createSearchFeedbackManagementSession(
       errorCode,
       exportFilename,
       exportFeedbackCount,
+      sendForReviewAvailable,
+      handoffMethod,
       focusTarget,
     });
   }
@@ -321,6 +342,7 @@ export function createSearchFeedbackManagementSession(
     errorCode = undefined;
     exportFilename = undefined;
     exportFeedbackCount = undefined;
+    handoffMethod = undefined;
     focusTarget = options?.focus ?? "heading";
     emit();
 
@@ -381,6 +403,8 @@ export function createSearchFeedbackManagementSession(
         errorCode,
         exportFilename,
         exportFeedbackCount,
+        sendForReviewAvailable,
+        handoffMethod,
         focusTarget,
       };
     },
@@ -729,6 +753,119 @@ export function createSearchFeedbackManagementSession(
       phase = feedbackCount === 0 ? "empty" : "list";
       exportFilename = undefined;
       exportFeedbackCount = undefined;
+      focusTarget = "list";
+      emit();
+    },
+
+    requestSendForReview(): void {
+      if (busy || writePromise || feedbackCount === 0) return;
+      if (!sendForReviewAvailable || typeof performHandoff !== "function") {
+        errorCode = "send_unavailable";
+        focusTarget = "status";
+        emit();
+        return;
+      }
+      if (
+        phase !== "list" &&
+        phase !== "empty" &&
+        phase !== "exported" &&
+        phase !== "handoff_prepared"
+      ) {
+        return;
+      }
+      phase = "confirm_handoff";
+      errorCode = undefined;
+      focusTarget = "status";
+      emit();
+    },
+
+    cancelSendForReview(): void {
+      if (phase !== "confirm_handoff") return;
+      phase = feedbackCount === 0 ? "empty" : "list";
+      focusTarget = "list";
+      emit();
+    },
+
+    async confirmSendForReview(): Promise<void> {
+      if (phase !== "confirm_handoff" || busy || writePromise || feedbackCount === 0) return;
+      if (!sendForReviewAvailable || typeof performHandoff !== "function") {
+        errorCode = "send_unavailable";
+        phase = feedbackCount === 0 ? "empty" : "list";
+        focusTarget = "status";
+        emit();
+        return;
+      }
+      writePromise = (async () => {
+        busy = true;
+        phase = "handoff_preparing";
+        errorCode = undefined;
+        exportFilename = undefined;
+        exportFeedbackCount = undefined;
+        handoffMethod = undefined;
+        emit();
+        try {
+          await withDb(async (db) => {
+            if (!deps.isCurrent()) return;
+            const result = await createExport(db, {
+              exportedAt: deps.now(),
+              appVersion: deps.appVersion,
+            });
+            if (!deps.isCurrent()) return;
+            if (!result.ok) {
+              busy = false;
+              phase = items.length === 0 ? "empty" : "list";
+              errorCode = mapExportFailure(result);
+              focusTarget = "status";
+              emit();
+              return;
+            }
+            const handoff = await performHandoff(result.artifact);
+            if (!deps.isCurrent()) return;
+            if (!handoff.ok) {
+              busy = false;
+              phase = items.length === 0 ? "empty" : "list";
+              if (handoff.reason === "cancelled") {
+                errorCode = undefined;
+              } else if (handoff.reason === "unavailable_email") {
+                errorCode = "send_unavailable";
+              } else {
+                errorCode = "send_failed";
+              }
+              focusTarget = "status";
+              emit();
+              return;
+            }
+            const after = await listSearchFeedbackDrafts(db);
+            if (!deps.isCurrent()) return;
+            busy = false;
+            phase = "handoff_prepared";
+            handoffMethod = handoff.method;
+            exportFilename = result.artifact.filename;
+            exportFeedbackCount = result.artifact.feedbackCount;
+            feedbackCount = after.length;
+            focusTarget = "status";
+            emit();
+          });
+        } catch {
+          if (!deps.isCurrent()) return;
+          busy = false;
+          phase = items.length === 0 ? "empty" : "list";
+          errorCode = "send_failed";
+          focusTarget = "status";
+          emit();
+        }
+      })().finally(() => {
+        writePromise = null;
+      });
+      return writePromise;
+    },
+
+    acknowledgeHandoff(): void {
+      if (phase !== "handoff_prepared") return;
+      phase = feedbackCount === 0 ? "empty" : "list";
+      exportFilename = undefined;
+      exportFeedbackCount = undefined;
+      handoffMethod = undefined;
       focusTarget = "list";
       emit();
     },

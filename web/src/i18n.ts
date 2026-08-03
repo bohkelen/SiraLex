@@ -547,11 +547,29 @@ const MESSAGES = {
     "correctionFeedback.manage.availability.dictionaryUnavailable": "Dictionary currently unavailable",
     "correctionFeedback.manage.availability.entryUnavailable": "Entry currently unavailable",
     "correctionFeedback.manage.availability.contentDiffers": "Dictionary content has changed since this correction was created.",
-    "correctionFeedback.manage.export.button": "Export correction feedback",
+    "correctionFeedback.manage.export.button": "Export",
     "correctionFeedback.manage.export.progress": "Preparing export…",
     "correctionFeedback.manage.export.success": "Export created: {filename} ({count} drafts)",
     "correctionFeedback.manage.export.acknowledge": "Back to list",
     "correctionFeedback.manage.export.authority": "This file contains unreviewed user suggestions. It must not be applied automatically.",
+    "correctionFeedback.manage.send.button": "Send for review",
+    "correctionFeedback.manage.send.unavailable":
+      "Send for review is unavailable until a review email is configured for this deployment.",
+    "correctionFeedback.manage.send.privacy":
+      "This feedback is currently stored only on this device. Continuing may share the exported feedback file with another app or email service.",
+    "correctionFeedback.manage.send.cancel": "Cancel",
+    "correctionFeedback.manage.send.continue": "Continue",
+    "correctionFeedback.manage.send.progress": "Preparing feedback for sharing…",
+    "correctionFeedback.manage.send.successShare": "Feedback prepared for sharing.",
+    "correctionFeedback.manage.send.successFallback":
+      "The feedback file was downloaded and your email app was opened. Attach the downloaded file before sending.",
+    "correctionFeedback.manage.send.acknowledge": "Back to list",
+    "correctionFeedback.manage.send.shareTitle": "SiraLex correction feedback",
+    "correctionFeedback.manage.send.shareText": "SiraLex correction feedback export",
+    "correctionFeedback.manage.send.mailtoSubject": "SiraLex correction feedback",
+    "correctionFeedback.manage.send.mailtoBody":
+      "Please attach the downloaded feedback file before sending:\n{filename}\n\nThis message was prepared by SiraLex. The file is not attached automatically.",
+    "correctionFeedback.manage.error.sendFailed": "Could not prepare feedback for sharing.",
     "correctionFeedback.manage.error.invalidStored": "Stored correction data is invalid. Export and list are blocked until the database is repaired or cleared.",
     "correctionFeedback.manage.error.readFailed": "Could not read correction drafts.",
     "correctionFeedback.manage.error.writeFailed": "Could not update correction drafts.",
@@ -651,13 +669,31 @@ const MESSAGES = {
     "searchFeedback.manage.counter": "{count} / {max}",
     "searchFeedback.manage.privacy":
       "Search feedback includes the exact searches you chose to report and any notes you added. Exported files are plain JSON.",
-    "searchFeedback.manage.export.button": "Export all search feedback",
+    "searchFeedback.manage.export.button": "Export",
     "searchFeedback.manage.export.progress": "Preparing export…",
     "searchFeedback.manage.export.success":
       "Exported {count} search feedback reports. File: {filename}",
     "searchFeedback.manage.export.acknowledge": "Back to list",
     "searchFeedback.manage.export.authority":
       "This file contains unreviewed search feedback. It does not establish that dictionary entries are missing.",
+    "searchFeedback.manage.send.button": "Send for review",
+    "searchFeedback.manage.send.unavailable":
+      "Send for review is unavailable until a review email is configured for this deployment.",
+    "searchFeedback.manage.send.privacy":
+      "This feedback is currently stored only on this device. Continuing may share the exported feedback file with another app or email service.",
+    "searchFeedback.manage.send.cancel": "Cancel",
+    "searchFeedback.manage.send.continue": "Continue",
+    "searchFeedback.manage.send.progress": "Preparing feedback for sharing…",
+    "searchFeedback.manage.send.successShare": "Feedback prepared for sharing.",
+    "searchFeedback.manage.send.successFallback":
+      "The feedback file was downloaded and your email app was opened. Attach the downloaded file before sending.",
+    "searchFeedback.manage.send.acknowledge": "Back to list",
+    "searchFeedback.manage.send.shareTitle": "SiraLex search feedback",
+    "searchFeedback.manage.send.shareText": "SiraLex search feedback export",
+    "searchFeedback.manage.send.mailtoSubject": "SiraLex search feedback",
+    "searchFeedback.manage.send.mailtoBody":
+      "Please attach the downloaded feedback file before sending:\n{filename}\n\nThis message was prepared by SiraLex. The file is not attached automatically.",
+    "searchFeedback.manage.error.sendFailed": "Could not prepare feedback for sharing.",
     "searchFeedback.manage.error.invalidStored":
       "Stored search feedback is invalid. Export and list are blocked until the database is repaired or cleared.",
     "searchFeedback.manage.error.readFailed": "Could not read search feedback.",
@@ -1175,11 +1211,29 @@ const MESSAGES = {
     "correctionFeedback.manage.availability.dictionaryUnavailable": "Dictionnaire actuellement indisponible",
     "correctionFeedback.manage.availability.entryUnavailable": "Entrée actuellement indisponible",
     "correctionFeedback.manage.availability.contentDiffers": "Le contenu du dictionnaire a changé depuis la création de cette correction.",
-    "correctionFeedback.manage.export.button": "Exporter les commentaires de correction",
+    "correctionFeedback.manage.export.button": "Exporter",
     "correctionFeedback.manage.export.progress": "Préparation de l’export…",
     "correctionFeedback.manage.export.success": "Export créé : {filename} ({count} brouillons)",
     "correctionFeedback.manage.export.acknowledge": "Retour à la liste",
     "correctionFeedback.manage.export.authority": "Ce fichier contient des suggestions utilisateur non révisées. Il ne doit pas être appliqué automatiquement.",
+    "correctionFeedback.manage.send.button": "Envoyer pour révision",
+    "correctionFeedback.manage.send.unavailable":
+      "Envoyer pour révision est indisponible tant qu’aucune adresse de révision n’est configurée pour ce déploiement.",
+    "correctionFeedback.manage.send.privacy":
+      "Ces commentaires sont actuellement stockés uniquement sur cet appareil. Continuer peut partager le fichier exporté avec une autre application ou un service de messagerie.",
+    "correctionFeedback.manage.send.cancel": "Annuler",
+    "correctionFeedback.manage.send.continue": "Continuer",
+    "correctionFeedback.manage.send.progress": "Préparation des commentaires pour le partage…",
+    "correctionFeedback.manage.send.successShare": "Commentaires prêts à être partagés.",
+    "correctionFeedback.manage.send.successFallback":
+      "Le fichier de commentaires a été téléchargé et votre application de messagerie a été ouverte. Joignez le fichier téléchargé avant d’envoyer.",
+    "correctionFeedback.manage.send.acknowledge": "Retour à la liste",
+    "correctionFeedback.manage.send.shareTitle": "Commentaires de correction SiraLex",
+    "correctionFeedback.manage.send.shareText": "Export des commentaires de correction SiraLex",
+    "correctionFeedback.manage.send.mailtoSubject": "Commentaires de correction SiraLex",
+    "correctionFeedback.manage.send.mailtoBody":
+      "Veuillez joindre le fichier de commentaires téléchargé avant d’envoyer :\n{filename}\n\nCe message a été préparé par SiraLex. Le fichier n’est pas joint automatiquement.",
+    "correctionFeedback.manage.error.sendFailed": "Impossible de préparer les commentaires pour le partage.",
     "correctionFeedback.manage.error.invalidStored": "Les données de correction stockées sont invalides. L’export et la liste sont bloqués jusqu’à réparation ou suppression de la base.",
     "correctionFeedback.manage.error.readFailed": "Impossible de lire les brouillons de correction.",
     "correctionFeedback.manage.error.writeFailed": "Impossible de mettre à jour les brouillons de correction.",
@@ -1288,14 +1342,31 @@ const MESSAGES = {
     "searchFeedback.manage.counter": "{count} / {max}",
     "searchFeedback.manage.privacy":
       "Les retours sur la recherche incluent les recherches exactes que vous avez choisi de signaler et les notes que vous avez ajoutées. Les fichiers exportés sont du JSON brut.",
-    "searchFeedback.manage.export.button":
-      "Exporter tous les retours sur la recherche",
+    "searchFeedback.manage.export.button": "Exporter",
     "searchFeedback.manage.export.progress": "Préparation de l’export…",
     "searchFeedback.manage.export.success":
       "{count} retours sur la recherche exportés. Fichier : {filename}",
     "searchFeedback.manage.export.acknowledge": "Retour à la liste",
     "searchFeedback.manage.export.authority":
       "Ce fichier contient des retours sur la recherche non examinés. Il n’établit pas que des entrées du dictionnaire manquent.",
+    "searchFeedback.manage.send.button": "Envoyer pour révision",
+    "searchFeedback.manage.send.unavailable":
+      "Envoyer pour révision est indisponible tant qu’aucune adresse de révision n’est configurée pour ce déploiement.",
+    "searchFeedback.manage.send.privacy":
+      "Ces retours sont actuellement stockés uniquement sur cet appareil. Continuer peut partager le fichier exporté avec une autre application ou un service de messagerie.",
+    "searchFeedback.manage.send.cancel": "Annuler",
+    "searchFeedback.manage.send.continue": "Continuer",
+    "searchFeedback.manage.send.progress": "Préparation des retours pour le partage…",
+    "searchFeedback.manage.send.successShare": "Retours prêts à être partagés.",
+    "searchFeedback.manage.send.successFallback":
+      "Le fichier de retours a été téléchargé et votre application de messagerie a été ouverte. Joignez le fichier téléchargé avant d’envoyer.",
+    "searchFeedback.manage.send.acknowledge": "Retour à la liste",
+    "searchFeedback.manage.send.shareTitle": "Retours sur la recherche SiraLex",
+    "searchFeedback.manage.send.shareText": "Export des retours sur la recherche SiraLex",
+    "searchFeedback.manage.send.mailtoSubject": "Retours sur la recherche SiraLex",
+    "searchFeedback.manage.send.mailtoBody":
+      "Veuillez joindre le fichier de retours téléchargé avant d’envoyer :\n{filename}\n\nCe message a été préparé par SiraLex. Le fichier n’est pas joint automatiquement.",
+    "searchFeedback.manage.error.sendFailed": "Impossible de préparer les retours pour le partage.",
     "searchFeedback.manage.error.invalidStored":
       "Les retours sur la recherche stockés sont invalides. L’export et la liste sont bloqués jusqu’à réparation ou vidage de la base.",
     "searchFeedback.manage.error.readFailed":
