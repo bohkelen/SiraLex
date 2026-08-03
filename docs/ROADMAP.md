@@ -132,14 +132,14 @@ CF1I6 — Closure — Complete
 PD2 — Post-CF1 Product Build Decision — Complete
 PD2 original disposition — PRODUCT_BUILD_DEFERRED
 PD2 owner override — PD2_OWNER_OVERRIDE_CF2_SELECTED
-CF2 — Missing Entry and Search Failure Feedback — DEFINITION
+CF2 — Missing Entry and Search Failure Feedback — CLOSED
 CF2D0 — Defined
 CF2I1 — Search Feedback Model and Validation — Implemented
 CF2I2 — Local Search Feedback Store — Implemented
 CF2I3 — Search Failure Capture Surface — Implemented
 CF2I4 — Manage Search Feedback and Export — Implemented
 CF2I5 — Offline Search Feedback Lifecycle Verification — Implemented
-CF2I6 — Search Feedback Closure — Next
+CF2I6 — Closure — Complete
 PV1A — Production Identity and Desktop Smoke — Parallel active
 PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 ```
@@ -150,15 +150,11 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **CF1** is closed (`docs/reports/cf1i6_correction_feedback_closure_report.md`): users can capture, retain, manage, and export local non-authoritative correction drafts offline from genuine lexicon entries without changing dictionary authority.
 - **CF1 delivered:** `correction_draft_v1` + `siralex_correction_feedback_v1`; IndexedDB `correction_drafts` (v5); entry Suggest form; Manage Corrections; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
 - **PD2** originally deferred construction (`docs/reports/pd2_post_cf1_product_build_decision.md`) because real-use miss-demand evidence was scarce. That evidence assessment remains historically valid.
-- **Owner override:** `PD2_OWNER_OVERRIDE_CF2_SELECTED` reopens the product-build track and selects CF2 without claiming new empirical proof that miss demand is already demonstrated. CF2 is built to **capture** that evidence.
-- **CF2D0** defines local offline search-failure feedback (`docs/reports/cf2d0_missing_entry_search_failure_feedback_product_definition.md`): `no_result` / `results_not_useful` evidence against search-event provenance; dedicated store/export; not CF1 entry corrections; not automatic missing-entry truth; not Phase 1.5 patches.
-- **CF2I1** implements pure draft + package validation (`docs/reports/cf2i1_search_feedback_model_validation_report.md`): `search_failure_feedback_draft_v1`, `siralex_search_feedback_v1`, unmet-need evidence semantics.
-- **CF2I2** implements IndexedDB persistence (`docs/reports/cf2i2_local_search_feedback_store_report.md`): DB v6 `search_failure_feedback`; secure IDs; immutable search-event provenance; editable user explanation only; bundle retention; isolation from CF1/Learning/query logs.
-- **CF2I3** implements the local capture surface (`docs/reports/cf2i3_search_failure_capture_surface_report.md`): Report this search for `no_result` / `results_not_useful`; frozen executed-search snapshot; stale protection; query-log/CF1/Learning isolation; create-only (no manage/export).
-- **CF2I4** implements management + export (`docs/reports/cf2i4_manage_search_feedback_export_report.md`): Manage Search Feedback; edit explanation only; delete with concurrency; export-all `siralex_search_feedback_v1`; independent DB-deletion reminder; no community/server submission.
-- **CF2I5** verifies the offline browser lifecycle (`docs/reports/cf2i5_offline_search_feedback_lifecycle_verification_report.md`): Chromium create/manage/edit/export/reload/delete; offline path; bundle removal retention; reminder lifecycle; isolation; EN/FR + a11y smoke; H1→H2 via Vitest (`NOT_APPLICABLE` in browser fixture).
-- **Next product slice:** `CF2I6 — Search Feedback Closure`.
-- **Parallel validation:** `PV1A` production identity/desktop smoke remains active; `PV1B` physical-device matrix remains hardware-gated / not run and must not be displaced by CF2. Phase 7N1 candidate identity may be recorded while device scenarios remain `not_run`.
+- **Owner override:** `PD2_OWNER_OVERRIDE_CF2_SELECTED` reopened the product-build track and selected CF2 without claiming new empirical proof that miss demand was already demonstrated. CF2 was built to **capture** that evidence.
+- **CF2** is closed (`docs/reports/cf2i6_search_feedback_closure_report.md`): users can deliberately record unmet search need as local non-authoritative evidence, manage and export it offline, and retain original dictionary provenance without asserting cause or changing dictionary authority.
+- **CF2 delivered:** `search_failure_feedback_draft_v1` + `siralex_search_feedback_v1`; IndexedDB `search_failure_feedback` (v6); Report this search capture; Manage Search Feedback; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
+- **Product-build track after CF2:** `NO ACTIVE PRODUCT BUILD`. Future candidates (including deferred `CG1 — Community Feedback Governance`) remain evidence-driven and are not automatically selected.
+- **Parallel validation:** `PV1A` production identity/desktop smoke remains active; `PV1B` physical-device matrix remains hardware-gated / not run. Phase 7N1 candidate identity may be recorded while device scenarios remain `not_run`.
 - Prior portfolio decision records: `docs/reports/pd2_post_cf1_product_build_decision.md`, `docs/reports/pd1_next_product_build_decision.md`, `docs/reports/pd0_next_product_build_decision.md`.
 
 ---
