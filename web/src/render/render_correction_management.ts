@@ -1,5 +1,5 @@
 /**
- * CF1I4 — Pure pending-corrections management renderer.
+ * CF1I4 / CF2I6A — Pure pending-corrections management renderer.
  * No IndexedDB, timestamps, ID generation, or dictionary resolution.
  */
 
@@ -85,6 +85,19 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/** Do not overwrite an actively edited control (preserves caret/IME). */
+function syncTextControl(
+  control: HTMLTextAreaElement | HTMLInputElement,
+  next: string,
+): void {
+  if (document.activeElement === control) return;
+  if (control.value !== next) control.value = next;
+}
+
+function setCounter(node: HTMLElement, count: number, max: number): void {
+  node.textContent = t("correctionFeedback.form.counter", { count, max });
+}
+
 function simplifyTargetLabel(target: CorrectionTarget): string {
   switch (target.type) {
     case "entry":
@@ -131,6 +144,25 @@ export type CorrectionManagementView = {
   update: (vm: CorrectionManagementVm) => void;
 };
 
+type StableEdit = {
+  draftId: string;
+  issueSelect: HTMLSelectElement;
+  targetSelect: HTMLSelectElement | null;
+  otherField: HTMLElement | null;
+  otherFieldInput: HTMLInputElement | null;
+  otherFieldCounter: HTMLElement | null;
+  modeFieldset: HTMLFieldSetElement;
+  modeProblem: HTMLInputElement;
+  modeProposed: HTMLInputElement;
+  descInput: HTMLTextAreaElement;
+  descCounter: HTMLElement;
+  propField: HTMLElement;
+  propInput: HTMLTextAreaElement;
+  propCounter: HTMLElement;
+  saveBtn: HTMLButtonElement;
+  cancelBtn: HTMLButtonElement;
+};
+
 export function renderCorrectionManagement(
   initial: CorrectionManagementVm,
   callbacks: CorrectionManagementRendererCallbacks,
@@ -138,7 +170,10 @@ export function renderCorrectionManagement(
   const root = el("div", "correction-manage");
   root.setAttribute("data-testid", "correction-manage");
 
+  let stableEdit: StableEdit | null = null;
+
   function paint(vm: CorrectionManagementVm): void {
+    stableEdit = null;
     root.replaceChildren();
     root.setAttribute("aria-busy", vm.busy ? "true" : "false");
 
@@ -344,11 +379,16 @@ export function renderCorrectionManagement(
     issueField.appendChild(issueSelect);
     root.appendChild(issueField);
 
+    let targetSelect: HTMLSelectElement | null = null;
+    let otherField: HTMLElement | null = null;
+    let otherFieldInput: HTMLInputElement | null = null;
+    let otherFieldCounter: HTMLElement | null = null;
+
     if (vm.editRetargetAllowed && vm.editTargetOptions) {
       const targetField = el("div", "field");
       const targetLabel = el("label", "label", t("correctionFeedback.form.targetLabel"));
       targetLabel.htmlFor = "correction-manage-target";
-      const targetSelect = document.createElement("select");
+      targetSelect = document.createElement("select");
       targetSelect.id = "correction-manage-target";
       targetSelect.disabled = vm.busy;
       for (const option of vm.editTargetOptions) {
@@ -358,34 +398,34 @@ export function renderCorrectionManagement(
         if (fields.target_key === option.key) opt.selected = true;
         targetSelect.appendChild(opt);
       }
-      targetSelect.addEventListener("change", () => callbacks.onTargetChange(targetSelect.value));
+      targetSelect.addEventListener("change", () => callbacks.onTargetChange(targetSelect!.value));
       targetField.appendChild(targetLabel);
       targetField.appendChild(targetSelect);
       root.appendChild(targetField);
-      if (fields.target_key === "other_field") {
-        const labelField = el("div", "field");
-        const lab = el("label", "label", t("correctionFeedback.form.otherFieldLabel"));
-        lab.htmlFor = "correction-manage-field-label";
-        const input = document.createElement("input");
-        input.type = "text";
-        input.id = "correction-manage-field-label";
-        input.value = fields.other_field_label;
-        input.disabled = vm.busy;
-        input.addEventListener("input", () => callbacks.onOtherFieldLabelChange(input.value));
-        labelField.appendChild(lab);
-        labelField.appendChild(input);
-        labelField.appendChild(
-          el(
-            "p",
-            "correction-form-counter",
-            t("correctionFeedback.form.counter", {
-              count: countUnicodeCharacters(fields.other_field_label),
-              max: CORRECTION_OTHER_FIELD_LABEL_MAX_CHARS,
-            }),
-          ),
-        );
-        root.appendChild(labelField);
-      }
+
+      // Always create other-field input; toggle visibility during incremental sync.
+      otherField = el("div", "field");
+      otherField.hidden = fields.target_key !== "other_field";
+      const lab = el("label", "label", t("correctionFeedback.form.otherFieldLabel"));
+      lab.htmlFor = "correction-manage-field-label";
+      otherFieldInput = document.createElement("input");
+      otherFieldInput.type = "text";
+      otherFieldInput.id = "correction-manage-field-label";
+      otherFieldInput.value = fields.other_field_label;
+      otherFieldInput.disabled = vm.busy;
+      otherFieldInput.addEventListener("input", () =>
+        callbacks.onOtherFieldLabelChange(otherFieldInput!.value),
+      );
+      otherFieldCounter = el("p", "correction-form-counter");
+      setCounter(
+        otherFieldCounter,
+        countUnicodeCharacters(fields.other_field_label),
+        CORRECTION_OTHER_FIELD_LABEL_MAX_CHARS,
+      );
+      otherField.appendChild(lab);
+      otherField.appendChild(otherFieldInput);
+      otherField.appendChild(otherFieldCounter);
+      root.appendChild(otherField);
     } else {
       root.appendChild(
         el(
@@ -400,6 +440,8 @@ export function renderCorrectionManagement(
     const modeFieldset = el("fieldset", "correction-form-mode");
     modeFieldset.disabled = vm.busy;
     modeFieldset.appendChild(el("legend", undefined, t("correctionFeedback.form.modeLabel")));
+    let modeProblem!: HTMLInputElement;
+    let modeProposed!: HTMLInputElement;
     for (const mode of ["problem_report", "proposed_correction"] as const) {
       const wrap = el("label", "correction-form-mode-option");
       const input = document.createElement("input");
@@ -410,6 +452,8 @@ export function renderCorrectionManagement(
       input.addEventListener("change", () => {
         if (input.checked) callbacks.onModeChange(mode);
       });
+      if (mode === "problem_report") modeProblem = input;
+      else modeProposed = input;
       wrap.appendChild(input);
       wrap.appendChild(
         document.createTextNode(
@@ -433,44 +477,38 @@ export function renderCorrectionManagement(
     desc.value = fields.problem_description;
     desc.disabled = vm.busy;
     desc.addEventListener("input", () => callbacks.onProblemDescriptionChange(desc.value));
+    const descCounter = el("p", "correction-form-counter");
+    setCounter(
+      descCounter,
+      countUnicodeCharacters(fields.problem_description),
+      CORRECTION_PROBLEM_DESCRIPTION_MAX_CHARS,
+    );
     descField.appendChild(descLabel);
     descField.appendChild(desc);
-    descField.appendChild(
-      el(
-        "p",
-        "correction-form-counter",
-        t("correctionFeedback.form.counter", {
-          count: countUnicodeCharacters(fields.problem_description),
-          max: CORRECTION_PROBLEM_DESCRIPTION_MAX_CHARS,
-        }),
-      ),
-    );
+    descField.appendChild(descCounter);
     root.appendChild(descField);
 
-    if (fields.mode === "proposed_correction") {
-      const propField = el("div", "field");
-      const propLabel = el("label", "label", t("correctionFeedback.form.proposedLabel"));
-      propLabel.htmlFor = "correction-manage-proposed";
-      const prop = document.createElement("textarea");
-      prop.id = "correction-manage-proposed";
-      prop.rows = 3;
-      prop.value = fields.proposed_value;
-      prop.disabled = vm.busy;
-      prop.addEventListener("input", () => callbacks.onProposedValueChange(prop.value));
-      propField.appendChild(propLabel);
-      propField.appendChild(prop);
-      propField.appendChild(
-        el(
-          "p",
-          "correction-form-counter",
-          t("correctionFeedback.form.counter", {
-            count: countUnicodeCharacters(fields.proposed_value),
-            max: CORRECTION_PROPOSED_VALUE_MAX_CHARS,
-          }),
-        ),
-      );
-      root.appendChild(propField);
-    }
+    // Always create proposed field; toggle visibility during incremental sync.
+    const propField = el("div", "field");
+    propField.hidden = fields.mode !== "proposed_correction";
+    const propLabel = el("label", "label", t("correctionFeedback.form.proposedLabel"));
+    propLabel.htmlFor = "correction-manage-proposed";
+    const prop = document.createElement("textarea");
+    prop.id = "correction-manage-proposed";
+    prop.rows = 3;
+    prop.value = fields.proposed_value;
+    prop.disabled = vm.busy;
+    prop.addEventListener("input", () => callbacks.onProposedValueChange(prop.value));
+    const propCounter = el("p", "correction-form-counter");
+    setCounter(
+      propCounter,
+      countUnicodeCharacters(fields.proposed_value),
+      CORRECTION_PROPOSED_VALUE_MAX_CHARS,
+    );
+    propField.appendChild(propLabel);
+    propField.appendChild(prop);
+    propField.appendChild(propCounter);
+    root.appendChild(propField);
 
     const actions = el("div", "correction-manage-actions");
     const save = document.createElement("button");
@@ -488,6 +526,111 @@ export function renderCorrectionManagement(
     actions.appendChild(save);
     actions.appendChild(cancel);
     root.appendChild(actions);
+
+    stableEdit = {
+      draftId: vm.selected.draft_id,
+      issueSelect,
+      targetSelect,
+      otherField,
+      otherFieldInput,
+      otherFieldCounter,
+      modeFieldset,
+      modeProblem,
+      modeProposed,
+      descInput: desc,
+      descCounter,
+      propField,
+      propInput: prop,
+      propCounter,
+      saveBtn: save,
+      cancelBtn: cancel,
+    };
+  }
+
+  function syncStableEdit(vm: CorrectionManagementVm): void {
+    if (!stableEdit || !vm.editFields) return;
+    const fields = vm.editFields;
+    root.setAttribute("aria-busy", vm.busy ? "true" : "false");
+
+    const status = root.querySelector<HTMLElement>("#correction-manage-status");
+    if (status) {
+      status.textContent =
+        vm.errorCode && ERROR_KEYS[vm.errorCode] ? t(ERROR_KEYS[vm.errorCode]!) : "";
+    }
+
+    let errorSummary = root.querySelector<HTMLElement>("#correction-manage-error-summary");
+    if (vm.errorCode === "stale_draft" || vm.errorCode === "invalid_fields") {
+      if (!errorSummary) {
+        errorSummary = el("div", "correction-manage-error-summary");
+        errorSummary.id = "correction-manage-error-summary";
+        errorSummary.setAttribute("role", "alert");
+        errorSummary.tabIndex = -1;
+        const insertBefore = stableEdit.issueSelect.closest(".field");
+        if (insertBefore) root.insertBefore(errorSummary, insertBefore);
+        else root.appendChild(errorSummary);
+      }
+      errorSummary.textContent = t(
+        ERROR_KEYS[vm.errorCode] ?? "correctionFeedback.manage.error.invalidFields",
+      );
+    } else if (errorSummary) {
+      errorSummary.remove();
+    }
+
+    syncTextControl(stableEdit.descInput, fields.problem_description);
+    syncTextControl(stableEdit.propInput, fields.proposed_value);
+    if (stableEdit.otherFieldInput) {
+      syncTextControl(stableEdit.otherFieldInput, fields.other_field_label);
+    }
+
+    stableEdit.issueSelect.disabled = vm.busy;
+    if (stableEdit.issueSelect.value !== fields.issue_type) {
+      stableEdit.issueSelect.value = fields.issue_type;
+    }
+    if (stableEdit.targetSelect) {
+      stableEdit.targetSelect.disabled = vm.busy;
+      if (stableEdit.targetSelect.value !== fields.target_key) {
+        stableEdit.targetSelect.value = fields.target_key;
+      }
+    }
+    if (stableEdit.otherFieldInput) {
+      stableEdit.otherFieldInput.disabled = vm.busy;
+    }
+    if (stableEdit.otherField) {
+      stableEdit.otherField.hidden = fields.target_key !== "other_field";
+    }
+    stableEdit.descInput.disabled = vm.busy;
+    stableEdit.propInput.disabled = vm.busy;
+    stableEdit.modeFieldset.disabled = vm.busy;
+
+    stableEdit.modeProblem.checked = fields.mode === "problem_report";
+    stableEdit.modeProposed.checked = fields.mode === "proposed_correction";
+    stableEdit.propField.hidden = fields.mode !== "proposed_correction";
+
+    setCounter(
+      stableEdit.descCounter,
+      countUnicodeCharacters(fields.problem_description),
+      CORRECTION_PROBLEM_DESCRIPTION_MAX_CHARS,
+    );
+    setCounter(
+      stableEdit.propCounter,
+      countUnicodeCharacters(fields.proposed_value),
+      CORRECTION_PROPOSED_VALUE_MAX_CHARS,
+    );
+    if (stableEdit.otherFieldCounter) {
+      setCounter(
+        stableEdit.otherFieldCounter,
+        countUnicodeCharacters(fields.other_field_label),
+        CORRECTION_OTHER_FIELD_LABEL_MAX_CHARS,
+      );
+    }
+
+    stableEdit.saveBtn.textContent = t("correctionFeedback.manage.saveEdit");
+    stableEdit.saveBtn.disabled = vm.busy;
+    stableEdit.cancelBtn.disabled = vm.busy;
+
+    if (vm.focusTarget !== "none") {
+      applyFocus(vm);
+    }
   }
 
   function paintDeleteConfirm(): void {
@@ -533,6 +676,26 @@ export function renderCorrectionManagement(
     });
   }
 
-  paint(initial);
-  return { root, update: paint };
+  function apply(vm: CorrectionManagementVm): void {
+    if (
+      vm.phase === "editing" &&
+      stableEdit &&
+      vm.selected?.draft_id === stableEdit.draftId &&
+      root.contains(stableEdit.descInput) &&
+      root.contains(stableEdit.propInput)
+    ) {
+      syncStableEdit(vm);
+      return;
+    }
+    paint(vm);
+  }
+
+  apply(initial);
+
+  return {
+    root,
+    update(vm: CorrectionManagementVm) {
+      apply(vm);
+    },
+  };
 }

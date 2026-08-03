@@ -123,6 +123,33 @@ export function renderSearchFeedbackManagement(
   const root = el("div", "search-feedback-manage");
   root.setAttribute("data-testid", "search-feedback-manage");
 
+  type StableEdit = {
+    feedbackId: string;
+    meaningInput: HTMLTextAreaElement;
+    detailsInput: HTMLTextAreaElement;
+    meaningCounter: HTMLElement;
+    detailsCounter: HTMLElement;
+    saveBtn: HTMLButtonElement;
+    cancelBtn: HTMLButtonElement;
+  };
+  let stableEdit: StableEdit | null = null;
+
+  function syncTextControl(
+    control: HTMLTextAreaElement | HTMLInputElement,
+    next: string,
+  ): void {
+    if (document.activeElement === control) return;
+    if (control.value !== next) control.value = next;
+  }
+
+  function setManageCounter(node: HTMLElement, count: number, max: number): void {
+    node.textContent = t("searchFeedback.manage.counter", { count, max });
+    node.className =
+      count > max
+        ? "search-feedback-manage-counter search-feedback-manage-counter-over"
+        : "search-feedback-manage-counter";
+  }
+
   function paintListChrome(vm: SearchFeedbackManagementVm): void {
     const privacy = el("p", "search-feedback-manage-privacy");
     privacy.textContent = t("searchFeedback.manage.privacy");
@@ -407,7 +434,7 @@ export function renderSearchFeedbackManagement(
 
   function paintEditForm(vm: SearchFeedbackManagementVm): void {
     const fields = vm.editFields;
-    if (!fields) return;
+    if (!fields || !vm.selected) return;
 
     paintError(vm);
 
@@ -425,15 +452,11 @@ export function renderSearchFeedbackManagement(
     meaningInput.addEventListener("input", () => {
       callbacks.onRequestedMeaningChange(meaningInput.value);
     });
-    const meaningCounter = el(
-      "p",
-      vm.requestedMeaningCount > SEARCH_FEEDBACK_REQUESTED_MEANING_MAX_CHARS
-        ? "search-feedback-manage-counter search-feedback-manage-counter-over"
-        : "search-feedback-manage-counter",
-      t("searchFeedback.manage.counter", {
-        count: vm.requestedMeaningCount,
-        max: SEARCH_FEEDBACK_REQUESTED_MEANING_MAX_CHARS,
-      }),
+    const meaningCounter = el("p", "search-feedback-manage-counter");
+    setManageCounter(
+      meaningCounter,
+      vm.requestedMeaningCount,
+      SEARCH_FEEDBACK_REQUESTED_MEANING_MAX_CHARS,
     );
     meaningField.append(meaningLabel, meaningInput, meaningCounter);
     root.appendChild(meaningField);
@@ -452,15 +475,11 @@ export function renderSearchFeedbackManagement(
     detailsInput.addEventListener("input", () => {
       callbacks.onUserDescriptionChange(detailsInput.value);
     });
-    const detailsCounter = el(
-      "p",
-      vm.userDescriptionCount > SEARCH_FEEDBACK_USER_DESCRIPTION_MAX_CHARS
-        ? "search-feedback-manage-counter search-feedback-manage-counter-over"
-        : "search-feedback-manage-counter",
-      t("searchFeedback.manage.counter", {
-        count: vm.userDescriptionCount,
-        max: SEARCH_FEEDBACK_USER_DESCRIPTION_MAX_CHARS,
-      }),
+    const detailsCounter = el("p", "search-feedback-manage-counter");
+    setManageCounter(
+      detailsCounter,
+      vm.userDescriptionCount,
+      SEARCH_FEEDBACK_USER_DESCRIPTION_MAX_CHARS,
     );
     detailsField.append(detailsLabel, detailsInput, detailsCounter);
     root.appendChild(detailsField);
@@ -472,19 +491,58 @@ export function renderSearchFeedbackManagement(
       vm.busy
         ? t("searchFeedback.manage.saving")
         : t("searchFeedback.manage.saveEdit"),
-    );
+    ) as HTMLButtonElement;
     save.type = "button";
     save.disabled = vm.busy;
     save.addEventListener("click", () => callbacks.onSaveEdit());
-    const cancel = el("button", "btn", t("searchFeedback.manage.cancel"));
+    const cancel = el(
+      "button",
+      "btn",
+      t("searchFeedback.manage.cancel"),
+    ) as HTMLButtonElement;
     cancel.type = "button";
     cancel.disabled = vm.busy;
     cancel.addEventListener("click", () => callbacks.onCancelEdit());
     actions.append(save, cancel);
     root.appendChild(actions);
+
+    stableEdit = {
+      feedbackId: vm.selected.feedback_id,
+      meaningInput,
+      detailsInput,
+      meaningCounter,
+      detailsCounter,
+      saveBtn: save,
+      cancelBtn: cancel,
+    };
+  }
+
+  function syncStableEdit(vm: SearchFeedbackManagementVm): void {
+    if (!stableEdit || !vm.editFields) return;
+    root.setAttribute("aria-busy", vm.busy ? "true" : "false");
+    syncTextControl(stableEdit.meaningInput, vm.editFields.requested_meaning);
+    syncTextControl(stableEdit.detailsInput, vm.editFields.user_description);
+    stableEdit.meaningInput.disabled = vm.busy;
+    stableEdit.detailsInput.disabled = vm.busy;
+    setManageCounter(
+      stableEdit.meaningCounter,
+      vm.requestedMeaningCount,
+      SEARCH_FEEDBACK_REQUESTED_MEANING_MAX_CHARS,
+    );
+    setManageCounter(
+      stableEdit.detailsCounter,
+      vm.userDescriptionCount,
+      SEARCH_FEEDBACK_USER_DESCRIPTION_MAX_CHARS,
+    );
+    stableEdit.saveBtn.textContent = vm.busy
+      ? t("searchFeedback.manage.saving")
+      : t("searchFeedback.manage.saveEdit");
+    stableEdit.saveBtn.disabled = vm.busy;
+    stableEdit.cancelBtn.disabled = vm.busy;
   }
 
   function paint(vm: SearchFeedbackManagementVm): void {
+    stableEdit = null;
     root.replaceChildren();
     root.setAttribute("aria-busy", vm.busy ? "true" : "false");
 
@@ -542,12 +600,26 @@ export function renderSearchFeedbackManagement(
     }
   }
 
-  paint(initial);
+  function apply(vm: SearchFeedbackManagementVm): void {
+    if (
+      vm.phase === "editing" &&
+      stableEdit &&
+      vm.selected?.feedback_id === stableEdit.feedbackId &&
+      root.contains(stableEdit.meaningInput) &&
+      root.contains(stableEdit.detailsInput)
+    ) {
+      syncStableEdit(vm);
+      return;
+    }
+    paint(vm);
+  }
+
+  apply(initial);
 
   return {
     root,
     update(vm: SearchFeedbackManagementVm) {
-      paint(vm);
+      apply(vm);
     },
   };
 }

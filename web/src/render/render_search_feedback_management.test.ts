@@ -198,4 +198,66 @@ describe("renderSearchFeedbackManagement", () => {
     expect(root.textContent).toContain("Exported 1 search feedback reports");
     await Promise.resolve();
   });
+
+  it("keeps edit textarea nodes stable across typing (CF2I6A)", () => {
+    let latest = baseVm({
+      phase: "editing",
+      selected: draft(),
+      editFields: { requested_meaning: "", user_description: "" },
+      availability: "dictionary_current",
+      focusTarget: "none",
+    });
+    const view = renderSearchFeedbackManagement(latest, {
+      ...callbacks(),
+      onRequestedMeaningChange: (value) => {
+        latest = {
+          ...latest,
+          editFields: {
+            requested_meaning: value,
+            user_description: latest.editFields?.user_description ?? "",
+          },
+          requestedMeaningCount: [...value].length,
+          focusTarget: "none",
+        };
+        view.update(latest);
+      },
+      onUserDescriptionChange: (value) => {
+        latest = {
+          ...latest,
+          editFields: {
+            requested_meaning: latest.editFields?.requested_meaning ?? "",
+            user_description: value,
+          },
+          userDescriptionCount: [...value].length,
+          focusTarget: "none",
+        };
+        view.update(latest);
+      },
+    });
+    document.body.appendChild(view.root);
+
+    const meaning = view.root.querySelector<HTMLTextAreaElement>(
+      "#search-feedback-manage-meaning",
+    )!;
+    meaning.focus();
+    for (const ch of "notes") {
+      meaning.value = `${meaning.value}${ch}`;
+      meaning.dispatchEvent(new Event("input", { bubbles: true }));
+      expect(view.root.querySelector("#search-feedback-manage-meaning")).toBe(meaning);
+      expect(document.activeElement).toBe(meaning);
+    }
+    expect(meaning.value).toBe("notes");
+
+    const details = view.root.querySelector<HTMLTextAreaElement>(
+      "#search-feedback-manage-details",
+    )!;
+    details.focus();
+    for (const ch of "ߞߎ") {
+      details.value = `${details.value}${ch}`;
+      details.dispatchEvent(new Event("input", { bubbles: true }));
+      expect(view.root.querySelector("#search-feedback-manage-details")).toBe(details);
+      expect(document.activeElement).toBe(details);
+    }
+    expect(details.value).toBe("ߞߎ");
+  });
 });

@@ -107,7 +107,11 @@ describe("renderCorrectionForm", () => {
     expect(root.querySelector("fieldset.correction-form-mode legend")?.textContent).toBe(
       "Response mode",
     );
-    expect(root.querySelector("#correction-form-proposed")).toBeNull();
+    // Proposed field is kept stable in the editing shell and hidden until mode switches.
+    expect(
+      (root.querySelector("#correction-form-proposed")?.closest(".field") as HTMLElement | null)
+        ?.hidden,
+    ).toBe(true);
     expect(root.querySelector("#correction-form-description-count")?.textContent).toContain("0 /");
 
     const nko = root.querySelector(".correction-form-entry-nko");
@@ -218,5 +222,69 @@ describe("renderCorrectionForm", () => {
     save.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     save.click();
     expect(onSave).toHaveBeenCalled();
+  });
+
+  it("keeps description/proposed textarea nodes stable across typing (CF2I6A)", () => {
+    const context = buildCorrectionEntryContext(lexicon(), meta())!;
+    let fields = createInitialCorrectionFormFields();
+    fields.issue_type = "spelling";
+    fields.mode = "proposed_correction";
+    fields.problem_description = "";
+    fields.proposed_value = "";
+    let latest = buildCorrectionFormViewModel({ state: "ready", context, fields });
+
+    const view = renderCorrectionForm(latest, {
+      onIssueTypeChange: vi.fn(),
+      onTargetChange: vi.fn(),
+      onModeChange: vi.fn(),
+      onProblemDescriptionChange: (value) => {
+        fields = { ...fields, problem_description: value };
+        latest = buildCorrectionFormViewModel({ state: "ready", context, fields });
+        view.update(latest);
+      },
+      onProposedValueChange: (value) => {
+        fields = { ...fields, proposed_value: value };
+        latest = buildCorrectionFormViewModel({ state: "ready", context, fields });
+        view.update(latest);
+      },
+      onOtherFieldLabelChange: vi.fn(),
+      onSave: vi.fn(),
+      onCancel: vi.fn(),
+      onBackToEntry: vi.fn(),
+    });
+    document.body.appendChild(view.root);
+
+    const desc = view.root.querySelector<HTMLTextAreaElement>(
+      "#correction-form-description",
+    )!;
+    desc.focus();
+    for (const ch of "abc") {
+      desc.value = `${desc.value}${ch}`;
+      desc.selectionStart = desc.value.length;
+      desc.selectionEnd = desc.value.length;
+      desc.dispatchEvent(new Event("input", { bubbles: true }));
+      expect(view.root.querySelector("#correction-form-description")).toBe(desc);
+      expect(document.activeElement).toBe(desc);
+    }
+    expect(desc.value).toBe("abc");
+
+    // Mid-string edit
+    desc.value = "abXc";
+    desc.selectionStart = 3;
+    desc.selectionEnd = 3;
+    desc.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(view.root.querySelector("#correction-form-description")).toBe(desc);
+    expect(document.activeElement).toBe(desc);
+
+    const prop = view.root.querySelector<HTMLTextAreaElement>("#correction-form-proposed")!;
+    expect((prop.closest(".field") as HTMLElement | null)?.hidden).toBe(false);
+    prop.focus();
+    for (const ch of "ߞߎ߲") {
+      prop.value = `${prop.value}${ch}`;
+      prop.dispatchEvent(new Event("input", { bubbles: true }));
+      expect(view.root.querySelector("#correction-form-proposed")).toBe(prop);
+      expect(document.activeElement).toBe(prop);
+    }
+    expect(prop.value).toBe("ߞߎ߲");
   });
 });

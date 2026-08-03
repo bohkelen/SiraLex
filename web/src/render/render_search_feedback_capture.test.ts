@@ -176,4 +176,73 @@ describe("render search feedback capture", () => {
     save.click();
     expect(cb.onSave).toHaveBeenCalled();
   });
+
+  it("keeps textarea DOM nodes stable across multi-character typing (CF2I6A)", () => {
+    let latest = baseVm();
+    const view = renderSearchFeedbackCapture(latest, {
+      onRequestedMeaningChange: (value) => {
+        latest = baseVm({
+          fields: { ...latest.fields, requested_meaning: value },
+          requestedMeaningCount: [...value].length,
+        });
+        view.update(latest);
+      },
+      onUserDescriptionChange: (value) => {
+        latest = baseVm({
+          fields: { ...latest.fields, user_description: value },
+          userDescriptionCount: [...value].length,
+        });
+        view.update(latest);
+      },
+      onSave: vi.fn(),
+      onCancel: vi.fn(),
+      onBackToSearch: vi.fn(),
+    });
+    document.body.appendChild(view.root);
+
+    const meaning = view.root.querySelector<HTMLTextAreaElement>(
+      "[data-testid='search-feedback-meaning']",
+    )!;
+    meaning.focus();
+    expect(document.activeElement).toBe(meaning);
+
+    for (const ch of "abcdef") {
+      meaning.value = `${meaning.value}${ch}`;
+      meaning.dispatchEvent(new Event("input", { bubbles: true }));
+      const next = view.root.querySelector<HTMLTextAreaElement>(
+        "[data-testid='search-feedback-meaning']",
+      )!;
+      expect(next).toBe(meaning);
+      expect(document.activeElement).toBe(meaning);
+    }
+    expect(meaning.value).toBe("abcdef");
+    expect(view.root.querySelector("#search-feedback-capture-meaning-counter")?.textContent).toContain(
+      "6 /",
+    );
+
+    // Mid-string caret insert.
+    meaning.value = "abXcdef";
+    meaning.selectionStart = 3;
+    meaning.selectionEnd = 3;
+    meaning.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(
+      view.root.querySelector("[data-testid='search-feedback-meaning']"),
+    ).toBe(meaning);
+    expect(document.activeElement).toBe(meaning);
+
+    // N’Ko characters.
+    const details = view.root.querySelector<HTMLTextAreaElement>(
+      "[data-testid='search-feedback-details']",
+    )!;
+    details.focus();
+    for (const ch of "ߞߎ߲") {
+      details.value = `${details.value}${ch}`;
+      details.dispatchEvent(new Event("input", { bubbles: true }));
+      expect(
+        view.root.querySelector("[data-testid='search-feedback-details']"),
+      ).toBe(details);
+      expect(document.activeElement).toBe(details);
+    }
+    expect(details.value).toBe("ߞߎ߲");
+  });
 });

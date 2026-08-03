@@ -16,6 +16,7 @@
     "test:e2e:corrections:headed": "npm run build && playwright test -c playwright.config.ts e2e/correction_lifecycle.spec.ts --headed",
     "test:e2e:search-feedback": "npm run build && playwright test -c playwright.config.ts e2e/search_feedback_lifecycle.spec.ts",
     "test:e2e:search-feedback:headed": "npm run build && playwright test -c playwright.config.ts e2e/search_feedback_lifecycle.spec.ts --headed",
+    "test:e2e:feedback-input": "npm run build && playwright test -c playwright.config.ts e2e/feedback_input_stability.spec.ts",
     "build:report": "REPORT=true npm run build"
   },
   "devDependencies": {

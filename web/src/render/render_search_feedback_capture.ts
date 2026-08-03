@@ -1,5 +1,8 @@
 /**
- * CF2I3 — Search failure capture renderer (DOM only).
+ * CF2I3 / CF2I6A — Search failure capture renderer (DOM only).
+ *
+ * Ordinary field input must preserve textarea nodes (focus/caret/composition).
+ * Full replacement is reserved for layout transitions (editing ↔ saved).
  *
  * No IndexedDB, search execution, provenance construction, or query logging.
  */
@@ -65,11 +68,6 @@ function fieldErrorMessage(
   return key ? t(key) : undefined;
 }
 
-function focusSelector(root: HTMLElement, selector: string): void {
-  const node = root.querySelector<HTMLElement>(selector);
-  node?.focus();
-}
-
 function looksLikeNko(text: string): boolean {
   return /[\u07C0-\u07FF]/.test(text);
 }
@@ -88,6 +86,28 @@ function directionLabel(
   return direction === "source_to_target"
     ? t("searchFeedback.capture.direction.sourceToTarget")
     : t("searchFeedback.capture.direction.targetToSource");
+}
+
+/** Do not overwrite an actively edited control (preserves caret/IME). */
+function syncTextControl(
+  control: HTMLTextAreaElement | HTMLInputElement,
+  next: string,
+): void {
+  if (document.activeElement === control) return;
+  if (control.value !== next) control.value = next;
+}
+
+function setCounter(
+  node: HTMLElement,
+  count: number,
+  max: number,
+  overClass: string,
+): void {
+  node.textContent = t("searchFeedback.capture.counter", { count, max });
+  node.className =
+    count > max
+      ? `search-feedback-capture-counter ${overClass}`
+      : "search-feedback-capture-counter";
 }
 
 export type SearchFeedbackCaptureView = {
@@ -160,6 +180,21 @@ export function renderResultsNotUsefulSearchFeedbackEntry(
   return root;
 }
 
+type EditingShell = {
+  meaningInput: HTMLTextAreaElement;
+  detailsInput: HTMLTextAreaElement;
+  meaningCounter: HTMLElement;
+  detailsCounter: HTMLElement;
+  meaningField: HTMLElement;
+  detailsField: HTMLElement;
+  meaningError: HTMLElement;
+  detailsError: HTMLElement;
+  staleHost: HTMLElement;
+  errorHost: HTMLElement;
+  saveBtn: HTMLButtonElement;
+  cancelBtn: HTMLButtonElement;
+};
+
 /**
  * Render the search-failure feedback form from a pure view model.
  */
@@ -170,9 +205,16 @@ export function renderSearchFeedbackCapture(
   const root = el("div", "search-feedback-capture");
   root.setAttribute("data-testid", "search-feedback-capture");
 
-  let current = initialVm;
+  let layout: "none" | "editing" | "saved" = "none";
+  let shell: EditingShell | null = null;
 
   function paintSuccess(vm: SearchFeedbackCaptureViewModel): void {
+    void vm;
+    shell = null;
+    layout = "saved";
+    root.replaceChildren();
+    root.setAttribute("aria-busy", "false");
+
     const heading = el(
       "h2",
       "search-feedback-capture-heading",
@@ -204,7 +246,7 @@ export function renderSearchFeedbackCapture(
     });
   }
 
-  function paintErrorSummary(vm: SearchFeedbackCaptureViewModel): void {
+  function buildErrorSummary(vm: SearchFeedbackCaptureViewModel): HTMLElement {
     const summary = el("div", "search-feedback-capture-error-summary");
     summary.setAttribute("role", "alert");
     summary.id = "search-feedback-capture-error-summary";
@@ -232,22 +274,12 @@ export function renderSearchFeedbackCapture(
       vm.errors.user_description,
     );
     if (detailsErr) summary.appendChild(el("p", undefined, detailsErr));
-
-    root.appendChild(summary);
-    queueMicrotask(() => {
-      summary.focus();
-    });
+    return summary;
   }
 
-  function paint(vm: SearchFeedbackCaptureViewModel): void {
-    current = vm;
+  function buildEditing(vm: SearchFeedbackCaptureViewModel): void {
     root.replaceChildren();
-    root.setAttribute("aria-busy", vm.state === "saving" ? "true" : "false");
-
-    if (vm.state === "saved") {
-      paintSuccess(vm);
-      return;
-    }
+    layout = "editing";
 
     const heading = el(
       "h2",
@@ -299,21 +331,12 @@ export function renderSearchFeedbackCapture(
     );
     root.appendChild(privacy);
 
-    if (vm.state === "stale_context") {
-      const stale = el("div", "search-feedback-capture-stale");
-      stale.setAttribute("role", "alert");
-      stale.id = "search-feedback-capture-stale";
-      stale.textContent = t("searchFeedback.capture.error.staleContext");
-      root.appendChild(stale);
-    }
+    const staleHost = el("div", "search-feedback-capture-stale-host");
+    root.appendChild(staleHost);
 
-    if (vm.state === "invalid" || vm.state === "error") {
-      paintErrorSummary(vm);
-    }
+    const errorHost = el("div", "search-feedback-capture-error-host");
+    root.appendChild(errorHost);
 
-    const locked = vm.state === "saving" || vm.state === "stale_context";
-
-    // Requested meaning
     const meaningField = el("div", "field search-feedback-capture-field");
     const meaningLabel = el(
       "label",
@@ -332,34 +355,22 @@ export function renderSearchFeedbackCapture(
     meaningInput.setAttribute("data-testid", "search-feedback-meaning");
     meaningInput.setAttribute("aria-describedby", "search-feedback-capture-meaning-help");
     meaningInput.value = vm.fields.requested_meaning;
-    meaningInput.disabled = locked;
     meaningInput.addEventListener("input", () => {
       callbacks.onRequestedMeaningChange(meaningInput.value);
     });
-    const meaningCounter = el(
-      "p",
-      vm.requestedMeaningCount > SEARCH_FEEDBACK_REQUESTED_MEANING_MAX_CHARS
-        ? "search-feedback-capture-counter search-feedback-capture-counter-over"
-        : "search-feedback-capture-counter",
-      t("searchFeedback.capture.counter", {
-        count: vm.requestedMeaningCount,
-        max: SEARCH_FEEDBACK_REQUESTED_MEANING_MAX_CHARS,
-      }),
-    );
+    const meaningCounter = el("p", "search-feedback-capture-counter");
     meaningCounter.id = "search-feedback-capture-meaning-counter";
-    meaningField.append(meaningLabel, meaningHelp, meaningInput, meaningCounter);
-    const meaningErr = fieldErrorMessage(
-      "requested_meaning",
-      vm.errors.requested_meaning,
+    const meaningError = el("p", "search-feedback-capture-field-error");
+    meaningError.hidden = true;
+    meaningField.append(
+      meaningLabel,
+      meaningHelp,
+      meaningInput,
+      meaningCounter,
+      meaningError,
     );
-    if (meaningErr) {
-      meaningField.appendChild(
-        el("p", "search-feedback-capture-field-error", meaningErr),
-      );
-    }
     root.appendChild(meaningField);
 
-    // Details
     const detailsField = el("div", "field search-feedback-capture-field");
     const detailsLabel = el(
       "label",
@@ -378,75 +389,168 @@ export function renderSearchFeedbackCapture(
     detailsInput.setAttribute("data-testid", "search-feedback-details");
     detailsInput.setAttribute("aria-describedby", "search-feedback-capture-details-help");
     detailsInput.value = vm.fields.user_description;
-    detailsInput.disabled = locked;
     detailsInput.addEventListener("input", () => {
       callbacks.onUserDescriptionChange(detailsInput.value);
     });
-    const detailsCounter = el(
-      "p",
-      vm.userDescriptionCount > SEARCH_FEEDBACK_USER_DESCRIPTION_MAX_CHARS
-        ? "search-feedback-capture-counter search-feedback-capture-counter-over"
-        : "search-feedback-capture-counter",
-      t("searchFeedback.capture.counter", {
-        count: vm.userDescriptionCount,
-        max: SEARCH_FEEDBACK_USER_DESCRIPTION_MAX_CHARS,
-      }),
-    );
+    const detailsCounter = el("p", "search-feedback-capture-counter");
     detailsCounter.id = "search-feedback-capture-details-counter";
-    detailsField.append(detailsLabel, detailsHelp, detailsInput, detailsCounter);
-    const detailsErr = fieldErrorMessage(
-      "user_description",
-      vm.errors.user_description,
+    const detailsError = el("p", "search-feedback-capture-field-error");
+    detailsError.hidden = true;
+    detailsField.append(
+      detailsLabel,
+      detailsHelp,
+      detailsInput,
+      detailsCounter,
+      detailsError,
     );
-    if (detailsErr) {
-      detailsField.appendChild(
-        el("p", "search-feedback-capture-field-error", detailsErr),
-      );
-    }
     root.appendChild(detailsField);
 
     const actions = el("div", "search-feedback-capture-actions");
     const saveBtn = el(
       "button",
       "btn search-feedback-capture-save",
-      vm.state === "saving"
-        ? t("searchFeedback.capture.saving")
-        : t("searchFeedback.capture.save"),
-    );
+      t("searchFeedback.capture.save"),
+    ) as HTMLButtonElement;
     saveBtn.type = "button";
     saveBtn.setAttribute("data-testid", "search-feedback-save");
-    saveBtn.disabled = locked;
-    if (vm.state === "saving") {
-      saveBtn.setAttribute("aria-busy", "true");
-    }
     saveBtn.addEventListener("click", () => callbacks.onSave());
 
     const cancelBtn = el(
       "button",
       "btn search-feedback-capture-cancel",
       t("searchFeedback.capture.cancel"),
-    );
+    ) as HTMLButtonElement;
     cancelBtn.type = "button";
     cancelBtn.setAttribute("data-testid", "search-feedback-cancel");
-    cancelBtn.disabled = vm.state === "saving";
     cancelBtn.addEventListener("click", () => callbacks.onCancel());
 
     actions.append(saveBtn, cancelBtn);
     root.appendChild(actions);
 
-    // Preserve focus on re-paint of the field the user was editing when possible.
-    void current;
+    shell = {
+      meaningInput,
+      detailsInput,
+      meaningCounter,
+      detailsCounter,
+      meaningField,
+      detailsField,
+      meaningError,
+      detailsError,
+      staleHost,
+      errorHost,
+      saveBtn,
+      cancelBtn,
+    };
+    syncEditing(vm);
   }
 
-  paint(initialVm);
+  function syncEditing(vm: SearchFeedbackCaptureViewModel): void {
+    if (!shell) return;
+    const locked = vm.state === "saving" || vm.state === "stale_context";
+    root.setAttribute("aria-busy", vm.state === "saving" ? "true" : "false");
+
+    syncTextControl(shell.meaningInput, vm.fields.requested_meaning);
+    syncTextControl(shell.detailsInput, vm.fields.user_description);
+    shell.meaningInput.disabled = locked;
+    shell.detailsInput.disabled = locked;
+
+    setCounter(
+      shell.meaningCounter,
+      vm.requestedMeaningCount,
+      SEARCH_FEEDBACK_REQUESTED_MEANING_MAX_CHARS,
+      "search-feedback-capture-counter-over",
+    );
+    setCounter(
+      shell.detailsCounter,
+      vm.userDescriptionCount,
+      SEARCH_FEEDBACK_USER_DESCRIPTION_MAX_CHARS,
+      "search-feedback-capture-counter-over",
+    );
+
+    const meaningErr = fieldErrorMessage(
+      "requested_meaning",
+      vm.errors.requested_meaning,
+    );
+    if (meaningErr) {
+      shell.meaningError.hidden = false;
+      shell.meaningError.textContent = meaningErr;
+      shell.meaningInput.setAttribute("aria-invalid", "true");
+    } else {
+      shell.meaningError.hidden = true;
+      shell.meaningError.textContent = "";
+      shell.meaningInput.removeAttribute("aria-invalid");
+    }
+
+    const detailsErr = fieldErrorMessage(
+      "user_description",
+      vm.errors.user_description,
+    );
+    if (detailsErr) {
+      shell.detailsError.hidden = false;
+      shell.detailsError.textContent = detailsErr;
+      shell.detailsInput.setAttribute("aria-invalid", "true");
+    } else {
+      shell.detailsError.hidden = true;
+      shell.detailsError.textContent = "";
+      shell.detailsInput.removeAttribute("aria-invalid");
+    }
+
+    shell.staleHost.replaceChildren();
+    if (vm.state === "stale_context") {
+      const stale = el("div", "search-feedback-capture-stale");
+      stale.setAttribute("role", "alert");
+      stale.id = "search-feedback-capture-stale";
+      stale.textContent = t("searchFeedback.capture.error.staleContext");
+      shell.staleHost.appendChild(stale);
+    }
+
+    const hadErrorSummary = Boolean(
+      shell.errorHost.querySelector("#search-feedback-capture-error-summary"),
+    );
+    shell.errorHost.replaceChildren();
+    if (vm.state === "invalid" || vm.state === "error") {
+      shell.errorHost.appendChild(buildErrorSummary(vm));
+      // Focus only when the summary newly appears (not on each field keystroke).
+      if (!hadErrorSummary) {
+        queueMicrotask(() => {
+          shell?.errorHost
+            .querySelector<HTMLElement>("#search-feedback-capture-error-summary")
+            ?.focus();
+        });
+      }
+    }
+
+    shell.saveBtn.textContent =
+      vm.state === "saving"
+        ? t("searchFeedback.capture.saving")
+        : t("searchFeedback.capture.save");
+    shell.saveBtn.disabled = locked;
+    if (vm.state === "saving") {
+      shell.saveBtn.setAttribute("aria-busy", "true");
+    } else {
+      shell.saveBtn.removeAttribute("aria-busy");
+    }
+    shell.cancelBtn.disabled = vm.state === "saving";
+  }
+
+  function apply(vm: SearchFeedbackCaptureViewModel): void {
+    if (vm.state === "saved") {
+      paintSuccess(vm);
+      return;
+    }
+    if (layout !== "editing" || !shell || !root.contains(shell.meaningInput)) {
+      buildEditing(vm);
+      return;
+    }
+    syncEditing(vm);
+  }
+
+  apply(initialVm);
 
   return {
     root,
     update(vm: SearchFeedbackCaptureViewModel) {
-      paint(vm);
-      if (vm.state === "ready") {
-        // Heading focus is applied by the host on first open.
-      }
+      apply(vm);
     },
   };
 }
