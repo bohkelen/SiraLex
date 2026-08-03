@@ -57,7 +57,8 @@ test.describe("CF2I6A feedback input stability", () => {
     });
     await page.locator(".search-feedback-manage-back").click();
 
-    // --- CF1 correction ---
+    // --- CF1 suggest correction (FR label: Décrivez le problème) ---
+    await setUiLocale(page, "fr");
     const toggle = page.locator("#langToggle");
     const label = (await toggle.textContent()) ?? "";
     if (!/Maninka|Target|Cible/.test(label.split("→")[0] ?? "")) {
@@ -71,12 +72,32 @@ test.describe("CF2I6A feedback input stability", () => {
     await expect(page.locator("#entry-suggest-correction")).toBeVisible({ timeout: 15_000 });
     await page.locator("#entry-suggest-correction").click();
     await expect(page.locator("[data-testid='correction-form']")).toBeVisible();
+    await expect(page.getByText("Décrivez le problème", { exact: true })).toBeVisible();
     await page.locator("#correction-form-issue").selectOption("spelling");
     await page.locator("#correction-form-target").selectOption({ index: 1 });
     const description = page.locator("#correction-form-description");
     await description.click();
-    await typeAndAssertFocus(page, description, "hello");
-    await expect(description).toHaveValue("hello");
+    await typeAndAssertFocus(page, description, "bonjour");
+    await expect(description).toHaveValue("bonjour");
+    await page.locator("#correction-form-save").click();
+    await expect(page.locator("#correction-form-success-heading")).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // --- CF1 manage edit (same FR description field; residual focus-steal path) ---
+    await page.locator("#openManageCorrections").click();
+    await expect(page.locator("[data-testid='correction-manage']")).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.locator(".correction-manage-row-button").first().click();
+    await page.getByRole("button", { name: "Modifier" }).click();
+    const manageDescription = page.locator("#correction-manage-description");
+    await expect(manageDescription).toBeVisible();
+    await expect(page.getByText("Décrivez le problème", { exact: true })).toBeVisible();
+    await manageDescription.click();
+    await manageDescription.fill("");
+    await typeAndAssertFocus(page, manageDescription, "corrige");
+    await expect(manageDescription).toHaveValue("corrige");
   });
 });
 

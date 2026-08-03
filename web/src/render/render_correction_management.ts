@@ -628,7 +628,10 @@ export function renderCorrectionManagement(
     stableEdit.saveBtn.disabled = vm.busy;
     stableEdit.cancelBtn.disabled = vm.busy;
 
-    if (vm.focusTarget !== "none") {
+    // Do not re-apply heading/list focus on keystroke sync — that steals the
+    // caret from text controls (same invariant as CF2 manage incremental sync).
+    // Only move focus for in-edit error surfacing after a failed save.
+    if (vm.focusTarget === "error_summary" || vm.focusTarget === "status") {
       applyFocus(vm);
     }
   }

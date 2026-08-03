@@ -288,8 +288,11 @@ describe("correction management session", () => {
     await session.load();
     await session.openDetail("d1");
     session.startEdit();
+    expect(lastVm(models).focusTarget).toBe("heading");
     session.setEditIssueType("nko");
+    expect(lastVm(models).focusTarget).toBe("none");
     session.setEditProblemDescription("N’Ko form looks wrong");
+    expect(lastVm(models).focusTarget).toBe("none");
     await session.saveEdit();
 
     const vm = lastVm(models);

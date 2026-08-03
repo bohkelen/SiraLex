@@ -163,6 +163,30 @@ proposed/other toggled via `hidden`; removed per-keystroke id-refocus.
 Also amended `render_correction_management.ts` with the same stable-edit pattern
 so Manage Corrections edit does not reintroduce the defect.
 
+### Residual follow-up (same amendment)
+
+After the first CF2I6A ship, Manage Corrections **description**
+(“Décrivez le problème”) still lost focus after one character.
+
+Second root cause (distinct from `replaceChildren`):
+
+```text
+startEdit() sets focusTarget = "heading"
+→ user types in #correction-manage-description
+→ syncStableEdit() re-called applyFocus("heading") on every keystroke
+→ caret stolen to heading
+```
+
+CF2 manage incremental sync never re-applied focus; CF1 manage incorrectly did.
+Unit coverage had masked this by forcing `focusTarget: "none"`.
+
+Fix:
+
+* `syncStableEdit` applies focus only for `error_summary` / `status`
+* edit field setters clear `focusTarget` to `"none"` (and clear `errorCode`)
+* unit test now keeps production-like `focusTarget: "heading"` across keystrokes
+* Playwright human-typing covers FR suggest + manage description paths
+
 ---
 
 ## 15. Controller/schema boundaries preserved
@@ -211,7 +235,8 @@ Uses sequential `locator.press(...)` (not `.fill()`) on:
 
 * CF2 capture meaning
 * CF2 manage edit meaning
-* CF1 correction description
+* CF1 suggest correction description (FR “Décrivez le problème”)
+* CF1 manage edit description (FR; residual heading-focus path)
 
 Plus lifecycle regressions:
 
