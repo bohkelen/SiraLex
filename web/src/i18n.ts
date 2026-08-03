@@ -609,6 +609,76 @@ const MESSAGES = {
       "The report could not be saved because of a local ID conflict. Try again.",
     "searchFeedback.capture.error.databaseWriteFailed":
       "The report could not be saved on this device.",
+    "searchFeedback.manage.open": "Manage Search Feedback",
+    "searchFeedback.manage.heading": "Search feedback",
+    "searchFeedback.manage.back": "← Back",
+    "searchFeedback.manage.backToList": "Back to list",
+    "searchFeedback.manage.loading": "Loading search feedback…",
+    "searchFeedback.manage.empty": "No search feedback yet",
+    "searchFeedback.manage.updated": "Updated {date}",
+    "searchFeedback.manage.meaningPreview": "Trying to find: “{meaning}”",
+    "searchFeedback.manage.meaningValue": "Requested meaning: {meaning}",
+    "searchFeedback.manage.detailsValue": "Additional details: {details}",
+    "searchFeedback.manage.resultCount": "{count} result(s)",
+    "searchFeedback.manage.timestamps": "Created {created} · Updated {updated}",
+    "searchFeedback.manage.resultState.noResult": "No results",
+    "searchFeedback.manage.resultState.resultsNotUseful":
+      "Results did not meet the user's need",
+    "searchFeedback.manage.direction.sourceToTarget": "Source → target",
+    "searchFeedback.manage.direction.targetToSource": "Target → source",
+    "searchFeedback.manage.availability.current": "Matching current dictionary",
+    "searchFeedback.manage.availability.contentDiffers":
+      "This feedback was recorded against an earlier version of the dictionary.",
+    "searchFeedback.manage.availability.unavailable":
+      "Original dictionary is not currently installed",
+    "searchFeedback.manage.provenance.toggle": "Technical provenance",
+    "searchFeedback.manage.edit": "Edit notes",
+    "searchFeedback.manage.saveEdit": "Save changes",
+    "searchFeedback.manage.saving": "Saving…",
+    "searchFeedback.manage.cancel": "Cancel",
+    "searchFeedback.manage.delete": "Delete",
+    "searchFeedback.manage.deleteConfirmTitle": "Delete this search feedback?",
+    "searchFeedback.manage.deleteConfirmBody":
+      "This removes the local report from this device. The dictionary is not changed.",
+    "searchFeedback.manage.deleteConfirmAction": "Delete feedback",
+    "searchFeedback.manage.meaningLabel": "What were you trying to find?",
+    "searchFeedback.manage.detailsLabel": "Additional details",
+    "searchFeedback.manage.optional": "optional",
+    "searchFeedback.manage.counter": "{count} / {max}",
+    "searchFeedback.manage.privacy":
+      "Search feedback includes the exact searches you chose to report and any notes you added. Exported files are plain JSON.",
+    "searchFeedback.manage.export.button": "Export all search feedback",
+    "searchFeedback.manage.export.progress": "Preparing export…",
+    "searchFeedback.manage.export.success":
+      "Exported {count} search feedback reports. File: {filename}",
+    "searchFeedback.manage.export.acknowledge": "Back to list",
+    "searchFeedback.manage.export.authority":
+      "This file contains unreviewed search feedback. It does not establish that dictionary entries are missing.",
+    "searchFeedback.manage.error.invalidStored":
+      "Stored search feedback is invalid. Export and list are blocked until the database is repaired or cleared.",
+    "searchFeedback.manage.error.readFailed": "Could not read search feedback.",
+    "searchFeedback.manage.error.writeFailed": "Could not update search feedback.",
+    "searchFeedback.manage.error.staleEdit":
+      "This feedback changed elsewhere. Reload the current report and edit again.",
+    "searchFeedback.manage.error.staleDelete":
+      "This feedback changed elsewhere. Reload the current report before deleting.",
+    "searchFeedback.manage.error.notFound": "This search feedback is no longer available.",
+    "searchFeedback.manage.error.invalidFields":
+      "The form could not be saved. Review the fields.",
+    "searchFeedback.manage.error.invalidTimestamp":
+      "A local clock error prevented saving.",
+    "searchFeedback.manage.error.exportFailed": "Could not export search feedback.",
+    "searchFeedback.manage.error.exportEmpty": "There is no search feedback to export.",
+    "searchFeedback.manage.error.exportInvalid":
+      "A stored search feedback report is invalid. Export is blocked.",
+    "searchFeedback.manage.error.exportDuplicate":
+      "Duplicate feedback identifiers block export.",
+    "searchFeedback.manage.error.exportTooLarge": "The export file is too large.",
+    "searchFeedback.manage.error.exportInvalidPackage":
+      "The generated export file was invalid.",
+    "searchFeedback.manage.deleteReminder":
+      "Before deleting the database, export your search feedback if you want to keep it.",
+    "searchFeedback.manage.deleteReminderAction": "Manage Search Feedback",
   },
   fr: {
     "app.subtitle": "Un dictionnaire utilisable hors ligne",
@@ -1171,6 +1241,85 @@ const MESSAGES = {
       "Le rapport n’a pas pu être enregistré en raison d’un conflit d’identifiant local. Réessayez.",
     "searchFeedback.capture.error.databaseWriteFailed":
       "Le rapport n’a pas pu être enregistré sur cet appareil.",
+    "searchFeedback.manage.open": "Gérer les retours sur la recherche",
+    "searchFeedback.manage.heading": "Retours sur la recherche",
+    "searchFeedback.manage.back": "← Retour",
+    "searchFeedback.manage.backToList": "Retour à la liste",
+    "searchFeedback.manage.loading": "Chargement des retours sur la recherche…",
+    "searchFeedback.manage.empty": "Aucun retour sur la recherche",
+    "searchFeedback.manage.updated": "Mis à jour le {date}",
+    "searchFeedback.manage.meaningPreview": "Cherchait : « {meaning} »",
+    "searchFeedback.manage.meaningValue": "Sens recherché : {meaning}",
+    "searchFeedback.manage.detailsValue": "Détails supplémentaires : {details}",
+    "searchFeedback.manage.resultCount": "{count} résultat(s)",
+    "searchFeedback.manage.timestamps": "Créé {created} · Mis à jour {updated}",
+    "searchFeedback.manage.resultState.noResult": "Aucun résultat",
+    "searchFeedback.manage.resultState.resultsNotUseful":
+      "Les résultats n’ont pas répondu au besoin de l’utilisateur",
+    "searchFeedback.manage.direction.sourceToTarget": "Source → cible",
+    "searchFeedback.manage.direction.targetToSource": "Cible → source",
+    "searchFeedback.manage.availability.current": "Correspond au dictionnaire actuel",
+    "searchFeedback.manage.availability.contentDiffers":
+      "Ce retour a été enregistré contre une version antérieure du dictionnaire.",
+    "searchFeedback.manage.availability.unavailable":
+      "Le dictionnaire d’origine n’est pas installé actuellement",
+    "searchFeedback.manage.provenance.toggle": "Provenance technique",
+    "searchFeedback.manage.edit": "Modifier les notes",
+    "searchFeedback.manage.saveEdit": "Enregistrer les modifications",
+    "searchFeedback.manage.saving": "Enregistrement…",
+    "searchFeedback.manage.cancel": "Annuler",
+    "searchFeedback.manage.delete": "Supprimer",
+    "searchFeedback.manage.deleteConfirmTitle":
+      "Supprimer ce retour sur la recherche ?",
+    "searchFeedback.manage.deleteConfirmBody":
+      "Cela retire le rapport local de cet appareil. Le dictionnaire n’est pas modifié.",
+    "searchFeedback.manage.deleteConfirmAction": "Supprimer le retour",
+    "searchFeedback.manage.meaningLabel": "Que cherchiez-vous à trouver ?",
+    "searchFeedback.manage.detailsLabel": "Détails supplémentaires",
+    "searchFeedback.manage.optional": "facultatif",
+    "searchFeedback.manage.counter": "{count} / {max}",
+    "searchFeedback.manage.privacy":
+      "Les retours sur la recherche incluent les recherches exactes que vous avez choisi de signaler et les notes que vous avez ajoutées. Les fichiers exportés sont du JSON brut.",
+    "searchFeedback.manage.export.button":
+      "Exporter tous les retours sur la recherche",
+    "searchFeedback.manage.export.progress": "Préparation de l’export…",
+    "searchFeedback.manage.export.success":
+      "{count} retours sur la recherche exportés. Fichier : {filename}",
+    "searchFeedback.manage.export.acknowledge": "Retour à la liste",
+    "searchFeedback.manage.export.authority":
+      "Ce fichier contient des retours sur la recherche non examinés. Il n’établit pas que des entrées du dictionnaire manquent.",
+    "searchFeedback.manage.error.invalidStored":
+      "Les retours sur la recherche stockés sont invalides. L’export et la liste sont bloqués jusqu’à réparation ou vidage de la base.",
+    "searchFeedback.manage.error.readFailed":
+      "Impossible de lire les retours sur la recherche.",
+    "searchFeedback.manage.error.writeFailed":
+      "Impossible de mettre à jour les retours sur la recherche.",
+    "searchFeedback.manage.error.staleEdit":
+      "Ce retour a changé ailleurs. Rechargez le rapport actuel et modifiez-le à nouveau.",
+    "searchFeedback.manage.error.staleDelete":
+      "Ce retour a changé ailleurs. Rechargez le rapport actuel avant de le supprimer.",
+    "searchFeedback.manage.error.notFound":
+      "Ce retour sur la recherche n’est plus disponible.",
+    "searchFeedback.manage.error.invalidFields":
+      "Le formulaire n’a pas pu être enregistré. Vérifiez les champs.",
+    "searchFeedback.manage.error.invalidTimestamp":
+      "Une erreur d’horloge locale a empêché l’enregistrement.",
+    "searchFeedback.manage.error.exportFailed":
+      "Impossible d’exporter les retours sur la recherche.",
+    "searchFeedback.manage.error.exportEmpty":
+      "Il n’y a aucun retour sur la recherche à exporter.",
+    "searchFeedback.manage.error.exportInvalid":
+      "Un retour sur la recherche stocké est invalide. L’export est bloqué.",
+    "searchFeedback.manage.error.exportDuplicate":
+      "Des identifiants de retour en double bloquent l’export.",
+    "searchFeedback.manage.error.exportTooLarge":
+      "Le fichier d’export est trop volumineux.",
+    "searchFeedback.manage.error.exportInvalidPackage":
+      "Le fichier d’export généré était invalide.",
+    "searchFeedback.manage.deleteReminder":
+      "Avant de supprimer la base de données, exportez vos retours sur la recherche si vous souhaitez les conserver.",
+    "searchFeedback.manage.deleteReminderAction":
+      "Gérer les retours sur la recherche",
   },
 } as const;
 

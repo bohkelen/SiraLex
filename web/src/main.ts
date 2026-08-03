@@ -115,6 +115,12 @@ import {
   deriveMatchedIrIdsFromRecords,
   type ExecutedSearchSnapshot,
 } from "./search_feedback/search_feedback_capture_model";
+import {
+  createSearchFeedbackManagementSession,
+  type SearchFeedbackManagementSession,
+} from "./search_feedback/search_feedback_management_session";
+import { countSearchFeedbackDrafts } from "./search_feedback/search_feedback_store";
+import { renderSearchFeedbackManagement } from "./render/render_search_feedback_management";
 import { createReviewSurfaceHost } from "./learning/review_surface_host";
 import {
   canOfferLearningSave,
@@ -198,6 +204,7 @@ app.innerHTML = `
           <div class="row" style="gap: 8px; flex-wrap: wrap">
             <button id="openSavedVocabulary" class="btn" type="button">${t("learning.openSaved")}</button>
             <button id="openManageCorrections" class="btn" type="button">${t("correctionFeedback.manage.open")}</button>
+            <button id="openManageSearchFeedback" class="btn" type="button">${t("searchFeedback.manage.open")}</button>
             <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
           </div>
         </div>
@@ -268,6 +275,7 @@ app.innerHTML = `
         <div class="row" style="margin-top: 12px; flex-direction: column; align-items: flex-start; gap: 8px">
           <p id="learningBackupDeleteReminder" class="learning-backup-delete-reminder" hidden></p>
           <p id="correctionFeedbackDeleteReminder" class="correction-manage-delete-reminder" hidden></p>
+          <p id="searchFeedbackDeleteReminder" class="search-feedback-manage-delete-reminder" hidden></p>
           <button id="clearDb" class="btn">${t("db.delete")}</button>
         </div>
       </div>
@@ -377,6 +385,9 @@ const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
 const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
 const openManageCorrectionsBtn = mustGetEl<HTMLButtonElement>("#openManageCorrections");
+const openManageSearchFeedbackBtn = mustGetEl<HTMLButtonElement>(
+  "#openManageSearchFeedback",
+);
 const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
 const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
 const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
@@ -401,6 +412,9 @@ const learningBackupHost = mustGetEl<HTMLDivElement>("#learningBackupHost");
 const learningBackupDeleteReminder = mustGetEl<HTMLParagraphElement>("#learningBackupDeleteReminder");
 const correctionFeedbackDeleteReminder = mustGetEl<HTMLParagraphElement>(
   "#correctionFeedbackDeleteReminder",
+);
+const searchFeedbackDeleteReminder = mustGetEl<HTMLParagraphElement>(
+  "#searchFeedbackDeleteReminder",
 );
 const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
 const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
@@ -871,6 +885,7 @@ openManageDictionariesBtn.addEventListener("click", () => {
   manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   void learningBackupSurface?.refreshCount();
   void updateCorrectionFeedbackDeleteReminder();
+  void updateSearchFeedbackDeleteReminder();
 });
 
 openSavedVocabularyBtn.addEventListener("click", () => {
@@ -879,6 +894,10 @@ openSavedVocabularyBtn.addEventListener("click", () => {
 
 openManageCorrectionsBtn.addEventListener("click", () => {
   showCorrectionManagement();
+});
+
+openManageSearchFeedbackBtn.addEventListener("click", () => {
+  showSearchFeedbackManagement();
 });
 
 catalogUrlInput.addEventListener("input", () => {
@@ -1769,7 +1788,9 @@ clearDbBtn.addEventListener("click", () => {
       await deleteSiralexDb();
       // Drop Saved Vocabulary / Review / correction hosts and focus intent before refresh.
       disposeActiveCorrectionManagement();
+      disposeActiveSearchFeedbackManagement();
       disposeActiveCorrectionForm();
+      disposeActiveSearchFeedbackForm();
       invalidateCollectionAndReviewContexts();
       learningBackupSurface?.dispose();
       learningBackupSurface = createAndMountLearningBackupSurface();
@@ -1783,6 +1804,7 @@ clearDbBtn.addEventListener("click", () => {
     await refreshDbStatus();
     await updateLearningBackupDeleteReminder();
     await updateCorrectionFeedbackDeleteReminder();
+    await updateSearchFeedbackDeleteReminder();
   });
 });
 
@@ -2147,8 +2169,9 @@ let activeCorrectionManagement: CorrectionManagementSession | undefined;
 let lastExecutedSearch: ExecutedSearchSnapshot | undefined;
 let searchFeedbackFormGeneration = 0;
 let activeSearchFeedbackForm: SearchFeedbackCaptureController | undefined;
-/** CF2I4 seam: bump when local search feedback is created. */
+/** CF2I4 seam: bump when local search feedback is created (invalidates mounted manage host). */
 let searchFeedbackManagementGeneration = 0;
+let activeSearchFeedbackManagement: SearchFeedbackManagementSession | undefined;
 
 /** Explicit host context for #searchResults navigation (LS1I3 / LS2I3 / LS2I4 / LS3I3). */
 type ResultsHostContext =
@@ -2184,6 +2207,44 @@ function invalidateCorrectionManagementGeneration() {
 
 function invalidateSearchFeedbackManagementGeneration() {
   searchFeedbackManagementGeneration += 1;
+}
+
+function disposeActiveSearchFeedbackManagement() {
+  activeSearchFeedbackManagement?.dispose();
+  activeSearchFeedbackManagement = undefined;
+  searchFeedbackManagementGeneration += 1;
+}
+
+async function updateSearchFeedbackDeleteReminder(): Promise<void> {
+  try {
+    const db = await openSiralexDb();
+    try {
+      const count = await countSearchFeedbackDrafts(db);
+      if (count > 0) {
+        searchFeedbackDeleteReminder.hidden = false;
+        searchFeedbackDeleteReminder.replaceChildren();
+        searchFeedbackDeleteReminder.appendChild(
+          document.createTextNode(`${t("searchFeedback.manage.deleteReminder")} `),
+        );
+        const link = document.createElement("button");
+        link.type = "button";
+        link.className = "btn";
+        link.textContent = t("searchFeedback.manage.deleteReminderAction");
+        link.addEventListener("click", () => {
+          showSearchFeedbackManagement();
+        });
+        searchFeedbackDeleteReminder.appendChild(link);
+      } else {
+        searchFeedbackDeleteReminder.hidden = true;
+        searchFeedbackDeleteReminder.replaceChildren();
+      }
+    } finally {
+      db.close();
+    }
+  } catch {
+    searchFeedbackDeleteReminder.hidden = true;
+    searchFeedbackDeleteReminder.replaceChildren();
+  }
 }
 
 function clearExecutedSearchSnapshot(): void {
@@ -2232,10 +2293,80 @@ async function updateCorrectionFeedbackDeleteReminder(): Promise<void> {
   }
 }
 
+function showSearchFeedbackManagement(): void {
+  disposeActiveReviewHost();
+  disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
+  disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackManagement();
+  const generation = ++searchFeedbackManagementGeneration;
+  resultsHostContext = "search";
+  entryDetailGeneration += 1;
+  savedVocabularyGeneration += 1;
+  searchResults.innerHTML = "";
+
+  let viewUpdate:
+    | ((vm: ReturnType<SearchFeedbackManagementSession["getVm"]>) => void)
+    | undefined;
+  const session = createSearchFeedbackManagementSession({
+    openDb: openSiralexDb,
+    dbOwnership: "controller_owned",
+    now: () => new Date().toISOString(),
+    appVersion: APP_VERSION,
+    isCurrent: () =>
+      generation === searchFeedbackManagementGeneration &&
+      activeSearchFeedbackManagement === session,
+    onModel: (vm) => {
+      viewUpdate?.(vm);
+    },
+    onFeedbackChanged: () => {
+      void updateSearchFeedbackDeleteReminder();
+    },
+  });
+  activeSearchFeedbackManagement = session;
+
+  const view = renderSearchFeedbackManagement(session.getVm(), {
+    onOpenDetail: (feedbackId) => {
+      void session.openDetail(feedbackId);
+    },
+    onBackToList: () => session.backToList(),
+    onStartEdit: () => session.startEdit(),
+    onCancelEdit: () => session.cancelEdit(),
+    onSaveEdit: () => {
+      void session.saveEdit();
+    },
+    onRequestedMeaningChange: (value) => session.setEditRequestedMeaning(value),
+    onUserDescriptionChange: (value) => session.setEditUserDescription(value),
+    onRequestDelete: () => session.requestDelete(),
+    onCancelDelete: () => session.cancelDelete(),
+    onConfirmDelete: () => {
+      void session.confirmDelete();
+    },
+    onExport: () => {
+      void session.exportAll();
+    },
+    onAcknowledgeExport: () => session.acknowledgeExport(),
+    onBack: () => {
+      disposeActiveSearchFeedbackManagement();
+      if (lastSearchResults.length > 0) {
+        showResultsList();
+      } else if (lastExecutedSearch?.result_state === "no_result") {
+        showNoResultSearchSurface(lastExecutedSearch.query_raw);
+      } else {
+        searchResults.innerHTML = "";
+      }
+    },
+  });
+  viewUpdate = view.update;
+  searchResults.appendChild(view.root);
+  void session.load();
+}
+
 function showCorrectionManagement(): void {
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
   disposeActiveSearchFeedbackForm();
+  disposeActiveSearchFeedbackManagement();
   disposeActiveCorrectionManagement();
   const generation = ++correctionManagementGeneration;
   resultsHostContext = "search";
@@ -2389,6 +2520,7 @@ async function updateLearningBackupDeleteReminder(): Promise<void> {
 
 createAndMountLearningBackupSurface();
 void updateCorrectionFeedbackDeleteReminder();
+void updateSearchFeedbackDeleteReminder();
 
 function cancelPendingSettledQueryLog() {
   if (queryLoggingSettleTimer !== undefined) {
@@ -2463,6 +2595,7 @@ function showNoResultSearchSurface(query: string): void {
   disposeActiveCorrectionForm();
   disposeActiveCorrectionManagement();
   disposeActiveSearchFeedbackForm();
+  disposeActiveSearchFeedbackManagement();
   searchResults.innerHTML = "";
   if (!canOfferSearchFeedbackCapture(lastExecutedSearch)) return;
   searchResults.appendChild(
@@ -2563,6 +2696,7 @@ function showSearchFeedbackCapture(): void {
     },
     onFeedbackSaved: () => {
       invalidateSearchFeedbackManagementGeneration();
+      void updateSearchFeedbackDeleteReminder();
     },
   });
   activeSearchFeedbackForm = controller;
@@ -2592,6 +2726,7 @@ function showResultsList() {
   disposeActiveCorrectionForm();
   disposeActiveCorrectionManagement();
   disposeActiveSearchFeedbackForm();
+  disposeActiveSearchFeedbackManagement();
   invalidateCollectionAndReviewContexts();
   searchResults.innerHTML = "";
   if (lastSearchResults.length === 0) return;
@@ -2623,6 +2758,7 @@ function showReviewSurface() {
   disposeActiveCorrectionForm();
   disposeActiveSearchFeedbackForm();
   disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackManagement();
   const generation = ++reviewGeneration;
   resultsHostContext = "review";
   entryDetailGeneration += 1;
@@ -2652,6 +2788,7 @@ function showSavedVocabulary() {
   disposeActiveCorrectionForm();
   disposeActiveSearchFeedbackForm();
   disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackManagement();
   const generation = ++savedVocabularyGeneration;
   resultsHostContext = "saved_vocabulary";
   entryDetailGeneration += 1;
@@ -2838,6 +2975,7 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
   disposeActiveCorrectionForm();
   disposeActiveSearchFeedbackForm();
   disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackManagement();
   if (origin.kind === "search") {
     savedVocabularyGeneration += 1;
   }
