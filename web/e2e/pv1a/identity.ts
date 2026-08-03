@@ -68,6 +68,8 @@ export type DeployedCandidateIdentity = {
   catalog_primary_bundle: CatalogBundleEntry | undefined;
   featured_manifest_http_status: number;
   featured_manifest: BundleManifest | undefined;
+  featured_records_http_status: number;
+  featured_search_index_http_status: number;
   primary_manifest_http_status: number;
   primary_manifest: BundleManifest | undefined;
   shell_html_title: string | undefined;
@@ -79,6 +81,7 @@ export type DeployedCandidateIdentity = {
     open_manage_corrections: boolean;
     open_manage_search_feedback: boolean;
     open_saved_vocabulary: boolean;
+    learning_backup_host: boolean;
     search_feedback_report: boolean;
     correction_manage_description: boolean;
     app_version_0_0_0: boolean;
@@ -171,6 +174,20 @@ async function fetchText(
   return { status: response.status, text, finalUrl: response.url };
 }
 
+/** Prefer HEAD for large payloads; fall back to GET status if HEAD unsupported. */
+async function fetchHeadOrGet(url: string): Promise<number> {
+  try {
+    const head = await fetch(url, { method: "HEAD", redirect: "follow" });
+    if (head.status !== 405 && head.status !== 501) return head.status;
+  } catch {
+    // fall through
+  }
+  const get = await fetch(url, { method: "GET", redirect: "follow" });
+  // Drain body so the connection can close cleanly for large assets.
+  await get.arrayBuffer();
+  return get.status;
+}
+
 function parseCatalog(text: string): {
   catalog_schema_version?: string;
   bundles: CatalogBundleEntry[];
@@ -212,6 +229,13 @@ export async function resolveDeployedCandidateIdentity(options: {
     featuredManifest = JSON.parse(featuredManifestFetch.text) as BundleManifest;
   }
 
+  const featuredRecords = await fetchHeadOrGet(
+    `${base}/${options.repositoryFeaturedBundleId}/records.jsonl`,
+  );
+  const featuredSearchIndex = await fetchHeadOrGet(
+    `${base}/${options.repositoryFeaturedBundleId}/search_index.jsonl`,
+  );
+
   let primaryManifest: BundleManifest | undefined;
   let primaryManifestStatus = 0;
   if (primary) {
@@ -240,6 +264,7 @@ export async function resolveDeployedCandidateIdentity(options: {
     open_manage_corrections: shellJsText.includes("openManageCorrections"),
     open_manage_search_feedback: shellJsText.includes("openManageSearchFeedback"),
     open_saved_vocabulary: shellJsText.includes("openSavedVocabulary"),
+    learning_backup_host: root.text.includes("learningBackupHost") || shellJsText.includes("learningBackupHost"),
     search_feedback_report: shellJsText.includes("search-feedback-report"),
     correction_manage_description: shellJsText.includes("correction-manage-description"),
     app_version_0_0_0: shellJsText.includes("0.0.0"),
@@ -259,6 +284,8 @@ export async function resolveDeployedCandidateIdentity(options: {
     catalog_primary_bundle: primary,
     featured_manifest_http_status: featuredManifestFetch.status,
     featured_manifest: featuredManifest,
+    featured_records_http_status: featuredRecords,
+    featured_search_index_http_status: featuredSearchIndex,
     primary_manifest_http_status: primaryManifestStatus,
     primary_manifest: primaryManifest,
     shell_html_title: titleMatch?.[1],
@@ -294,8 +321,18 @@ export function reconcileIdentities(
     deployed.shell_markers.featured_bundle_id &&
     deployed.shell_markers.open_manage_corrections &&
     deployed.shell_markers.open_manage_search_feedback &&
+    deployed.shell_markers.open_saved_vocabulary &&
+    deployed.shell_markers.learning_backup_host &&
     deployed.shell_markers.search_feedback_report &&
     deployed.shell_markers.correction_manage_description;
+
+  const payloadsOk =
+    deployed.featured_manifest_http_status === 200 &&
+    deployed.featured_records_http_status === 200 &&
+    deployed.featured_search_index_http_status === 200 &&
+    deployed.webmanifest_http_status === 200 &&
+    deployed.root_http_status === 200 &&
+    deployed.catalog_http_status === 200;
 
   if (!deployed.catalog_featured_match) {
     notes.push(
@@ -307,9 +344,14 @@ export function reconcileIdentities(
       `Repository featured manifest HTTP ${deployed.featured_manifest_http_status} at /${repository.featured_bundle_id}/bundle.manifest.json.`,
     );
   }
+  if (deployed.featured_records_http_status !== 200 || deployed.featured_search_index_http_status !== 200) {
+    notes.push(
+      `Featured payloads: records=${deployed.featured_records_http_status} search_index=${deployed.featured_search_index_http_status}.`,
+    );
+  }
   if (!amendedRuntimeMarkersPresent) {
     notes.push(
-      "Deployed app shell JS lacks amended-candidate runtime markers (featured bundle id and/or CF1/CF2 management surfaces). CF2I6A renderer stability fix cannot be present in this shell.",
+      "Deployed app shell JS lacks amended-candidate runtime markers (featured bundle id and/or CF1/CF2/Learning management surfaces). CF2I6A renderer stability fix cannot be present in this shell.",
     );
   }
   if (deployed.catalog_primary_bundle) {
@@ -319,13 +361,13 @@ export function reconcileIdentities(
   }
 
   let alignment: AlignmentStatus;
-  if (bundleIdReconciled && catalogHashReconciled && amendedRuntimeMarkersPresent) {
+  if (bundleIdReconciled && catalogHashReconciled && amendedRuntimeMarkersPresent && payloadsOk) {
     alignment = "ALIGNED";
     notes.push("Repository candidate and deployed production candidate reconcile.");
   } else if (
     deployed.root_http_status === 200 &&
     deployed.catalog_http_status === 200 &&
-    (!bundleIdReconciled || !amendedRuntimeMarkersPresent)
+    (!bundleIdReconciled || !amendedRuntimeMarkersPresent || !payloadsOk)
   ) {
     alignment = "DEPLOYMENT_BEHIND_REPOSITORY";
     notes.push(

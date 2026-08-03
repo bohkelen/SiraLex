@@ -12,6 +12,8 @@
 
 import { expect, test, type Page, type Request, type Response } from "@playwright/test";
 
+import { parseLearningBackupJson } from "../../src/learning/learning_backup_package";
+
 import {
   AMENDED_FLOOR_COMMIT,
   DEFAULT_PRODUCTION_URL,
@@ -75,47 +77,43 @@ test.describe("PV1A production identity and desktop smoke", () => {
       ].join(" | "),
     );
 
-    const httpsOk =
+    const assetsOk =
       identity.deployed.root_http_status === 200 &&
       identity.deployed.catalog_http_status === 200 &&
-      (identity.deployed.featured_manifest_http_status === 200 ||
-        identity.deployed.primary_manifest_http_status === 200);
-
-    if (
-      identity.deployed.root_http_status === 200 &&
-      identity.deployed.catalog_http_status === 200 &&
+      identity.deployed.webmanifest_http_status === 200 &&
+      identity.deployed.featured_manifest_http_status === 200 &&
+      identity.deployed.featured_records_http_status === 200 &&
+      identity.deployed.featured_search_index_http_status === 200 &&
       identity.bundle_id_reconciled &&
-      identity.catalog_hash_reconciled
-    ) {
+      identity.catalog_hash_reconciled;
+
+    if (assetsOk) {
       mark(
         scenarios,
         "https_root_catalog_manifest",
         "PASS",
-        "Root, catalog, and repository featured manifest reconcile over HTTPS.",
+        "Root, webmanifest, catalog, featured manifest, records, and search_index reconcile over HTTPS.",
       );
-    } else if (httpsOk && !identity.bundle_id_reconciled) {
-      mark(
-        scenarios,
-        "https_root_catalog_manifest",
-        "FAIL",
-        `Root/catalog reachable, but repository featured manifest HTTP ${identity.deployed.featured_manifest_http_status}; deployed primary manifest HTTP ${identity.deployed.primary_manifest_http_status}.`,
-      );
-      defects.push({
-        class: "DEPLOYMENT_DEFECT",
-        summary:
-          "Deployed catalog/manifest set does not include the repository featured bundle assets.",
-        blocks_verified: true,
-      });
     } else {
       mark(
         scenarios,
         "https_root_catalog_manifest",
         "FAIL",
-        `HTTPS probe failed: root=${identity.deployed.root_http_status} catalog=${identity.deployed.catalog_http_status}`,
+        [
+          `root=${identity.deployed.root_http_status}`,
+          `catalog=${identity.deployed.catalog_http_status}`,
+          `webmanifest=${identity.deployed.webmanifest_http_status}`,
+          `featured_manifest=${identity.deployed.featured_manifest_http_status}`,
+          `records=${identity.deployed.featured_records_http_status}`,
+          `search_index=${identity.deployed.featured_search_index_http_status}`,
+          `bundle_id_reconciled=${identity.bundle_id_reconciled}`,
+          `hash_reconciled=${identity.catalog_hash_reconciled}`,
+        ].join(" "),
       );
       defects.push({
         class: "DEPLOYMENT_DEFECT",
-        summary: "Production HTTPS root or catalog unavailable.",
+        summary:
+          "Deployed catalog/manifest/payload set does not fully reconcile with the repository featured candidate.",
         blocks_verified: true,
       });
     }
@@ -185,9 +183,11 @@ test.describe("PV1A production identity and desktop smoke", () => {
       const requiredIds = [
         "production_identity_resolved",
         "https_root_catalog_manifest",
+        "shell_capability_gate",
         "clean_first_run_install",
         "source_to_target_search",
         "target_to_source_search",
+        "accented_unicode_search",
         "entry_detail",
         "learning_smoke",
         "lp1_smoke",
@@ -315,12 +315,20 @@ test.describe("PV1A production identity and desktop smoke", () => {
         description: evidencePath,
       });
 
-      // Harness completes successfully when it correctly records VERIFIED or BLOCKED.
+      // Harness records VERIFIED only when aligned and all required scenarios pass.
       expect(["PV1A_PRODUCTION_DESKTOP_SMOKE_VERIFIED", "PV1A_PRODUCTION_DESKTOP_SMOKE_BLOCKED"]).toContain(
         decision,
       );
       if (identity.alignment_status !== "ALIGNED") {
         expect(decision).toBe("PV1A_PRODUCTION_DESKTOP_SMOKE_BLOCKED");
+      } else {
+        expect(
+          decision,
+          `Aligned production must verify; failed scenarios: ${scenarios
+            .filter((s) => s.status === "FAIL")
+            .map((s) => s.id)
+            .join(", ")}`,
+        ).toBe("PV1A_PRODUCTION_DESKTOP_SMOKE_VERIFIED");
       }
     } finally {
       await context.close();
@@ -362,9 +370,11 @@ async function runMisalignedProductionProbe(
 
   const blockedNote = `Skipped against amended candidate: deployment alignment ${identity.alignment_status}. Deployed shell markers: CF1=${hasCf1}, CF2=${hasCf2}, Learning=${hasLearning}. Deployed catalog featured match=${Boolean(identity.deployed.catalog_featured_match)}.`;
 
+  mark(scenarios, "shell_capability_gate", "FAIL", blockedNote);
   for (const id of [
     "source_to_target_search",
     "target_to_source_search",
+    "accented_unicode_search",
     "entry_detail",
     "learning_smoke",
     "lp1_smoke",
@@ -417,6 +427,38 @@ async function runAlignedProductionSmoke(options: {
   });
 
   const defaultLocale = await page.locator("#localeSelect").inputValue();
+
+  // Shell capability sanity gate before install/smoke.
+  const hasSaved = (await page.locator("#openSavedVocabulary").count()) > 0;
+  const hasCf1 = (await page.locator("#openManageCorrections").count()) > 0;
+  const hasCf2 = (await page.locator("#openManageSearchFeedback").count()) > 0;
+  await page.locator("#openManageDictionaries").click();
+  await page.locator("#manageDictionariesPanel").evaluate((el) => {
+    if (el instanceof HTMLDetailsElement) el.open = true;
+  });
+  const hasLearningData = (await page.locator("#learningBackupHost").count()) > 0;
+  if (hasSaved && hasCf1 && hasCf2 && hasLearningData) {
+    mark(
+      scenarios,
+      "shell_capability_gate",
+      "PASS",
+      "Saved Vocabulary, Manage Corrections, Manage Search Feedback, and Learning-data host present.",
+    );
+  } else {
+    mark(
+      scenarios,
+      "shell_capability_gate",
+      "FAIL",
+      `saved=${hasSaved} cf1=${hasCf1} cf2=${hasCf2} learningData=${hasLearningData}`,
+    );
+    defects.push({
+      class: "DEPLOYMENT_DEFECT",
+      summary: "Deployed shell missing Learning/CF1/CF2 management surfaces.",
+      blocks_verified: true,
+    });
+    return;
+  }
+
   await setUiLocale(page, "fr");
   await expect(page.locator("#featuredInstall")).toBeVisible();
   await page.locator("#featuredInstall").click();
@@ -457,6 +499,7 @@ async function runAlignedProductionSmoke(options: {
   await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
     timeout: 15_000,
   });
+  mark(scenarios, "accented_unicode_search", "PASS", `Query ${QUERY_ACCENTED}`);
 
   await ensureTargetToSource(page);
   await runSearch(page, QUERY_TARGET_HIT);
@@ -471,11 +514,13 @@ async function runAlignedProductionSmoke(options: {
     timeout: 15_000,
   });
 
-  // Entry detail
-  await runSearch(page, QUERY_SOURCE_HIT);
-  await page.locator("#searchResults .result-open").first().click();
+  // Entry detail (genuine lexicon_entry, not source-result shell)
+  await openGenuineLexiconEntry(page, QUERY_SOURCE_HIT);
+  await expect(page.locator(".entry-detail.entry-lexicon")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".entry-headword")).toBeVisible({ timeout: 15_000 });
-  const entryText = (await page.locator("#entryView").innerText()) ?? "";
+  await expect(page.locator("#entry-learning-save")).toBeVisible();
+  await expect(page.locator("#entry-suggest-correction")).toBeVisible();
+  const entryText = (await page.locator(".entry-detail.entry-lexicon").innerText()) ?? "";
   if (/storage_scope_id|content_sha256|git_commit/i.test(entryText)) {
     mark(
       scenarios,
@@ -489,7 +534,12 @@ async function runAlignedProductionSmoke(options: {
       blocks_verified: true,
     });
   } else {
-    mark(scenarios, "entry_detail", "PASS", "Lexicon entry rendered without metadata leak.");
+    mark(
+      scenarios,
+      "entry_detail",
+      "PASS",
+      "Genuine lexicon entry rendered with Save/Suggest; no metadata leak.",
+    );
   }
   screenshotBuffers.push({
     name: "02_entry_detail.png",
@@ -497,10 +547,11 @@ async function runAlignedProductionSmoke(options: {
   });
 
   // Learning smoke
-  await page.locator("#entry-save").click();
+  await page.locator("#entry-learning-save").click();
   await page.locator("#openSavedVocabulary").click();
   await expect(page.locator("#saved-vocab-heading")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".saved-vocab-list .saved-vocab-row").first()).toBeVisible();
+  await expect(page.locator("#saved-vocab-progress-heading")).toBeVisible();
   await page.locator("#saved-vocab-start-review").click();
   await expect(page.locator(".review-reveal").or(page.locator("#review-complete-heading"))).toBeVisible(
     { timeout: 15_000 },
@@ -510,8 +561,8 @@ async function runAlignedProductionSmoke(options: {
     await page.locator(".review-still-learning").click();
   }
   await page.locator(".review-back").click();
-  await page.locator("#openProgress").click();
-  await expect(page.locator("#progress-heading")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("#saved-vocab-heading")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("#saved-vocab-progress-heading")).toBeVisible({ timeout: 15_000 });
   mark(scenarios, "learning_smoke", "PASS", "Save → Saved Vocabulary → Review → Progress.");
 
   // LP1 export + preview cancel
@@ -527,38 +578,43 @@ async function runAlignedProductionSmoke(options: {
   const { readFile } = await import("node:fs/promises");
   const learningText = await readFile(learningPath, "utf8");
   downloadTexts.push({ name: learningDownload.suggestedFilename(), text: learningText });
-  const learningPkg = JSON.parse(learningText) as { package_schema?: string };
-  if (learningPkg.package_schema !== "siralex_learning_backup_v1") {
-    mark(scenarios, "lp1_smoke", "FAIL", `Unexpected package_schema ${learningPkg.package_schema}`);
+  const parsedLearning = parseLearningBackupJson(learningText, {
+    byteLength: Buffer.byteLength(learningText, "utf8"),
+  });
+  if (!parsedLearning.ok) {
+    mark(
+      scenarios,
+      "lp1_smoke",
+      "FAIL",
+      `LP1 parser rejected export: ${parsedLearning.errors.map((e) => e.code).join(",")}`,
+    );
     defects.push({
       class: "PRODUCT_DEFECT",
       summary: "LP1 export failed production parser schema check.",
       blocks_verified: true,
     });
   } else {
-    // Bounded restore: preview then cancel when UI exposes cancel.
-    const restoreInput = page.locator("#learningBackupRestoreFile");
+    const restoreInput = page.locator("#learning-backup-file-input");
     if ((await restoreInput.count()) > 0) {
-      const tmpPath = await learningDownload.path();
-      if (tmpPath) {
-        await restoreInput.setInputFiles(tmpPath);
-        const cancel = page
-          .locator("button")
-          .filter({ hasText: /Cancel|Annuler/i })
-          .first();
-        if (await cancel.isVisible().catch(() => false)) {
-          await cancel.click();
-        }
-      }
+      await restoreInput.setInputFiles(learningPath);
+      await expect(page.locator("#learning-backup-preview-heading")).toBeVisible({
+        timeout: 15_000,
+      });
+      // Bounded restore: abandon preview by returning to search shell (no apply).
+      await page.goto("/", { waitUntil: "domcontentloaded" });
+      await expect(page.locator("#searchInput")).toBeEnabled({ timeout: 30_000 });
     }
-    mark(scenarios, "lp1_smoke", "PASS", "Export validated; restore limited to safe preview/cancel.");
+    mark(
+      scenarios,
+      "lp1_smoke",
+      "PASS",
+      "Export validated by parseLearningBackupJson; restore preview opened then abandoned without apply.",
+    );
   }
 
   // CF1 human typing
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await ensureSourceToTarget(page);
-  await runSearch(page, QUERY_SOURCE_HIT);
-  await page.locator("#searchResults .result-open").first().click();
+  await openGenuineLexiconEntry(page, QUERY_SOURCE_HIT);
   await expect(page.locator("#entry-suggest-correction")).toBeVisible({ timeout: 15_000 });
   await page.locator("#entry-suggest-correction").click();
   await expect(page.locator("[data-testid='correction-form']")).toBeVisible();
@@ -587,13 +643,18 @@ async function runAlignedProductionSmoke(options: {
   await manageDesc.click();
   await manageDesc.fill("");
   await typeAndAssertFocus(page, manageDesc, "edit");
+  await expect(manageDesc).toHaveValue("edit");
   await page.getByRole("button", { name: /Save changes|Enregistrer/i }).click();
+  await expect(page.locator(".correction-manage-description")).toContainText("edit", {
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: /Back to list|Retour à la liste/i }).click();
+  await expect(page.locator("#correction-manage-export")).toBeEnabled({ timeout: 15_000 });
   const cf1ExportPromise = page.waitForEvent("download", { timeout: 30_000 });
-  await page.locator(".correction-manage-export .btn, button").filter({ hasText: /Export/i }).first().click();
+  await page.locator("#correction-manage-export").click();
   const cf1Download = await cf1ExportPromise;
   const cf1Path = await cf1Download.path();
   if (cf1Path) {
-    const { readFile } = await import("node:fs/promises");
     downloadTexts.push({
       name: cf1Download.suggestedFilename(),
       text: await readFile(cf1Path, "utf8"),
@@ -637,17 +698,18 @@ async function runAlignedProductionSmoke(options: {
   await manageMeaning.click();
   await manageMeaning.fill("");
   await typeAndAssertFocus(page, manageMeaning, "ok");
+  await expect(manageMeaning).toHaveValue("ok");
   await page.getByRole("button", { name: /Save changes|Enregistrer/i }).click();
+  await expect(page.locator(".search-feedback-manage-detail-meaning")).toContainText("ok", {
+    timeout: 15_000,
+  });
+  await page.locator(".search-feedback-manage-back-list").click();
+  await expect(page.locator("#search-feedback-manage-export")).toBeEnabled({ timeout: 15_000 });
   const cf2ExportPromise = page.waitForEvent("download", { timeout: 30_000 });
-  await page
-    .locator("button")
-    .filter({ hasText: /Export/i })
-    .first()
-    .click();
+  await page.locator("#search-feedback-manage-export").click();
   const cf2Download = await cf2ExportPromise;
   const cf2Path = await cf2Download.path();
   if (cf2Path) {
-    const { readFile } = await import("node:fs/promises");
     downloadTexts.push({
       name: cf2Download.suggestedFilename(),
       text: await readFile(cf2Path, "utf8"),
@@ -663,7 +725,7 @@ async function runAlignedProductionSmoke(options: {
     scenarios,
     "feedback_input_amendment_regression",
     "PASS",
-    "Sequential key presses retained focus on CF1/CF2 free-text fields.",
+    "Sequential key presses retained focus on CF1 capture, CF1 manage edit, CF2 capture, and CF2 manage edit.",
   );
 
   // Hard reload persistence
@@ -686,13 +748,8 @@ async function runAlignedProductionSmoke(options: {
   await context.setOffline(true);
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: 30_000 });
-  await ensureSourceToTarget(page);
-  await runSearch(page, QUERY_SOURCE_HIT);
-  await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
-    timeout: 15_000,
-  });
-  await page.locator("#searchResults .result-open").first().click();
-  await expect(page.locator(".entry-headword")).toBeVisible({ timeout: 15_000 });
+  await openGenuineLexiconEntry(page, QUERY_SOURCE_HIT);
+  await expect(page.locator(".entry-detail.entry-lexicon")).toBeVisible({ timeout: 15_000 });
   await page.locator("#openSavedVocabulary").click();
   await expect(page.locator("#saved-vocab-heading")).toBeVisible({ timeout: 15_000 });
   await page.locator("#openManageCorrections").click();
@@ -708,6 +765,9 @@ async function runAlignedProductionSmoke(options: {
     "Core shipped desktop functionality remains usable without a remote network dependency after the application shell and dictionary are locally available.",
   );
   await context.setOffline(false);
+  // Allow SW to claim the page after returning online.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("#searchInput")).toBeEnabled({ timeout: 30_000 });
 
   await observePwa(page, scenarios);
   await observeIndexedDb(page, scenarios);
@@ -766,7 +826,15 @@ async function observePwa(page: Page, scenarios: ScenarioResult[]): Promise<void
     }
   });
 
-  if (manifestOk.ok && sw.supported && "ok" in sw && sw.ok && (sw.controller || sw.active)) {
+  if (
+    manifestOk.ok &&
+    sw.supported &&
+    "ok" in sw &&
+    sw.ok &&
+    sw.controller &&
+    "active" in sw &&
+    sw.active
+  ) {
     mark(
       scenarios,
       "pwa_service_worker",
@@ -992,6 +1060,27 @@ async function runSearch(page: Page, query: string): Promise<void> {
   await page.waitForTimeout(300);
 }
 
+/** Open a genuine lexicon_entry (via target link when source-result shell is shown). */
+async function openGenuineLexiconEntry(page: Page, sourceQuery: string): Promise<void> {
+  await ensureSourceToTarget(page);
+  await runSearch(page, sourceQuery);
+  await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.locator("#searchResults .result-open").first().click();
+  await expect(page.locator(".entry-headword")).toBeVisible({ timeout: 15_000 });
+
+  if (await page.locator(".entry-detail.entry-lexicon").isVisible().catch(() => false)) {
+    return;
+  }
+
+  const targetLink = page.locator(".entry-index .target-link").first();
+  await expect(targetLink).toBeVisible({ timeout: 15_000 });
+  await targetLink.click();
+  await expect(page.locator(".entry-detail.entry-lexicon")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("#entry-learning-save")).toBeVisible({ timeout: 15_000 });
+}
+
 async function getActiveBundleId(page: Page): Promise<string | undefined> {
   return page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -1013,11 +1102,10 @@ async function getActiveBundleId(page: Page): Promise<string | undefined> {
 }
 
 async function openManageLearningData(page: Page): Promise<void> {
-  const direct = page.locator("#openManageLearningData");
-  if ((await direct.count()) > 0) {
-    await direct.click();
-    return;
-  }
-  await page.locator("#openSavedVocabulary").click();
-  await page.locator("button").filter({ hasText: /Manage Learning Data|Gérer les données/i }).click();
+  await page.locator("#openManageDictionaries").click();
+  await expect(page.locator("#manageDictionariesPanel")).toBeVisible();
+  await page.locator("#manageDictionariesPanel").evaluate((el) => {
+    if (el instanceof HTMLDetailsElement) el.open = true;
+  });
+  await expect(page.locator("#learning-backup-heading")).toBeVisible({ timeout: 15_000 });
 }

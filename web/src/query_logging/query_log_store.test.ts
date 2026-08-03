@@ -685,28 +685,33 @@ describe("query log store v2", () => {
     }
   });
 
-  it("evicts the oldest row when the 2001st append exceeds QUERY_LOG_MAX_ROWS", async () => {
-    const db = await openSiralexDb();
-    try {
-      for (let i = 0; i < QUERY_LOG_MAX_ROWS + 1; i += 1) {
-        await appendQueryLogV2(
-          db,
-          makeAppendV2Input({
-            query_raw: `q-${i}`,
-            event_id: `evt-${i}`,
-            timestamp_iso: `2026-06-18T00:00:${String(i % 60).padStart(2, "0")}.000Z`,
-          }),
-        );
-      }
+  // 2001 sequential IndexedDB appends; needs headroom under full-suite load.
+  it(
+    "evicts the oldest row when the 2001st append exceeds QUERY_LOG_MAX_ROWS",
+    async () => {
+      const db = await openSiralexDb();
+      try {
+        for (let i = 0; i < QUERY_LOG_MAX_ROWS + 1; i += 1) {
+          await appendQueryLogV2(
+            db,
+            makeAppendV2Input({
+              query_raw: `q-${i}`,
+              event_id: `evt-${i}`,
+              timestamp_iso: `2026-06-18T00:00:${String(i % 60).padStart(2, "0")}.000Z`,
+            }),
+          );
+        }
 
-      expect(await countQueryLogs(db)).toBe(QUERY_LOG_MAX_ROWS);
-      const rows = await listQueryLogs(db);
-      expect(rows[0]?.query_raw).toBe("q-1");
-      expect(rows[rows.length - 1]?.query_raw).toBe(`q-${QUERY_LOG_MAX_ROWS}`);
-    } finally {
-      db.close();
-    }
-  });
+        expect(await countQueryLogs(db)).toBe(QUERY_LOG_MAX_ROWS);
+        const rows = await listQueryLogs(db);
+        expect(rows[0]?.query_raw).toBe("q-1");
+        expect(rows[rows.length - 1]?.query_raw).toBe(`q-${QUERY_LOG_MAX_ROWS}`);
+      } finally {
+        db.close();
+      }
+    },
+    30_000,
+  );
 
   it("prunes rows older than QUERY_LOG_MAX_AGE_MS on append", async () => {
     const db = await openSiralexDb();

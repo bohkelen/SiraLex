@@ -11,7 +11,8 @@ const productionUrl = (
 
 export default defineConfig({
   testDir: "./e2e/pv1a",
-  timeout: 900_000,
+  // Featured dictionary download + IndexedDB import on production can exceed 15m.
+  timeout: 2_700_000,
   expect: {
     timeout: 30_000,
   },
