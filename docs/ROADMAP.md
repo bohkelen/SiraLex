@@ -138,7 +138,8 @@ CF2I1 — Search Feedback Model and Validation — Implemented
 CF2I2 — Local Search Feedback Store — Implemented
 CF2I3 — Search Failure Capture Surface — Implemented
 CF2I4 — Manage Search Feedback and Export — Implemented
-CF2I5 — Offline Search Feedback Lifecycle Verification — Next
+CF2I5 — Offline Search Feedback Lifecycle Verification — Implemented
+CF2I6 — Search Feedback Closure — Next
 PV1A — Production Identity and Desktop Smoke — Parallel active
 PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 ```
@@ -155,7 +156,8 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **CF2I2** implements IndexedDB persistence (`docs/reports/cf2i2_local_search_feedback_store_report.md`): DB v6 `search_failure_feedback`; secure IDs; immutable search-event provenance; editable user explanation only; bundle retention; isolation from CF1/Learning/query logs.
 - **CF2I3** implements the local capture surface (`docs/reports/cf2i3_search_failure_capture_surface_report.md`): Report this search for `no_result` / `results_not_useful`; frozen executed-search snapshot; stale protection; query-log/CF1/Learning isolation; create-only (no manage/export).
 - **CF2I4** implements management + export (`docs/reports/cf2i4_manage_search_feedback_export_report.md`): Manage Search Feedback; edit explanation only; delete with concurrency; export-all `siralex_search_feedback_v1`; independent DB-deletion reminder; no community/server submission.
-- **Next product slice:** `CF2I5 — Offline Search Feedback Lifecycle Verification`.
+- **CF2I5** verifies the offline browser lifecycle (`docs/reports/cf2i5_offline_search_feedback_lifecycle_verification_report.md`): Chromium create/manage/edit/export/reload/delete; offline path; bundle removal retention; reminder lifecycle; isolation; EN/FR + a11y smoke; H1→H2 via Vitest (`NOT_APPLICABLE` in browser fixture).
+- **Next product slice:** `CF2I6 — Search Feedback Closure`.
 - **Parallel validation:** `PV1A` production identity/desktop smoke remains active; `PV1B` physical-device matrix remains hardware-gated / not run and must not be displaced by CF2. Phase 7N1 candidate identity may be recorded while device scenarios remain `not_run`.
 - Prior portfolio decision records: `docs/reports/pd2_post_cf1_product_build_decision.md`, `docs/reports/pd1_next_product_build_decision.md`, `docs/reports/pd0_next_product_build_decision.md`.
 
