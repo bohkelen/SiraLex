@@ -141,7 +141,7 @@ CF2I4 — Manage Search Feedback and Export — Implemented
 CF2I5 — Offline Search Feedback Lifecycle Verification — Implemented
 CF2I6 — Closure — Complete
 CF2I6A — Feedback Renderer Input Stability Amendment — Complete
-PV1A — Production Identity and Desktop Smoke — Parallel active
+PV1A — Production Identity and Desktop Smoke — BLOCKED (deployment behind amended candidate)
 PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 ```
 
@@ -156,7 +156,7 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **CF2 delivered:** `search_failure_feedback_draft_v1` + `siralex_search_feedback_v1`; IndexedDB `search_failure_feedback` (v6); Report this search capture; Manage Search Feedback; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
 - **CF2I6A** post-closure amendment (`docs/reports/cf2i6a_feedback_input_stability_amendment_report.md`): renderer input lifecycle fix so ordinary CF1/CF2 typing preserves textarea DOM nodes/focus; product contracts unchanged; CF1/CF2 remain CLOSED.
 - **Product-build track after CF2:** `NO ACTIVE PRODUCT BUILD`. Future candidates (including deferred `CG1 — Community Feedback Governance`) remain evidence-driven and are not automatically selected.
-- **Parallel validation:** `PV1A` production identity/desktop smoke remains active and should run on the CF2I6A-amended build; `PV1B` physical-device matrix remains hardware-gated / not run. Phase 7N1 candidate identity may be recorded while device scenarios remain `not_run`.
+- **Parallel validation:** `PV1A` ran against live production and is **BLOCKED** (`PV1A_PRODUCTION_DESKTOP_SMOKE_BLOCKED`, `docs/reports/pv1a_production_identity_desktop_smoke_report.md`): repository amended candidate (featured `bundle_full_20260710_337619ff`, CF2I6A floor `56cb76e`) is identifiable, but `loquacious-piroshki-be432c.netlify.app` still serves a pre-Learning/CF1/CF2 shell with 7J-only catalog assets (`DEPLOYMENT_BEHIND_REPOSITORY`). Re-run `npm run test:e2e:pv1a` after deploying the amended build. `PV1B` remains hardware-gated / not run.
 - Prior portfolio decision records: `docs/reports/pd2_post_cf1_product_build_decision.md`, `docs/reports/pd1_next_product_build_decision.md`, `docs/reports/pd0_next_product_build_decision.md`.
 
 ---
