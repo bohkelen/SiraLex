@@ -1,5 +1,5 @@
 export const SIRALEX_DB_NAME = "siralex_db";
-export const SIRALEX_DB_VERSION = 5;
+export const SIRALEX_DB_VERSION = 6;
 
 export const STORE_META = "meta" as const;
 export const STORE_RECORDS = "records" as const;
@@ -8,6 +8,7 @@ export const STORE_BUNDLES_REGISTRY = "bundles_registry" as const;
 export const STORE_QUERY_LOGS = "query_logs" as const;
 export const STORE_LEARNING_RECORDS = "learning_records" as const;
 export const STORE_CORRECTION_DRAFTS = "correction_drafts" as const;
+export const STORE_SEARCH_FAILURE_FEEDBACK = "search_failure_feedback" as const;
 
 const INDEX_BY_BUNDLE_ID = "by_bundle_id";
 export const LEARNING_RECORD_INDEX_BY_BUNDLE_ID = "by_bundle_id" as const;
@@ -22,7 +23,8 @@ export type SiralexObjectStoreName =
   | typeof STORE_BUNDLES_REGISTRY
   | typeof STORE_QUERY_LOGS
   | typeof STORE_LEARNING_RECORDS
-  | typeof STORE_CORRECTION_DRAFTS;
+  | typeof STORE_CORRECTION_DRAFTS
+  | typeof STORE_SEARCH_FAILURE_FEEDBACK;
 
 export type BundleLanguageMeta = {
   source_lang?: string;
@@ -163,6 +165,15 @@ export async function openSiralexDb(): Promise<IDBDatabase> {
       // No indexes: key lookup, full list, and count cover current CF1 queries.
       if (!db.objectStoreNames.contains(STORE_CORRECTION_DRAFTS)) {
         db.createObjectStore(STORE_CORRECTION_DRAFTS, { keyPath: "draft_id" });
+      }
+
+      // CF2I2: search-failure feedback (v5 → v6). Additive only — no rewrite of
+      // dictionary, Learning, query-log, CF1 drafts, catalog, registry, meta, or
+      // search-index rows. No indexes: key lookup, full list, and count cover CF2.
+      if (!db.objectStoreNames.contains(STORE_SEARCH_FAILURE_FEEDBACK)) {
+        db.createObjectStore(STORE_SEARCH_FAILURE_FEEDBACK, {
+          keyPath: "feedback_id",
+        });
       }
 
       if (oldVersion < 2 && tx != null) {

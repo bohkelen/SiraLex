@@ -91,10 +91,10 @@ test.describe("CF1I5 correction lifecycle", () => {
     await page.locator("#correction-form-proposed").fill("alpha_mnk?");
 
     // Duplicate activation: rapid double Save → one draft.
-    await Promise.all([
-      page.locator("#correction-form-save").click(),
-      page.locator("#correction-form-save").click(),
-    ]);
+    await page.locator("#correction-form-save").evaluate((el) => {
+      (el as HTMLButtonElement).click();
+      (el as HTMLButtonElement).click();
+    });
     await expect(page.locator("#correction-form-success-heading")).toBeVisible({ timeout: 15_000 });
     await expect(page.locator("#correction-form-success-heading")).toBeFocused();
     expect(await countCorrectionDrafts(page)).toBe(1);
@@ -137,10 +137,10 @@ test.describe("CF1I5 correction lifecycle", () => {
     await page.locator("#correction-manage-proposed").fill(PROPOSED_V2);
 
     // Duplicate edit-save.
-    await Promise.all([
-      page.getByRole("button", { name: "Save changes" }).click(),
-      page.getByRole("button", { name: "Save changes" }).click(),
-    ]);
+    await page.getByRole("button", { name: "Save changes" }).evaluate((el) => {
+      (el as HTMLButtonElement).click();
+      (el as HTMLButtonElement).click();
+    });
     await expect(page.locator(".correction-manage-description")).toContainText(DESCRIPTION_V2, {
       timeout: 15_000,
     });

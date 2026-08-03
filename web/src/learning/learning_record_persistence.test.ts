@@ -306,10 +306,10 @@ describe("Learning Record persistence API", () => {
     }
   });
 
-  it("fresh DB is v5 with learning_records store and by_bundle_id index", async () => {
-    expect(SIRALEX_DB_VERSION).toBe(5);
+  it("fresh DB has learning_records store and by_bundle_id index", async () => {
+    expect(SIRALEX_DB_VERSION).toBe(6);
     const db = await openSiralexDb();
-    expect(db.version).toBe(5);
+    expect(db.version).toBe(6);
     expect(db.objectStoreNames.contains(STORE_LEARNING_RECORDS)).toBe(true);
     const tx = db.transaction(STORE_LEARNING_RECORDS, "readonly");
     const store = tx.objectStore(STORE_LEARNING_RECORDS);
@@ -318,10 +318,10 @@ describe("Learning Record persistence API", () => {
     db.close();
   });
 
-  it("v3 → v5 upgrade creates learning_records and preserves existing data", async () => {
+  it("v3 → current upgrade creates learning_records and preserves existing data", async () => {
     await openLegacyV3DbWithData();
     const db = await openSiralexDb();
-    expect(db.version).toBe(5);
+    expect(db.version).toBe(6);
     expect(db.objectStoreNames.contains(STORE_LEARNING_RECORDS)).toBe(true);
 
     const metaTx = db.transaction(STORE_META, "readonly");

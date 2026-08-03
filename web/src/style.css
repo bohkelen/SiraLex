@@ -468,6 +468,200 @@ a {
   gap: 8px;
 }
 
+/* --- Search failure feedback capture (CF2I3) --- */
+
+.search-feedback-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.search-feedback-entry-message,
+.search-feedback-entry-prompt {
+  margin: 0;
+}
+
+.search-feedback-report-btn {
+  align-self: flex-start;
+}
+
+.search-feedback-capture {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-feedback-capture-heading {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.search-feedback-capture-query {
+  margin: 4px 0 0;
+  font-weight: 600;
+  white-space: pre-wrap;
+}
+
+.search-feedback-capture-search-meta {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.search-feedback-capture-privacy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.92rem;
+  opacity: 0.92;
+}
+
+.search-feedback-capture-privacy p {
+  margin: 0;
+}
+
+.search-feedback-capture-help,
+.search-feedback-capture-counter {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+}
+
+.search-feedback-capture-counter-over,
+.search-feedback-capture-field-error,
+.search-feedback-capture-stale,
+.search-feedback-capture-error-summary {
+  color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
+}
+
+.search-feedback-capture-error-summary {
+  border: 1px solid color-mix(in oklab, var(--text) 35%, #f87171 40%);
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.search-feedback-capture-error-summary-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.search-feedback-capture-field textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+}
+
+.search-feedback-capture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* --- Search feedback management (CF2I4) --- */
+
+.search-feedback-manage-delete-reminder {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.search-feedback-manage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-feedback-manage-heading {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.search-feedback-manage-privacy,
+.search-feedback-manage-export-warning,
+.search-feedback-manage-empty,
+.search-feedback-manage-status {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.search-feedback-manage-export-warning {
+  font-weight: 600;
+}
+
+.search-feedback-manage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-feedback-manage-row-button {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--text) 18%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.search-feedback-manage-row-query {
+  font-weight: 600;
+  white-space: pre-wrap;
+}
+
+.search-feedback-manage-row-meta,
+.search-feedback-manage-row-updated,
+.search-feedback-manage-row-meaning,
+.search-feedback-manage-availability,
+.search-feedback-manage-detail-meta,
+.search-feedback-manage-timestamps,
+.search-feedback-manage-counter {
+  font-size: 0.9rem;
+  opacity: 0.92;
+}
+
+.search-feedback-manage-detail-query {
+  margin: 0;
+  font-weight: 600;
+  white-space: pre-wrap;
+}
+
+.search-feedback-manage-error-summary,
+.search-feedback-manage-delete-confirm,
+.search-feedback-manage-counter-over {
+  color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
+}
+
+.search-feedback-manage-error-summary,
+.search-feedback-manage-delete-confirm {
+  border: 1px solid color-mix(in oklab, var(--text) 35%, #f87171 40%);
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.search-feedback-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.search-feedback-manage-provenance-body {
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.search-feedback-manage field textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+}
+
 /* --- Saved vocabulary (LS1I3) --- */
 
 .saved-vocab-surface {

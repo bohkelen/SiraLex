@@ -1,7 +1,8 @@
 /**
- * CF1I3 — Pure correction suggestion form renderer.
+ * CF1I3 / CF2I6A — Pure correction suggestion form renderer.
  *
  * DOM only: no IndexedDB, dictionary resolution, timestamps, or ID generation.
+ * Editing layout keeps text controls stable across ordinary keystroke updates.
  */
 
 import { t, type TranslationKey } from "../i18n";
@@ -91,6 +92,13 @@ const STORE_ERROR_KEYS: Record<CorrectionFormErrorCode, TranslationKey> = {
   invalid_input: "correctionFeedback.form.error.reviewFields",
 };
 
+const DESC_DESCRIBED_BY =
+  "correction-form-description-help correction-form-description-count";
+const PROP_DESCRIBED_BY =
+  "correction-form-proposed-help correction-form-proposed-count";
+const FIELD_LABEL_DESCRIBED_BY =
+  "correction-form-field-label-help correction-form-field-label-count";
+
 export function formatCorrectionTargetOptionLabel(label: CorrectionTargetOptionLabel): string {
   switch (label.kind) {
     case "entry":
@@ -142,17 +150,80 @@ function fieldErrorMessage(
   return key ? t(key) : undefined;
 }
 
-function cssEscapeIdent(value: string): string {
-  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
-    return CSS.escape(value);
-  }
-  return value.replace(/([^a-zA-Z0-9_-])/g, "\\$1");
+/** Do not overwrite an actively edited control (preserves caret/IME). */
+function syncTextControl(
+  control: HTMLTextAreaElement | HTMLInputElement,
+  next: string,
+): void {
+  if (document.activeElement === control) return;
+  if (control.value !== next) control.value = next;
 }
 
-function focusSelector(root: HTMLElement, selector: string): void {
-  const node = root.querySelector<HTMLElement>(selector);
-  node?.focus();
+function setCounter(node: HTMLElement, count: number, max: number): void {
+  node.textContent = t("correctionFeedback.form.counter", { count, max });
+  if (count > max) {
+    node.classList.add("correction-form-counter-over");
+    node.setAttribute("role", "status");
+  } else {
+    node.classList.remove("correction-form-counter-over");
+    node.removeAttribute("role");
+  }
 }
+
+function syncFieldError(
+  control: HTMLElement,
+  errorEl: HTMLElement,
+  message: string | undefined,
+  errorId: string,
+  baseDescribedBy?: string,
+): void {
+  if (message) {
+    errorEl.hidden = false;
+    errorEl.id = errorId;
+    errorEl.setAttribute("role", "alert");
+    errorEl.textContent = message;
+    control.setAttribute("aria-invalid", "true");
+    control.setAttribute(
+      "aria-describedby",
+      baseDescribedBy ? `${baseDescribedBy} ${errorId}` : errorId,
+    );
+  } else {
+    errorEl.hidden = true;
+    errorEl.textContent = "";
+    control.removeAttribute("aria-invalid");
+    if (baseDescribedBy) {
+      control.setAttribute("aria-describedby", baseDescribedBy);
+    } else {
+      control.removeAttribute("aria-describedby");
+    }
+  }
+}
+
+type EditingShell = {
+  issueSelect: HTMLSelectElement;
+  issueError: HTMLElement;
+  targetSelect: HTMLSelectElement;
+  targetPreview: HTMLElement;
+  targetError: HTMLElement;
+  otherField: HTMLElement;
+  otherFieldInput: HTMLInputElement;
+  otherFieldCounter: HTMLElement;
+  otherFieldError: HTMLElement;
+  modeFieldset: HTMLFieldSetElement;
+  modeProblem: HTMLInputElement;
+  modeProposed: HTMLInputElement;
+  descInput: HTMLTextAreaElement;
+  descCounter: HTMLElement;
+  descError: HTMLElement;
+  propField: HTMLElement;
+  propInput: HTMLTextAreaElement;
+  propCounter: HTMLElement;
+  propError: HTMLElement;
+  staleHost: HTMLElement;
+  errorHost: HTMLElement;
+  saveBtn: HTMLButtonElement;
+  cancelBtn: HTMLButtonElement;
+};
 
 export type CorrectionFormView = {
   root: HTMLElement;
@@ -169,289 +240,15 @@ export function renderCorrectionForm(
   const root = el("div", "correction-form");
   root.setAttribute("data-testid", "correction-form");
 
-  let current = initialVm;
-
-  function paint(vm: CorrectionFormViewModel): void {
-    current = vm;
-    const previousFocusId = document.activeElement?.id;
-    root.replaceChildren();
-    root.setAttribute("aria-busy", vm.busy ? "true" : "false");
-
-    if (vm.state === "saved") {
-      paintSuccess(vm);
-      return;
-    }
-
-    const heading = el("h2", "correction-form-heading", t("correctionFeedback.form.heading"));
-    heading.id = "correction-form-heading";
-    root.appendChild(heading);
-
-    const summary = el("p", "correction-form-entry-summary");
-    summary.id = "correction-form-entry-summary";
-    const headword = vm.context.entry.display && "headword_latin" in vm.context.entry.display
-      ? vm.context.entry.display.headword_latin
-      : vm.context.ir_id;
-    summary.textContent = t("correctionFeedback.form.entrySummary", { headword });
-    root.appendChild(summary);
-
-    const nko =
-      vm.context.entry.display &&
-      "headword_nko_provided" in vm.context.entry.display &&
-      vm.context.entry.display.headword_nko_provided
-        ? vm.context.entry.display.headword_nko_provided
-        : undefined;
-    if (nko) {
-      const nkoEl = el("p", "correction-form-entry-nko", nko);
-      nkoEl.setAttribute("lang", "nqo");
-      nkoEl.dir = "rtl";
-      root.appendChild(nkoEl);
-    }
-
-    const privacy = el("div", "correction-form-privacy");
-    privacy.appendChild(el("p", undefined, t("correctionFeedback.form.privacy.localOnly")));
-    privacy.appendChild(el("p", undefined, t("correctionFeedback.form.privacy.exportLater")));
-    privacy.appendChild(el("p", undefined, t("correctionFeedback.form.privacy.unreviewed")));
-    root.appendChild(privacy);
-
-    if (vm.state === "stale_context") {
-      const stale = el("div", "correction-form-stale");
-      stale.setAttribute("role", "alert");
-      stale.id = "correction-form-stale";
-      stale.textContent = t("correctionFeedback.form.error.staleContext");
-      root.appendChild(stale);
-    }
-
-    if (vm.state === "invalid" || vm.state === "error") {
-      paintErrorSummary(vm);
-    }
-
-    // Issue type
-    const issueField = el("div", "field correction-form-field");
-    const issueLabel = el("label", "label", t("correctionFeedback.form.issueLabel"));
-    issueLabel.htmlFor = "correction-form-issue";
-    const issueSelect = document.createElement("select");
-    issueSelect.id = "correction-form-issue";
-    issueSelect.disabled = vm.state === "saving" || vm.state === "stale_context";
-    const issuePlaceholder = document.createElement("option");
-    issuePlaceholder.value = "";
-    issuePlaceholder.textContent = t("correctionFeedback.form.issuePlaceholder");
-    issueSelect.appendChild(issuePlaceholder);
-    for (const issue of CORRECTION_FORM_ISSUE_TYPES) {
-      const opt = document.createElement("option");
-      opt.value = issue;
-      opt.textContent = t(ISSUE_LABEL_KEYS[issue]);
-      if (vm.fields.issue_type === issue) opt.selected = true;
-      issueSelect.appendChild(opt);
-    }
-    issueSelect.addEventListener("change", () => {
-      callbacks.onIssueTypeChange(issueSelect.value as CorrectionIssueType | "");
-    });
-    issueField.appendChild(issueLabel);
-    issueField.appendChild(issueSelect);
-    appendFieldError(issueField, "issue_type", vm.errors, "correction-form-issue-error");
-    root.appendChild(issueField);
-
-    // Target
-    const targetField = el("div", "field correction-form-field");
-    const targetLabel = el("label", "label", t("correctionFeedback.form.targetLabel"));
-    targetLabel.htmlFor = "correction-form-target";
-    const targetSelect = document.createElement("select");
-    targetSelect.id = "correction-form-target";
-    targetSelect.disabled = vm.state === "saving" || vm.state === "stale_context";
-    for (const option of vm.targetOptions) {
-      targetSelect.appendChild(optionElement(option, vm.fields.target_key === option.key));
-    }
-    targetSelect.addEventListener("change", () => {
-      callbacks.onTargetChange(targetSelect.value);
-    });
-    targetField.appendChild(targetLabel);
-    targetField.appendChild(targetSelect);
-    if (vm.targetPreview) {
-      const preview = el(
-        "p",
-        "correction-form-target-preview",
-        t("correctionFeedback.form.targetPreview", { text: vm.targetPreview }),
-      );
-      preview.id = "correction-form-target-preview";
-      if (vm.fields.target_key === "nko" || /[\u07C0-\u07FF]/.test(vm.targetPreview)) {
-        preview.setAttribute("lang", "nqo");
-        preview.dir = "rtl";
-      }
-      targetField.appendChild(preview);
-    }
-    appendFieldError(targetField, "target", vm.errors, "correction-form-target-error");
-    root.appendChild(targetField);
-
-    if (vm.fields.target_key === "other_field") {
-      const labelField = el("div", "field correction-form-field");
-      const label = el("label", "label", t("correctionFeedback.form.otherFieldLabel"));
-      label.htmlFor = "correction-form-field-label";
-      const input = document.createElement("input");
-      input.type = "text";
-      input.id = "correction-form-field-label";
-      input.value = vm.fields.other_field_label;
-      input.disabled = vm.state === "saving" || vm.state === "stale_context";
-      input.setAttribute("aria-describedby", "correction-form-field-label-help correction-form-field-label-count");
-      input.addEventListener("input", () => {
-        callbacks.onOtherFieldLabelChange(input.value);
-      });
-      const help = el("p", "correction-form-help", t("correctionFeedback.form.otherFieldHelp"));
-      help.id = "correction-form-field-label-help";
-      const counter = el(
-        "p",
-        "correction-form-counter",
-        t("correctionFeedback.form.counter", {
-          count: vm.fieldLabelCount,
-          max: CORRECTION_OTHER_FIELD_LABEL_MAX_CHARS,
-        }),
-      );
-      counter.id = "correction-form-field-label-count";
-      if (vm.fieldLabelCount > CORRECTION_OTHER_FIELD_LABEL_MAX_CHARS) {
-        counter.classList.add("correction-form-counter-over");
-        counter.setAttribute("role", "status");
-      }
-      labelField.appendChild(label);
-      labelField.appendChild(input);
-      labelField.appendChild(help);
-      labelField.appendChild(counter);
-      appendFieldError(labelField, "field_label", vm.errors, "correction-form-field-label-error");
-      root.appendChild(labelField);
-    }
-
-    // Mode
-    const modeFieldset = el("fieldset", "correction-form-mode");
-    modeFieldset.disabled = vm.state === "saving" || vm.state === "stale_context";
-    modeFieldset.appendChild(el("legend", undefined, t("correctionFeedback.form.modeLabel")));
-    modeFieldset.appendChild(
-      radioOption(
-        "problem_report",
-        t("correctionFeedback.form.mode.problem_report"),
-        vm.fields.mode === "problem_report",
-        () => callbacks.onModeChange("problem_report"),
-      ),
-    );
-    modeFieldset.appendChild(
-      radioOption(
-        "proposed_correction",
-        t("correctionFeedback.form.mode.proposed_correction"),
-        vm.fields.mode === "proposed_correction",
-        () => callbacks.onModeChange("proposed_correction"),
-      ),
-    );
-    root.appendChild(modeFieldset);
-
-    // Description
-    const descField = el("div", "field correction-form-field");
-    const descLabel = el("label", "label", t("correctionFeedback.form.descriptionLabel"));
-    descLabel.htmlFor = "correction-form-description";
-    const desc = document.createElement("textarea");
-    desc.id = "correction-form-description";
-    desc.rows = 5;
-    desc.value = vm.fields.problem_description;
-    desc.disabled = vm.state === "saving" || vm.state === "stale_context";
-    desc.setAttribute(
-      "aria-describedby",
-      "correction-form-description-help correction-form-description-count",
-    );
-    desc.addEventListener("input", () => {
-      callbacks.onProblemDescriptionChange(desc.value);
-    });
-    const descHelp = el("p", "correction-form-help", t("correctionFeedback.form.descriptionHelp"));
-    descHelp.id = "correction-form-description-help";
-    const descCount = el(
-      "p",
-      "correction-form-counter",
-      t("correctionFeedback.form.counter", {
-        count: vm.descriptionCount,
-        max: CORRECTION_PROBLEM_DESCRIPTION_MAX_CHARS,
-      }),
-    );
-    descCount.id = "correction-form-description-count";
-    if (vm.descriptionCount > CORRECTION_PROBLEM_DESCRIPTION_MAX_CHARS) {
-      descCount.classList.add("correction-form-counter-over");
-      descCount.setAttribute("role", "status");
-    }
-    descField.appendChild(descLabel);
-    descField.appendChild(desc);
-    descField.appendChild(descHelp);
-    descField.appendChild(descCount);
-    appendFieldError(descField, "problem_description", vm.errors, "correction-form-description-error");
-    root.appendChild(descField);
-
-    if (vm.fields.mode === "proposed_correction") {
-      const propField = el("div", "field correction-form-field");
-      const propLabel = el("label", "label", t("correctionFeedback.form.proposedLabel"));
-      propLabel.htmlFor = "correction-form-proposed";
-      const prop = document.createElement("textarea");
-      prop.id = "correction-form-proposed";
-      prop.rows = 4;
-      prop.value = vm.fields.proposed_value;
-      prop.disabled = vm.state === "saving" || vm.state === "stale_context";
-      prop.setAttribute(
-        "aria-describedby",
-        "correction-form-proposed-help correction-form-proposed-count",
-      );
-      prop.addEventListener("input", () => {
-        callbacks.onProposedValueChange(prop.value);
-      });
-      const propHelp = el("p", "correction-form-help", t("correctionFeedback.form.proposedHelp"));
-      propHelp.id = "correction-form-proposed-help";
-      const propCount = el(
-        "p",
-        "correction-form-counter",
-        t("correctionFeedback.form.counter", {
-          count: vm.proposedCount,
-          max: CORRECTION_PROPOSED_VALUE_MAX_CHARS,
-        }),
-      );
-      propCount.id = "correction-form-proposed-count";
-      if (vm.proposedCount > CORRECTION_PROPOSED_VALUE_MAX_CHARS) {
-        propCount.classList.add("correction-form-counter-over");
-        propCount.setAttribute("role", "status");
-      }
-      propField.appendChild(propLabel);
-      propField.appendChild(prop);
-      propField.appendChild(propHelp);
-      propField.appendChild(propCount);
-      appendFieldError(propField, "proposed_value", vm.errors, "correction-form-proposed-error");
-      root.appendChild(propField);
-    }
-
-    const actions = el("div", "correction-form-actions");
-    const saveBtn = document.createElement("button");
-    saveBtn.type = "button";
-    saveBtn.className = "btn correction-form-save";
-    saveBtn.id = "correction-form-save";
-    saveBtn.textContent =
-      vm.state === "saving"
-        ? t("correctionFeedback.form.saving")
-        : t("correctionFeedback.form.save");
-    saveBtn.disabled = vm.saveDisabled;
-    saveBtn.addEventListener("click", () => {
-      callbacks.onSave();
-    });
-    const cancelBtn = document.createElement("button");
-    cancelBtn.type = "button";
-    cancelBtn.className = "btn correction-form-cancel";
-    cancelBtn.id = "correction-form-cancel";
-    cancelBtn.textContent = t("correctionFeedback.form.cancel");
-    cancelBtn.disabled = vm.state === "saving";
-    cancelBtn.addEventListener("click", () => {
-      callbacks.onCancel();
-    });
-    actions.appendChild(saveBtn);
-    actions.appendChild(cancelBtn);
-    root.appendChild(actions);
-
-    // Restore focus when possible; otherwise apply invalid/success focus rules.
-    if (vm.state === "invalid" || vm.state === "error") {
-      focusSelector(root, "#correction-form-error-summary");
-    } else if (previousFocusId) {
-      focusSelector(root, `#${cssEscapeIdent(previousFocusId)}`);
-    }
-  }
+  let layout: "none" | "editing" | "saved" = "none";
+  let shell: EditingShell | null = null;
 
   function paintSuccess(vm: CorrectionFormViewModel): void {
+    shell = null;
+    layout = "saved";
+    root.replaceChildren();
+    root.setAttribute("aria-busy", "false");
+
     const heading = el("h2", "correction-form-heading", t("correctionFeedback.form.success.heading"));
     heading.id = "correction-form-success-heading";
     heading.tabIndex = -1;
@@ -467,14 +264,13 @@ export function renderCorrectionForm(
       callbacks.onBackToEntry();
     });
     root.appendChild(back);
-    // Focus after paint.
     queueMicrotask(() => {
       heading.focus();
     });
     void vm;
   }
 
-  function paintErrorSummary(vm: CorrectionFormViewModel): void {
+  function buildErrorSummary(vm: CorrectionFormViewModel): HTMLElement {
     const summary = el("div", "correction-form-error-summary");
     summary.id = "correction-form-error-summary";
     summary.setAttribute("role", "alert");
@@ -498,38 +294,399 @@ export function renderCorrectionForm(
       list.appendChild(item);
     }
     if (list.childElementCount > 0) summary.appendChild(list);
-    root.appendChild(summary);
+    return summary;
   }
 
-  function appendFieldError(
-    field: HTMLElement,
-    key: keyof CorrectionFormFieldErrors,
-    errors: CorrectionFormFieldErrors,
-    errorId: string,
-  ): void {
-    const message = fieldErrorMessage(key, errors[key]);
-    if (!message) return;
-    const err = el("p", "correction-form-field-error", message);
-    err.id = errorId;
-    err.setAttribute("role", "alert");
-    field.appendChild(err);
-    const control = field.querySelector<HTMLElement>("select, textarea, input");
-    if (control) {
-      control.setAttribute("aria-invalid", "true");
-      const describedBy = control.getAttribute("aria-describedby");
-      control.setAttribute(
-        "aria-describedby",
-        describedBy ? `${describedBy} ${errorId}` : errorId,
-      );
+  function syncTargetOptions(vm: CorrectionFormViewModel): void {
+    if (!shell) return;
+    const select = shell.targetSelect;
+    const nextKeys = vm.targetOptions.map((o) => o.key);
+    const currentKeys = [...select.options].map((o) => o.value);
+    const keysChanged =
+      nextKeys.length !== currentKeys.length ||
+      nextKeys.some((key, i) => key !== currentKeys[i]);
+
+    if (keysChanged) {
+      select.replaceChildren();
+      for (const option of vm.targetOptions) {
+        select.appendChild(optionElement(option, vm.fields.target_key === option.key));
+      }
+    } else {
+      for (const option of select.options) {
+        option.selected = option.value === vm.fields.target_key;
+      }
+    }
+
+    if (vm.targetPreview) {
+      shell.targetPreview.hidden = false;
+      shell.targetPreview.textContent = t("correctionFeedback.form.targetPreview", {
+        text: vm.targetPreview,
+      });
+      if (vm.fields.target_key === "nko" || /[\u07C0-\u07FF]/.test(vm.targetPreview)) {
+        shell.targetPreview.setAttribute("lang", "nqo");
+        shell.targetPreview.dir = "rtl";
+      } else {
+        shell.targetPreview.removeAttribute("lang");
+        shell.targetPreview.removeAttribute("dir");
+      }
+    } else {
+      shell.targetPreview.hidden = true;
+      shell.targetPreview.textContent = "";
+      shell.targetPreview.removeAttribute("lang");
+      shell.targetPreview.removeAttribute("dir");
     }
   }
 
-  paint(initialVm);
+  function buildEditing(vm: CorrectionFormViewModel): void {
+    root.replaceChildren();
+    layout = "editing";
+
+    const heading = el("h2", "correction-form-heading", t("correctionFeedback.form.heading"));
+    heading.id = "correction-form-heading";
+    root.appendChild(heading);
+
+    const summary = el("p", "correction-form-entry-summary");
+    summary.id = "correction-form-entry-summary";
+    const headword =
+      vm.context.entry.display && "headword_latin" in vm.context.entry.display
+        ? vm.context.entry.display.headword_latin
+        : vm.context.ir_id;
+    summary.textContent = t("correctionFeedback.form.entrySummary", { headword });
+    root.appendChild(summary);
+
+    const nko =
+      vm.context.entry.display &&
+      "headword_nko_provided" in vm.context.entry.display &&
+      vm.context.entry.display.headword_nko_provided
+        ? vm.context.entry.display.headword_nko_provided
+        : undefined;
+    if (nko) {
+      const nkoEl = el("p", "correction-form-entry-nko", nko);
+      nkoEl.setAttribute("lang", "nqo");
+      nkoEl.dir = "rtl";
+      root.appendChild(nkoEl);
+    }
+
+    const privacy = el("div", "correction-form-privacy");
+    privacy.appendChild(el("p", undefined, t("correctionFeedback.form.privacy.localOnly")));
+    privacy.appendChild(el("p", undefined, t("correctionFeedback.form.privacy.exportLater")));
+    privacy.appendChild(el("p", undefined, t("correctionFeedback.form.privacy.unreviewed")));
+    root.appendChild(privacy);
+
+    const staleHost = el("div", "correction-form-stale-host");
+    root.appendChild(staleHost);
+
+    const errorHost = el("div", "correction-form-error-host");
+    root.appendChild(errorHost);
+
+    // Issue type
+    const issueField = el("div", "field correction-form-field");
+    const issueLabel = el("label", "label", t("correctionFeedback.form.issueLabel"));
+    issueLabel.htmlFor = "correction-form-issue";
+    const issueSelect = document.createElement("select");
+    issueSelect.id = "correction-form-issue";
+    const issuePlaceholder = document.createElement("option");
+    issuePlaceholder.value = "";
+    issuePlaceholder.textContent = t("correctionFeedback.form.issuePlaceholder");
+    issueSelect.appendChild(issuePlaceholder);
+    for (const issue of CORRECTION_FORM_ISSUE_TYPES) {
+      const opt = document.createElement("option");
+      opt.value = issue;
+      opt.textContent = t(ISSUE_LABEL_KEYS[issue]);
+      issueSelect.appendChild(opt);
+    }
+    issueSelect.addEventListener("change", () => {
+      callbacks.onIssueTypeChange(issueSelect.value as CorrectionIssueType | "");
+    });
+    const issueError = el("p", "correction-form-field-error");
+    issueError.id = "correction-form-issue-error";
+    issueError.hidden = true;
+    issueField.append(issueLabel, issueSelect, issueError);
+    root.appendChild(issueField);
+
+    // Target
+    const targetField = el("div", "field correction-form-field");
+    const targetLabel = el("label", "label", t("correctionFeedback.form.targetLabel"));
+    targetLabel.htmlFor = "correction-form-target";
+    const targetSelect = document.createElement("select");
+    targetSelect.id = "correction-form-target";
+    targetSelect.addEventListener("change", () => {
+      callbacks.onTargetChange(targetSelect.value);
+    });
+    const targetPreview = el("p", "correction-form-target-preview");
+    targetPreview.id = "correction-form-target-preview";
+    targetPreview.hidden = true;
+    const targetError = el("p", "correction-form-field-error");
+    targetError.id = "correction-form-target-error";
+    targetError.hidden = true;
+    targetField.append(targetLabel, targetSelect, targetPreview, targetError);
+    root.appendChild(targetField);
+
+    // Other-field label (always created; hidden unless target is other_field)
+    const otherField = el("div", "field correction-form-field");
+    const otherLabel = el("label", "label", t("correctionFeedback.form.otherFieldLabel"));
+    otherLabel.htmlFor = "correction-form-field-label";
+    const otherFieldInput = document.createElement("input");
+    otherFieldInput.type = "text";
+    otherFieldInput.id = "correction-form-field-label";
+    otherFieldInput.setAttribute("aria-describedby", FIELD_LABEL_DESCRIBED_BY);
+    otherFieldInput.addEventListener("input", () => {
+      callbacks.onOtherFieldLabelChange(otherFieldInput.value);
+    });
+    const otherHelp = el("p", "correction-form-help", t("correctionFeedback.form.otherFieldHelp"));
+    otherHelp.id = "correction-form-field-label-help";
+    const otherFieldCounter = el("p", "correction-form-counter");
+    otherFieldCounter.id = "correction-form-field-label-count";
+    const otherFieldError = el("p", "correction-form-field-error");
+    otherFieldError.id = "correction-form-field-label-error";
+    otherFieldError.hidden = true;
+    otherField.append(
+      otherLabel,
+      otherFieldInput,
+      otherHelp,
+      otherFieldCounter,
+      otherFieldError,
+    );
+    root.appendChild(otherField);
+
+    // Mode
+    const modeFieldset = el("fieldset", "correction-form-mode");
+    modeFieldset.appendChild(el("legend", undefined, t("correctionFeedback.form.modeLabel")));
+    const modeProblemWrap = radioOption(
+      "problem_report",
+      t("correctionFeedback.form.mode.problem_report"),
+      false,
+      () => callbacks.onModeChange("problem_report"),
+    );
+    const modeProposedWrap = radioOption(
+      "proposed_correction",
+      t("correctionFeedback.form.mode.proposed_correction"),
+      false,
+      () => callbacks.onModeChange("proposed_correction"),
+    );
+    modeFieldset.append(modeProblemWrap, modeProposedWrap);
+    root.appendChild(modeFieldset);
+    const modeProblem = modeProblemWrap.querySelector<HTMLInputElement>(
+      "#correction-form-mode-problem_report",
+    )!;
+    const modeProposed = modeProposedWrap.querySelector<HTMLInputElement>(
+      "#correction-form-mode-proposed_correction",
+    )!;
+
+    // Description (always created once)
+    const descField = el("div", "field correction-form-field");
+    const descLabel = el("label", "label", t("correctionFeedback.form.descriptionLabel"));
+    descLabel.htmlFor = "correction-form-description";
+    const descInput = document.createElement("textarea");
+    descInput.id = "correction-form-description";
+    descInput.rows = 5;
+    descInput.setAttribute("aria-describedby", DESC_DESCRIBED_BY);
+    descInput.addEventListener("input", () => {
+      callbacks.onProblemDescriptionChange(descInput.value);
+    });
+    const descHelp = el("p", "correction-form-help", t("correctionFeedback.form.descriptionHelp"));
+    descHelp.id = "correction-form-description-help";
+    const descCounter = el("p", "correction-form-counter");
+    descCounter.id = "correction-form-description-count";
+    const descError = el("p", "correction-form-field-error");
+    descError.id = "correction-form-description-error";
+    descError.hidden = true;
+    descField.append(descLabel, descInput, descHelp, descCounter, descError);
+    root.appendChild(descField);
+
+    // Proposed (always created; hidden unless mode is proposed_correction)
+    const propField = el("div", "field correction-form-field");
+    const propLabel = el("label", "label", t("correctionFeedback.form.proposedLabel"));
+    propLabel.htmlFor = "correction-form-proposed";
+    const propInput = document.createElement("textarea");
+    propInput.id = "correction-form-proposed";
+    propInput.rows = 4;
+    propInput.setAttribute("aria-describedby", PROP_DESCRIBED_BY);
+    propInput.addEventListener("input", () => {
+      callbacks.onProposedValueChange(propInput.value);
+    });
+    const propHelp = el("p", "correction-form-help", t("correctionFeedback.form.proposedHelp"));
+    propHelp.id = "correction-form-proposed-help";
+    const propCounter = el("p", "correction-form-counter");
+    propCounter.id = "correction-form-proposed-count";
+    const propError = el("p", "correction-form-field-error");
+    propError.id = "correction-form-proposed-error";
+    propError.hidden = true;
+    propField.append(propLabel, propInput, propHelp, propCounter, propError);
+    root.appendChild(propField);
+
+    const actions = el("div", "correction-form-actions");
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btn correction-form-save";
+    saveBtn.id = "correction-form-save";
+    saveBtn.addEventListener("click", () => {
+      callbacks.onSave();
+    });
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn correction-form-cancel";
+    cancelBtn.id = "correction-form-cancel";
+    cancelBtn.textContent = t("correctionFeedback.form.cancel");
+    cancelBtn.addEventListener("click", () => {
+      callbacks.onCancel();
+    });
+    actions.append(saveBtn, cancelBtn);
+    root.appendChild(actions);
+
+    shell = {
+      issueSelect,
+      issueError,
+      targetSelect,
+      targetPreview,
+      targetError,
+      otherField,
+      otherFieldInput,
+      otherFieldCounter,
+      otherFieldError,
+      modeFieldset,
+      modeProblem,
+      modeProposed,
+      descInput,
+      descCounter,
+      descError,
+      propField,
+      propInput,
+      propCounter,
+      propError,
+      staleHost,
+      errorHost,
+      saveBtn,
+      cancelBtn,
+    };
+    syncEditing(vm);
+  }
+
+  function syncEditing(vm: CorrectionFormViewModel): void {
+    if (!shell) return;
+    const locked = vm.state === "saving" || vm.state === "stale_context";
+    root.setAttribute("aria-busy", vm.busy ? "true" : "false");
+
+    syncTextControl(shell.descInput, vm.fields.problem_description);
+    syncTextControl(shell.propInput, vm.fields.proposed_value);
+    syncTextControl(shell.otherFieldInput, vm.fields.other_field_label);
+
+    shell.issueSelect.disabled = locked;
+    shell.targetSelect.disabled = locked;
+    shell.otherFieldInput.disabled = locked;
+    shell.descInput.disabled = locked;
+    shell.propInput.disabled = locked;
+    shell.modeFieldset.disabled = locked;
+
+    shell.issueSelect.value = vm.fields.issue_type;
+    syncTargetOptions(vm);
+
+    shell.modeProblem.checked = vm.fields.mode === "problem_report";
+    shell.modeProposed.checked = vm.fields.mode === "proposed_correction";
+
+    shell.propField.hidden = vm.fields.mode !== "proposed_correction";
+    shell.otherField.hidden = vm.fields.target_key !== "other_field";
+
+    setCounter(
+      shell.descCounter,
+      vm.descriptionCount,
+      CORRECTION_PROBLEM_DESCRIPTION_MAX_CHARS,
+    );
+    setCounter(shell.propCounter, vm.proposedCount, CORRECTION_PROPOSED_VALUE_MAX_CHARS);
+    setCounter(
+      shell.otherFieldCounter,
+      vm.fieldLabelCount,
+      CORRECTION_OTHER_FIELD_LABEL_MAX_CHARS,
+    );
+
+    syncFieldError(
+      shell.issueSelect,
+      shell.issueError,
+      fieldErrorMessage("issue_type", vm.errors.issue_type),
+      "correction-form-issue-error",
+    );
+    syncFieldError(
+      shell.targetSelect,
+      shell.targetError,
+      fieldErrorMessage("target", vm.errors.target),
+      "correction-form-target-error",
+    );
+    syncFieldError(
+      shell.otherFieldInput,
+      shell.otherFieldError,
+      fieldErrorMessage("field_label", vm.errors.field_label),
+      "correction-form-field-label-error",
+      FIELD_LABEL_DESCRIBED_BY,
+    );
+    syncFieldError(
+      shell.descInput,
+      shell.descError,
+      fieldErrorMessage("problem_description", vm.errors.problem_description),
+      "correction-form-description-error",
+      DESC_DESCRIBED_BY,
+    );
+    syncFieldError(
+      shell.propInput,
+      shell.propError,
+      fieldErrorMessage("proposed_value", vm.errors.proposed_value),
+      "correction-form-proposed-error",
+      PROP_DESCRIBED_BY,
+    );
+
+    shell.staleHost.replaceChildren();
+    if (vm.state === "stale_context") {
+      const stale = el("div", "correction-form-stale");
+      stale.setAttribute("role", "alert");
+      stale.id = "correction-form-stale";
+      stale.textContent = t("correctionFeedback.form.error.staleContext");
+      shell.staleHost.appendChild(stale);
+    }
+
+    const hadErrorSummary = Boolean(
+      shell.errorHost.querySelector("#correction-form-error-summary"),
+    );
+    shell.errorHost.replaceChildren();
+    if (vm.state === "invalid" || vm.state === "error") {
+      const summary = buildErrorSummary(vm);
+      shell.errorHost.appendChild(summary);
+      // Focus only when the summary newly appears (not on each field keystroke).
+      if (!hadErrorSummary) {
+        summary.focus();
+      }
+    }
+
+    shell.saveBtn.textContent =
+      vm.state === "saving"
+        ? t("correctionFeedback.form.saving")
+        : t("correctionFeedback.form.save");
+    shell.saveBtn.disabled = vm.saveDisabled;
+    shell.cancelBtn.disabled = vm.state === "saving";
+  }
+
+  function apply(vm: CorrectionFormViewModel): void {
+    if (vm.state === "saved") {
+      paintSuccess(vm);
+      return;
+    }
+    if (
+      layout !== "editing" ||
+      !shell ||
+      !root.contains(shell.descInput) ||
+      !root.contains(shell.propInput) ||
+      !root.contains(shell.otherFieldInput)
+    ) {
+      buildEditing(vm);
+      return;
+    }
+    syncEditing(vm);
+  }
+
+  apply(initialVm);
 
   return {
     root,
     update: (vm) => {
-      paint(vm);
+      apply(vm);
     },
   };
 }

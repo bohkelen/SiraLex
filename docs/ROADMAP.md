@@ -98,7 +98,9 @@ Status markers: **✅ Complete** · **in progress** · **deferred** · **pending
 
 ### Learning System & next product build
 
-Canonical status (see `docs/reports/pd1_next_product_build_decision.md`,
+Canonical status (see `docs/reports/cf2d0_missing_entry_search_failure_feedback_product_definition.md`,
+`docs/reports/pd2_post_cf1_product_build_decision.md`,
+`docs/reports/pd1_next_product_build_decision.md`,
 `docs/reports/pd0_next_product_build_decision.md`, and
 `docs/reports/lp1_local_learning_backup_restore_closure_report.md`):
 
@@ -127,8 +129,20 @@ CF1I3A — Correction Form Commit and Database Lifecycle — Complete
 CF1I4 — Pending Corrections and Export — Implemented
 CF1I5 — Offline Correction Lifecycle Verification — Implemented
 CF1I6 — Closure — Complete
+PD2 — Post-CF1 Product Build Decision — Complete
+PD2 original disposition — PRODUCT_BUILD_DEFERRED
+PD2 owner override — PD2_OWNER_OVERRIDE_CF2_SELECTED
+CF2 — Missing Entry and Search Failure Feedback — CLOSED
+CF2D0 — Defined
+CF2I1 — Search Feedback Model and Validation — Implemented
+CF2I2 — Local Search Feedback Store — Implemented
+CF2I3 — Search Failure Capture Surface — Implemented
+CF2I4 — Manage Search Feedback and Export — Implemented
+CF2I5 — Offline Search Feedback Lifecycle Verification — Implemented
+CF2I6 — Closure — Complete
+CF2I6A — Feedback Renderer Input Stability Amendment — Complete
 PV1A — Production Identity and Desktop Smoke — Parallel active
-PV1B — Physical Device Validation — Parallel, hardware-gated
+PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 ```
 
 - **LS4** remains product-defined (`docs/reports/ls4d0_guided_review_sessions_product_definition.md`) but **must not** proceed to `LS4I1` unless direct use exposes a clear need for selective Review.
@@ -136,9 +150,14 @@ PV1B — Physical Device Validation — Parallel, hardware-gated
 - **PD1** selected `CF1` as the product build while keeping release validation parallel (`docs/reports/pd1_next_product_build_decision.md`).
 - **CF1** is closed (`docs/reports/cf1i6_correction_feedback_closure_report.md`): users can capture, retain, manage, and export local non-authoritative correction drafts offline from genuine lexicon entries without changing dictionary authority.
 - **CF1 delivered:** `correction_draft_v1` + `siralex_correction_feedback_v1`; IndexedDB `correction_drafts` (v5); entry Suggest form; Manage Corrections; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
-- **Do not assume CF2 next.** Next product-build slice should be selected from the broader SiraLex roadmap; **PV1** remains the active parallel release-validation track.
-- **Parallel validation:** `PV1A` production identity/desktop smoke now; `PV1B` physical-device matrix when hardware is available.
-- Prior portfolio decision record: `docs/reports/pd0_next_product_build_decision.md`.
+- **PD2** originally deferred construction (`docs/reports/pd2_post_cf1_product_build_decision.md`) because real-use miss-demand evidence was scarce. That evidence assessment remains historically valid.
+- **Owner override:** `PD2_OWNER_OVERRIDE_CF2_SELECTED` reopened the product-build track and selected CF2 without claiming new empirical proof that miss demand was already demonstrated. CF2 was built to **capture** that evidence.
+- **CF2** is closed (`docs/reports/cf2i6_search_feedback_closure_report.md`): users can deliberately record unmet search need as local non-authoritative evidence, manage and export it offline, and retain original dictionary provenance without asserting cause or changing dictionary authority.
+- **CF2 delivered:** `search_failure_feedback_draft_v1` + `siralex_search_feedback_v1`; IndexedDB `search_failure_feedback` (v6); Report this search capture; Manage Search Feedback; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
+- **CF2I6A** post-closure amendment (`docs/reports/cf2i6a_feedback_input_stability_amendment_report.md`): renderer input lifecycle fix so ordinary CF1/CF2 typing preserves textarea DOM nodes/focus; product contracts unchanged; CF1/CF2 remain CLOSED.
+- **Product-build track after CF2:** `NO ACTIVE PRODUCT BUILD`. Future candidates (including deferred `CG1 — Community Feedback Governance`) remain evidence-driven and are not automatically selected.
+- **Parallel validation:** `PV1A` production identity/desktop smoke remains active and should run on the CF2I6A-amended build; `PV1B` physical-device matrix remains hardware-gated / not run. Phase 7N1 candidate identity may be recorded while device scenarios remain `not_run`.
+- Prior portfolio decision records: `docs/reports/pd2_post_cf1_product_build_decision.md`, `docs/reports/pd1_next_product_build_decision.md`, `docs/reports/pd0_next_product_build_decision.md`.
 
 ---
 

@@ -484,6 +484,8 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
       if (phase !== "editing" || !editFields || busy) return;
       editFields = { ...editFields, issue_type: value };
       editErrors = undefined;
+      errorCode = undefined;
+      focusTarget = "none";
       emit();
     },
 
@@ -491,6 +493,8 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
       if (phase !== "editing" || !editFields || busy) return;
       editFields = correctionFormFieldsForMode(editFields, mode);
       editErrors = undefined;
+      errorCode = undefined;
+      focusTarget = "none";
       emit();
     },
 
@@ -502,6 +506,8 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
         other_field_label: key === "other_field" ? editFields.other_field_label : "",
       };
       editErrors = undefined;
+      errorCode = undefined;
+      focusTarget = "none";
       emit();
     },
 
@@ -509,6 +515,8 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
       if (phase !== "editing" || !editFields || busy) return;
       editFields = { ...editFields, problem_description: value };
       editErrors = undefined;
+      errorCode = undefined;
+      focusTarget = "none";
       emit();
     },
 
@@ -517,6 +525,8 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
       if (editFields.mode !== "proposed_correction") return;
       editFields = { ...editFields, proposed_value: value };
       editErrors = undefined;
+      errorCode = undefined;
+      focusTarget = "none";
       emit();
     },
 
@@ -525,6 +535,8 @@ export function createCorrectionManagementSession(deps: CorrectionManagementSess
       if (editFields.target_key !== "other_field") return;
       editFields = { ...editFields, other_field_label: value };
       editErrors = undefined;
+      errorCode = undefined;
+      focusTarget = "none";
       emit();
     },
 

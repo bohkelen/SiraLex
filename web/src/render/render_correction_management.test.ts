@@ -220,4 +220,86 @@ describe("renderCorrectionManagement", () => {
     await Promise.resolve();
     expect(document.activeElement?.id).toBe("correction-manage-list");
   });
+
+  it("keeps edit textarea nodes stable across typing (CF2I6A)", async () => {
+    const fields = createInitialCorrectionFormFields();
+    fields.issue_type = "spelling";
+    fields.mode = "problem_report";
+    fields.problem_description = "";
+    fields.proposed_value = "";
+    // Production startEdit() leaves focusTarget at "heading"; incremental sync
+    // must not steal caret back to the heading on each keystroke.
+    let latest = baseVm({
+      phase: "editing",
+      selected: draft(),
+      editFields: fields,
+      editRetargetAllowed: false,
+      focusTarget: "heading",
+    });
+    const view = renderCorrectionManagement(latest, {
+      ...callbacks(),
+      onProblemDescriptionChange: (value) => {
+        latest = {
+          ...latest,
+          editFields: { ...(latest.editFields ?? fields), problem_description: value },
+          // Session clears this; keep "heading" here to prove renderer defense.
+          focusTarget: "heading",
+        };
+        view.update(latest);
+      },
+      onProposedValueChange: (value) => {
+        latest = {
+          ...latest,
+          editFields: { ...(latest.editFields ?? fields), proposed_value: value },
+          focusTarget: "heading",
+        };
+        view.update(latest);
+      },
+      onModeChange: (mode) => {
+        latest = {
+          ...latest,
+          editFields: {
+            ...(latest.editFields ?? fields),
+            mode,
+            proposed_value: mode === "problem_report" ? "" : latest.editFields?.proposed_value ?? "",
+          },
+          focusTarget: "heading",
+        };
+        view.update(latest);
+      },
+    });
+    document.body.appendChild(view.root);
+    await Promise.resolve(); // flush initial paint applyFocus("heading")
+
+    const desc = view.root.querySelector<HTMLTextAreaElement>(
+      "#correction-manage-description",
+    )!;
+    desc.focus();
+    expect(document.activeElement).toBe(desc);
+    for (const ch of "notes") {
+      desc.value = `${desc.value}${ch}`;
+      desc.dispatchEvent(new Event("input", { bubbles: true }));
+      await Promise.resolve(); // flush any applyFocus microtasks
+      expect(view.root.querySelector("#correction-manage-description")).toBe(desc);
+      expect(document.activeElement).toBe(desc);
+    }
+    expect(desc.value).toBe("notes");
+
+    const modeProposed = view.root.querySelector<HTMLInputElement>(
+      'input[name="correction-manage-mode"][value="proposed_correction"]',
+    )!;
+    modeProposed.checked = true;
+    modeProposed.dispatchEvent(new Event("change", { bubbles: true }));
+    const prop = view.root.querySelector<HTMLTextAreaElement>("#correction-manage-proposed")!;
+    expect((prop.closest(".field") as HTMLElement | null)?.hidden).toBe(false);
+    prop.focus();
+    for (const ch of "ߞߎ") {
+      prop.value = `${prop.value}${ch}`;
+      prop.dispatchEvent(new Event("input", { bubbles: true }));
+      await Promise.resolve();
+      expect(view.root.querySelector("#correction-manage-proposed")).toBe(prop);
+      expect(document.activeElement).toBe(prop);
+    }
+    expect(prop.value).toBe("ߞߎ");
+  });
 });
