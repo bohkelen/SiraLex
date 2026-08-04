@@ -66,13 +66,13 @@ Current production env sets:
 VITE_FEEDBACK_EMAIL=diabilasekou@gmail.com
 ```
 
-Operational closure still requires deploy + one real end-to-end email proof:
+Operational closure completed in PVR1 (`docs/reports/pvr1_theme_feedback_production_resmoke_report.md`):
 
 ```text
-FH1_PRODUCTION_HANDOFF_NOT_YET_OPERATIONAL
+FH1_PRODUCTION_HANDOFF_OPERATIONAL
 ```
 
-until production confirms Send for review is enabled and a real attachment arrives.
+after production Send-for-review + operator-confirmed inbox receipt.
 
 Prefer migrating later to a durable inbox (`feedback@siralex.org` or equivalent) without changing user-facing destination semantics beyond the configured value.
 
@@ -90,5 +90,5 @@ Prefer migrating later to a durable inbox (`feedback@siralex.org` or equivalent)
 ```text
 FH1_FEEDBACK_REVIEW_HANDOFF_IMPLEMENTED   — Accepted
 FH1_REVIEW_DESTINATION_AMENDMENT_IMPLEMENTED — Complete
-FH1_PRODUCTION_HANDOFF_NOT_YET_OPERATIONAL — until deploy + real inbox proof
+FH1_PRODUCTION_HANDOFF_OPERATIONAL — PVR1 verified
 ```

@@ -18,8 +18,9 @@
     "test:e2e:search-feedback:headed": "npm run build && playwright test -c playwright.config.ts e2e/search_feedback_lifecycle.spec.ts --headed",
     "test:e2e:feedback-input": "npm run build && playwright test -c playwright.config.ts e2e/feedback_input_stability.spec.ts",
     "test:e2e:theme": "npm run build && playwright test -c playwright.config.ts e2e/theme_preference.spec.ts",
-    "test:e2e:handoff": "VITE_FEEDBACK_EMAIL=review@example.org npm run build && playwright test -c playwright.config.ts e2e/feedback_handoff.spec.ts",
+    "test:e2e:handoff": "playwright test -c playwright.handoff.config.ts",
     "test:e2e:pv1a": "playwright test -c playwright.pv1a.config.ts",
+    "test:e2e:pvr1": "playwright test -c playwright.pvr1.config.ts",
     "build:report": "REPORT=true npm run build"
   },
   "devDependencies": {

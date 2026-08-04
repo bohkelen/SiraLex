@@ -682,7 +682,7 @@ a {
 
 .search-feedback-manage-heading {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
 }
 
 .search-feedback-manage-privacy,
@@ -753,6 +753,31 @@ a {
   border: 1px solid color-mix(in oklab, var(--text) 35%, #f87171 40%);
   padding: 10px 12px;
   border-radius: 6px;
+}
+
+.search-feedback-manage-handoff-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--text) 18%, transparent);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.search-feedback-manage-handoff-confirm .search-feedback-manage-handoff-heading {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.search-feedback-manage-handoff-confirm p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.search-feedback-manage-handoff-confirm .feedback-handoff-email {
+  font-size: inherit;
 }
 
 .search-feedback-manage-actions {
@@ -1403,6 +1428,12 @@ button.target-link .target-text {
   gap: 12px;
 }
 
+.correction-manage-heading {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
 .correction-manage-heading:focus,
 .correction-manage-status:focus,
 .correction-manage-error-summary:focus,
@@ -1475,6 +1506,27 @@ button.target-link .target-text {
   border: 1px solid color-mix(in oklab, var(--muted) 40%, var(--panel));
   border-radius: 8px;
   background: color-mix(in oklab, var(--panel) 94%, var(--accent) 6%);
+}
+
+#correction-manage-handoff-confirm {
+  display: grid;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+#correction-manage-handoff-confirm .correction-manage-handoff-heading {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+#correction-manage-handoff-confirm p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+#correction-manage-handoff-confirm .feedback-handoff-email {
+  font-size: inherit;
 }
 
 .correction-manage-help,

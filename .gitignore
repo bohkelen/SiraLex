@@ -35,6 +35,7 @@ pnpm-debug.log*
 
 # Web build outputs
 web/dist/
+web/dist-handoff-e2e/
 web/.vite/
 web/dist/stats.html
 web/playwright-report/

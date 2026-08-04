@@ -68,6 +68,9 @@ const EXPECTED_FALLBACK = {
 const ENV_PRODUCTION_EXPECTED = `# Non-secret production featured bundle selector (Phase 7N2B4G11).
 # Public identity also present in web/public/catalog.json.
 VITE_FEATURED_BUNDLE_ID=bundle_full_20260710_337619ff
+
+# FH1 review inbox for “Send for review”.
+VITE_FEEDBACK_EMAIL=diabilasekou@gmail.com
 `;
 
 function sha256File(path: string): string {
