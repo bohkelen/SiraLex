@@ -81,6 +81,37 @@ describe("i18n translations", () => {
     setCurrentLocale(previous);
   });
 
+  it("interpolates configured review email into handoff copy without hardcoding it", () => {
+    const previous = getCurrentLocale();
+    const email = "inbox@example.org";
+    setCurrentLocale("en");
+    expect(t("correctionFeedback.manage.send.destination", { email })).toContain(email);
+    expect(t("correctionFeedback.manage.send.shareText", { email })).toContain(email);
+    expect(t("searchFeedback.manage.send.shareText", { email })).toContain(email);
+    expect(t("correctionFeedback.manage.send.shareText", { email })).not.toContain(
+      "diabilasekou@gmail.com",
+    );
+    setCurrentLocale("fr");
+    expect(t("correctionFeedback.manage.send.destination", { email })).toContain(email);
+    expect(t("correctionFeedback.manage.send.shareText", { email })).toContain(email);
+    setCurrentLocale(previous);
+  });
+
+  it("resolves Theme labels in English and French", () => {
+    const previous = getCurrentLocale();
+    setCurrentLocale("en");
+    expect(t("theme.selectorLabel")).toBe("Theme");
+    expect(t("theme.system")).toBe("System");
+    expect(t("theme.light")).toBe("Light");
+    expect(t("theme.dark")).toBe("Dark");
+    setCurrentLocale("fr");
+    expect(t("theme.selectorLabel")).toBe("Thème");
+    expect(t("theme.system")).toBe("Système");
+    expect(t("theme.light")).toBe("Clair");
+    expect(t("theme.dark")).toBe("Sombre");
+    setCurrentLocale(previous);
+  });
+
   it("resolves Progress keys in English and French", () => {
     const previous = getCurrentLocale();
 

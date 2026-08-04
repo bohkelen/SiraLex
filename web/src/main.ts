@@ -11,6 +11,7 @@ import {
   getSourceLabel,
   getTargetLabel,
   getTargetEntriesLabel,
+  localizeStoredBundleDisplayName,
   type SearchDirection,
 } from "./bundle_labels";
 import {
@@ -42,9 +43,11 @@ import {
   getInstalledBundleMeta,
   listInstalledBundles,
   openSiralexDb,
+  putInstalledBundleMeta,
   recoverInterruptedBundleInstall,
   setCachedBundleCatalog,
   setActiveBundleId,
+  setActiveBundleMeta,
   storeHasData,
   type ActiveBundleMeta,
   type CachedBundleCatalog,
@@ -77,6 +80,21 @@ import {
   setCurrentLocaleWithPersistence,
   t,
 } from "./i18n";
+import {
+  getCurrentUiThemePreference,
+  initUiTheme,
+  setUiThemePreferenceWithPersistence,
+  type UiThemePreference,
+} from "./theme";
+import {
+  handoffFeedbackForReview,
+  isFeedbackHandoffConfigured,
+  resolveFeedbackEmailFromEnv,
+  toFeedbackHandoffArtifact,
+  type FeedbackHandoffKind,
+} from "./feedback/feedback_handoff";
+import { downloadCorrectionFeedbackArtifact } from "./corrections/correction_feedback_file";
+import { downloadSearchFeedbackArtifact } from "./search_feedback/search_feedback_export";
 import {
   recentLogMatchedKeyDisplay,
   recentLogMatchedKeyTypeDisplay,
@@ -161,10 +179,72 @@ const DEFAULT_LOCALE = resolveDefaultLocale(
   typeof navigator !== "undefined" ? navigator.language : undefined,
 );
 setCurrentLocale(DEFAULT_LOCALE);
+initUiTheme();
+const DEFAULT_UI_THEME = getCurrentUiThemePreference();
 
 const FEATURED_CATALOG_URL =
   import.meta.env.VITE_FEATURED_CATALOG_URL?.trim() || "/catalog.json";
 const FEATURED_BUNDLE_ID = import.meta.env.VITE_FEATURED_BUNDLE_ID?.trim() || undefined;
+const FEEDBACK_EMAIL = resolveFeedbackEmailFromEnv();
+const FEEDBACK_HANDOFF_AVAILABLE = isFeedbackHandoffConfigured(FEEDBACK_EMAIL);
+
+async function performConfiguredFeedbackHandoff(
+  artifact: { filename: string; mediaType: "application/json"; text: string },
+  kind: FeedbackHandoffKind,
+): Promise<Awaited<ReturnType<typeof handoffFeedbackForReview>>> {
+  const bridged = toFeedbackHandoffArtifact(artifact, kind);
+  if (!bridged) {
+    return { ok: false, reason: "invalid_artifact" };
+  }
+  const email = FEEDBACK_EMAIL ?? "";
+  const copy =
+    kind === "correction_feedback"
+      ? {
+          shareTitle: t("correctionFeedback.manage.send.shareTitle"),
+          shareText: t("correctionFeedback.manage.send.shareText", { email }),
+          mailtoSubject: t("correctionFeedback.manage.send.mailtoSubject"),
+          mailtoBody: t("correctionFeedback.manage.send.mailtoBody", {
+            filename: bridged.filename,
+            email,
+          }),
+        }
+      : {
+          shareTitle: t("searchFeedback.manage.send.shareTitle"),
+          shareText: t("searchFeedback.manage.send.shareText", { email }),
+          mailtoSubject: t("searchFeedback.manage.send.mailtoSubject"),
+          mailtoBody: t("searchFeedback.manage.send.mailtoBody", {
+            filename: bridged.filename,
+            email,
+          }),
+        };
+  return handoffFeedbackForReview(bridged, {
+    feedbackEmail: FEEDBACK_EMAIL,
+    // Privacy confirmation is handled by the management confirm_handoff UI.
+    confirmPrivacy: () => true,
+    copy,
+    downloadArtifact: (handoffArtifact) => {
+      if (kind === "correction_feedback") {
+        downloadCorrectionFeedbackArtifact({
+          filename: handoffArtifact.filename,
+          mediaType: "application/json",
+          text: handoffArtifact.text,
+          byteLength: new TextEncoder().encode(handoffArtifact.text).byteLength,
+          draftCount: 0,
+          exportedAt: new Date(0).toISOString(),
+        });
+        return;
+      }
+      downloadSearchFeedbackArtifact({
+        filename: handoffArtifact.filename,
+        mediaType: "application/json",
+        text: handoffArtifact.text,
+        byteLength: new TextEncoder().encode(handoffArtifact.text).byteLength,
+        feedbackCount: 0,
+        exportedAt: new Date(0).toISOString(),
+      });
+    },
+  });
+}
 
 app.innerHTML = `
   <div class="container">
@@ -174,12 +254,22 @@ app.innerHTML = `
           <h1 class="title">SiraLex</h1>
           <p class="subtitle">${t("app.subtitle")}</p>
         </div>
-        <div class="field locale-control">
-          <div class="label">${t("locale.selectorLabel")}</div>
-          <select id="localeSelect">
-            <option value="fr" ${DEFAULT_LOCALE === "fr" ? "selected" : ""}>${t("locale.french")}</option>
-            <option value="en" ${DEFAULT_LOCALE === "en" ? "selected" : ""}>${t("locale.english")}</option>
-          </select>
+        <div class="header-prefs">
+          <div class="field theme-control">
+            <div class="label" id="themeSelectorLabel">${t("theme.selectorLabel")}</div>
+            <select id="themeSelect" aria-labelledby="themeSelectorLabel">
+              <option value="system" ${DEFAULT_UI_THEME === "system" ? "selected" : ""}>${t("theme.system")}</option>
+              <option value="light" ${DEFAULT_UI_THEME === "light" ? "selected" : ""}>${t("theme.light")}</option>
+              <option value="dark" ${DEFAULT_UI_THEME === "dark" ? "selected" : ""}>${t("theme.dark")}</option>
+            </select>
+          </div>
+          <div class="field locale-control">
+            <div class="label">${t("locale.selectorLabel")}</div>
+            <select id="localeSelect">
+              <option value="fr" ${DEFAULT_LOCALE === "fr" ? "selected" : ""}>${t("locale.french")}</option>
+              <option value="en" ${DEFAULT_LOCALE === "en" ? "selected" : ""}>${t("locale.english")}</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -381,6 +471,7 @@ function mustGetEl<T extends Element>(selector: string): T {
 
 // Primary UI elements
 const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
+const themeSelect = mustGetEl<HTMLSelectElement>("#themeSelect");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
 const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
@@ -502,11 +593,34 @@ function getManifestPayloadBytes(manifest: BundleManifestV1): number | undefined
   return total > 0 ? total : undefined;
 }
 
-function getInstalledBundleName(bundle: ActiveBundleMeta): string {
-  if (bundle.language_meta) {
-    return getLocalizedBundleDisplayName(bundle.bundle_id, bundle.language_meta);
+function resolveInstalledLanguageMeta(
+  bundle: ActiveBundleMeta,
+): ActiveBundleMeta["language_meta"] | undefined {
+  if (bundle.language_meta?.source_lang || bundle.language_meta?.target_lang) {
+    return bundle.language_meta;
   }
-  return bundle.display_name ?? getLocalizedBundleDisplayName(bundle.bundle_id, bundle.language_meta);
+  // Featured manifests historically omit languages; catalog carries them.
+  const fromCatalog = getLoadedCatalogEntry(bundle.bundle_id)?.language_meta;
+  if (!fromCatalog) return bundle.language_meta;
+  return {
+    source_lang: fromCatalog.source_lang,
+    target_lang: fromCatalog.target_lang,
+    source_label: fromCatalog.source_label,
+    target_label: fromCatalog.target_label,
+    target_scripts: bundle.language_meta?.target_scripts,
+  };
+}
+
+function getInstalledBundleName(bundle: ActiveBundleMeta): string {
+  const languageMeta = resolveInstalledLanguageMeta(bundle);
+  if (languageMeta?.source_lang || languageMeta?.target_lang || languageMeta?.source_label) {
+    return getLocalizedBundleDisplayName(bundle.bundle_id, languageMeta);
+  }
+  if (bundle.display_name) {
+    // Already-installed featured bundles often have English display_name and no language_meta.
+    return localizeStoredBundleDisplayName(bundle.display_name, getCurrentLocale());
+  }
+  return getLocalizedBundleDisplayName(bundle.bundle_id, languageMeta);
 }
 
 function getLocalizedBundleDisplayName(
@@ -846,6 +960,63 @@ function applyCachedCatalog(cached: CachedBundleCatalog, source: "network" | "ca
   loadedCatalogSource = source;
   catalogUrlInput.value = cached.request_url;
   updateCatalogControls();
+  // Installed bundles may already be loaded (catalog refresh); boot path backfills after refreshDbStatus.
+  void backfillInstalledLanguageMetaFromCatalog(cached.catalog.bundles).then((changed) => {
+    if (!changed) return;
+    renderBundleSelectOptions(currentActiveBundle?.bundle_id);
+    renderInstalledBundleManager();
+    if (currentActiveBundle) {
+      activeDictionarySummary.textContent = t("activeDictionary.usingReady", {
+        name: getInstalledBundleName(currentActiveBundle),
+      });
+    }
+  });
+}
+
+/** Persist catalog languages onto installed metas that were saved without them. */
+async function backfillInstalledLanguageMetaFromCatalog(
+  bundles: BundleCatalogEntryV1[],
+): Promise<boolean> {
+  if (installedBundles.length === 0 || bundles.length === 0) return false;
+  const byId = new Map(bundles.map((entry) => [entry.bundle_id, entry]));
+  const db = await openSiralexDb();
+  try {
+    let changed = false;
+    const nextInstalled: ActiveBundleMeta[] = [];
+    for (const installed of installedBundles) {
+      if (installed.language_meta?.source_lang || installed.language_meta?.target_lang) {
+        nextInstalled.push(installed);
+        continue;
+      }
+      const entry = byId.get(installed.bundle_id);
+      if (!entry?.language_meta) {
+        nextInstalled.push(installed);
+        continue;
+      }
+      const updated: ActiveBundleMeta = {
+        ...installed,
+        language_meta: {
+          source_lang: entry.language_meta.source_lang,
+          target_lang: entry.language_meta.target_lang,
+          source_label: entry.language_meta.source_label,
+          target_label: entry.language_meta.target_label,
+        },
+      };
+      await putInstalledBundleMeta(db, updated);
+      if (currentActiveBundle?.bundle_id === updated.bundle_id) {
+        await setActiveBundleMeta(db, updated);
+        currentActiveBundle = updated;
+      }
+      nextInstalled.push(updated);
+      changed = true;
+    }
+    if (changed) {
+      installedBundles = nextInstalled;
+    }
+    return changed;
+  } finally {
+    db.close();
+  }
 }
 
 function invalidateManifestValidation() {
@@ -878,6 +1049,13 @@ localeSelect.addEventListener("change", () => {
   if (typeof window !== "undefined") {
     window.location.reload();
   }
+});
+
+themeSelect.addEventListener("change", () => {
+  const nextTheme = themeSelect.value;
+  if (nextTheme !== "system" && nextTheme !== "light" && nextTheme !== "dark") return;
+  if (nextTheme === getCurrentUiThemePreference()) return;
+  setUiThemePreferenceWithPersistence(nextTheme as UiThemePreference);
 });
 
 openManageDictionariesBtn.addEventListener("click", () => {
@@ -1095,6 +1273,9 @@ async function refreshDbStatus() {
           : undefined;
       installedBundles = bundles;
       currentActiveBundle = active;
+      if (loadedCatalogBundles.length > 0) {
+        await backfillInstalledLanguageMetaFromCatalog(loadedCatalogBundles);
+      }
       const nextBundleId = active?.bundle_id;
       const nextContentSha = active?.expected_content_sha256;
       if (
@@ -2313,6 +2494,10 @@ function showSearchFeedbackManagement(): void {
     dbOwnership: "controller_owned",
     now: () => new Date().toISOString(),
     appVersion: APP_VERSION,
+    sendForReviewAvailable: FEEDBACK_HANDOFF_AVAILABLE,
+    reviewEmail: FEEDBACK_EMAIL,
+    performHandoff: (artifact) =>
+      performConfiguredFeedbackHandoff(artifact, "search_feedback"),
     isCurrent: () =>
       generation === searchFeedbackManagementGeneration &&
       activeSearchFeedbackManagement === session,
@@ -2346,6 +2531,12 @@ function showSearchFeedbackManagement(): void {
       void session.exportAll();
     },
     onAcknowledgeExport: () => session.acknowledgeExport(),
+    onRequestSendForReview: () => session.requestSendForReview(),
+    onCancelSendForReview: () => session.cancelSendForReview(),
+    onConfirmSendForReview: () => {
+      void session.confirmSendForReview();
+    },
+    onAcknowledgeHandoff: () => session.acknowledgeHandoff(),
     onBack: () => {
       disposeActiveSearchFeedbackManagement();
       if (lastSearchResults.length > 0) {
@@ -2380,6 +2571,10 @@ function showCorrectionManagement(): void {
     dbOwnership: "controller_owned",
     now: () => new Date().toISOString(),
     appVersion: APP_VERSION,
+    sendForReviewAvailable: FEEDBACK_HANDOFF_AVAILABLE,
+    reviewEmail: FEEDBACK_EMAIL,
+    performHandoff: (artifact) =>
+      performConfiguredFeedbackHandoff(artifact, "correction_feedback"),
     isCurrent: () =>
       generation === correctionManagementGeneration && activeCorrectionManagement === session,
     onModel: (vm) => {
@@ -2417,6 +2612,12 @@ function showCorrectionManagement(): void {
       void session.exportAll();
     },
     onAcknowledgeExport: () => session.acknowledgeExport(),
+    onRequestSendForReview: () => session.requestSendForReview(),
+    onCancelSendForReview: () => session.cancelSendForReview(),
+    onConfirmSendForReview: () => {
+      void session.confirmSendForReview();
+    },
+    onAcknowledgeHandoff: () => session.acknowledgeHandoff(),
     onBack: () => {
       disposeActiveCorrectionManagement();
       if (lastSearchResults.length > 0) {

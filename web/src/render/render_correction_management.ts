@@ -36,6 +36,10 @@ export type CorrectionManagementRendererCallbacks = {
   onConfirmDelete: () => void;
   onExport: () => void;
   onAcknowledgeExport: () => void;
+  onRequestSendForReview: () => void;
+  onCancelSendForReview: () => void;
+  onConfirmSendForReview: () => void;
+  onAcknowledgeHandoff: () => void;
   onBack: () => void;
 };
 
@@ -72,6 +76,8 @@ const ERROR_KEYS: Partial<Record<CorrectionManagementErrorCode, TranslationKey>>
   duplicate_draft_id: "correctionFeedback.manage.error.exportDuplicate",
   generated_package_too_large: "correctionFeedback.manage.error.exportTooLarge",
   generated_package_invalid: "correctionFeedback.manage.error.exportInvalidPackage",
+  send_failed: "correctionFeedback.manage.error.sendFailed",
+  send_unavailable: "correctionFeedback.manage.send.unavailable",
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -83,6 +89,36 @@ function el<K extends keyof HTMLElementTagNameMap>(
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+/** Render copy that includes a configured email as a mailto link (address from config, not translations). */
+function appendTextWithEmailLink(
+  parent: HTMLElement,
+  text: string,
+  email: string,
+  className?: string,
+): void {
+  const p = el("p", className);
+  if (!email) {
+    p.textContent = text;
+    parent.appendChild(p);
+    return;
+  }
+  const idx = text.indexOf(email);
+  if (idx < 0) {
+    p.textContent = text;
+    parent.appendChild(p);
+    return;
+  }
+  if (idx > 0) p.append(text.slice(0, idx));
+  const link = document.createElement("a");
+  link.href = `mailto:${email}`;
+  link.textContent = email;
+  link.rel = "noopener";
+  link.className = "feedback-handoff-email";
+  p.append(link);
+  if (idx + email.length < text.length) p.append(text.slice(idx + email.length));
+  parent.appendChild(p);
 }
 
 /** Do not overwrite an actively edited control (preserves caret/IME). */
@@ -208,9 +244,28 @@ export function renderCorrectionManagement(
         filename: vm.exportFilename ?? "",
         count: vm.exportDraftCount ?? 0,
       });
+    } else if (vm.phase === "handoff_preparing") {
+      status.textContent = t("correctionFeedback.manage.send.progress");
+    } else if (vm.phase === "handoff_prepared") {
+      status.textContent =
+        vm.handoffMethod === "download_mailto"
+          ? t("correctionFeedback.manage.send.successFallback", {
+              email: vm.reviewEmail ?? "",
+            })
+          : t("correctionFeedback.manage.send.successShare");
+    } else if (vm.phase === "confirm_handoff") {
+      status.textContent = t("correctionFeedback.manage.send.confirmHeading");
     }
 
-    if (vm.phase === "list" || vm.phase === "empty" || vm.phase === "exported" || vm.phase === "exporting") {
+    if (
+      vm.phase === "list" ||
+      vm.phase === "empty" ||
+      vm.phase === "exported" ||
+      vm.phase === "exporting" ||
+      vm.phase === "handoff_preparing" ||
+      vm.phase === "handoff_prepared" ||
+      vm.phase === "confirm_handoff"
+    ) {
       paintListChrome(vm);
     }
     if (vm.phase === "list") {
@@ -225,12 +280,24 @@ export function renderCorrectionManagement(
     if (vm.phase === "confirm_delete") {
       paintDeleteConfirm();
     }
+    if (vm.phase === "confirm_handoff") {
+      paintHandoffConfirm(vm);
+    }
     if (vm.phase === "exported") {
       const ack = document.createElement("button");
       ack.type = "button";
       ack.className = "btn";
       ack.textContent = t("correctionFeedback.manage.export.acknowledge");
       ack.addEventListener("click", () => callbacks.onAcknowledgeExport());
+      root.appendChild(ack);
+    }
+    if (vm.phase === "handoff_prepared") {
+      const ack = document.createElement("button");
+      ack.type = "button";
+      ack.className = "btn";
+      ack.id = "correction-manage-handoff-acknowledge";
+      ack.textContent = t("correctionFeedback.manage.send.acknowledge");
+      ack.addEventListener("click", () => callbacks.onAcknowledgeHandoff());
       root.appendChild(ack);
     }
 
@@ -240,14 +307,78 @@ export function renderCorrectionManagement(
   function paintListChrome(vm: CorrectionManagementVm): void {
     const warning = el("p", "correction-manage-export-warning", t("correctionFeedback.manage.export.authority"));
     root.appendChild(warning);
+    const actions = el("div", "row correction-manage-transport-actions");
     const exportBtn = document.createElement("button");
     exportBtn.type = "button";
     exportBtn.className = "btn correction-manage-export";
     exportBtn.id = "correction-manage-export";
     exportBtn.textContent = t("correctionFeedback.manage.export.button");
-    exportBtn.disabled = vm.busy || vm.draftCount === 0 || vm.phase === "exporting";
+    exportBtn.disabled =
+      vm.busy ||
+      vm.draftCount === 0 ||
+      vm.phase === "exporting" ||
+      vm.phase === "handoff_preparing" ||
+      vm.phase === "confirm_handoff";
     exportBtn.addEventListener("click", () => callbacks.onExport());
-    root.appendChild(exportBtn);
+    actions.appendChild(exportBtn);
+
+    const sendBtn = document.createElement("button");
+    sendBtn.type = "button";
+    sendBtn.className = "btn correction-manage-send";
+    sendBtn.id = "correction-manage-send";
+    sendBtn.textContent = t("correctionFeedback.manage.send.button");
+    sendBtn.disabled =
+      !vm.sendForReviewAvailable ||
+      vm.busy ||
+      vm.draftCount === 0 ||
+      vm.phase === "exporting" ||
+      vm.phase === "handoff_preparing" ||
+      vm.phase === "confirm_handoff";
+    sendBtn.addEventListener("click", () => callbacks.onRequestSendForReview());
+    actions.appendChild(sendBtn);
+    root.appendChild(actions);
+
+    if (!vm.sendForReviewAvailable) {
+      root.appendChild(
+        el("p", "correction-manage-send-unavailable", t("correctionFeedback.manage.send.unavailable")),
+      );
+    }
+  }
+
+  function paintHandoffConfirm(vm: CorrectionManagementVm): void {
+    const box = el("div", "correction-manage-delete-confirm");
+    box.id = "correction-manage-handoff-confirm";
+    const email = vm.reviewEmail ?? "";
+    box.appendChild(
+      el("h3", "correction-manage-handoff-heading", t("correctionFeedback.manage.send.confirmHeading")),
+    );
+    box.appendChild(el("p", undefined, t("correctionFeedback.manage.send.privacy")));
+    appendTextWithEmailLink(
+      box,
+      t("correctionFeedback.manage.send.destination", { email }),
+      email,
+      "correction-manage-handoff-destination",
+    );
+    box.appendChild(
+      el("p", undefined, t("correctionFeedback.manage.send.destinationHint")),
+    );
+    const row = el("div", "row");
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn";
+    cancel.id = "correction-manage-handoff-cancel";
+    cancel.textContent = t("correctionFeedback.manage.send.cancel");
+    cancel.addEventListener("click", () => callbacks.onCancelSendForReview());
+    const cont = document.createElement("button");
+    cont.type = "button";
+    cont.className = "btn";
+    cont.id = "correction-manage-handoff-continue";
+    cont.textContent = t("correctionFeedback.manage.send.continue");
+    cont.addEventListener("click", () => callbacks.onConfirmSendForReview());
+    row.appendChild(cancel);
+    row.appendChild(cont);
+    box.appendChild(row);
+    root.appendChild(box);
   }
 
   function paintList(vm: CorrectionManagementVm): void {

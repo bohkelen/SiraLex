@@ -7,6 +7,7 @@ import {
   getSourceLabel,
   getTargetEntriesLabel,
   getTargetLabel,
+  localizeStoredBundleDisplayName,
 } from "./bundle_labels";
 import type { BundleLanguageMeta } from "./idb/siralex_db";
 
@@ -59,6 +60,34 @@ describe("bundle language labels", () => {
   it("preserves legacy fallback behavior when no display locale is provided", () => {
     expect(getBundleDisplayName("bundle-id", LANGUAGE_META, "Source", "Target")).toBe(
       "French ↔ Maninka",
+    );
+  });
+
+  it("does not leak English catalog source labels into French UI", () => {
+    // Simulate Intl missing a useful name by relying on static fallback for fr/fr.
+    expect(getSourceLabel(LANGUAGE_META, "Source", "fr")).toBe("Français");
+    expect(getBundleDisplayName("bundle-id", LANGUAGE_META, "Source", "Cible", "fr")).toBe(
+      "Français ↔ Maninka",
+    );
+  });
+
+  it("pins Maninka for mnk even when Intl would offer Mandingue/Mandingo", () => {
+    // Product table wins over platform CLDR (iOS Safari often yields Mandingue).
+    expect(getTargetLabel(LANGUAGE_META, "Target", "fr")).toBe("Maninka");
+    expect(getTargetLabel(LANGUAGE_META, "Target", "en")).toBe("Maninka");
+    expect(getSearchDirectionText("source_to_target", LANGUAGE_META, "Source", "Target", "fr")).toBe(
+      "Français → Maninka",
+    );
+    expect(getSearchDirectionText("source_to_target", LANGUAGE_META, "Source", "Target", "en")).toBe(
+      "French → Maninka",
+    );
+  });
+
+  it("localizes stored English catalog display names for French UI", () => {
+    expect(localizeStoredBundleDisplayName("French ↔ Maninka", "fr")).toBe("Français ↔ Maninka");
+    expect(localizeStoredBundleDisplayName("French ↔ Maninka", "en")).toBe("French ↔ Maninka");
+    expect(localizeStoredBundleDisplayName("French ↔ Maninka norm_v2 Validation Bundle", "fr")).toBe(
+      "Français ↔ Maninka norm_v2 Validation Bundle",
     );
   });
 });

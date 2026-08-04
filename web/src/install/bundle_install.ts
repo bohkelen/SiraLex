@@ -61,6 +61,13 @@ export type InstallBundleMetadata = {
   displayName?: string;
   version?: string;
   storageBytes?: number;
+  /** Catalog/language metadata when the bundle manifest omits languages. */
+  languageMeta?: {
+    source_lang?: string;
+    target_lang?: string;
+    source_label?: string;
+    target_label?: string;
+  };
 };
 
 export type InstallProgressCopy = {
@@ -229,6 +236,20 @@ function computeManifestPayloadBytes(manifest: BundleManifestV1): number | undef
   return total > 0 ? total : undefined;
 }
 
+function mergeLanguageMeta(
+  fromManifest: ReturnType<typeof buildLanguageMetaFromManifest>,
+  fromCatalog: InstallBundleMetadata["languageMeta"] | undefined,
+): ActiveBundleMeta["language_meta"] {
+  const merged = {
+    source_lang: fromManifest?.source_lang ?? fromCatalog?.source_lang,
+    target_lang: fromManifest?.target_lang ?? fromCatalog?.target_lang,
+    source_label: fromManifest?.source_label ?? fromCatalog?.source_label,
+    target_label: fromManifest?.target_label ?? fromCatalog?.target_label,
+    target_scripts: fromManifest?.target_scripts,
+  };
+  return Object.values(merged).some((value) => value !== undefined) ? merged : undefined;
+}
+
 function buildInstalledBundleMeta(
   manifest: BundleManifestV1,
   storageScopeId: string,
@@ -253,7 +274,8 @@ function buildInstalledBundleMeta(
     imported_at_iso: new Date().toISOString(),
     records_count: recordsCount,
     index_entries_count: indexCount,
-    language_meta: buildLanguageMetaFromManifest(manifest),
+    // Featured manifests may omit languages; catalog language_meta fills the gap.
+    language_meta: mergeLanguageMeta(buildLanguageMetaFromManifest(manifest), metadata?.languageMeta),
   };
 }
 
@@ -523,6 +545,14 @@ export async function installRemoteCatalogBundle(
       displayName: entry.name,
       version: entry.version,
       storageBytes: entry.size_bytes,
+      languageMeta: entry.language_meta
+        ? {
+            source_lang: entry.language_meta.source_lang,
+            target_lang: entry.language_meta.target_lang,
+            source_label: entry.language_meta.source_label,
+            target_label: entry.language_meta.target_label,
+          }
+        : undefined,
     },
     options.activateOnCommit ?? true,
     progressCopy,

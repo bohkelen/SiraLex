@@ -14,18 +14,38 @@ function titleCaseLanguageName(value: string, locale: string): string {
   return `${value.slice(0, 1).toLocaleUpperCase(locale)}${value.slice(1)}`;
 }
 
+/**
+ * Product UI names for language codes used in SiraLex surfaces.
+ * Preferred over Intl.DisplayNames so platforms that map mnk→Mandingue/Mandingo
+ * cannot diverge from the catalog product name "Maninka", while still giving
+ * stable Français/French for fr.
+ */
+const UI_LANGUAGE_NAME_FALLBACKS: Record<string, Record<string, string>> = {
+  en: { en: "English", fr: "French", mnk: "Maninka" },
+  fr: { en: "Anglais", fr: "Français", mnk: "Maninka" },
+};
+
 function getLocaleLanguageName(code: string | undefined, locale: string | undefined): string | undefined {
-  if (!code || !locale || typeof Intl.DisplayNames !== "function") return undefined;
+  if (!code || !locale) return undefined;
   const normalizedCode = code.trim().toLowerCase();
   if (normalizedCode === "") return undefined;
+  const localeBase = locale.trim().toLowerCase().split("-")[0] ?? "";
 
-  try {
-    const name = new Intl.DisplayNames([locale], { type: "language" }).of(normalizedCode);
-    if (!name || name.trim().toLowerCase() === normalizedCode) return undefined;
-    return titleCaseLanguageName(name.trim(), locale);
-  } catch {
-    return undefined;
+  const productName = UI_LANGUAGE_NAME_FALLBACKS[localeBase]?.[normalizedCode];
+  if (productName) return productName;
+
+  if (typeof Intl.DisplayNames === "function") {
+    try {
+      const name = new Intl.DisplayNames([locale], { type: "language" }).of(normalizedCode);
+      if (name && name.trim().toLowerCase() !== normalizedCode) {
+        return titleCaseLanguageName(name.trim(), locale);
+      }
+    } catch {
+      // No product name and Intl unavailable/unhelpful.
+    }
   }
+
+  return undefined;
 }
 
 export function buildLanguageMetaFromManifest(manifest: BundleManifestV1): BundleLanguageMeta | undefined {
@@ -79,6 +99,39 @@ export function getBundleDisplayName(
     return bundleId;
   }
   return `${source} ↔ ${target}`;
+}
+
+/**
+ * Localize a stored catalog display_name for the active UI locale.
+ * Needed when installed bundles were saved with English catalog names and no language_meta
+ * (featured manifests historically omit languages).
+ *
+ * Uses the same UI language-name table as getSourceLabel (English token → locale token).
+ */
+export function localizeStoredBundleDisplayName(
+  displayName: string,
+  displayLocale: string | undefined,
+): string {
+  const localeBase = displayLocale?.trim().toLowerCase().split("-")[0] ?? "";
+  if (!localeBase || localeBase === "en") return displayName;
+  const localizedNames = UI_LANGUAGE_NAME_FALLBACKS[localeBase];
+  const englishNames = UI_LANGUAGE_NAME_FALLBACKS.en;
+  if (!localizedNames || !englishNames) return displayName;
+
+  const pairParts = displayName.split(" ↔ ");
+  const sourcePart = pairParts[0];
+  if (!sourcePart || pairParts.length < 2) return displayName;
+
+  const localizeToken = (token: string): string => {
+    for (const [code, englishName] of Object.entries(englishNames)) {
+      if (token === englishName && localizedNames[code]) {
+        return localizedNames[code];
+      }
+    }
+    return token;
+  };
+
+  return [localizeToken(sourcePart), ...pairParts.slice(1).map(localizeToken)].join(" ↔ ");
 }
 
 export function getSearchDirectionText(
