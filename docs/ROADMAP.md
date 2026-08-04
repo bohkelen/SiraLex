@@ -143,6 +143,7 @@ CF2I6 — Closure — Complete
 CF2I6A — Feedback Renderer Input Stability Amendment — Complete
 UXT1 — Appearance / Theme Preference — Complete
 UX2I1 — Design Tokens and Visual Foundation — Complete
+UX2I1A — Accessible Action Text Token Amendment — Complete
 FH1 — Feedback Review Handoff — Complete (Accepted)
 FH1A — Explicit Review Destination Amendment — Complete
 PV1A — Production Identity and Desktop Smoke — VERIFIED
@@ -161,6 +162,7 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **CF2I6A** post-closure amendment (`docs/reports/cf2i6a_feedback_input_stability_amendment_report.md`): renderer input lifecycle fix so ordinary CF1/CF2 typing preserves textarea DOM nodes/focus; product contracts unchanged; CF1/CF2 remain CLOSED.
 - **UXT1** complete (`docs/reports/uxt1_appearance_preference_report.md`, `UXT1_APPEARANCE_PREFERENCE_IMPLEMENTED`): System / Light / Dark theme preference via `siralex.ui_theme`, CSS variables, offline local persistence, no-reload apply; System follows OS `prefers-color-scheme`. UI label Theme/Thème (dropdown).
 - **UX2I1** complete (`docs/reports/ux2i1_design_tokens_visual_foundation_report.md`, `UX2I1_DESIGN_FOUNDATION_IMPLEMENTED`): Contemporary West African Modernism semantic design tokens (color, type, spacing, focus, responsive, N’Ko primitive) extracted from Figma handoff; UXT1 theme contract preserved; screens not redesigned.
+- **UX2I1A** complete (`docs/reports/ux2i1_design_tokens_visual_foundation_report.md`, `UX2I1A_ACCESSIBLE_ACTION_TEXT_IMPLEMENTED`): adds `--color-action-text` for normal-text terracotta actions/links/nav labels; brand `--color-accent` / `--color-focus` unchanged; legacy `--accent` not remapped.
 - **FH1** accepted (`docs/reports/fh1_feedback_review_handoff_report.md`, `FH1_FEEDBACK_REVIEW_HANDOFF_IMPLEMENTED`): transport-only “Send for review”; reuses CF1/CF2 governed packages; Web Share or download+mailto; drafts stay `draft`.
 - **FH1A** complete (`docs/reports/fh1a_review_destination_amendment_report.md`, `FH1_REVIEW_DESTINATION_AMENDMENT_IMPLEMENTED`): configured `VITE_FEEDBACK_EMAIL` shown in confirm UI and Web Share text; mailto remains pre-addressed.
 - **PVR1** verified (`docs/reports/pvr1_theme_feedback_production_resmoke_report.md`, `PVR1_THEME_AND_FEEDBACK_PRODUCTION_VERIFIED`): Theme + FH1/FH1A + CF1/CF2 handoff preparation PASS on production; operator-confirmed real inbox receipt (Linux Thunderbird + iPhone Gmail/Proton). FH1 production handoff is **OPERATIONAL**. Next: PV1B.

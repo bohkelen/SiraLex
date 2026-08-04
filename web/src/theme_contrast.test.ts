@@ -96,7 +96,9 @@ describe("theme contrast sanity", () => {
       const inputBackground = requireVar(vars, "--color-input-background");
       const buttonBackground = requireVar(vars, "--color-surface-subtle");
       const accent = requireVar(vars, "--color-accent");
+      const actionText = requireVar(vars, "--color-action-text");
       const focus = requireVar(vars, "--color-focus");
+      const surfaceSubtle = requireVar(vars, "--color-surface-subtle");
 
       expect(contrastRatio(text, background)).toBeGreaterThanOrEqual(MIN_BODY_CONTRAST);
       expect(contrastRatio(text, surface)).toBeGreaterThanOrEqual(MIN_BODY_CONTRAST);
@@ -108,6 +110,10 @@ describe("theme contrast sanity", () => {
       expect(contrastRatio(accent, background)).toBeGreaterThanOrEqual(MIN_UI_CONTRAST);
       expect(contrastRatio(focus, background)).toBeGreaterThanOrEqual(MIN_UI_CONTRAST);
       expect(contrastRatio(focus, surface)).toBeGreaterThanOrEqual(MIN_UI_CONTRAST);
+      // Action-text is for small terracotta text; normal-text AA (≥4.5:1).
+      expect(contrastRatio(actionText, background)).toBeGreaterThanOrEqual(MIN_BODY_CONTRAST);
+      expect(contrastRatio(actionText, surface)).toBeGreaterThanOrEqual(MIN_BODY_CONTRAST);
+      expect(contrastRatio(actionText, surfaceSubtle)).toBeGreaterThanOrEqual(MIN_BODY_CONTRAST);
     });
   }
 
@@ -123,6 +129,7 @@ describe("theme contrast sanity", () => {
       "--color-accent",
       "--color-accent-hover",
       "--color-accent-pressed",
+      "--color-action-text",
       "--color-success",
       "--color-warning",
       "--color-danger",

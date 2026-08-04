@@ -62,6 +62,7 @@ Figma summary: DM Serif Display + DM Sans · terracotta palette · warm cream gr
 | accent | `#b85225` |
 | accent-hover | `#9e4420` |
 | accent-pressed | `#8a3a1c` |
+| action-text | `#9e4420` |
 | success | `#3d7a52` |
 | success-soft | `#e0ede6` |
 | warning | `#a06c1a` |
@@ -87,6 +88,7 @@ Figma summary: DM Serif Display + DM Sans · terracotta palette · warm cream gr
 | accent | `#cf6535` |
 | accent-hover | `#e07040` |
 | accent-pressed | `#d46830` |
+| action-text | `#e07040` |
 | success | `#5aad74` |
 | success-soft | `#0e2a18` |
 | warning | `#d4922a` |
@@ -200,6 +202,16 @@ CSS: `--layout-*` custom properties only. Shell/nav migration deferred.
 
 ## 13. Accessibility / contrast results
 
+### Semantic split (UX2I1A)
+
+| Token | Role |
+|---|---|
+| `--color-accent` | Brand/UI accent — non-text uses (icons, rules, highlights, decorative/structural accent). Light `#b85225` / Dark `#cf6535` unchanged from Figma. |
+| `--color-focus` | Focus ring. Light `#b85225` / Dark `#cf6535` unchanged. |
+| `--color-action-text` | Normal small-text terracotta — textual links, textual actions, active nav labels. Light `#9e4420` / Dark `#e07040`. |
+
+Legacy `--accent` continues to alias `--color-accent` (not remapped to action-text). Later UX2 slices choose deliberately.
+
 Computed ratios (WCAG relative luminance):
 
 ### Light
@@ -211,8 +223,11 @@ Computed ratios (WCAG relative luminance):
 | secondary text / background | 7.09:1 | ≥4.5 PASS |
 | muted text / background | 5.53:1 | ≥3.0 / AA large PASS |
 | input text / input background | 14.33:1 | ≥4.5 PASS |
-| accent / background | 4.23:1 | UI ≥3.0 PASS; normal-text AA marginal |
+| accent / background | 4.23:1 | UI ≥3.0 PASS (brand/non-text) |
 | focus / surface | 3.88:1 | UI ≥3.0 PASS |
+| action-text / background | 5.47:1 | ≥4.5 PASS |
+| action-text / surface | 5.02:1 | ≥4.5 PASS |
+| action-text / surface-subtle | 4.51:1 | ≥4.5 PASS |
 
 ### Dark
 
@@ -223,14 +238,25 @@ Computed ratios (WCAG relative luminance):
 | secondary text / background | 8.16:1 | ≥4.5 PASS |
 | muted text / background | 5.14:1 | ≥3.0 / AA large PASS |
 | input text / input background | 14.78:1 | ≥4.5 PASS |
-| accent / background | 4.66:1 | ≥4.5 PASS |
-| focus / surface | 4.94:1 | ≥3.0 PASS |
+| accent / background | 4.66:1 | UI ≥3.0 PASS (brand/non-text) |
+| focus / surface | 4.94:1 | UI ≥3.0 PASS |
+| action-text / background | 5.50:1 | ≥4.5 PASS |
+| action-text / surface | 5.82:1 | ≥4.5 PASS |
+| action-text / surface-subtle | 5.07:1 | ≥4.5 PASS |
 
 Focus primitive: 3px solid `--color-focus`, 2px offset (`.ux2-focus-ring`).
 
 Touch-target invariant recorded: **44 × 44 CSS px** (enforcement in later component slices).
 
-Accessibility: **PASS** (exact Figma values retained; accent-as-small-text in light noted as UI-component-grade).
+Accessibility: **PASS** — brand accent retained for UI/non-text; small terracotta text uses `--color-action-text` at normal-text AA on background, surface, and surface-subtle.
+
+### UX2I1A amendment
+
+```text
+UX2I1A_ACCESSIBLE_ACTION_TEXT_IMPLEMENTED
+```
+
+BASE_COMMIT for amendment: `f5922cd322d6511e32781107b46b78764be179e5`
 
 ---
 
@@ -371,4 +397,5 @@ See completion response / post-commit `git status --short`.
 
 ```text
 UX2I1_DESIGN_FOUNDATION_IMPLEMENTED
+UX2I1A_ACCESSIBLE_ACTION_TEXT_IMPLEMENTED
 ```

@@ -131,6 +131,8 @@
   --color-accent: #b85225;
   --color-accent-hover: #9e4420;
   --color-accent-pressed: #8a3a1c;
+  /* Textual terracotta actions/links/nav labels (normal-text AA). Brand accent unchanged. */
+  --color-action-text: #9e4420;
   --color-success: #3d7a52;
   --color-success-soft: #e0ede6;
   --color-warning: #a06c1a;
@@ -179,6 +181,7 @@
   --color-accent: #b85225;
   --color-accent-hover: #9e4420;
   --color-accent-pressed: #8a3a1c;
+  --color-action-text: #9e4420;
   --color-success: #3d7a52;
   --color-success-soft: #e0ede6;
   --color-warning: #a06c1a;
@@ -220,6 +223,7 @@
   --color-accent: #cf6535;
   --color-accent-hover: #e07040;
   --color-accent-pressed: #d46830;
+  --color-action-text: #e07040;
   --color-success: #5aad74;
   --color-success-soft: #0e2a18;
   --color-warning: #d4922a;
@@ -262,6 +266,7 @@
     --color-accent: #cf6535;
     --color-accent-hover: #e07040;
     --color-accent-pressed: #d46830;
+    --color-action-text: #e07040;
     --color-success: #5aad74;
     --color-success-soft: #0e2a18;
     --color-warning: #d4922a;
