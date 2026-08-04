@@ -112,6 +112,29 @@ describe("i18n translations", () => {
     setCurrentLocale(previous);
   });
 
+  it("resolves UX2 primary navigation and More labels in English and French", () => {
+    const previous = getCurrentLocale();
+    setCurrentLocale("en");
+    expect(t("nav.primaryAriaLabel")).toBe("Primary");
+    expect(t("nav.search")).toBe("Search");
+    expect(t("nav.saved")).toBe("Saved");
+    expect(t("nav.review")).toBe("Review");
+    expect(t("nav.more")).toBe("More");
+    expect(t("more.myCorrections")).toBe("My corrections");
+    expect(t("more.searchFeedback")).toBe("Search feedback");
+    expect(t("more.dictionaries")).toBe("Dictionaries");
+    setCurrentLocale("fr");
+    expect(t("nav.primaryAriaLabel")).toBe("Principal");
+    expect(t("nav.search")).toBe("Recherche");
+    expect(t("nav.saved")).toBe("Enregistré");
+    expect(t("nav.review")).toBe("Révision");
+    expect(t("nav.more")).toBe("Plus");
+    expect(t("more.myCorrections")).toBe("Mes corrections");
+    expect(t("more.searchFeedback")).toBe("Retours de recherche");
+    expect(t("more.dictionaries")).toBe("Dictionnaires");
+    setCurrentLocale(previous);
+  });
+
   it("resolves Progress keys in English and French", () => {
     const previous = getCurrentLocale();
 

@@ -124,6 +124,11 @@ import {
 } from "./render/render_search_feedback_capture";
 import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
 import {
+  renderPrimaryNavigation,
+  type PrimaryDestination,
+  type PrimaryNavigationView,
+} from "./render/render_primary_navigation";
+import {
   createSearchFeedbackCaptureController,
   type SearchFeedbackCaptureController,
 } from "./search_feedback/search_feedback_capture_controller";
@@ -247,14 +252,53 @@ async function performConfiguredFeedbackHandoff(
 }
 
 app.innerHTML = `
-  <div class="container">
-    <div class="card">
-      <div class="row" style="align-items: start; justify-content: space-between; gap: 12px">
-        <div>
-          <h1 class="title">SiraLex</h1>
-          <p class="subtitle">${t("app.subtitle")}</p>
+  <div class="ux2-app-shell" id="ux2AppShell" data-primary="search">
+    <header class="ux2-app-header">
+      <div class="ux2-wordmark ux2-type-wordmark" id="ux2Wordmark">SiraLex</div>
+      <div id="ux2PrimaryNavHost" class="ux2-primary-nav-host"></div>
+    </header>
+
+    <main class="ux2-main">
+      <div id="searchChrome" class="ux2-search-chrome">
+        <h2 class="title" id="searchHeading" tabindex="-1" style="font-size: 16px; margin-bottom: 8px">${t("search.title")}</h2>
+        <p class="subtitle">${t("search.subtitle")}</p>
+        <div id="dictStatus" class="mono"></div>
+        <div id="firstRun" style="display: none; margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
+          <div class="label">${t("firstRun.title")}</div>
+          <p class="subtitle" style="margin: 6px 0 0 0">${t("firstRun.intro")}</p>
+          <div id="featuredInstallStatus" class="mono"></div>
+          <div class="row" style="margin-top: 10px; gap: 8px">
+            <button id="featuredInstall" class="btn">${t("firstRun.install")}</button>
+            <button id="retryFeaturedInstall" class="btn" style="display: none">${t("firstRun.retryInstall")}</button>
+          </div>
         </div>
-        <div class="header-prefs">
+
+        <div id="activeDictionaryRow" style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
+          <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
+        </div>
+
+        <div id="searchControlsRow" class="row" style="display: none; margin-top: 12px; align-items: center">
+          <div class="field" style="flex: 1">
+            <div class="label" id="searchLabel">${t("search.queryLabel", { direction: `${t("language.source")} → ${t("language.target")}` })}</div>
+            <input id="searchInput" type="text" placeholder="${t("search.placeholder", { language: t("language.source") })}" disabled autocomplete="off" />
+          </div>
+          <button id="langToggle" class="btn" disabled>${t("language.source")} → ${t("language.target")}</button>
+        </div>
+
+        <div id="searchMeta" class="mono" style="margin-top: 12px"></div>
+      </div>
+
+      <div id="searchResults" class="ux2-surface-host" style="margin-top: 12px"></div>
+
+      <section id="moreDestination" class="ux2-more-landing" hidden>
+        <h2 class="title" id="moreHeading" tabindex="-1" style="font-size: 16px; margin-bottom: 8px">${t("more.title")}</h2>
+        <div class="ux2-more-actions">
+          <button id="openManageCorrections" class="btn ux2-more-action" type="button">${t("more.myCorrections")}</button>
+          <button id="openManageSearchFeedback" class="btn ux2-more-action" type="button">${t("more.searchFeedback")}</button>
+          <button id="openManageDictionaries" class="btn ux2-more-action" type="button">${t("more.dictionaries")}</button>
+        </div>
+        <div class="ux2-more-display">
+          <div class="label ux2-type-section-heading">${t("more.displaySection")}</div>
           <div class="field theme-control">
             <div class="label" id="themeSelectorLabel">${t("theme.selectorLabel")}</div>
             <select id="themeSelect" aria-labelledby="themeSelectorLabel">
@@ -264,55 +308,16 @@ app.innerHTML = `
             </select>
           </div>
           <div class="field locale-control">
-            <div class="label">${t("locale.selectorLabel")}</div>
-            <select id="localeSelect">
+            <div class="label" id="localeSelectorLabel">${t("locale.selectorLabel")}</div>
+            <select id="localeSelect" aria-labelledby="localeSelectorLabel">
               <option value="fr" ${DEFAULT_LOCALE === "fr" ? "selected" : ""}>${t("locale.french")}</option>
               <option value="en" ${DEFAULT_LOCALE === "en" ? "selected" : ""}>${t("locale.english")}</option>
             </select>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <div class="card" style="margin-top: 16px">
-      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("search.title")}</h2>
-      <p class="subtitle">${t("search.subtitle")}</p>
-      <div id="dictStatus" class="mono"></div>
-      <div id="firstRun" style="display: none; margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
-        <div class="label">${t("firstRun.title")}</div>
-        <p class="subtitle" style="margin: 6px 0 0 0">${t("firstRun.intro")}</p>
-        <div id="featuredInstallStatus" class="mono"></div>
-        <div class="row" style="margin-top: 10px; gap: 8px">
-          <button id="featuredInstall" class="btn">${t("firstRun.install")}</button>
-          <button id="retryFeaturedInstall" class="btn" style="display: none">${t("firstRun.retryInstall")}</button>
-        </div>
-      </div>
-
-      <div id="activeDictionaryRow" style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
-        <div class="row" style="align-items: center; justify-content: space-between; gap: 8px">
-          <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
-          <div class="row" style="gap: 8px; flex-wrap: wrap">
-            <button id="openSavedVocabulary" class="btn" type="button">${t("learning.openSaved")}</button>
-            <button id="openManageCorrections" class="btn" type="button">${t("correctionFeedback.manage.open")}</button>
-            <button id="openManageSearchFeedback" class="btn" type="button">${t("searchFeedback.manage.open")}</button>
-            <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="searchControlsRow" class="row" style="display: none; margin-top: 12px; align-items: center">
-        <div class="field" style="flex: 1">
-          <div class="label" id="searchLabel">${t("search.queryLabel", { direction: `${t("language.source")} → ${t("language.target")}` })}</div>
-          <input id="searchInput" type="text" placeholder="${t("search.placeholder", { language: t("language.source") })}" disabled autocomplete="off" />
-        </div>
-        <button id="langToggle" class="btn" disabled>${t("language.source")} → ${t("language.target")}</button>
-      </div>
-
-      <div id="searchMeta" class="mono" style="margin-top: 12px"></div>
-      <div id="searchResults" style="margin-top: 12px"></div>
-    </div>
-
-    <details id="manageDictionariesPanel" style="margin-top: 16px">
+    <details id="manageDictionariesPanel" class="ux2-manage-dictionaries-panel" style="margin-top: 16px">
       <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("manage.summary")}</summary>
       <div class="card" style="margin-top: 8px">
         <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("manage.title")}</h2>
@@ -458,6 +463,7 @@ app.innerHTML = `
         <div id="probeOut" class="mono" style="margin-top: 12px"></div>
       </div>
     </details>
+    </main>
   </div>
 `;
 
@@ -470,11 +476,15 @@ function mustGetEl<T extends Element>(selector: string): T {
 }
 
 // Primary UI elements
+const appShell = mustGetEl<HTMLDivElement>("#ux2AppShell");
+const primaryNavHost = mustGetEl<HTMLDivElement>("#ux2PrimaryNavHost");
+const searchHeading = mustGetEl<HTMLHeadingElement>("#searchHeading");
+const moreDestination = mustGetEl<HTMLElement>("#moreDestination");
+const moreHeading = mustGetEl<HTMLHeadingElement>("#moreHeading");
 const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
 const themeSelect = mustGetEl<HTMLSelectElement>("#themeSelect");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
-const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
 const openManageCorrectionsBtn = mustGetEl<HTMLButtonElement>("#openManageCorrections");
 const openManageSearchFeedbackBtn = mustGetEl<HTMLButtonElement>(
   "#openManageSearchFeedback",
@@ -1059,23 +1069,15 @@ themeSelect.addEventListener("change", () => {
 });
 
 openManageDictionariesBtn.addEventListener("click", () => {
-  manageDictionariesPanel.open = true;
-  manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-  void learningBackupSurface?.refreshCount();
-  void updateCorrectionFeedbackDeleteReminder();
-  void updateSearchFeedbackDeleteReminder();
-});
-
-openSavedVocabularyBtn.addEventListener("click", () => {
-  showSavedVocabulary();
+  openDictionariesFromMore();
 });
 
 openManageCorrectionsBtn.addEventListener("click", () => {
-  showCorrectionManagement();
+  showCorrectionManagement({ returnTo: "more" });
 });
 
 openManageSearchFeedbackBtn.addEventListener("click", () => {
-  showSearchFeedbackManagement();
+  showSearchFeedbackManagement({ returnTo: "more" });
 });
 
 catalogUrlInput.addEventListener("input", () => {
@@ -2363,6 +2365,147 @@ type ResultsHostContext =
   | "review";
 let resultsHostContext: ResultsHostContext = "search";
 
+/**
+ * UX2I2 — top-level consumer destination (separate from ResultsHostContext).
+ * UX2_NAVIGATION_AMENDMENT: Review is a stable primary destination.
+ */
+let primaryDestination: PrimaryDestination = "search";
+let primaryNavView: PrimaryNavigationView | undefined;
+type ManagementReturnTo = "more" | "search";
+
+function setPrimaryDestination(destination: PrimaryDestination): void {
+  primaryDestination = destination;
+  appShell.dataset.primary = destination;
+  primaryNavView?.setActive(destination);
+}
+
+function focusPrimaryHeading(destination: PrimaryDestination): void {
+  if (destination === "search") {
+    searchHeading.focus();
+    return;
+  }
+  if (destination === "more") {
+    moreHeading.focus();
+    return;
+  }
+  if (destination === "saved") {
+    const heading = searchResults.querySelector<HTMLElement>("#saved-vocab-heading");
+    heading?.setAttribute("tabindex", "-1");
+    heading?.focus();
+    return;
+  }
+  if (destination === "review") {
+    const heading = searchResults.querySelector<HTMLElement>(
+      ".review-title, #review-heading, [data-testid='review-title']",
+    );
+    heading?.setAttribute("tabindex", "-1");
+    heading?.focus();
+  }
+}
+
+function hideMoreLanding(): void {
+  moreDestination.hidden = true;
+}
+
+function showMoreLandingSurface(): void {
+  moreDestination.hidden = false;
+  manageDictionariesPanel.open = false;
+}
+
+function openDictionariesFromMore(): void {
+  setPrimaryDestination("more");
+  hideMoreLanding();
+  disposeActiveReviewHost();
+  disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
+  disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackManagement();
+  searchResults.innerHTML = "";
+  manageDictionariesPanel.open = true;
+  manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  void learningBackupSurface?.refreshCount();
+  void updateCorrectionFeedbackDeleteReminder();
+  void updateSearchFeedbackDeleteReminder();
+}
+
+function restoreSearchDestinationSurface(): void {
+  disposeActiveCorrectionForm();
+  disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackForm();
+  disposeActiveSearchFeedbackManagement();
+  if (lastSearchResults.length > 0) {
+    showResultsList();
+    return;
+  }
+  if (lastExecutedSearch?.result_state === "no_result") {
+    showNoResultSearchSurface(lastExecutedSearch.query_raw);
+    return;
+  }
+  invalidateCollectionAndReviewContexts();
+  resultsHostContext = "search";
+  searchResults.innerHTML = "";
+}
+
+/**
+ * Application-owned primary navigation coordinator (UX2I2).
+ * Preserves search query/direction/results; does not persist destination.
+ */
+function navigatePrimary(destination: PrimaryDestination): void {
+  if (destination === "search") {
+    hideMoreLanding();
+    manageDictionariesPanel.open = false;
+    setPrimaryDestination("search");
+    if (
+      resultsHostContext === "search" &&
+      (lastSearchResults.length > 0 || lastExecutedSearch?.result_state === "no_result")
+    ) {
+      // Already on Search with a valid surface — keep it.
+      if (searchResults.childElementCount === 0) {
+        restoreSearchDestinationSurface();
+      }
+      focusPrimaryHeading("search");
+      return;
+    }
+    if (resultsHostContext === "entry_from_search") {
+      restoreSearchDestinationSurface();
+      focusPrimaryHeading("search");
+      return;
+    }
+    restoreSearchDestinationSurface();
+    focusPrimaryHeading("search");
+    return;
+  }
+
+  if (destination === "saved") {
+    hideMoreLanding();
+    manageDictionariesPanel.open = false;
+    showSavedVocabulary();
+    return;
+  }
+
+  if (destination === "review") {
+    hideMoreLanding();
+    manageDictionariesPanel.open = false;
+    showReviewSurface();
+    return;
+  }
+
+  // more
+  disposeActiveReviewHost();
+  disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
+  disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackManagement();
+  savedVocabularyGeneration += 1;
+  entryDetailGeneration += 1;
+  resultsHostContext = "search";
+  searchResults.innerHTML = "";
+  manageDictionariesPanel.open = false;
+  setPrimaryDestination("more");
+  showMoreLandingSurface();
+  focusPrimaryHeading("more");
+}
+
 function disposeActiveReviewHost() {
   activeReviewHost?.dispose();
   activeReviewHost = undefined;
@@ -2412,7 +2555,7 @@ async function updateSearchFeedbackDeleteReminder(): Promise<void> {
         link.className = "btn";
         link.textContent = t("searchFeedback.manage.deleteReminderAction");
         link.addEventListener("click", () => {
-          showSearchFeedbackManagement();
+          showSearchFeedbackManagement({ returnTo: "more" });
         });
         searchFeedbackDeleteReminder.appendChild(link);
       } else {
@@ -2458,7 +2601,7 @@ async function updateCorrectionFeedbackDeleteReminder(): Promise<void> {
         link.className = "btn";
         link.textContent = t("correctionFeedback.manage.deleteReminderAction");
         link.addEventListener("click", () => {
-          showCorrectionManagement();
+          showCorrectionManagement({ returnTo: "more" });
         });
         correctionFeedbackDeleteReminder.appendChild(link);
       } else {
@@ -2474,7 +2617,10 @@ async function updateCorrectionFeedbackDeleteReminder(): Promise<void> {
   }
 }
 
-function showSearchFeedbackManagement(): void {
+function showSearchFeedbackManagement(
+  options: { returnTo?: ManagementReturnTo } = {},
+): void {
+  const returnTo = options.returnTo ?? "more";
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
   disposeActiveSearchFeedbackForm();
@@ -2484,6 +2630,8 @@ function showSearchFeedbackManagement(): void {
   resultsHostContext = "search";
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
+  hideMoreLanding();
+  setPrimaryDestination("more");
   searchResults.innerHTML = "";
 
   let viewUpdate:
@@ -2539,6 +2687,10 @@ function showSearchFeedbackManagement(): void {
     onAcknowledgeHandoff: () => session.acknowledgeHandoff(),
     onBack: () => {
       disposeActiveSearchFeedbackManagement();
+      if (returnTo === "more") {
+        navigatePrimary("more");
+        return;
+      }
       if (lastSearchResults.length > 0) {
         showResultsList();
       } else if (lastExecutedSearch?.result_state === "no_result") {
@@ -2553,7 +2705,8 @@ function showSearchFeedbackManagement(): void {
   void session.load();
 }
 
-function showCorrectionManagement(): void {
+function showCorrectionManagement(options: { returnTo?: ManagementReturnTo } = {}): void {
+  const returnTo = options.returnTo ?? "more";
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
   disposeActiveSearchFeedbackForm();
@@ -2563,6 +2716,8 @@ function showCorrectionManagement(): void {
   resultsHostContext = "search";
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
+  hideMoreLanding();
+  setPrimaryDestination("more");
   searchResults.innerHTML = "";
 
   let viewUpdate: ((vm: ReturnType<CorrectionManagementSession["getVm"]>) => void) | undefined;
@@ -2620,6 +2775,10 @@ function showCorrectionManagement(): void {
     onAcknowledgeHandoff: () => session.acknowledgeHandoff(),
     onBack: () => {
       disposeActiveCorrectionManagement();
+      if (returnTo === "more") {
+        navigatePrimary("more");
+        return;
+      }
       if (lastSearchResults.length > 0) {
         showResultsList();
       } else {
@@ -2965,6 +3124,9 @@ function showReviewSurface() {
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
   focusReviewActionOnce = false;
+  hideMoreLanding();
+  manageDictionariesPanel.open = false;
+  setPrimaryDestination("review");
   searchResults.innerHTML = "";
 
   const host = createReviewSurfaceHost({
@@ -2976,12 +3138,14 @@ function showReviewSurface() {
     onBack: () => {
       disposeActiveReviewHost();
       focusReviewActionOnce = true;
+      // UX2: Review Back returns to Saved and syncs primary nav.
       showSavedVocabulary();
     },
   });
   // Ownership: only this host may present while active; dispose before replace.
   activeReviewHost = host;
   host.start();
+  queueMicrotask(() => focusPrimaryHeading("review"));
 }
 
 function showSavedVocabulary() {
@@ -2993,6 +3157,9 @@ function showSavedVocabulary() {
   const generation = ++savedVocabularyGeneration;
   resultsHostContext = "saved_vocabulary";
   entryDetailGeneration += 1;
+  hideMoreLanding();
+  manageDictionariesPanel.open = false;
+  setPrimaryDestination("saved");
   searchResults.innerHTML = "";
 
   let lastFocusTarget: HTMLElement | null = null;
@@ -3007,7 +3174,7 @@ function showSavedVocabulary() {
     const view = renderSavedVocabulary(model, {
       onBack: () => {
         savedVocabularyGeneration += 1;
-        showResultsList();
+        navigatePrimary("search");
       },
       onOpen: (row) => {
         showEntryDetail(row.liveEntry, { kind: "saved_vocabulary" });
@@ -3040,6 +3207,10 @@ function showSavedVocabulary() {
       } else if (view.heading) {
         view.heading.focus();
       }
+    } else if (!restoreReviewActionFocus && !didRestoreFocus && model.surface !== "loading") {
+      didRestoreFocus = true;
+      view.heading?.setAttribute("tabindex", "-1");
+      view.heading?.focus();
     }
   };
 
@@ -3055,6 +3226,13 @@ function showSavedVocabulary() {
   applyModel({ surface: "loading" });
   void session.load();
 }
+
+primaryNavView = renderPrimaryNavigation("search", {
+  onNavigate: (destination) => {
+    navigatePrimary(destination);
+  },
+});
+primaryNavHost.appendChild(primaryNavView.root);
 
 function setSearchDirection(direction: SearchDirection) {
   if (searchDirection === direction) {

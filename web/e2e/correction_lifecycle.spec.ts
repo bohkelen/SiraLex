@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Download, type Page, type Request } from "@playwright/test";
 
+import { navigateUx2Primary, openMoreAnd } from "./helpers/ux2_nav";
+
 import {
   CORRECTION_FEEDBACK_AUTHORITY_LABEL,
   CORRECTION_FEEDBACK_PACKAGE_SCHEMA,
@@ -64,7 +66,9 @@ test.describe("CF1I5 correction lifecycle", () => {
     await installDebugBundle(page);
     await setUiLocale(page, "en");
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
+    await navigateUx2Primary(page, "more");
     await expect(page.locator("#openManageCorrections")).toBeVisible();
+    await navigateUx2Primary(page, "search");
 
     // Reminder hidden with zero drafts.
     await openManageDictionaries(page);
@@ -112,7 +116,7 @@ test.describe("CF1I5 correction lifecycle", () => {
     await expect(page.locator("#learningBackupDeleteReminder")).toBeHidden();
     mark(scenarioResults, "deletion_reminder_after_create", "PASS");
 
-    await page.locator("#openManageCorrections").click();
+    await openMoreAnd(page, "corrections");
     await expect(page.locator("[data-testid='correction-manage']")).toBeVisible();
     await expect(page.locator("#correction-manage-heading")).toBeFocused({ timeout: 5_000 });
     await expect(page.locator("#correction-manage-list [role='listitem']")).toHaveCount(1, {
@@ -154,7 +158,7 @@ test.describe("CF1I5 correction lifecycle", () => {
     await openManageDictionaries(page);
     await expect(page.locator("#correctionFeedbackDeleteReminder")).toBeVisible();
 
-    await page.locator("#openManageCorrections").click();
+    await openMoreAnd(page, "corrections");
     await expect(page.locator("#correction-manage-export")).toBeEnabled({ timeout: 15_000 });
 
     const downloadPromise = page.waitForEvent("download", { timeout: 30_000 });
@@ -198,7 +202,7 @@ test.describe("CF1I5 correction lifecycle", () => {
     // Hard reload persistence.
     await page.reload({ waitUntil: "domcontentloaded", timeout: offlineTimeoutMs });
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
-    await page.locator("#openManageCorrections").click();
+    await openMoreAnd(page, "corrections");
     await expect(page.locator("#correction-manage-list [role='listitem']")).toHaveCount(1, {
       timeout: 15_000,
     });
@@ -270,7 +274,7 @@ test.describe("CF1I5 correction lifecycle", () => {
     await page.locator("#correction-form-save").click();
     await expect(page.locator("#correction-form-success-heading")).toBeVisible({ timeout: 15_000 });
 
-    await page.locator("#openManageCorrections").click();
+    await openMoreAnd(page, "corrections");
     await expect(page.locator("#correction-manage-list [role='listitem']")).toHaveCount(1, {
       timeout: 15_000,
     });
@@ -314,7 +318,7 @@ test.describe("CF1I5 correction lifecycle", () => {
     if (offlineReloadStatus === "PASS") {
       await page.reload({ waitUntil: "domcontentloaded", timeout: offlineTimeoutMs });
       await expect(page.locator("#searchInput")).toBeEnabled({ timeout: offlineTimeoutMs });
-      await page.locator("#openManageCorrections").click();
+      await openMoreAnd(page, "corrections");
       await expect(page.locator("#correction-manage-list [role='listitem']")).toHaveCount(1, {
         timeout: 15_000,
       });
@@ -366,7 +370,7 @@ test.describe("CF1I5 correction lifecycle", () => {
     expect(after[0]?.content_sha256).toBe(provenance.content_sha256);
     expect(after[0]?.storage_scope_id).toBe(provenance.storage_scope_id);
 
-    await page.locator("#openManageCorrections").click();
+    await openMoreAnd(page, "corrections");
     await expect(page.locator("#correction-manage-list [role='listitem']")).toHaveCount(1);
     await page.locator(".correction-manage-row-button").first().click();
     await expect(page.locator(".correction-manage-availability")).toContainText(
@@ -477,7 +481,9 @@ test.describe("CF1I5 correction lifecycle", () => {
     page.on("dialog", (dialog) => dialog.accept());
     await installDebugBundle(page);
     await setUiLocale(page, "fr");
-    await expect(page.locator("#openManageCorrections")).toHaveText("Gérer les corrections");
+    await navigateUx2Primary(page, "more");
+    await expect(page.locator("#openManageCorrections")).toHaveText("Mes corrections");
+    await navigateUx2Primary(page, "search");
 
     await openLexiconEntry(page, LEX_QUERY);
     await expect(page.locator("#entry-suggest-correction")).toHaveText("Suggérer une correction");
@@ -496,7 +502,7 @@ test.describe("CF1I5 correction lifecycle", () => {
       timeout: 15_000,
     });
 
-    await page.locator("#openManageCorrections").click();
+    await openMoreAnd(page, "corrections");
     await expect(page.locator("#correction-manage-heading")).toHaveText("Corrections en attente");
     await expect(page.locator(".correction-manage-export-warning")).toContainText(
       "Ce fichier contient des suggestions utilisateur non révisées",
@@ -527,7 +533,7 @@ test.describe("CF1I5 correction lifecycle", () => {
     await page.keyboard.press("Enter");
     await expect(page.locator("#correction-form-success-heading")).toBeFocused({ timeout: 15_000 });
 
-    await page.locator("#openManageCorrections").click();
+    await openMoreAnd(page, "corrections");
     await expect(page.locator("#correction-manage-heading")).toBeFocused({ timeout: 5_000 });
     await expect(page.locator("[data-testid='correction-manage']")).toHaveAttribute(
       "aria-busy",
@@ -659,6 +665,7 @@ async function createQuickDraft(
 }
 
 async function openLexiconEntry(page: Page, query: string): Promise<void> {
+  await navigateUx2Primary(page, "search");
   const toggle = page.locator("#langToggle");
   const label = (await toggle.textContent()) ?? "";
   if (!/Maninka|Target|Cible/.test(label.split("→")[0] ?? "")) {
@@ -673,18 +680,19 @@ async function openLexiconEntry(page: Page, query: string): Promise<void> {
 }
 
 async function openManageDictionaries(page: Page): Promise<void> {
-  await page.locator("#openManageDictionaries").click();
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "dictionaries");
 }
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
+  await navigateUx2Primary(page, "more");
   const select = page.locator("#localeSelect");
   if ((await select.inputValue()) !== locale) {
     await select.selectOption(locale);
     await page.waitForLoadState("domcontentloaded");
+    await navigateUx2Primary(page, "search");
     await expect(page.locator("#searchInput")).toBeVisible({ timeout: offlineTimeoutMs });
+  } else {
+    await navigateUx2Primary(page, "search");
   }
 }
 
@@ -718,9 +726,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openManageDictionaries(page);
   const quickImportInput = page.locator("#quickImportFiles");
   await expect(quickImportInput).toBeAttached();
   await quickImportInput.setInputFiles(files);
@@ -730,6 +736,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   await expect(page.locator("#importProgress")).toContainText(/Installing|Complete|already installed/i, {
     timeout: 30_000,
   });
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
   await expect(page.locator("#activeDictionarySummary")).not.toContainText(
     /No dictionary added|Aucun dictionnaire ajouté/,

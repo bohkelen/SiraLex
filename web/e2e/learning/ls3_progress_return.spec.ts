@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { navigateUx2Primary, openMoreAnd } from "../helpers/ux2_nav";
+
 /**
  * LS3I4 — offline Progress & Return browser verification.
  * Uses the local debug directional bundle (same fixture as LS1/LS2 learning e2e).
@@ -362,9 +364,15 @@ async function expectProgress(
 }
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
+  await navigateUx2Primary(page, "more");
   const select = page.locator("#localeSelect");
   if ((await select.inputValue()) !== locale) {
     await select.selectOption(locale);
+    await page.waitForLoadState("domcontentloaded");
+    await navigateUx2Primary(page, "search");
+    await expect(page.locator("#searchInput")).toBeVisible({ timeout: 30_000 });
+  } else {
+    await navigateUx2Primary(page, "search");
   }
 }
 
@@ -408,9 +416,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openManageDictionaries(page);
 
   const quickImportInput = page.locator("#quickImportFiles");
   await expect(quickImportInput).toBeAttached();
@@ -421,6 +427,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   await expect(page.locator("#importProgress")).toContainText(/Installing|Complete|already installed/i, {
     timeout: 30_000,
   });
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
   await expect(page.locator("#activeDictionarySummary")).not.toContainText(
     /No dictionary added|Aucun dictionnaire ajouté/,
