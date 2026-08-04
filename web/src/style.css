@@ -1,51 +1,206 @@
-:root {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell,
-    Noto Sans, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+/*
+ * UX2I1 — Design tokens and visual foundation
+ * Source: Figma Engineering Handoff (Contemporary West African Modernism)
+ * https://coach-spider-78723578.figma.site/
+ *
+ * Theme contract (UXT1): html[data-theme="light"|"dark"], localStorage siralex.ui_theme.
+ * Semantic tokens are authoritative; legacy --background/--text/etc. alias them.
+ */
 
+:root {
   /* Fallbacks before data-theme is applied (system light). */
   color-scheme: light;
-  --background: #f4f6fa;
-  --surface: #ffffff;
-  --text: #111827;
-  --muted-text: #4b5563;
-  --border: #d1d5db;
-  --input-background: #ffffff;
-  --button-background: #eef2f7;
-  --hover-surface: #e8eef6;
-  --divider: #d1d5db;
-  --accent: #2563eb;
-  --danger: #b91c1c;
-  --badge-info-text: #1d4ed8;
-  --badge-ok-text: #047857;
-  --badge-warn-text: #b45309;
 
-  /* Compatibility aliases used across existing surfaces. */
+  /* --- Typography families (offline: local/system stacks; no remote CDN) --- */
+  /* Figma: DM Serif Display / DM Sans — not embedded in this slice (fidelity gap). */
+  --font-serif: "DM Serif Display", "Iowan Old Style", "Palatino Linotype", Palatino,
+    "Book Antiqua", Georgia, "Times New Roman", serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Ubuntu, Cantarell, "Noto Sans", sans-serif;
+  --font-nko: "Noto Sans NKo", "Noto Sans N'Ko", "Noto Sans", "Noto Sans Arabic",
+    "Segoe UI", sans-serif;
+
+  /* --- Type scale (Figma handoff; mobile / desktop where split) --- */
+  --type-wordmark-size: 18px;
+  --type-wordmark-size-desktop: 20px;
+  --type-wordmark-weight: 400;
+  --type-wordmark-line-height: 1;
+  --type-wordmark-tracking: -0.01em;
+
+  --type-headword-large-size: 44px;
+  --type-headword-large-size-desktop: 72px;
+  --type-headword-large-weight: 400;
+  --type-headword-large-line-height: 1;
+  --type-headword-large-tracking: -0.02em;
+
+  --type-headword-medium-size: 21px;
+  --type-headword-medium-size-desktop: 26px;
+  --type-headword-medium-weight: 400;
+  --type-headword-medium-line-height: 1.2;
+  --type-headword-medium-tracking: -0.01em;
+
+  --type-page-title-size: 28px;
+  --type-page-title-size-desktop: 32px;
+  --type-page-title-weight: 400;
+  --type-page-title-line-height: 1.1;
+  --type-page-title-tracking: -0.015em;
+
+  --type-section-heading-size: 10px;
+  --type-section-heading-weight: 600;
+  --type-section-heading-line-height: 1;
+  --type-section-heading-tracking: 0.08em;
+
+  --type-body-size: 15px;
+  --type-body-weight: 400;
+  --type-body-line-height: 1.6;
+  --type-body-tracking: 0;
+
+  --type-ui-label-size: 13px;
+  --type-ui-label-weight: 500;
+  --type-ui-label-line-height: 1;
+  --type-ui-label-tracking: 0;
+
+  --type-metadata-size: 10px;
+  --type-metadata-weight: 600;
+  --type-metadata-line-height: 1;
+  --type-metadata-tracking: 0.06em;
+
+  --type-helper-size: 11px;
+  --type-helper-size-desktop: 12px;
+  --type-helper-weight: 400;
+  --type-helper-line-height: 1.5;
+  --type-helper-tracking: 0;
+
+  --type-nav-label-size: 10px;
+  --type-nav-label-size-desktop: 12.5px;
+  --type-nav-label-weight: 500;
+  --type-nav-label-line-height: 1;
+  --type-nav-label-tracking: 0;
+
+  --type-nko-entry-size: 24px;
+  --type-nko-entry-size-max: 30px;
+  --type-nko-sidebar-size: 16px;
+  --type-nko-min-size: 14px;
+  --type-nko-line-height: 1.45;
+
+  /* --- Spacing scale (Figma 8-based + canonical 22px mobile gutter) --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 22px; /* mobile gutter / card padding (canonical; not 24) */
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --space-gutter-mobile: var(--space-5);
+  --space-component: var(--space-4);
+  --space-component-sm: var(--space-3);
+  --space-row: var(--space-2);
+  --space-section: var(--space-7);
+  --space-section-lg: var(--space-8);
+  --space-column-gap-desktop: var(--space-6);
+
+  /* --- Responsive / layout primitives (tokens only; shell not migrated) --- */
+  --layout-breakpoint-desktop: 768px;
+  --layout-gutter-mobile: var(--space-gutter-mobile);
+  --layout-max-content-width: 1100px;
+  --layout-max-content-width-production: 1200px;
+  --layout-reading-column: 820px;
+  --layout-nav-height-mobile: 58px;
+  --layout-nav-height-desktop: 48px;
+  --layout-rail-width-min: 286px;
+  --layout-rail-width-max: 300px;
+  --layout-status-bar-reserve: 20px;
+  --touch-target-min: 44px;
+
+  /* --- Focus primitive --- */
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
+
+  /* --- Light semantic palette (Figma exact) --- */
+  --color-background: #f5ede0;
+  --color-surface: #ece4d0;
+  --color-surface-subtle: #e3d8c4;
+  --color-text-primary: #1c1410;
+  --color-text-secondary: #5c4c3a;
+  --color-text-muted: #6c5c4a;
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-divider: rgba(0, 0, 0, 0.1);
+  --color-input-background: #ece4d0;
+  --color-accent: #b85225;
+  --color-accent-hover: #9e4420;
+  --color-accent-pressed: #8a3a1c;
+  --color-success: #3d7a52;
+  --color-success-soft: #e0ede6;
+  --color-warning: #a06c1a;
+  --color-warning-soft: #f2e6cc;
+  --color-danger: #b83025;
+  --color-danger-soft: #f2dbd8;
+  --color-focus: #b85225;
+
+  /* Legacy aliases → semantic tokens (existing screens keep working). */
+  --background: var(--color-background);
+  --surface: var(--color-surface);
+  --text: var(--color-text-primary);
+  --muted-text: var(--color-text-muted);
+  --border: var(--color-border);
+  --input-background: var(--color-input-background);
+  --button-background: var(--color-surface-subtle);
+  --hover-surface: var(--color-surface-subtle);
+  --divider: var(--color-divider);
+  --accent: var(--color-accent);
+  --danger: var(--color-danger);
+  --badge-info-text: var(--color-accent);
+  --badge-ok-text: var(--color-success);
+  --badge-warn-text: var(--color-warning);
   --bg: var(--background);
   --panel: var(--surface);
   --muted: var(--muted-text);
 
-  background: var(--background);
-  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: var(--type-body-line-height);
+  font-weight: 400;
+  background: var(--color-background);
+  color: var(--color-text-primary);
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --background: #f4f6fa;
-  --surface: #ffffff;
-  --text: #111827;
-  --muted-text: #4b5563;
-  --border: #d1d5db;
-  --input-background: #ffffff;
-  --button-background: #eef2f7;
-  --hover-surface: #e8eef6;
-  --divider: #d1d5db;
-  --accent: #2563eb;
-  --danger: #b91c1c;
-  --badge-info-text: #1d4ed8;
-  --badge-ok-text: #047857;
-  --badge-warn-text: #b45309;
+  --color-background: #f5ede0;
+  --color-surface: #ece4d0;
+  --color-surface-subtle: #e3d8c4;
+  --color-text-primary: #1c1410;
+  --color-text-secondary: #5c4c3a;
+  --color-text-muted: #6c5c4a;
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-divider: rgba(0, 0, 0, 0.1);
+  --color-input-background: #ece4d0;
+  --color-accent: #b85225;
+  --color-accent-hover: #9e4420;
+  --color-accent-pressed: #8a3a1c;
+  --color-success: #3d7a52;
+  --color-success-soft: #e0ede6;
+  --color-warning: #a06c1a;
+  --color-warning-soft: #f2e6cc;
+  --color-danger: #b83025;
+  --color-danger-soft: #f2dbd8;
+  --color-focus: #b85225;
+
+  --background: var(--color-background);
+  --surface: var(--color-surface);
+  --text: var(--color-text-primary);
+  --muted-text: var(--color-text-muted);
+  --border: var(--color-border);
+  --input-background: var(--color-input-background);
+  --button-background: var(--color-surface-subtle);
+  --hover-surface: var(--color-surface-subtle);
+  --divider: var(--color-divider);
+  --accent: var(--color-accent);
+  --danger: var(--color-danger);
+  --badge-info-text: var(--color-accent);
+  --badge-ok-text: var(--color-success);
+  --badge-warn-text: var(--color-warning);
   --bg: var(--background);
   --panel: var(--surface);
   --muted: var(--muted-text);
@@ -53,20 +208,40 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --background: #0b0f19;
-  --surface: #111827;
-  --text: #e5e7eb;
-  --muted-text: #9ca3af;
-  --border: #374151;
-  --input-background: #0f172a;
-  --button-background: #1f2937;
-  --hover-surface: #1f2937;
-  --divider: #374151;
-  --accent: #60a5fa;
-  --danger: #c45c5c;
-  --badge-info-text: #bfdbfe;
-  --badge-ok-text: #d1fae5;
-  --badge-warn-text: #fde68a;
+  --color-background: #1e1810;
+  --color-surface: #171208;
+  --color-surface-subtle: #26200e;
+  --color-text-primary: #ede4d4;
+  --color-text-secondary: #c0ae96;
+  --color-text-muted: #9a8872;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-divider: rgba(255, 255, 255, 0.1);
+  --color-input-background: #171208;
+  --color-accent: #cf6535;
+  --color-accent-hover: #e07040;
+  --color-accent-pressed: #d46830;
+  --color-success: #5aad74;
+  --color-success-soft: #0e2a18;
+  --color-warning: #d4922a;
+  --color-warning-soft: #2a1d08;
+  --color-danger: #d94030;
+  --color-danger-soft: #2a0e0a;
+  --color-focus: #cf6535;
+
+  --background: var(--color-background);
+  --surface: var(--color-surface);
+  --text: var(--color-text-primary);
+  --muted-text: var(--color-text-muted);
+  --border: var(--color-border);
+  --input-background: var(--color-input-background);
+  --button-background: var(--color-surface-subtle);
+  --hover-surface: var(--color-surface-subtle);
+  --divider: var(--color-divider);
+  --accent: var(--color-accent);
+  --danger: var(--color-danger);
+  --badge-info-text: var(--color-accent);
+  --badge-ok-text: var(--color-success);
+  --badge-warn-text: var(--color-warning);
   --bg: var(--background);
   --panel: var(--surface);
   --muted: var(--muted-text);
@@ -75,23 +250,55 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --background: #0b0f19;
-    --surface: #111827;
-    --text: #e5e7eb;
-    --muted-text: #9ca3af;
-    --border: #374151;
-    --input-background: #0f172a;
-    --button-background: #1f2937;
-    --hover-surface: #1f2937;
-    --divider: #374151;
-    --accent: #60a5fa;
-    --danger: #c45c5c;
-    --badge-info-text: #bfdbfe;
-    --badge-ok-text: #d1fae5;
-    --badge-warn-text: #fde68a;
+    --color-background: #1e1810;
+    --color-surface: #171208;
+    --color-surface-subtle: #26200e;
+    --color-text-primary: #ede4d4;
+    --color-text-secondary: #c0ae96;
+    --color-text-muted: #9a8872;
+    --color-border: rgba(255, 255, 255, 0.1);
+    --color-divider: rgba(255, 255, 255, 0.1);
+    --color-input-background: #171208;
+    --color-accent: #cf6535;
+    --color-accent-hover: #e07040;
+    --color-accent-pressed: #d46830;
+    --color-success: #5aad74;
+    --color-success-soft: #0e2a18;
+    --color-warning: #d4922a;
+    --color-warning-soft: #2a1d08;
+    --color-danger: #d94030;
+    --color-danger-soft: #2a0e0a;
+    --color-focus: #cf6535;
+
+    --background: var(--color-background);
+    --surface: var(--color-surface);
+    --text: var(--color-text-primary);
+    --muted-text: var(--color-text-muted);
+    --border: var(--color-border);
+    --input-background: var(--color-input-background);
+    --button-background: var(--color-surface-subtle);
+    --hover-surface: var(--color-surface-subtle);
+    --divider: var(--color-divider);
+    --accent: var(--color-accent);
+    --danger: var(--color-danger);
+    --badge-info-text: var(--color-accent);
+    --badge-ok-text: var(--color-success);
+    --badge-warn-text: var(--color-warning);
     --bg: var(--background);
     --panel: var(--surface);
     --muted: var(--muted-text);
+  }
+}
+
+/* Desktop type-scale adjustments (primitives; not a shell migration). */
+@media (min-width: 768px) {
+  :root {
+    --type-wordmark-size: var(--type-wordmark-size-desktop);
+    --type-headword-large-size: var(--type-headword-large-size-desktop);
+    --type-headword-medium-size: var(--type-headword-medium-size-desktop);
+    --type-page-title-size: var(--type-page-title-size-desktop);
+    --type-helper-size: var(--type-helper-size-desktop);
+    --type-nav-label-size: var(--type-nav-label-size-desktop);
   }
 }
 
@@ -1548,5 +1755,168 @@ button.target-link .target-text {
 .entry-error {
   color: var(--danger);
   font-size: 13px;
+}
+
+/* =============================================================================
+ * UX2I1 — Structural visual primitives (foundation only; screens not redesigned)
+ * ============================================================================= */
+
+.ux2-surface {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.ux2-surface-subtle {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-primary);
+}
+
+.ux2-text-primary {
+  color: var(--color-text-primary);
+}
+
+.ux2-text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.ux2-text-muted {
+  color: var(--color-text-muted);
+}
+
+.ux2-divider {
+  border: 0;
+  border-top: 1px solid var(--color-divider);
+  margin: 0;
+  height: 0;
+}
+
+.ux2-accent {
+  color: var(--color-accent);
+}
+
+.ux2-accent:hover {
+  color: var(--color-accent-hover);
+}
+
+.ux2-accent:active {
+  color: var(--color-accent-pressed);
+}
+
+.ux2-focus-ring:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Typography roles — opt-in classes for later UX2 screen migration */
+.ux2-type-wordmark {
+  font-family: var(--font-serif);
+  font-weight: var(--type-wordmark-weight);
+  font-size: var(--type-wordmark-size);
+  line-height: var(--type-wordmark-line-height);
+  letter-spacing: var(--type-wordmark-tracking);
+}
+
+.ux2-type-headword-large {
+  font-family: var(--font-serif);
+  font-weight: var(--type-headword-large-weight);
+  font-size: var(--type-headword-large-size);
+  line-height: var(--type-headword-large-line-height);
+  letter-spacing: var(--type-headword-large-tracking);
+  color: var(--color-text-primary);
+}
+
+.ux2-type-headword-medium {
+  font-family: var(--font-serif);
+  font-weight: var(--type-headword-medium-weight);
+  font-size: var(--type-headword-medium-size);
+  line-height: var(--type-headword-medium-line-height);
+  letter-spacing: var(--type-headword-medium-tracking);
+  color: var(--color-text-primary);
+}
+
+.ux2-type-page-title {
+  font-family: var(--font-serif);
+  font-weight: var(--type-page-title-weight);
+  font-size: var(--type-page-title-size);
+  line-height: var(--type-page-title-line-height);
+  letter-spacing: var(--type-page-title-tracking);
+  color: var(--color-text-primary);
+}
+
+.ux2-type-section-heading {
+  font-family: var(--font-sans);
+  font-weight: var(--type-section-heading-weight);
+  font-size: var(--type-section-heading-size);
+  line-height: var(--type-section-heading-line-height);
+  letter-spacing: var(--type-section-heading-tracking);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.ux2-type-body {
+  font-family: var(--font-sans);
+  font-weight: var(--type-body-weight);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  letter-spacing: var(--type-body-tracking);
+  color: var(--color-text-primary);
+}
+
+.ux2-type-ui-label {
+  font-family: var(--font-sans);
+  font-weight: var(--type-ui-label-weight);
+  font-size: var(--type-ui-label-size);
+  line-height: var(--type-ui-label-line-height);
+  letter-spacing: var(--type-ui-label-tracking);
+}
+
+.ux2-type-metadata {
+  font-family: var(--font-sans);
+  font-weight: var(--type-metadata-weight);
+  font-size: var(--type-metadata-size);
+  line-height: var(--type-metadata-line-height);
+  letter-spacing: var(--type-metadata-tracking);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.ux2-type-helper {
+  font-family: var(--font-sans);
+  font-weight: var(--type-helper-weight);
+  font-size: var(--type-helper-size);
+  line-height: var(--type-helper-line-height);
+  letter-spacing: var(--type-helper-tracking);
+  color: var(--color-text-muted);
+}
+
+.ux2-type-nav-label {
+  font-family: var(--font-sans);
+  font-weight: var(--type-nav-label-weight);
+  font-size: var(--type-nav-label-size);
+  line-height: var(--type-nav-label-line-height);
+  letter-spacing: var(--type-nav-label-tracking);
+}
+
+/*
+ * N’Ko typography primitive — RTL, no clip, system N’Ko-capable fallback stack.
+ * Apply with lang="nqo" in markup when rendering N’Ko content.
+ */
+.ux2-text-nko {
+  font-family: var(--font-nko);
+  font-size: var(--type-nko-entry-size);
+  line-height: var(--type-nko-line-height);
+  direction: rtl;
+  unicode-bidi: embed;
+  text-align: right;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  color: var(--color-text-primary);
+}
+
+@media (min-width: 768px) {
+  .ux2-text-nko {
+    font-size: clamp(var(--type-nko-entry-size), 2.2vw, var(--type-nko-entry-size-max));
+  }
 }
 
