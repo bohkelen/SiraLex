@@ -503,7 +503,9 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     await installDebugBundle(page);
     await setUiLocale(page, "fr");
     await navigateUx2Primary(page, "more");
-    await expect(page.locator("#openManageSearchFeedback")).toHaveText("Retours de recherche");
+    await expect(page.locator("#openManageSearchFeedback .ux2-more-row-title")).toHaveText(
+      "Retours de recherche",
+    );
     await navigateUx2Primary(page, "search");
 
     await ensureSourceToTarget(page);
@@ -589,7 +591,8 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     expect(await countQueryLogs(page)).toBe(logsOffBefore);
     mark(scenarioResults, "query_log_isolation_off", "PASS");
 
-    // Logging ON: open Diagnostics panel (toggle lives in a closed <details>).
+    // Logging ON: open More management bridge so Diagnostics (advanced) is reachable.
+    await openMoreAnd(page, "dictionaries");
     await page.locator("details", { has: page.locator("#queryLoggingToggle") }).evaluate((el) => {
       if (el instanceof HTMLDetailsElement) el.open = true;
     });
@@ -597,6 +600,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     await page.locator("#queryLoggingToggle").click();
     // Consent dialog may appear — accept already wired.
     await page.waitForTimeout(300);
+    await navigateUx2Primary(page, "search");
     await runSearch(page, "zzzz_cf2_qlon");
     await page.waitForTimeout(1000); // settle delay for query log
     const logsAfterSearch = await countQueryLogs(page);

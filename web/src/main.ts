@@ -123,6 +123,7 @@ import {
   renderSearchFeedbackCapture,
 } from "./render/render_search_feedback_capture";
 import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
+import { renderMore } from "./render/render_more";
 import {
   renderPrimaryNavigation,
   type PrimaryDestination,
@@ -185,7 +186,6 @@ const DEFAULT_LOCALE = resolveDefaultLocale(
 );
 setCurrentLocale(DEFAULT_LOCALE);
 initUiTheme();
-const DEFAULT_UI_THEME = getCurrentUiThemePreference();
 
 const FEATURED_CATALOG_URL =
   import.meta.env.VITE_FEATURED_CATALOG_URL?.trim() || "/catalog.json";
@@ -297,34 +297,11 @@ app.innerHTML = `
 
       <div id="searchResults" class="ux2-surface-host ux2-search-results"></div>
 
-      <section id="moreDestination" class="ux2-more-landing" hidden>
-        <h2 class="title" id="moreHeading" tabindex="-1" style="font-size: 16px; margin-bottom: 8px">${t("more.title")}</h2>
-        <div class="ux2-more-actions">
-          <button id="openManageCorrections" class="btn ux2-more-action" type="button">${t("more.myCorrections")}</button>
-          <button id="openManageSearchFeedback" class="btn ux2-more-action" type="button">${t("more.searchFeedback")}</button>
-          <button id="openManageDictionaries" class="btn ux2-more-action" type="button">${t("more.dictionaries")}</button>
-        </div>
-        <div class="ux2-more-display">
-          <div class="label ux2-type-section-heading">${t("more.displaySection")}</div>
-          <div class="field theme-control">
-            <div class="label" id="themeSelectorLabel">${t("theme.selectorLabel")}</div>
-            <select id="themeSelect" aria-labelledby="themeSelectorLabel">
-              <option value="system" ${DEFAULT_UI_THEME === "system" ? "selected" : ""}>${t("theme.system")}</option>
-              <option value="light" ${DEFAULT_UI_THEME === "light" ? "selected" : ""}>${t("theme.light")}</option>
-              <option value="dark" ${DEFAULT_UI_THEME === "dark" ? "selected" : ""}>${t("theme.dark")}</option>
-            </select>
-          </div>
-          <div class="field locale-control">
-            <div class="label" id="localeSelectorLabel">${t("locale.selectorLabel")}</div>
-            <select id="localeSelect" aria-labelledby="localeSelectorLabel">
-              <option value="fr" ${DEFAULT_LOCALE === "fr" ? "selected" : ""}>${t("locale.french")}</option>
-              <option value="en" ${DEFAULT_LOCALE === "en" ? "selected" : ""}>${t("locale.english")}</option>
-            </select>
-          </div>
-        </div>
-      </section>
+      <section id="moreDestination" class="ux2-more-landing" hidden></section>
 
-    <details id="manageDictionariesPanel" class="ux2-manage-dictionaries-panel" style="margin-top: 16px">
+    <div id="moreManagementHost" class="ux2-more-management-host" hidden>
+      <button id="moreManagementBack" class="ux2-more-management-back" type="button">${t("more.back")}</button>
+    <details id="manageDictionariesPanel" class="ux2-manage-dictionaries-panel" style="margin-top: 8px">
       <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("manage.summary")}</summary>
       <div class="card" style="margin-top: 8px">
         <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("manage.title")}</h2>
@@ -383,7 +360,7 @@ app.innerHTML = `
       </div>
     </details>
 
-    <details style="margin-top: 16px">
+    <details class="ux2-more-legacy-advanced" style="margin-top: 16px">
       <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("diagnostics.summary")}</summary>
       <div class="card" style="margin-top: 8px">
         <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("diagnostics.title")}</h2>
@@ -419,7 +396,7 @@ app.innerHTML = `
       </div>
     </details>
 
-    <details style="margin-top: 16px">
+    <details class="ux2-more-legacy-advanced" style="margin-top: 16px">
       <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("dev.summary")}</summary>
 
       <div class="card" style="margin-top: 8px">
@@ -470,6 +447,7 @@ app.innerHTML = `
         <div id="probeOut" class="mono" style="margin-top: 12px"></div>
       </div>
     </details>
+    </div>
     </main>
   </div>
 `;
@@ -487,17 +465,12 @@ const appShell = mustGetEl<HTMLDivElement>("#ux2AppShell");
 const primaryNavHost = mustGetEl<HTMLDivElement>("#ux2PrimaryNavHost");
 const searchHeading = mustGetEl<HTMLHeadingElement>("#searchHeading");
 const moreDestination = mustGetEl<HTMLElement>("#moreDestination");
-const moreHeading = mustGetEl<HTMLHeadingElement>("#moreHeading");
-const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
-const themeSelect = mustGetEl<HTMLSelectElement>("#themeSelect");
+const moreManagementHost = mustGetEl<HTMLElement>("#moreManagementHost");
+const moreManagementBackBtn = mustGetEl<HTMLButtonElement>("#moreManagementBack");
+let moreHeading: HTMLHeadingElement | null = null;
+const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
-const openManageCorrectionsBtn = mustGetEl<HTMLButtonElement>("#openManageCorrections");
-const openManageSearchFeedbackBtn = mustGetEl<HTMLButtonElement>(
-  "#openManageSearchFeedback",
-);
-const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
-const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
 const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
 const featuredInstallBtn = mustGetEl<HTMLButtonElement>("#featuredInstall");
 const retryFeaturedInstallBtn = mustGetEl<HTMLButtonElement>("#retryFeaturedInstall");
@@ -1061,33 +1034,8 @@ updateCatalogControls();
 updateInstallControls();
 updateFeaturedInstallControls();
 
-localeSelect.addEventListener("change", () => {
-  const nextLocale = localeSelect.value;
-  if (nextLocale !== "fr" && nextLocale !== "en") return;
-  if (nextLocale === getCurrentLocale()) return;
-  setCurrentLocaleWithPersistence(nextLocale as Locale);
-  if (typeof window !== "undefined") {
-    window.location.reload();
-  }
-});
-
-themeSelect.addEventListener("change", () => {
-  const nextTheme = themeSelect.value;
-  if (nextTheme !== "system" && nextTheme !== "light" && nextTheme !== "dark") return;
-  if (nextTheme === getCurrentUiThemePreference()) return;
-  setUiThemePreferenceWithPersistence(nextTheme as UiThemePreference);
-});
-
-openManageDictionariesBtn.addEventListener("click", () => {
-  openDictionariesFromMore();
-});
-
-openManageCorrectionsBtn.addEventListener("click", () => {
-  showCorrectionManagement({ returnTo: "more" });
-});
-
-openManageSearchFeedbackBtn.addEventListener("click", () => {
-  showSearchFeedbackManagement({ returnTo: "more" });
+moreManagementBackBtn.addEventListener("click", () => {
+  closeMoreManagementBridge();
 });
 
 catalogUrlInput.addEventListener("input", () => {
@@ -1395,6 +1343,13 @@ async function refreshDbStatus() {
     searchResults.innerHTML = "";
   }
   updateLangToggle();
+  if (
+    appShell.dataset.primary === "more" &&
+    appShell.dataset.moreView === "landing" &&
+    !moreDestination.hidden
+  ) {
+    mountMoreLanding();
+  }
 }
 
 // --- Writer lock (prevents concurrent import/delete operations) ---
@@ -2414,7 +2369,7 @@ function focusPrimaryHeading(destination: PrimaryDestination): void {
     return;
   }
   if (destination === "more") {
-    moreHeading.focus();
+    moreHeading?.focus();
     return;
   }
   if (destination === "saved") {
@@ -2432,16 +2387,71 @@ function focusPrimaryHeading(destination: PrimaryDestination): void {
   }
 }
 
+type MoreViewMode = "landing" | "management";
+type MoreManagementMode = "dictionaries" | "learning_data";
+
+function setMoreView(view: MoreViewMode): void {
+  appShell.dataset.moreView = view;
+}
+
 function hideMoreLanding(): void {
   moreDestination.hidden = true;
 }
 
-function showMoreLandingSurface(): void {
-  moreDestination.hidden = false;
+function hideMoreManagementHost(): void {
+  moreManagementHost.hidden = true;
   manageDictionariesPanel.open = false;
 }
 
-function openDictionariesFromMore(): void {
+function mountMoreLanding(): void {
+  const view = renderMore(
+    {
+      theme: getCurrentUiThemePreference(),
+      locale: getCurrentLocale(),
+      appVersion: APP_VERSION,
+      hasActiveDictionary: hasActiveBundle,
+    },
+    {
+      onOpenCorrections: () => {
+        showCorrectionManagement({ returnTo: "more" });
+      },
+      onOpenSearchFeedback: () => {
+        showSearchFeedbackManagement({ returnTo: "more" });
+      },
+      onOpenDictionaries: () => {
+        openMoreManagement("dictionaries");
+      },
+      onOpenLearningData: () => {
+        openMoreManagement("learning_data");
+      },
+      onThemeChange: (theme) => {
+        if (theme === getCurrentUiThemePreference()) return;
+        setUiThemePreferenceWithPersistence(theme);
+        if (appShell.dataset.primary === "more" && appShell.dataset.moreView === "landing") {
+          mountMoreLanding();
+        }
+      },
+      onLocaleChange: (locale) => {
+        if (locale === getCurrentLocale()) return;
+        setCurrentLocaleWithPersistence(locale);
+        if (typeof window !== "undefined") {
+          window.location.reload();
+        }
+      },
+    },
+  );
+  moreDestination.replaceChildren(view.root);
+  moreHeading = view.heading as HTMLHeadingElement;
+}
+
+function showMoreLandingSurface(): void {
+  hideMoreManagementHost();
+  setMoreView("landing");
+  mountMoreLanding();
+  moreDestination.hidden = false;
+}
+
+function openMoreManagement(mode: MoreManagementMode): void {
   setPrimaryDestination("more");
   hideMoreLanding();
   disposeActiveReviewHost();
@@ -2450,11 +2460,35 @@ function openDictionariesFromMore(): void {
   disposeActiveCorrectionManagement();
   disposeActiveSearchFeedbackManagement();
   searchResults.innerHTML = "";
+  setMoreView("management");
+  moreManagementHost.hidden = false;
   manageDictionariesPanel.open = true;
-  manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   void learningBackupSurface?.refreshCount();
   void updateCorrectionFeedbackDeleteReminder();
   void updateSearchFeedbackDeleteReminder();
+  if (mode === "learning_data") {
+    learningBackupHost.scrollIntoView({ behavior: "smooth", block: "start" });
+    const backupHeading =
+      learningBackupHost.querySelector<HTMLElement>("#learning-backup-heading") ??
+      learningBackupHost.querySelector<HTMLElement>("h2, h3, .title");
+    backupHeading?.setAttribute("tabindex", "-1");
+    backupHeading?.focus();
+    return;
+  }
+  manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  moreManagementBackBtn.focus();
+}
+
+function closeMoreManagementBridge(): void {
+  hideMoreManagementHost();
+  setPrimaryDestination("more");
+  showMoreLandingSurface();
+  focusPrimaryHeading("more");
+}
+
+/** @deprecated Prefer openMoreManagement("dictionaries") */
+function openDictionariesFromMore(): void {
+  openMoreManagement("dictionaries");
 }
 
 function restoreSearchDestinationSurface(): void {
@@ -2482,7 +2516,7 @@ function restoreSearchDestinationSurface(): void {
 function navigatePrimary(destination: PrimaryDestination): void {
   if (destination === "search") {
     hideMoreLanding();
-    manageDictionariesPanel.open = false;
+    hideMoreManagementHost();
     setPrimaryDestination("search");
     if (
       resultsHostContext === "search" &&
@@ -2507,7 +2541,7 @@ function navigatePrimary(destination: PrimaryDestination): void {
 
   if (destination === "saved") {
     hideMoreLanding();
-    manageDictionariesPanel.open = false;
+    hideMoreManagementHost();
     setSearchView("search");
     showSavedVocabulary();
     return;
@@ -2515,7 +2549,7 @@ function navigatePrimary(destination: PrimaryDestination): void {
 
   if (destination === "review") {
     hideMoreLanding();
-    manageDictionariesPanel.open = false;
+    hideMoreManagementHost();
     setSearchView("search");
     showReviewSurface();
     return;
@@ -2532,7 +2566,7 @@ function navigatePrimary(destination: PrimaryDestination): void {
   resultsHostContext = "search";
   setSearchView("search");
   searchResults.innerHTML = "";
-  manageDictionariesPanel.open = false;
+  hideMoreManagementHost();
   setPrimaryDestination("more");
   showMoreLandingSurface();
   focusPrimaryHeading("more");
@@ -2663,6 +2697,7 @@ function showSearchFeedbackManagement(
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
   hideMoreLanding();
+  hideMoreManagementHost();
   setPrimaryDestination("more");
   searchResults.innerHTML = "";
 
@@ -2749,6 +2784,7 @@ function showCorrectionManagement(options: { returnTo?: ManagementReturnTo } = {
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
   hideMoreLanding();
+  hideMoreManagementHost();
   setPrimaryDestination("more");
   searchResults.innerHTML = "";
 
@@ -2900,8 +2936,7 @@ async function updateLearningBackupDeleteReminder(): Promise<void> {
     link.className = "btn";
     link.textContent = t("learningBackup.deleteReminderAction");
     link.addEventListener("click", () => {
-      manageDictionariesPanel.open = true;
-      learningBackupHost.scrollIntoView({ behavior: "smooth", block: "start" });
+      openMoreManagement("learning_data");
     });
     learningBackupDeleteReminder.appendChild(link);
   } else {

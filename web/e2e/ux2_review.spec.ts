@@ -177,11 +177,14 @@ test.describe("UX2I5B review and reflect", () => {
     await saveLexiconEntry(page, "beta_mnk");
 
     await navigateUx2Primary(page, "review");
+    await expect(page.locator("#review-heading")).toBeVisible();
     await expect(page.locator(".ux2-review-workspace")).toBeVisible();
-    const maxWidth = await page.locator(".ux2-review-workspace").evaluate((el) => {
-      return getComputedStyle(el).maxWidth;
+    const workspaceWidth = await page.evaluate(() => {
+      const ws = document.querySelector(".ux2-review-workspace");
+      return ws ? ws.getBoundingClientRect().width : 0;
     });
-    expect(maxWidth === "720px" || maxWidth.includes("720")).toBe(true);
+    expect(workspaceWidth).toBeGreaterThan(0);
+    expect(workspaceWidth).toBeLessThanOrEqual(720.5);
 
     await mkdir(evidenceRoot, { recursive: true });
     await page.screenshot({

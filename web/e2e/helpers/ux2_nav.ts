@@ -12,7 +12,7 @@ export async function navigateUx2Primary(
 
 export async function openMoreAnd(
   page: Page,
-  action: "corrections" | "search-feedback" | "dictionaries",
+  action: "corrections" | "search-feedback" | "dictionaries" | "learning-data",
 ): Promise<void> {
   await navigateUx2Primary(page, "more");
   if (action === "corrections") {
@@ -23,7 +23,14 @@ export async function openMoreAnd(
     await page.locator("#openManageSearchFeedback").click();
     return;
   }
+  if (action === "learning-data") {
+    await page.locator("#openManageLearningData").click();
+    await expect(page.locator("#moreManagementHost")).toBeVisible();
+    await expect(page.locator("#learningBackupHost")).toBeVisible();
+    return;
+  }
   await page.locator("#openManageDictionaries").click();
+  await expect(page.locator("#moreManagementHost")).toBeVisible();
   await page.locator("#manageDictionariesPanel").evaluate((el) => {
     if (el instanceof HTMLDetailsElement) el.open = true;
   });

@@ -120,18 +120,25 @@ describe("i18n translations", () => {
     expect(t("nav.saved")).toBe("Saved");
     expect(t("nav.review")).toBe("Review");
     expect(t("nav.more")).toBe("More");
-    expect(t("more.myCorrections")).toBe("My corrections");
+    expect(t("more.corrections")).toBe("Corrections");
+    expect(t("more.myCorrections")).toBe("Corrections");
     expect(t("more.searchFeedback")).toBe("Search feedback");
     expect(t("more.dictionaries")).toBe("Dictionaries");
+    expect(t("more.learningData")).toBe("Learning data");
+    expect(t("more.contributeSection")).toBe("Contribute");
+    expect(t("more.back")).toBe("← Back to More");
     setCurrentLocale("fr");
     expect(t("nav.primaryAriaLabel")).toBe("Principal");
     expect(t("nav.search")).toBe("Recherche");
     expect(t("nav.saved")).toBe("Enregistré");
     expect(t("nav.review")).toBe("Révision");
     expect(t("nav.more")).toBe("Plus");
-    expect(t("more.myCorrections")).toBe("Mes corrections");
+    expect(t("more.corrections")).toBe("Corrections");
+    expect(t("more.myCorrections")).toBe("Corrections");
     expect(t("more.searchFeedback")).toBe("Retours de recherche");
     expect(t("more.dictionaries")).toBe("Dictionnaires");
+    expect(t("more.learningData")).toBe("Données d’apprentissage");
+    expect(t("more.back")).toBe("← Retour à Plus");
     setCurrentLocale(previous);
   });
 

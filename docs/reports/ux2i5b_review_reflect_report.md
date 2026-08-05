@@ -179,8 +179,10 @@ PASS (3/3)
 ## 33. Full suite
 
 ```text
-847 passed; 9 query_log_store.test.ts baseline failures unchanged
+848 passed; 9 query_log_store.test.ts baseline failures unchanged
 ```
+
+(Corrected during UX2I6A preflight on `30ac25e`; prior report text said 847. UX2I5B decision unchanged.)
 
 ## 34. Build
 

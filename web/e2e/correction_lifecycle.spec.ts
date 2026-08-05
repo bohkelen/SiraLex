@@ -486,7 +486,9 @@ test.describe("CF1I5 correction lifecycle", () => {
     await installDebugBundle(page);
     await setUiLocale(page, "fr");
     await navigateUx2Primary(page, "more");
-    await expect(page.locator("#openManageCorrections")).toHaveText("Mes corrections");
+    await expect(page.locator("#openManageCorrections .ux2-more-row-title")).toHaveText(
+      "Corrections",
+    );
     await navigateUx2Primary(page, "search");
 
     await openLexiconEntry(page, LEX_QUERY);

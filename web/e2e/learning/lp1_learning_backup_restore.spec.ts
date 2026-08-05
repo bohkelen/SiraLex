@@ -498,9 +498,7 @@ async function readDownloadedPackage(download: Download): Promise<{
 }
 
 async function openManageLearningData(page: Page): Promise<void> {
-  await openMoreAnd(page, "dictionaries");
-  await expect(page.locator("#manageDictionariesPanel")).toBeVisible();
-  await openManageDictionaries(page);
+  await openMoreAnd(page, "learning-data");
   await expect(page.locator("#learning-backup-heading")).toBeVisible({ timeout: 15_000 });
 }
 
