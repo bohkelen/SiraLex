@@ -152,7 +152,7 @@ test.describe("LP1 Learning backup and restore", () => {
     await page.locator('input[name="learning-backup-policy"][value="replace_all"]').check();
     await expect(page.locator('input[name="learning-backup-policy"][value="replace_all"]')).toBeChecked();
     await page
-      .locator(".learning-backup-actions .btn", { hasText: "Replace all learning records" })
+      .locator(".learning-backup-actions .btn", { hasText: "Continue" })
       .click();
     await expect(page.locator("dialog.learning-backup-confirm-dialog")).toBeVisible({
       timeout: 15_000,
@@ -164,7 +164,7 @@ test.describe("LP1 Learning backup and restore", () => {
 
     await page.locator('input[name="learning-backup-policy"][value="replace_all"]').check();
     await page
-      .locator(".learning-backup-actions .btn", { hasText: "Replace all learning records" })
+      .locator(".learning-backup-actions .btn", { hasText: "Continue" })
       .click();
     await expect(page.locator("dialog.learning-backup-confirm-dialog")).toBeVisible({
       timeout: 15_000,
@@ -288,7 +288,7 @@ test.describe("LP1 Learning backup and restore", () => {
     await expect(page.locator("#learning-backup-preview-heading")).toBeVisible({ timeout: 15_000 });
     await page.locator('input[value="replace_all"]').check();
     await page
-      .locator(".learning-backup-actions .btn", { hasText: "Replace all learning records" })
+      .locator(".learning-backup-actions .btn", { hasText: "Continue" })
       .click();
     await page
       .locator("dialog.learning-backup-confirm-dialog button", {
@@ -433,7 +433,7 @@ test.describe("LP1 Learning backup and restore", () => {
     await expect(page.locator("#learning-backup-preview-heading")).toBeVisible({ timeout: 15_000 });
     await page.locator('input[value="replace_all"]').check();
     await page
-      .locator(".learning-backup-actions .btn", { hasText: "Replace all learning records" })
+      .locator(".learning-backup-actions .btn", { hasText: "Continue" })
       .click();
     await page
       .locator("dialog.learning-backup-confirm-dialog button", {
@@ -476,7 +476,7 @@ test.describe("LP1 Learning backup and restore", () => {
 
     await page.locator('input[value="replace_all"]').check();
     await page
-      .locator(".learning-backup-actions .btn", { hasText: "Replace all learning records" })
+      .locator(".learning-backup-actions .btn", { hasText: "Continue" })
       .click();
     await expect(page.locator("#learning-backup-confirm-heading")).toBeVisible();
     await page.locator("dialog.learning-backup-confirm-dialog button", { hasText: "Cancel" }).click();

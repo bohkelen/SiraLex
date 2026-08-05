@@ -433,6 +433,8 @@ const MESSAGES = {
     "queryLogs.exportFailed": "Export failed: {error}",
     "queryLogs.clearFailed": "Clear failed: {error}",
     "learningBackup.heading": "Manage Learning Data",
+    "learningBackup.pageIntro":
+      "Protect your saved vocabulary and review progress. Dictionary content is installed separately and is not included in this backup.",
     "learningBackup.localOnly":
       "Learning backups stay on this device and in any files you choose to keep. They are not synced to an account.",
     "learningBackup.privacy.contains":
@@ -441,6 +443,10 @@ const MESSAGES = {
       "Anyone with this file may be able to see the words you saved and your learning progress. Store it somewhere you trust.",
     "learningBackup.privacy.trust":
       "Only restore files you trust. SiraLex validates the file structure but cannot verify who created or edited it.",
+    "learningBackup.backupSectionHelp":
+      "Save a copy of your learning data outside this browser.",
+    "learningBackup.restoreSectionHelp":
+      "Restore learning data from a SiraLex backup file.",
     "learningBackup.export.title": "Export Learning Backup",
     "learningBackup.export.button": "Export Learning Backup",
     "learningBackup.export.loading": "Checking Learning Records…",
@@ -460,6 +466,7 @@ const MESSAGES = {
     "learningBackup.restore.completed": "Restore completed",
     "learningBackup.restore.failedHeading": "Restore failed",
     "learningBackup.restore.failed": "Restore failed. No learning data was changed.",
+    "learningBackup.restore.noLearningChanged": "No Learning data was changed.",
     "learningBackup.restore.noDataChanged":
       "Dictionary data was not changed.",
     "learningBackup.restore.successAdd": "Added: {added}. Existing records kept: {kept}.",
@@ -469,25 +476,27 @@ const MESSAGES = {
     "learningBackup.preview.exportedAt": "Backup created at {value}",
     "learningBackup.preview.schema": "Package version: {value}",
     "learningBackup.preview.counts":
-      "Backup records: {backup}. Local records: {local}. Bundles in backup: {bundles}.",
+      "Records in backup: {backup}. Records currently on this device: {local}. Dictionaries in backup: {bundles}.",
     "learningBackup.compat.heading": "Dictionary compatibility",
-    "learningBackup.compat.colBundle": "Bundle",
+    "learningBackup.compat.colBundle": "Dictionary",
     "learningBackup.compat.colRecords": "Records",
     "learningBackup.compat.colState": "Status",
-    "learningBackup.compat.matching": "Installed and matching",
-    "learningBackup.compat.mismatch": "Installed with different dictionary content",
+    "learningBackup.compat.matching": "Dictionary installed and matching",
+    "learningBackup.compat.mismatch": "Dictionary installed, but content version differs",
     "learningBackup.compat.notInstalled": "Dictionary not installed",
-    "learningBackup.policy.legend": "Restore policy",
+    "learningBackup.policy.legend": "Choose how to restore",
     "learningBackup.policy.addMissing": "Add missing records",
     "learningBackup.policy.addMissingHelp":
-      "Adds identities that are absent locally. Existing local records stay unchanged, including identical and conflicting identities.",
+      "Keep existing learning data. Adds identities that are absent locally. Existing local records stay unchanged, including identical and conflicting identities.",
     "learningBackup.policy.addMissingCounts":
       "Records to add: {add}. Existing identities to keep: {skip}.",
     "learningBackup.policy.replaceAll": "Replace all learning records",
     "learningBackup.policy.replaceAllHelp":
-      "Removes all current Learning Records and restores exactly the backup contents. Dictionary data, query logs, and settings remain unchanged.",
+      "Replace this device’s learning data with the backup. Removes all current Learning Records and restores exactly the backup contents. Dictionary data, query logs, and settings remain unchanged.",
     "learningBackup.policy.replaceAllCounts":
       "Previous Learning Records: {previous}. Restored Learning Records: {restored}.",
+    "learningBackup.policy.restoreAction": "Restore learning data",
+    "learningBackup.policy.continueReplace": "Continue",
     "learningBackup.localInvalid.explanation":
       "Existing Learning data is inconsistent ({count} invalid records) and cannot be safely combined with this backup.",
     "learningBackup.localInvalid.addUnavailable":
@@ -1169,6 +1178,8 @@ const MESSAGES = {
     "queryLogs.exportFailed": "Échec d'export : {error}",
     "queryLogs.clearFailed": "Échec d'effacement : {error}",
     "learningBackup.heading": "Gérer les données d’apprentissage",
+    "learningBackup.pageIntro":
+      "Protégez votre vocabulaire enregistré et votre progression. Le contenu du dictionnaire est installé séparément et n’est pas inclus dans cette sauvegarde.",
     "learningBackup.localOnly":
       "Les sauvegardes d’apprentissage restent sur cet appareil et dans les fichiers que vous choisissez de conserver. Elles ne sont pas synchronisées avec un compte.",
     "learningBackup.privacy.contains":
@@ -1177,6 +1188,10 @@ const MESSAGES = {
       "Toute personne disposant de ce fichier pourra éventuellement voir les mots que vous avez enregistrés et votre progression. Conservez-le dans un endroit de confiance.",
     "learningBackup.privacy.trust":
       "Restaurez uniquement des fichiers auxquels vous faites confiance. SiraLex valide la structure du fichier, mais ne peut pas vérifier qui l’a créé ou modifié.",
+    "learningBackup.backupSectionHelp":
+      "Enregistrez une copie de vos données d’apprentissage hors de ce navigateur.",
+    "learningBackup.restoreSectionHelp":
+      "Restaurez des données d’apprentissage à partir d’un fichier de sauvegarde SiraLex.",
     "learningBackup.export.title": "Exporter la sauvegarde d’apprentissage",
     "learningBackup.export.button": "Exporter la sauvegarde d’apprentissage",
     "learningBackup.export.loading": "Vérification des enregistrements d’apprentissage…",
@@ -1199,6 +1214,8 @@ const MESSAGES = {
     "learningBackup.restore.failedHeading": "Échec de la restauration",
     "learningBackup.restore.failed":
       "Échec de la restauration. Aucune donnée d’apprentissage n’a été modifiée.",
+    "learningBackup.restore.noLearningChanged":
+      "Aucune donnée d’apprentissage n’a été modifiée.",
     "learningBackup.restore.noDataChanged": "Les données du dictionnaire n’ont pas été modifiées.",
     "learningBackup.restore.successAdd":
       "Ajoutés : {added}. Enregistrements existants conservés : {kept}.",
@@ -1208,25 +1225,28 @@ const MESSAGES = {
     "learningBackup.preview.exportedAt": "Sauvegarde créée le {value}",
     "learningBackup.preview.schema": "Version du paquet : {value}",
     "learningBackup.preview.counts":
-      "Enregistrements de la sauvegarde : {backup}. Enregistrements locaux : {local}. Dictionnaires dans la sauvegarde : {bundles}.",
+      "Enregistrements dans la sauvegarde : {backup}. Enregistrements actuellement sur cet appareil : {local}. Dictionnaires dans la sauvegarde : {bundles}.",
     "learningBackup.compat.heading": "Compatibilité des dictionnaires",
     "learningBackup.compat.colBundle": "Dictionnaire",
     "learningBackup.compat.colRecords": "Enregistrements",
     "learningBackup.compat.colState": "État",
-    "learningBackup.compat.matching": "Installé et correspondant",
-    "learningBackup.compat.mismatch": "Installé avec un contenu de dictionnaire différent",
+    "learningBackup.compat.matching": "Dictionnaire installé et correspondant",
+    "learningBackup.compat.mismatch":
+      "Dictionnaire installé, mais la version du contenu diffère",
     "learningBackup.compat.notInstalled": "Dictionnaire non installé",
-    "learningBackup.policy.legend": "Politique de restauration",
+    "learningBackup.policy.legend": "Choisir comment restaurer",
     "learningBackup.policy.addMissing": "Ajouter les enregistrements manquants",
     "learningBackup.policy.addMissingHelp":
-      "Ajoute les identités absentes localement. Les enregistrements locaux existants restent inchangés, y compris les identités identiques ou conflictuelles.",
+      "Conserver les données d’apprentissage existantes. Ajoute les identités absentes localement. Les enregistrements locaux existants restent inchangés, y compris les identités identiques ou conflictuelles.",
     "learningBackup.policy.addMissingCounts":
       "Enregistrements à ajouter : {add}. Identités existantes à conserver : {skip}.",
     "learningBackup.policy.replaceAll": "Remplacer tous les enregistrements d’apprentissage",
     "learningBackup.policy.replaceAllHelp":
-      "Supprime tous les enregistrements d’apprentissage actuels et restaure exactement le contenu de la sauvegarde. Les données du dictionnaire, les journaux de requêtes et les réglages restent inchangés.",
+      "Remplacer les données d’apprentissage de cet appareil par la sauvegarde. Supprime tous les enregistrements d’apprentissage actuels et restaure exactement le contenu de la sauvegarde. Les données du dictionnaire, les journaux de requêtes et les réglages restent inchangés.",
     "learningBackup.policy.replaceAllCounts":
       "Enregistrements d’apprentissage précédents : {previous}. Enregistrements restaurés : {restored}.",
+    "learningBackup.policy.restoreAction": "Restaurer les données d’apprentissage",
+    "learningBackup.policy.continueReplace": "Continuer",
     "learningBackup.localInvalid.explanation":
       "Les données d’apprentissage existantes sont incohérentes ({count} enregistrements invalides) et ne peuvent pas être combinées en toute sécurité avec cette sauvegarde.",
     "learningBackup.localInvalid.addUnavailable":

@@ -130,6 +130,10 @@ describe("i18n translations", () => {
     expect(t("dictionaries.title")).toBe("Dictionaries");
     expect(t("dictionaries.advanced")).toBe("Advanced");
     expect(t("dictionaries.removeFromDevice")).toBe("Remove from device");
+    expect(t("learningBackup.pageIntro")).toContain("saved vocabulary");
+    expect(t("learningBackup.policy.continueReplace")).toBe("Continue");
+    expect(t("learningBackup.policy.restoreAction")).toBe("Restore learning data");
+    expect(t("learningBackup.restore.noLearningChanged")).toBe("No Learning data was changed.");
     setCurrentLocale("fr");
     expect(t("nav.primaryAriaLabel")).toBe("Principal");
     expect(t("nav.search")).toBe("Recherche");

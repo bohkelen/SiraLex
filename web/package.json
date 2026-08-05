@@ -25,6 +25,8 @@
     "test:e2e:ux2-review": "npm run build && playwright test -c playwright.config.ts e2e/ux2_review.spec.ts",
     "test:e2e:ux2-more": "npm run build && playwright test -c playwright.config.ts e2e/ux2_more.spec.ts",
     "test:e2e:ux2-dictionaries": "npm run build && playwright test -c playwright.config.ts e2e/ux2_dictionaries.spec.ts",
+    "test:e2e:ux2-learning-data": "npm run build && playwright test -c playwright.config.ts e2e/ux2_learning_data.spec.ts",
+    "test:e2e:lp1": "npm run build && playwright test -c playwright.config.ts e2e/learning/lp1_learning_backup_restore.spec.ts",
     "test:e2e:handoff": "playwright test -c playwright.handoff.config.ts",
     "test:e2e:pv1a": "playwright test -c playwright.pv1a.config.ts",
     "test:e2e:pvr1": "playwright test -c playwright.pvr1.config.ts",

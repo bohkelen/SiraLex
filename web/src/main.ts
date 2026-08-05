@@ -2364,18 +2364,23 @@ function openMoreManagement(mode: MoreManagementMode): void {
   setMoreView("management");
   setMoreManagementMode(mode);
   moreManagementHost.hidden = false;
-  void learningBackupSurface?.refreshCount();
   void updateCorrectionFeedbackDeleteReminder();
   void updateSearchFeedbackDeleteReminder();
   if (mode === "learning_data") {
     learningBackupHost.scrollIntoView({ behavior: "smooth", block: "start" });
-    const backupHeading =
-      learningBackupHost.querySelector<HTMLElement>("#learning-backup-heading") ??
-      learningBackupHost.querySelector<HTMLElement>("h2, h3, .title");
-    backupHeading?.setAttribute("tabindex", "-1");
-    backupHeading?.focus();
+    // Await count refresh so remounted heading receives focus (presentation glue).
+    void (async () => {
+      await learningBackupSurface?.refreshCount();
+      if (appShell.dataset.moreManagement !== "learning-data") return;
+      const backupHeading =
+        learningBackupHost.querySelector<HTMLElement>("#learning-backup-heading") ??
+        learningBackupHost.querySelector<HTMLElement>("h2, h3, .title");
+      backupHeading?.setAttribute("tabindex", "-1");
+      backupHeading?.focus();
+    })();
     return;
   }
+  void learningBackupSurface?.refreshCount();
   dictionariesAdvanced.open = false;
   dictionaryManagementHeading.focus();
 }

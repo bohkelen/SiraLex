@@ -1,5 +1,5 @@
 /**
- * LP1I4 — Learning backup renderer / i18n presentation tests.
+ * LP1I4 / UX2I6B2 — Learning backup renderer / i18n presentation tests.
  */
 
 // @vitest-environment jsdom
@@ -38,6 +38,33 @@ const noopCallbacks = {
   onCancelRestore: vi.fn(),
 };
 
+function previewVm(
+  overrides: Partial<LearningBackupSurfaceVm> = {},
+): LearningBackupSurfaceVm {
+  return baseVm({
+    focusTarget: "preview_heading",
+    restore: {
+      phase: "preview",
+      filename: "b.json",
+      selectedPolicy: "add_missing",
+      addMissingAvailable: true,
+      preview: {
+        package_schema: LEARNING_BACKUP_PACKAGE_SCHEMA,
+        exported_at: "2026-07-30T22:30:00.000Z",
+        record_count: 12,
+        current_local_record_count: 8,
+        local_validation: { state: "valid" },
+        bundle_compatibility: [
+          { bundle_id: "b1", record_count: 12, state: "installed_matching" },
+        ],
+        add_missing: { state: "available", add_count: 4, skipped_existing_count: 8 },
+        replace_all: { previous_count: 8, restored_count: 12 },
+      },
+    },
+    ...overrides,
+  });
+}
+
 beforeEach(() => {
   setCurrentLocale("en");
 });
@@ -49,12 +76,31 @@ describe("renderLearningBackupSurface", () => {
     expect(root.querySelector("#learning-backup-heading")?.textContent).toBe(
       "Manage Learning Data",
     );
+    expect(root.classList.contains("ux2-learning-backup")).toBe(true);
+    expect(root.textContent).toContain("Protect your saved vocabulary");
     expect(root.textContent).toContain("This backup contains your saved vocabulary");
+    expect(root.textContent).toContain("Store it somewhere you trust");
+    expect(root.textContent).toContain("Only restore files you trust");
     expect(root.textContent).toContain("Export Learning Backup");
     expect(root.textContent).toContain("Restore Learning Backup");
+    expect(root.textContent).toContain("2 Learning Records on this device");
     expect(fileInput.getAttribute("id")).toBe("learning-backup-file-input");
     expect(root.querySelector("label[for='learning-backup-file-input']")).toBeTruthy();
     expect(root.querySelector("button")?.tagName).toBe("BUTTON");
+    expect(root.querySelector(".learning-backup-export")).toBeTruthy();
+    expect(root.querySelector(".learning-backup-restore")).toBeTruthy();
+  });
+
+  it("disables export when empty and does not invent backup content", () => {
+    const host = document.createElement("div");
+    const { root } = renderLearningBackupSurface(
+      host,
+      baseVm({ recordCount: 0, exportEnabled: false }),
+      noopCallbacks,
+    );
+    expect(root.textContent).toContain("No learning data to back up");
+    const exportBtn = root.querySelector(".learning-backup-export button") as HTMLButtonElement;
+    expect(exportBtn.disabled).toBe(true);
   });
 
   it("renders preview radios, compatibility table, and disables Add missing when unavailable", () => {
@@ -92,10 +138,55 @@ describe("renderLearningBackupSurface", () => {
     ) as HTMLInputElement | null;
     expect(add?.disabled).toBe(true);
     expect(replace?.disabled).toBe(false);
+    expect(replace?.checked).toBe(false);
     expect(host.textContent).toContain("Dictionary not installed");
     expect(host.textContent).toContain("Add missing is unavailable");
+    expect(host.textContent).toContain("Records in backup: 1");
+    expect(host.textContent).toContain("Records currently on this device: 1");
+    expect(host.textContent).not.toContain("sha256:");
     expect(host.querySelector("table.learning-backup-compat-table")).toBeTruthy();
     expect(host.querySelector("fieldset.learning-backup-policies")).toBeTruthy();
+    expect(host.querySelector("#learning-backup-preview-heading")).toBeTruthy();
+  });
+
+  it("renders ready preview with add-missing and replace-all impact counts", () => {
+    const host = document.createElement("div");
+    renderLearningBackupSurface(host, previewVm(), noopCallbacks);
+    expect(host.textContent).toContain("Records to add: 4");
+    expect(host.textContent).toContain("Existing identities to keep: 8");
+    expect(host.textContent).toContain("Previous Learning Records: 8");
+    expect(host.textContent).toContain("Restored Learning Records: 12");
+    expect(host.textContent).toContain("Dictionary installed and matching");
+    expect(host.textContent).toContain("Restore learning data");
+    expect(host.textContent).not.toContain("alpha_mnk");
+  });
+
+  it("uses Continue for replace-all preview action", () => {
+    const host = document.createElement("div");
+    renderLearningBackupSurface(
+      host,
+      previewVm({
+        restore: {
+          phase: "preview",
+          filename: "b.json",
+          selectedPolicy: "replace_all",
+          addMissingAvailable: true,
+          preview: {
+            package_schema: LEARNING_BACKUP_PACKAGE_SCHEMA,
+            exported_at: "2026-07-30T22:30:00.000Z",
+            record_count: 12,
+            current_local_record_count: 8,
+            local_validation: { state: "valid" },
+            bundle_compatibility: [],
+            add_missing: { state: "available", add_count: 4, skipped_existing_count: 8 },
+            replace_all: { previous_count: 8, restored_count: 12 },
+          },
+        },
+      }),
+      noopCallbacks,
+    );
+    const commit = host.querySelector(".learning-backup-actions .btn") as HTMLButtonElement;
+    expect(commit.textContent).toBe("Continue");
   });
 
   it("opens accessible replace confirmation dialog", () => {
@@ -127,18 +218,67 @@ describe("renderLearningBackupSurface", () => {
       const dialog = host.querySelector("dialog.learning-backup-confirm-dialog");
       expect(dialog).toBeTruthy();
       expect(dialog?.textContent).toContain("permanently remove the current Learning Records");
-      // Must open after the dialog is connected; otherwise showModal throws and leaves the host empty.
+      expect(dialog?.textContent).toContain("Dictionary data will not be changed");
+      expect(dialog?.textContent).toContain("Cancel");
+      expect(dialog?.textContent).toContain("Replace all learning records");
       expect(dialog?.isConnected).toBe(true);
       expect(
         dialog instanceof HTMLDialogElement
           ? dialog.open || dialog.hasAttribute("open")
           : dialog?.hasAttribute("open"),
       ).toBe(true);
-      // Host must still contain the management surface after opening the dialog.
       expect(host.querySelector("#learning-backup-heading")).toBeTruthy();
     } finally {
       host.remove();
     }
+  });
+
+  it("renders restore success with Open Saved action", () => {
+    const onOpen = vi.fn();
+    const host = document.createElement("div");
+    renderLearningBackupSurface(
+      host,
+      baseVm({
+        focusTarget: "result_heading",
+        restore: {
+          phase: "success",
+          policy: "replace_all",
+          previous_count: 8,
+          restored_count: 12,
+        },
+      }),
+      { ...noopCallbacks, onOpenSavedVocabulary: onOpen },
+    );
+    expect(host.textContent).toContain("Restore completed");
+    expect(host.textContent).toContain("Previous Learning Records: 8");
+    expect(host.textContent).toContain("Restored Learning Records: 12");
+    const openBtn = [...host.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("Open saved vocabulary"),
+    );
+    expect(openBtn).toBeTruthy();
+    openBtn?.click();
+    expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it("renders invalid and error states with non-mutation boundary", () => {
+    const host = document.createElement("div");
+    renderLearningBackupSurface(
+      host,
+      baseVm({
+        focusTarget: "invalid_heading",
+        restore: {
+          phase: "invalid",
+          filename: "bad.json",
+          error: { code: "invalid_json", messageKey: "learningBackup.error.invalidJson" },
+          detailCodes: [],
+        },
+      }),
+      noopCallbacks,
+    );
+    expect(host.textContent).toContain("Backup file is invalid");
+    expect(host.textContent).toContain("No Learning data was changed");
+    expect(host.textContent).toContain("Dictionary data was not changed");
+    expect(host.textContent).not.toContain("TypeError");
   });
 
   it("renders focused French copy for heading, policies, and privacy", () => {
@@ -152,5 +292,6 @@ describe("renderLearningBackupSurface", () => {
     expect(t("learningBackup.policy.addMissing")).toContain("manquants");
     expect(t("learningBackup.policy.replaceAll")).toContain("Remplacer");
     expect(t("learningBackup.confirm.replaceWarning")).toContain("définitivement");
+    expect(t("learningBackup.policy.continueReplace")).toBe("Continuer");
   });
 });
