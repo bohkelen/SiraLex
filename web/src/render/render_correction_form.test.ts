@@ -79,6 +79,7 @@ describe("renderCorrectionForm", () => {
     const { root } = renderCorrectionForm(baseVm(), callbacks);
     document.body.appendChild(root);
 
+    expect(root.classList.contains("ux2-correction-form")).toBe(true);
     expect(root.querySelector("#correction-form-heading")?.textContent).toBe(
       "Suggest a correction",
     );
@@ -140,6 +141,7 @@ describe("renderCorrectionForm", () => {
       onCancel: vi.fn(),
       onBackToEntry: vi.fn(),
     });
+    expect(root.classList.contains("ux2-correction-form")).toBe(true);
     expect(root.querySelector("#correction-form-heading")?.textContent).toBe(
       t("correctionFeedback.form.heading"),
     );
