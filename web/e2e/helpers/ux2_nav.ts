@@ -31,9 +31,17 @@ export async function openMoreAnd(
   }
   await page.locator("#openManageDictionaries").click();
   await expect(page.locator("#moreManagementHost")).toBeVisible();
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await expect(page.locator("#dictionary-management-heading")).toBeVisible();
+  await expect(page.locator("#ux2AppShell")).toHaveAttribute(
+    "data-more-management",
+    "dictionaries",
+  );
+}
+
+/** Open Dictionaries including the subordinate data-management / Delete DB area. */
+export async function openDictionariesDataManagement(page: Page): Promise<void> {
+  await openMoreAnd(page, "dictionaries");
+  await expect(page.locator("#clearDb")).toBeVisible();
 }
 
 /** Visible search-from language (left label in UX2 direction row). */

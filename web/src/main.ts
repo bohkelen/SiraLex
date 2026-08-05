@@ -124,6 +124,7 @@ import {
 } from "./render/render_search_feedback_capture";
 import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
 import { renderMore } from "./render/render_more";
+import { renderInstalledDictionaryList } from "./render/render_dictionary_management";
 import {
   renderPrimaryNavigation,
   type PrimaryDestination,
@@ -301,67 +302,79 @@ app.innerHTML = `
 
     <div id="moreManagementHost" class="ux2-more-management-host" hidden>
       <button id="moreManagementBack" class="ux2-more-management-back" type="button">${t("more.back")}</button>
-    <details id="manageDictionariesPanel" class="ux2-manage-dictionaries-panel" style="margin-top: 8px">
-      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("manage.summary")}</summary>
-      <div class="card" style="margin-top: 8px">
-        <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("manage.title")}</h2>
-        <p class="subtitle" style="margin: 0 0 8px 0">${t("manage.surfaceHint")}</p>
-        <div class="row" style="margin-top: 12px; align-items: center">
-          <div class="field" style="flex: 1">
-            <div class="label">${t("manage.installedLabel")}</div>
-            <select id="bundleSelect" disabled>
-              <option value="">${t("manage.noneInstalled")}</option>
-            </select>
-          </div>
-        </div>
-        <div id="installedBundleStatus" class="mono" style="margin-top: 12px"></div>
-        <div id="installedBundleList" style="margin-top: 12px"></div>
 
-        <div style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
-          <div class="label">${t("import.packageTitle")}</div>
-          <p class="subtitle" style="margin: 6px 0 0 0">${t("import.packageChooseHint")}</p>
-          <div class="row" style="margin-top: 10px; gap: 8px">
-            <button id="packageImport" class="btn" type="button">${t("import.packageChooseButton")}</button>
-            <input id="packageImportFile" type="file" accept=".siralex.zip,application/zip" style="display: none" />
-          </div>
-        </div>
+    <section id="dictionaryManagementSurface" class="ux2-dictionary-management" aria-labelledby="dictionary-management-heading">
+      <div id="manageDictionariesPanel" class="ux2-manage-dictionaries-panel">
+        <h2 id="dictionary-management-heading" class="ux2-type-page-title ux2-dict-title" tabindex="-1">${t("dictionaries.title")}</h2>
 
-        <details style="margin-top: 12px">
-          <summary style="color: var(--muted); font-size: 13px; cursor: pointer">${t("advancedSetup.summary")}</summary>
-          <p class="subtitle" style="margin: 8px 0 0 0">${t("advancedSetup.surfaceHint")}</p>
-          <div class="row" style="margin-top: 12px; align-items: end">
-            <div class="field" style="flex: 1">
-              <div class="label">${t("catalog.urlLabel")}</div>
-              <input id="catalogUrl" type="text" placeholder="${t("catalog.urlPlaceholder")}" autocomplete="off" />
+        <div class="ux2-dict-layout">
+          <section class="ux2-dict-section ux2-dict-installed-section" aria-labelledby="dictionaries-installed-heading">
+            <h3 id="dictionaries-installed-heading" class="ux2-type-section-heading ux2-dict-section-heading">${t("dictionaries.installed")}</h3>
+            <div class="ux2-dict-active-control">
+              <label class="ux2-dict-active-label" for="bundleSelect" id="bundleSelectLabel">${t("dictionaries.activeDictionary")}</label>
+              <select id="bundleSelect" disabled aria-labelledby="bundleSelectLabel">
+                <option value="">${t("manage.noneInstalled")}</option>
+              </select>
             </div>
-            <button id="loadCatalog" class="btn">${t("catalog.load")}</button>
+            <div id="installedBundleList" class="ux2-dict-installed-host"></div>
+          </section>
+
+          <section class="ux2-dict-section ux2-dict-add-section" aria-labelledby="dictionaries-add-heading">
+            <h3 id="dictionaries-add-heading" class="ux2-type-section-heading ux2-dict-section-heading">${t("dictionaries.add")}</h3>
+            <p class="ux2-dict-add-help">${t("dictionaries.addHelp")}</p>
+            <div class="ux2-dict-add-actions">
+              <button id="packageImport" class="ux2-dict-package-btn" type="button">${t("dictionaries.chooseFile")}</button>
+              <input id="packageImportFile" type="file" accept=".siralex.zip,application/zip" style="display: none" />
+            </div>
+            <div id="importProgress" class="ux2-dict-progress" role="status" style="display: none"></div>
+          </section>
+        </div>
+
+        <details id="dictionariesAdvanced" class="ux2-dict-advanced">
+          <summary>${t("dictionaries.advanced")}</summary>
+          <p class="ux2-dict-advanced-hint">${t("advancedSetup.surfaceHint")}</p>
+          <div id="installedBundleStatus" class="mono ux2-dict-tech-status"></div>
+          <div class="ux2-dict-advanced-block">
+            <div class="label">${t("catalog.urlLabel")}</div>
+            <div class="row" style="margin-top: 8px; align-items: end">
+              <div class="field" style="flex: 1">
+                <input id="catalogUrl" type="text" placeholder="${t("catalog.urlPlaceholder")}" autocomplete="off" />
+              </div>
+              <button id="loadCatalog" class="btn">${t("catalog.load")}</button>
+            </div>
+            <div id="catalogStatus" class="mono" style="margin-top: 12px"></div>
+            <div id="catalogList" style="margin-top: 12px"></div>
           </div>
-          <div id="catalogStatus" class="mono" style="margin-top: 12px"></div>
-          <div id="catalogList" style="margin-top: 12px"></div>
-          <div style="margin-top: 12px">
+          <div class="ux2-dict-advanced-block">
             <div class="label">${t("import.legacyThreeFileLabel")}</div>
             <p class="subtitle" style="margin: 4px 0 0 0">${t("import.legacyThreeFileHint")}</p>
-          </div>
-          <div class="row" style="margin-top: 8px">
-            <button id="quickImport" class="btn">${t("import.legacyThreeFileButton")}</button>
-            <input id="quickImportFiles" type="file" multiple style="display: none" />
-            <button id="cancelInstall" class="btn" style="display: none">${t("import.cancel")}</button>
+            <div class="row" style="margin-top: 8px">
+              <button id="quickImport" class="btn">${t("import.legacyThreeFileButton")}</button>
+              <input id="quickImportFiles" type="file" multiple style="display: none" />
+              <button id="cancelInstall" class="btn" style="display: none">${t("import.cancel")}</button>
+            </div>
           </div>
         </details>
-
-        <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
-        <div id="learningBackupHost" class="learning-backup-host" style="margin-top: 12px"></div>
-        <div class="row" style="margin-top: 12px; flex-direction: column; align-items: flex-start; gap: 8px">
-          <p id="learningBackupDeleteReminder" class="learning-backup-delete-reminder" hidden></p>
-          <p id="correctionFeedbackDeleteReminder" class="correction-manage-delete-reminder" hidden></p>
-          <p id="searchFeedbackDeleteReminder" class="search-feedback-manage-delete-reminder" hidden></p>
-          <button id="clearDb" class="btn">${t("db.delete")}</button>
-        </div>
       </div>
-    </details>
+    </section>
 
-    <details class="ux2-more-legacy-advanced" style="margin-top: 16px">
-      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("diagnostics.summary")}</summary>
+    <section id="learningDataSurface" class="ux2-learning-data-surface" aria-label="${t("more.learningData")}" hidden>
+      <div id="learningBackupHost" class="learning-backup-host"></div>
+    </section>
+
+    <section id="dictionariesDestructive" class="ux2-dict-destructive" aria-labelledby="dictionaries-data-heading">
+      <h3 id="dictionaries-data-heading" class="ux2-type-section-heading ux2-dict-section-heading">${t("dictionaries.dataManagement")}</h3>
+      <p class="ux2-dict-destructive-hint">${t("dictionaries.dataManagementHelp")}</p>
+      <div class="ux2-dict-destructive-body">
+        <p id="learningBackupDeleteReminder" class="learning-backup-delete-reminder" hidden></p>
+        <p id="correctionFeedbackDeleteReminder" class="correction-manage-delete-reminder" hidden></p>
+        <p id="searchFeedbackDeleteReminder" class="search-feedback-manage-delete-reminder" hidden></p>
+        <button id="clearDb" class="btn ux2-dict-clear-db" type="button">${t("db.delete")}</button>
+      </div>
+    </section>
+
+    <details class="ux2-more-legacy-advanced">
+      <summary>${t("diagnostics.summary")}</summary>
       <div class="card" style="margin-top: 8px">
         <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("diagnostics.title")}</h2>
         <p class="subtitle" style="margin: 0 0 8px 0">${t("diagnostics.surfaceHint")}</p>
@@ -468,7 +481,11 @@ const moreDestination = mustGetEl<HTMLElement>("#moreDestination");
 const moreManagementHost = mustGetEl<HTMLElement>("#moreManagementHost");
 const moreManagementBackBtn = mustGetEl<HTMLButtonElement>("#moreManagementBack");
 let moreHeading: HTMLHeadingElement | null = null;
-const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
+const dictionaryManagementSurface = mustGetEl<HTMLElement>("#dictionaryManagementSurface");
+const learningDataSurface = mustGetEl<HTMLElement>("#learningDataSurface");
+const dictionaryManagementHeading = mustGetEl<HTMLHeadingElement>("#dictionary-management-heading");
+const manageDictionariesPanel = mustGetEl<HTMLElement>("#manageDictionariesPanel");
+const dictionariesAdvanced = mustGetEl<HTMLDetailsElement>("#dictionariesAdvanced");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
 const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
@@ -670,8 +687,6 @@ function getCatalogEntryRuntimeState(entry: BundleCatalogEntryV1): {
 }
 
 function renderInstalledBundleManager() {
-  installedBundleList.innerHTML = "";
-
   const knownPayloadBytes = getKnownBundlePayloadBytes(installedBundles);
   const unknownSizeCount = installedBundles.filter((bundle) => bundle.storage_bytes === undefined).length;
   const statusLines = [
@@ -690,147 +705,71 @@ function renderInstalledBundleManager() {
   }
   installedBundleStatus.textContent = statusLines.join("\n");
 
-  if (installedBundles.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "catalog-empty";
-    empty.textContent = t("manage.noInstalledMetadata");
-    installedBundleList.appendChild(empty);
-    return;
-  }
-
-  const list = document.createElement("div");
-  list.className = "catalog-list";
-
-  for (const bundle of installedBundles) {
-    const item = document.createElement("article");
-    item.className = "catalog-item";
-
-    const header = document.createElement("div");
-    header.className = "catalog-item-header";
-
-    const titleBlock = document.createElement("div");
-    const title = document.createElement("div");
-    title.className = "catalog-item-title";
-    title.textContent = getInstalledBundleName(bundle);
-    const bundleId = document.createElement("div");
-    bundleId.className = "catalog-item-subtitle";
-    bundleId.textContent = bundle.bundle_id;
-    titleBlock.append(title, bundleId);
-
-    const isActive = currentActiveBundle?.bundle_id === bundle.bundle_id;
+  const rows = installedBundles.map((bundle) => {
     const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
     const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
-    const updateAvailable = catalogState?.comparison.state === "update_available";
-    const badges = document.createElement("div");
-    badges.className = "row";
-    if (isActive) {
-      const activeBadge = document.createElement("span");
-      activeBadge.className = "catalog-badge catalog-badge-active";
-      activeBadge.textContent = t("catalog.badge.active");
-      badges.appendChild(activeBadge);
-    }
-    if (updateAvailable) {
-      const updateBadge = document.createElement("span");
-      updateBadge.className = "catalog-badge catalog-badge-update";
-      updateBadge.textContent = t("catalog.badge.updateAvailable");
-      badges.appendChild(updateBadge);
-    } else if (!isActive) {
-      const installedBadge = document.createElement("span");
-      installedBadge.className = "catalog-badge catalog-badge-installed";
-      installedBadge.textContent = t("catalog.badge.installed");
-      badges.appendChild(installedBadge);
-    }
-    header.append(titleBlock, badges);
+    return {
+      bundleId: bundle.bundle_id,
+      displayName: getInstalledBundleName(bundle),
+      versionLabel: bundle.version
+        ? t("catalog.meta.version", { value: bundle.version })
+        : undefined,
+      languageDirection: `${getLocalizedSourceLabel(bundle.language_meta)} → ${getLocalizedTargetLabel(bundle.language_meta)}`,
+      isActive: currentActiveBundle?.bundle_id === bundle.bundle_id,
+      updateAvailable: catalogState?.comparison.state === "update_available",
+    };
+  });
 
-    const meta = document.createElement("div");
-    meta.className = "catalog-item-meta";
-    const labels = `${getLocalizedSourceLabel(bundle.language_meta)} → ${getLocalizedTargetLabel(bundle.language_meta)}`;
-    const metaParts = [
-      bundle.version ? t("catalog.meta.version", { value: bundle.version }) : undefined,
-      labels,
-      t("catalog.meta.records", { count: bundle.records_count ?? "n/a" }),
-      t("catalog.meta.indexEntries", { count: bundle.index_entries_count ?? "n/a" }),
-      fmtBytes(bundle.storage_bytes),
-    ].filter((part): part is string => part !== undefined);
-    meta.textContent = metaParts.join(" | ");
-
-    const note = document.createElement("div");
-    note.className = "catalog-item-note";
-    note.textContent =
-      `${t("catalog.note.installed", { value: formatInstalledAt(bundle.imported_at_iso) })}\n` +
-      `${t("catalog.note.storageScope", { value: getBundleStorageScopeId(bundle) })}\n` +
-      t("catalog.note.normalizationSchema", {
-        normalization: bundle.normalization_ruleset,
-        schema: `${bundle.record_schema_id}@${bundle.record_schema_version}`,
-      });
-    if (updateAvailable && catalogEntry) {
-      note.textContent +=
-        `\n${t("catalog.note.installedHash", { value: bundle.expected_content_sha256 ?? "unknown" })}` +
-        `\n${t("catalog.note.catalogHash", { value: catalogEntry.content_sha256 })}`;
-    }
-
-    const actions = document.createElement("div");
-    actions.className = "row";
-
-    if (updateAvailable && catalogEntry) {
-      const updateBtn = document.createElement("button");
-      updateBtn.className = "btn";
-      updateBtn.textContent = t("catalog.action.update");
-      updateBtn.disabled = busy || !loadedCatalogUrl;
-      updateBtn.addEventListener("click", () => {
-        void withSingleWriterLock(`update bundle ${bundle.bundle_id}`, async () => {
-          await installCatalogEntry(catalogEntry, catalogState?.activateOnCommit ?? isActive);
-        });
-      });
-      actions.appendChild(updateBtn);
-    }
-
-    const useBtn = document.createElement("button");
-    useBtn.className = "btn";
-    useBtn.textContent = isActive ? t("catalog.badge.active") : t("catalog.action.use");
-    useBtn.disabled = busy || isActive;
-    useBtn.addEventListener("click", () => {
-      void withSingleWriterLock(`switch active bundle ${bundle.bundle_id}`, async () => {
+  const list = renderInstalledDictionaryList(rows, {
+    isBusy: () => busy,
+    onUse: (bundleId) => {
+      void withSingleWriterLock(`switch active bundle ${bundleId}`, async () => {
         const db = await openSiralexDb();
         try {
-          await setActiveBundleId(db, bundle.bundle_id);
+          await setActiveBundleId(db, bundleId);
         } finally {
           db.close();
         }
         importProgress.style.display = "";
-        importProgress.textContent = t("bundle.activeSet", { bundleId: bundle.bundle_id });
+        importProgress.textContent = t("bundle.activeSet", { bundleId });
+        await refreshDbStatus();
       });
-    });
-
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "btn";
-    removeBtn.textContent = t("catalog.action.remove");
-    removeBtn.disabled = busy;
-    removeBtn.addEventListener("click", () => {
+    },
+    onRemove: (bundleId) => {
       const confirmed =
         typeof window === "undefined" ||
-        window.confirm(t("bundle.removeConfirm", { bundleId: bundle.bundle_id }));
+        window.confirm(t("bundle.removeConfirm", { bundleId }));
       if (!confirmed) return;
-      void withSingleWriterLock(`remove bundle ${bundle.bundle_id}`, async () => {
+      void withSingleWriterLock(`remove bundle ${bundleId}`, async () => {
         const db = await openSiralexDb();
         try {
-          await deleteBundleData(db, bundle.bundle_id);
+          await deleteBundleData(db, bundleId);
         } finally {
           db.close();
         }
         learningBackupSurface?.invalidatePreviewForBundleChange();
         importProgress.style.display = "";
-        importProgress.textContent = t("bundle.removed", { bundleId: bundle.bundle_id });
+        importProgress.textContent = t("bundle.removed", { bundleId });
         await refreshDbStatus();
       });
-    });
-
-    actions.append(useBtn, removeBtn);
-    item.append(header, meta, note, actions);
-    list.appendChild(item);
-  }
-
-  installedBundleList.appendChild(list);
+    },
+    onUpdate: (bundleId) => {
+      if (!loadedCatalogUrl) return;
+      const bundle = installedBundles.find((b) => b.bundle_id === bundleId);
+      if (!bundle) return;
+      const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
+      const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
+      if (!catalogEntry || catalogState?.comparison.state !== "update_available") return;
+      void withSingleWriterLock(`update bundle ${bundle.bundle_id}`, async () => {
+        await installCatalogEntry(
+          catalogEntry,
+          catalogState?.activateOnCommit ??
+            currentActiveBundle?.bundle_id === bundle.bundle_id,
+        );
+      });
+    },
+  });
+  installedBundleList.replaceChildren(list);
 }
 
 function updatePackageImportControls() {
@@ -2400,7 +2339,45 @@ function hideMoreLanding(): void {
 
 function hideMoreManagementHost(): void {
   moreManagementHost.hidden = true;
-  manageDictionariesPanel.open = false;
+  delete appShell.dataset.moreManagement;
+  dictionaryManagementSurface.hidden = true;
+  learningDataSurface.hidden = true;
+}
+
+function setMoreManagementMode(mode: MoreManagementMode): void {
+  const token = mode === "learning_data" ? "learning-data" : "dictionaries";
+  appShell.dataset.moreManagement = token;
+  const showDictionaries = mode === "dictionaries";
+  dictionaryManagementSurface.hidden = !showDictionaries;
+  learningDataSurface.hidden = showDictionaries;
+}
+
+function openMoreManagement(mode: MoreManagementMode): void {
+  setPrimaryDestination("more");
+  hideMoreLanding();
+  disposeActiveReviewHost();
+  disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
+  disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackManagement();
+  searchResults.innerHTML = "";
+  setMoreView("management");
+  setMoreManagementMode(mode);
+  moreManagementHost.hidden = false;
+  void learningBackupSurface?.refreshCount();
+  void updateCorrectionFeedbackDeleteReminder();
+  void updateSearchFeedbackDeleteReminder();
+  if (mode === "learning_data") {
+    learningBackupHost.scrollIntoView({ behavior: "smooth", block: "start" });
+    const backupHeading =
+      learningBackupHost.querySelector<HTMLElement>("#learning-backup-heading") ??
+      learningBackupHost.querySelector<HTMLElement>("h2, h3, .title");
+    backupHeading?.setAttribute("tabindex", "-1");
+    backupHeading?.focus();
+    return;
+  }
+  dictionariesAdvanced.open = false;
+  dictionaryManagementHeading.focus();
 }
 
 function mountMoreLanding(): void {
@@ -2449,34 +2426,6 @@ function showMoreLandingSurface(): void {
   setMoreView("landing");
   mountMoreLanding();
   moreDestination.hidden = false;
-}
-
-function openMoreManagement(mode: MoreManagementMode): void {
-  setPrimaryDestination("more");
-  hideMoreLanding();
-  disposeActiveReviewHost();
-  disposeActiveCorrectionForm();
-  disposeActiveSearchFeedbackForm();
-  disposeActiveCorrectionManagement();
-  disposeActiveSearchFeedbackManagement();
-  searchResults.innerHTML = "";
-  setMoreView("management");
-  moreManagementHost.hidden = false;
-  manageDictionariesPanel.open = true;
-  void learningBackupSurface?.refreshCount();
-  void updateCorrectionFeedbackDeleteReminder();
-  void updateSearchFeedbackDeleteReminder();
-  if (mode === "learning_data") {
-    learningBackupHost.scrollIntoView({ behavior: "smooth", block: "start" });
-    const backupHeading =
-      learningBackupHost.querySelector<HTMLElement>("#learning-backup-heading") ??
-      learningBackupHost.querySelector<HTMLElement>("h2, h3, .title");
-    backupHeading?.setAttribute("tabindex", "-1");
-    backupHeading?.focus();
-    return;
-  }
-  manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-  moreManagementBackBtn.focus();
 }
 
 function closeMoreManagementBridge(): void {
@@ -3195,7 +3144,7 @@ function showReviewSurface() {
   savedVocabularyGeneration += 1;
   focusReviewActionOnce = false;
   hideMoreLanding();
-  manageDictionariesPanel.open = false;
+  hideMoreManagementHost();
   setPrimaryDestination("review");
   searchResults.innerHTML = "";
 
@@ -3228,7 +3177,7 @@ function showSavedVocabulary() {
   resultsHostContext = "saved_vocabulary";
   entryDetailGeneration += 1;
   hideMoreLanding();
-  manageDictionariesPanel.open = false;
+  hideMoreManagementHost();
   setPrimaryDestination("saved");
   searchResults.innerHTML = "";
 

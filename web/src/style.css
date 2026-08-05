@@ -2737,8 +2737,273 @@ button.target-link .target-text {
   outline-offset: var(--focus-ring-offset);
 }
 
+.ux2-app-shell[data-more-management="learning-data"] .ux2-more-legacy-advanced {
+  display: none !important;
+}
+
+.ux2-dictionary-management {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  max-width: var(--layout-max-content-width-production, 960px);
+}
+
+.ux2-dictionary-management[hidden],
+.ux2-learning-data-surface[hidden] {
+  display: none !important;
+}
+
+.ux2-manage-dictionaries-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.ux2-dict-title {
+  margin: 0;
+}
+
+.ux2-dict-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.ux2-dict-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.ux2-dict-section-heading {
+  margin: 0;
+}
+
+.ux2-dict-active-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ux2-dict-active-label {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.ux2-dict-active-control select {
+  min-height: var(--touch-target-min);
+  width: 100%;
+  max-width: 36rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+}
+
+.ux2-dict-installed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ux2-dict-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ux2-dict-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.ux2-dict-row-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+}
+
+.ux2-dict-row-title {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.ux2-dict-row-active {
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  font-weight: 600;
+  color: var(--color-action-text);
+}
+
+.ux2-dict-row-meta,
+.ux2-dict-row-offline,
+.ux2-dict-row-update,
+.ux2-dict-row-retain {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
+}
+
+.ux2-dict-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.ux2-dict-action,
+.ux2-dict-package-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-action-text);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ux2-dict-action-remove {
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.ux2-dict-action:disabled,
+.ux2-dict-package-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  color: var(--color-text-muted);
+}
+
+.ux2-dict-action:focus-visible,
+.ux2-dict-package-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ux2-dict-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.ux2-dict-empty-lead {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.ux2-dict-empty-hint,
+.ux2-dict-add-help,
+.ux2-dict-advanced-hint,
+.ux2-dict-destructive-hint {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
+}
+
+.ux2-dict-progress {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
+}
+
+.ux2-dict-advanced,
+.ux2-more-legacy-advanced {
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.ux2-dict-destructive {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.ux2-dict-advanced > summary,
+.ux2-more-legacy-advanced > summary {
+  min-height: var(--touch-target-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+}
+
+.ux2-dict-advanced-block {
+  margin-top: var(--space-4);
+}
+
+.ux2-dict-tech-status {
+  margin-top: var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.ux2-dict-destructive-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.ux2-learning-data-surface {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
 .ux2-surface-host {
   min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .ux2-dict-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    column-gap: var(--space-column-gap-desktop, var(--space-6));
+    align-items: start;
+  }
 }
 
 @media (min-width: 768px) {

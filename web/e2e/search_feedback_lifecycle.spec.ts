@@ -395,10 +395,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     };
 
     await openManageDictionaries(page);
-    await page
-      .locator("#installedBundleList .catalog-item .btn", { hasText: /Remove|Retirer/ })
-      .first()
-      .click();
+    await page.locator(".ux2-dict-action-remove").first().click();
     await expect(page.locator("#importProgress")).toContainText(/removed|retiré/i, {
       timeout: 30_000,
     });

@@ -127,6 +127,9 @@ describe("i18n translations", () => {
     expect(t("more.learningData")).toBe("Learning data");
     expect(t("more.contributeSection")).toBe("Contribute");
     expect(t("more.back")).toBe("← Back to More");
+    expect(t("dictionaries.title")).toBe("Dictionaries");
+    expect(t("dictionaries.advanced")).toBe("Advanced");
+    expect(t("dictionaries.removeFromDevice")).toBe("Remove from device");
     setCurrentLocale("fr");
     expect(t("nav.primaryAriaLabel")).toBe("Principal");
     expect(t("nav.search")).toBe("Recherche");
@@ -139,6 +142,8 @@ describe("i18n translations", () => {
     expect(t("more.dictionaries")).toBe("Dictionnaires");
     expect(t("more.learningData")).toBe("Données d’apprentissage");
     expect(t("more.back")).toBe("← Retour à Plus");
+    expect(t("dictionaries.title")).toBe("Dictionnaires");
+    expect(t("dictionaries.advanced")).toBe("Avancé");
     setCurrentLocale(previous);
   });
 

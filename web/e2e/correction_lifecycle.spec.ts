@@ -359,10 +359,7 @@ test.describe("CF1I5 correction lifecycle", () => {
     };
 
     await openManageDictionaries(page);
-    await page
-      .locator("#installedBundleList .catalog-item .btn", { hasText: /Remove|Retirer/ })
-      .first()
-      .click();
+    await page.locator(".ux2-dict-action-remove").first().click();
     await expect(page.locator("#importProgress")).toContainText(/removed|retiré/i, {
       timeout: 30_000,
     });
@@ -428,10 +425,7 @@ test.describe("CF1I5 correction lifecycle", () => {
     await page.locator("#correction-form-description").fill("About to go stale");
 
     await openManageDictionaries(page);
-    await page
-      .locator("#installedBundleList .catalog-item .btn", { hasText: /Remove|Retirer/ })
-      .first()
-      .click();
+    await page.locator(".ux2-dict-action-remove").first().click();
     await expect(page.locator("#importProgress")).toContainText(/removed|retiré/i, {
       timeout: 30_000,
     });
