@@ -10,7 +10,12 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { navigateUx2Primary, openMoreAnd } from "./helpers/ux2_nav";
+import {
+  ensureSourceToTarget,
+  ensureTargetToSource,
+  navigateUx2Primary,
+  openMoreAnd,
+} from "./helpers/ux2_nav";
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const usageBundleDir = path.join(webRoot, "public/debug-bundles/test_directional_bundle");
@@ -63,11 +68,7 @@ test.describe("CF2I6A feedback input stability", () => {
     // --- CF1 suggest correction (FR label: Décrivez le problème) ---
     await setUiLocale(page, "fr");
     await navigateUx2Primary(page, "search");
-    const toggle = page.locator("#langToggle");
-    const label = (await toggle.textContent()) ?? "";
-    if (!/Maninka|Target|Cible/.test(label.split("→")[0] ?? "")) {
-      await toggle.click();
-    }
+    await ensureTargetToSource(page);
     await page.locator("#searchInput").fill("alpha_mnk");
     await expect(page.locator("#searchResults .result-open").first()).toContainText("alpha_mnk", {
       timeout: 15_000,
@@ -126,17 +127,6 @@ async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
     await expect(page.locator("#searchInput")).toBeVisible({ timeout: 30_000 });
   } else {
     await navigateUx2Primary(page, "search");
-  }
-}
-
-async function ensureSourceToTarget(page: Page): Promise<void> {
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  if (/→/.test(label)) {
-    const left = label.split("→")[0] ?? "";
-    if (/Maninka|Target|Cible|mnk/i.test(left)) {
-      await toggle.click();
-    }
   }
 }
 

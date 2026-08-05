@@ -135,6 +135,29 @@ describe("i18n translations", () => {
     setCurrentLocale(previous);
   });
 
+  it("resolves UX2I3 Search Home/Results labels in English and French", () => {
+    const previous = getCurrentLocale();
+    setCurrentLocale("en");
+    expect(t("search.switchDirection", { from: "French", to: "Maninka" })).toBe(
+      "Switch search direction: French to Maninka",
+    );
+    expect(t("search.resultMeta", { count: 4 })).toBe("4 results");
+    expect(t("searchFeedback.capture.resultsNotUsefulAction")).toContain(
+      "Tell us what you were looking for",
+    );
+    expect(t("search.lookingForSomethingElse")).toBe("Looking for something else?");
+    setCurrentLocale("fr");
+    expect(t("search.switchDirection", { from: "Français", to: "Maninka" })).toBe(
+      "Changer le sens de recherche : Français vers Maninka",
+    );
+    expect(t("search.resultMeta", { count: 4 })).toBe("4 résultats");
+    expect(t("searchFeedback.capture.resultsNotUsefulAction")).toContain(
+      "Dites-nous ce que vous cherchiez",
+    );
+    expect(t("search.lookingForSomethingElse")).toBe("Vous cherchiez autre chose ?");
+    setCurrentLocale(previous);
+  });
+
   it("resolves Progress keys in English and French", () => {
     const previous = getCurrentLocale();
 

@@ -6,7 +6,6 @@ import { probeJsonlFile } from "./bundle_probe";
 import {
   buildLanguageMetaFromManifest,
   getBundleDisplayName,
-  getSearchDirectionText,
   getSearchPlaceholder,
   getSourceLabel,
   getTargetLabel,
@@ -115,6 +114,7 @@ import {
   renderResultsList,
   type ResultDisplayContext,
 } from "./render/render_results";
+import { applySearchDirectionPresentation } from "./render/render_search_chrome";
 import { renderEntryDetail, showTargetEntryUnavailable } from "./render/render_entry";
 import { renderCorrectionForm } from "./render/render_correction_form";
 import {
@@ -259,11 +259,11 @@ app.innerHTML = `
     </header>
 
     <main class="ux2-main">
-      <div id="searchChrome" class="ux2-search-chrome">
-        <h2 class="title" id="searchHeading" tabindex="-1" style="font-size: 16px; margin-bottom: 8px">${t("search.title")}</h2>
-        <p class="subtitle">${t("search.subtitle")}</p>
-        <div id="dictStatus" class="mono"></div>
-        <div id="firstRun" style="display: none; margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
+      <div id="searchChrome" class="ux2-search-chrome" data-search-ready="false">
+        <h2 class="ux2-visually-hidden" id="searchHeading" tabindex="-1">${t("search.title")}</h2>
+        <p class="subtitle ux2-search-setup-copy">${t("search.subtitle")}</p>
+        <div id="dictStatus" class="mono ux2-search-diagnostic"></div>
+        <div id="firstRun" class="ux2-search-first-run" style="display: none">
           <div class="label">${t("firstRun.title")}</div>
           <p class="subtitle" style="margin: 6px 0 0 0">${t("firstRun.intro")}</p>
           <div id="featuredInstallStatus" class="mono"></div>
@@ -273,22 +273,29 @@ app.innerHTML = `
           </div>
         </div>
 
-        <div id="activeDictionaryRow" style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
+        <div id="activeDictionaryRow" class="ux2-search-diagnostic ux2-active-dictionary-row">
           <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
         </div>
 
-        <div id="searchControlsRow" class="row" style="display: none; margin-top: 12px; align-items: center">
-          <div class="field" style="flex: 1">
-            <div class="label" id="searchLabel">${t("search.queryLabel", { direction: `${t("language.source")} → ${t("language.target")}` })}</div>
-            <input id="searchInput" type="text" placeholder="${t("search.placeholder", { language: t("language.source") })}" disabled autocomplete="off" />
+        <div id="searchControlsRow" class="ux2-search-controls" style="display: none">
+          <div class="ux2-search-direction" data-testid="ux2-search-direction">
+            <span id="searchSourceLanguage" class="ux2-search-language"></span>
+            <button id="langToggle" class="ux2-search-swap" type="button" disabled aria-label="${t("search.switchDirection", { from: t("language.source"), to: t("language.target") })}"></button>
+            <span id="searchTargetLanguage" class="ux2-search-language"></span>
           </div>
-          <button id="langToggle" class="btn" disabled>${t("language.source")} → ${t("language.target")}</button>
+          <label class="ux2-visually-hidden" id="searchLabel" for="searchInput">${t("search.queryLabel", { direction: `${t("language.source")} → ${t("language.target")}` })}</label>
+          <div class="ux2-search-field">
+            <span class="ux2-search-field-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+            <input id="searchInput" type="search" enterkeyhint="search" placeholder="${t("search.placeholder", { language: t("language.source") })}" disabled autocomplete="off" />
+          </div>
         </div>
 
-        <div id="searchMeta" class="mono" style="margin-top: 12px"></div>
+        <div id="searchMeta" class="ux2-search-meta" aria-live="polite"></div>
       </div>
 
-      <div id="searchResults" class="ux2-surface-host" style="margin-top: 12px"></div>
+      <div id="searchResults" class="ux2-surface-host ux2-search-results"></div>
 
       <section id="moreDestination" class="ux2-more-landing" hidden>
         <h2 class="title" id="moreHeading" tabindex="-1" style="font-size: 16px; margin-bottom: 8px">${t("more.title")}</h2>
@@ -517,8 +524,11 @@ const correctionFeedbackDeleteReminder = mustGetEl<HTMLParagraphElement>(
 const searchFeedbackDeleteReminder = mustGetEl<HTMLParagraphElement>(
   "#searchFeedbackDeleteReminder",
 );
+const searchChrome = mustGetEl<HTMLDivElement>("#searchChrome");
 const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
-const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
+const searchLabel = mustGetEl<HTMLLabelElement>("#searchLabel");
+const searchSourceLanguage = mustGetEl<HTMLSpanElement>("#searchSourceLanguage");
+const searchTargetLanguage = mustGetEl<HTMLSpanElement>("#searchTargetLanguage");
 const searchMeta = mustGetEl<HTMLDivElement>("#searchMeta");
 const searchResults = mustGetEl<HTMLDivElement>("#searchResults");
 const searchControlsRow = mustGetEl<HTMLDivElement>("#searchControlsRow");
@@ -1376,6 +1386,7 @@ async function refreshDbStatus() {
   }
   renderCatalogList();
   searchControlsRow.style.display = hasActiveBundle ? "" : "none";
+  searchChrome.dataset.searchReady = hasActiveBundle ? "true" : "false";
   searchInput.disabled = !hasActiveBundle || busy;
   langToggle.disabled = !hasActiveBundle || busy;
   updateFeaturedInstallControls();
@@ -2203,22 +2214,33 @@ async function renderQueryLoggingToggle() {
 }
 
 function updateLangToggle() {
-  const directionText = getSearchDirectionText(
-    searchDirection,
+  const locale = getCurrentLocale();
+  const sourceLanguageLabel = getSourceLabel(
     currentActiveBundle?.language_meta,
     t("language.source"),
-    t("language.target"),
-    getCurrentLocale(),
+    locale,
   );
-  langToggle.textContent = directionText;
-  searchLabel.textContent = t("search.queryLabel", { direction: directionText });
+  const targetLanguageLabel = getTargetLabel(
+    currentActiveBundle?.language_meta,
+    t("language.target"),
+    locale,
+  );
+  applySearchDirectionPresentation({
+    sourceLabelEl: searchSourceLanguage,
+    targetLabelEl: searchTargetLanguage,
+    swapButton: langToggle,
+    searchLabelEl: searchLabel,
+    direction: searchDirection,
+    sourceLanguageLabel,
+    targetLanguageLabel,
+  });
   searchInput.placeholder = getSearchPlaceholder(
     searchDirection,
     currentActiveBundle?.language_meta,
     t("language.source"),
     t("language.target"),
     (label) => t("search.placeholder", { language: label }),
-    getCurrentLocale(),
+    locale,
   );
 }
 
@@ -3507,7 +3529,6 @@ async function runSearch(query: string) {
     if (seq !== searchSeq) return;
 
     searchMeta.textContent = t("search.resultMeta", {
-      query,
       count: records.length,
     });
 

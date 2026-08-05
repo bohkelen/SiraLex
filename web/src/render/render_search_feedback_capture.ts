@@ -125,26 +125,21 @@ export function renderNoResultSearchFeedbackEntry(
   const root = el("div", "search-feedback-entry search-feedback-entry-no-result");
   root.setAttribute("data-testid", "search-feedback-entry-no-result");
 
-  const message = el(
-    "p",
-    "search-feedback-entry-message",
-    t("searchFeedback.capture.zeroResultMessage", { query }),
+  root.appendChild(
+    el("p", "search-feedback-entry-prompt", t("search.lookingForSomethingElse")),
   );
-  if (looksLikeNko(query)) {
-    message.setAttribute("lang", "nqo");
-    message.dir = "rtl";
-  }
-  root.appendChild(message);
 
   const button = el(
     "button",
-    "btn search-feedback-report-btn",
-    t("searchFeedback.capture.reportAction"),
+    "ux2-search-feedback-cta search-feedback-report-btn",
+    t("searchFeedback.capture.noResultAction"),
   );
   button.type = "button";
   button.setAttribute("data-testid", "search-feedback-report");
   button.addEventListener("click", () => onReport());
   root.appendChild(button);
+  // Keep exact query available for diagnostics without dominating the calm surface.
+  root.dataset.query = query;
   return root;
 }
 
@@ -170,8 +165,8 @@ export function renderResultsNotUsefulSearchFeedbackEntry(
 
   const button = el(
     "button",
-    "btn search-feedback-report-btn",
-    t("searchFeedback.capture.reportAction"),
+    "ux2-search-feedback-cta search-feedback-report-btn",
+    t("searchFeedback.capture.resultsNotUsefulAction"),
   );
   button.type = "button";
   button.setAttribute("data-testid", "search-feedback-report");

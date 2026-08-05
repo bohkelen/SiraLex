@@ -28,3 +28,30 @@ export async function openMoreAnd(
     if (el instanceof HTMLDetailsElement) el.open = true;
   });
 }
+
+/** Visible search-from language (left label in UX2 direction row). */
+export async function getSearchFromLanguage(page: Page): Promise<string> {
+  return ((await page.locator("#searchSourceLanguage").textContent()) ?? "").trim();
+}
+
+/**
+ * Ensure dictionary source→target search direction.
+ * Uses visible UX2 labels (swap button is icon-only).
+ */
+export async function ensureSourceToTarget(page: Page): Promise<void> {
+  const from = await getSearchFromLanguage(page);
+  if (/Maninka|Target|Cible|^mnk$/i.test(from)) {
+    await page.locator("#langToggle").click();
+  }
+}
+
+/**
+ * Ensure dictionary target→source search direction.
+ * Uses visible UX2 labels (swap button is icon-only).
+ */
+export async function ensureTargetToSource(page: Page): Promise<void> {
+  const from = await getSearchFromLanguage(page);
+  if (!/Maninka|Target|Cible|^mnk$/i.test(from)) {
+    await page.locator("#langToggle").click();
+  }
+}

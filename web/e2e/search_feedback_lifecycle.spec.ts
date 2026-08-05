@@ -11,7 +11,11 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Download, type Page, type Request } from "@playwright/test";
 
-import { navigateUx2Primary, openMoreAnd } from "./helpers/ux2_nav";
+import {
+  ensureSourceToTarget,
+  navigateUx2Primary,
+  openMoreAnd,
+} from "./helpers/ux2_nav";
 
 import {
   SEARCH_FEEDBACK_AUTHORITY_LABEL,
@@ -81,7 +85,10 @@ test.describe("CF2I5 search feedback lifecycle", () => {
       timeout: 15_000,
     });
     await expect(page.locator("[data-testid='search-feedback-report']")).toBeVisible();
-    await expect(page.locator("[data-testid='search-feedback-entry-no-result']")).toContainText(
+    // Exact query stays on #searchMeta; the calm CF2 invitation no longer repeats it.
+    await expect(page.locator("#searchMeta")).toContainText(NO_RESULT_QUERY);
+    await expect(page.locator("[data-testid='search-feedback-entry-no-result']")).toHaveAttribute(
+      "data-query",
       NO_RESULT_QUERY,
     );
 
@@ -502,7 +509,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     await ensureSourceToTarget(page);
     await runSearch(page, "zzzz_cf2_fr");
     await expect(page.locator("[data-testid='search-feedback-report']")).toHaveText(
-      "Signaler cette recherche",
+      "Signaler cette recherche →",
     );
     await page.locator("[data-testid='search-feedback-report']").click();
     await expect(page.locator("#search-feedback-capture-heading")).toHaveText(
@@ -743,18 +750,6 @@ async function runSearch(page: Page, query: string): Promise<void> {
       .waitFor({ state: "visible", timeout: 15_000 }),
     page.locator("#searchMeta").waitFor({ state: "visible", timeout: 15_000 }),
   ]).catch(() => undefined);
-}
-
-async function ensureSourceToTarget(page: Page): Promise<void> {
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  // Default product direction is source→target. If currently target→source, flip once.
-  if (/→/.test(label)) {
-    const left = label.split("→")[0] ?? "";
-    if (/Maninka|Target|Cible|mnk/i.test(left)) {
-      await toggle.click();
-    }
-  }
 }
 
 async function openManageDictionaries(page: Page): Promise<void> {
