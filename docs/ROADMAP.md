@@ -148,6 +148,7 @@ UX2I2 — Responsive Application Shell and Primary Navigation — Complete
 UX2I3 — Search Home and Search Results — Complete
 UX2I4 — Lexical Entry Detail — Complete
 UX2I5A — Saved Vocabulary and Progress — Complete
+UX2I5B — Review and Reflect Experience — Complete
 FH1 — Feedback Review Handoff — Complete (Accepted)
 FH1A — Explicit Review Destination Amendment — Complete
 PV1A — Production Identity and Desktop Smoke — VERIFIED
@@ -171,6 +172,7 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **UX2I3** complete (`docs/reports/ux2i3_search_results_report.md`, `UX2I3_SEARCH_RESULTS_IMPLEMENTED`): ordinary Search Home + Results migrated to Contemporary West African Modernism; bundle-derived direction swap; desktop Search rail; CF2 Search-surface CTA restyle only; search algorithms/ordering/CF2 lifecycle unchanged.
 - **UX2I4** complete (`docs/reports/ux2i4_lexical_entry_detail_report.md`, `UX2I4_LEXICAL_ENTRY_DETAIL_IMPLEMENTED`): Entry Detail as a dictionary reading surface; Latin/N’Ko orthography; senses/examples/secondary fields; Learning Save + CF1 entry affordances restyled; mobile dedicated-entry (`data-search-view`); domain contracts unchanged.
 - **UX2I5A** complete (`docs/reports/ux2i5a_saved_vocabulary_progress_report.md`, `UX2I5A_SAVED_VOCABULARY_PROGRESS_IMPLEMENTED`): Saved Vocabulary + Progress migrated to Contemporary West African Modernism; top-level Saved nav (`UX2_SAVED_TOP_LEVEL_NAVIGATION_AMENDMENT`); Progress truthfulness preserved; Review visual migration deferred to UX2I5B.
+- **UX2I5B** complete (`docs/reports/ux2i5b_review_reflect_report.md`, `UX2I5B_REVIEW_REFLECT_IMPLEMENTED`): Review/Reflect presentation migrated; live lexical authority and LS2 session architecture preserved; conversational reflection labels (`UX2_REVIEW_ACTION_LABEL_AMENDMENT`) map to still_learning / remembered.
 - **UX2I8 follow-up (tracked, non-blocking from UX2I3):** ready-state diagnostic text is still visually clipped rather than removed from the accessibility tree; ordinary assistive-technology users should ultimately not receive hidden technical status noise.
 - **FH1** accepted (`docs/reports/fh1_feedback_review_handoff_report.md`, `FH1_FEEDBACK_REVIEW_HANDOFF_IMPLEMENTED`): transport-only “Send for review”; reuses CF1/CF2 governed packages; Web Share or download+mailto; drafts stay `draft`.
 - **FH1A** complete (`docs/reports/fh1a_review_destination_amendment_report.md`, `FH1_REVIEW_DESTINATION_AMENDMENT_IMPLEMENTED`): configured `VITE_FEEDBACK_EMAIL` shown in confirm UI and Web Share text; mailto remains pre-addressed.

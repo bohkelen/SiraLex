@@ -239,8 +239,8 @@ test.describe("LS2 offline Review lifecycle", () => {
       timeout: 15_000,
     });
     await page.locator(".review-reveal").click();
-    await expect(page.locator(".review-still-learning")).toContainText("Encore en apprentissage");
-    await expect(page.locator(".review-remembered")).toContainText("Mémorisé");
+    await expect(page.locator(".review-still-learning")).toContainText("Pas encore");
+    await expect(page.locator(".review-remembered")).toContainText("Je l’ai");
   });
 
   test("double Start Review keeps a single Review surface", async ({ page }) => {
