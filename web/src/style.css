@@ -867,6 +867,12 @@ a {
   gap: var(--space-2);
 }
 
+/* Author display:flex must not override HTML hidden on conditional fields. */
+.correction-form .field.correction-form-field[hidden],
+.correction-manage .field[hidden] {
+  display: none !important;
+}
+
 .correction-form .field .label,
 .correction-manage .field .label {
   font-family: var(--font-sans);

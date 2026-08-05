@@ -109,3 +109,76 @@ UX2I8_ADVANCED_INTERNAL_SEPARATION_REMAINS_TRACKED
 ```text
 UX2I7A_CF1_CONSUMER_EXPERIENCE_IMPLEMENTED
 ```
+
+---
+
+# UX2I7A1 — CF1 Conditional Field Visibility Fix
+
+## Decision
+
+```text
+UX2I7A1_CF1_CONDITIONAL_VISIBILITY_FIXED
+```
+
+## BASE_COMMIT
+
+```text
+2a84362365e8e2b1bf9f5846b6932bee602ec62b
+```
+
+## Root cause
+
+UX2 author rule `.correction-form .field.correction-form-field { display: flex; }` overrode the HTML `hidden` attribute’s `display: none`, so Field label and Proposed correction remained visually rendered while `element.hidden === true`. Renderer state logic was correct and unchanged.
+
+## Fix
+
+Presentation-only CSS safeguard:
+
+```css
+.correction-form .field.correction-form-field[hidden],
+.correction-manage .field[hidden] {
+  display: none !important;
+}
+```
+
+## Checks
+
+| Check | Result |
+|-------|--------|
+| Field label hidden (default) | PASS |
+| Proposed correction hidden (default) | PASS |
+| Other field → visible | PASS |
+| Return from Other field → hidden | PASS |
+| Propose → visible | PASS |
+| Return to Report → hidden | PASS |
+| Stable control/caret behavior | PASS |
+| CF1 behavior unchanged | PASS |
+| High-risk behavioral files changed | NONE |
+
+## Validation
+
+| Suite | Result |
+|-------|--------|
+| Unit (`test:run`) | **863 passed**; **9** `query_log_store` baseline failures |
+| `test:e2e:ux2-corrections` | PASS (4/4) |
+| `test:e2e:corrections` | PASS (7/7) |
+| Build | PASS |
+| git diff --check | PASS |
+
+## Visual evidence
+
+```text
+data/local_evidence/ux2_corrections/2026-08-05T21-44-59-373Z/
+  mobile-light-correction-capture.png
+  mobile-dark-correction-capture.png
+  desktop-light-correction-capture.png
+  desktop-dark-correction-capture.png
+```
+
+Default capture screenshots show Whole entry + Report a problem with Field label and Proposed correction not visually rendered.
+
+## Final decision
+
+```text
+UX2I7A1_CF1_CONDITIONAL_VISIBILITY_FIXED
+```

@@ -1,5 +1,5 @@
 /**
- * UX2I7A — CF1 correction consumer presentation smoke.
+ * UX2I7A / UX2I7A1 — CF1 correction consumer presentation smoke.
  *
  * CF2_VISUAL_MIGRATION_DEFERRED_TO_UX2I7B (out of scope here)
  */
@@ -50,6 +50,10 @@ test.describe("UX2I7A CF1 correction experience", () => {
     await expect(page.locator("#correction-form-target")).toBeVisible();
     await expect(page.locator("#correction-form-mode-problem_report")).toBeVisible();
     await expect(page.locator("#correction-form-description")).toBeVisible();
+    await expect(page.locator("#correction-form-field-label")).not.toBeVisible();
+    await expect(page.locator("#correction-form-proposed")).not.toBeVisible();
+    await expectHiddenFieldDisplayNone(page, "#correction-form-field-label");
+    await expectHiddenFieldDisplayNone(page, "#correction-form-proposed");
 
     await mkdir(evidenceRoot, { recursive: true });
     await page.screenshot({
@@ -115,6 +119,8 @@ test.describe("UX2I7A CF1 correction experience", () => {
     await page.locator("#searchResults .result-open").first().click();
     await page.locator("#entry-suggest-correction").click();
     await expect(page.locator(".ux2-correction-form")).toBeVisible();
+    await expect(page.locator("#correction-form-field-label")).not.toBeVisible();
+    await expect(page.locator("#correction-form-proposed")).not.toBeVisible();
 
     await mkdir(evidenceRoot, { recursive: true });
     await page.screenshot({
@@ -193,13 +199,87 @@ test.describe("UX2I7A CF1 correction experience", () => {
     await page.locator("#searchResults .result-open").first().click();
     await page.locator("#entry-suggest-correction").click();
     await expect(page.locator(".ux2-correction-form")).toBeVisible();
+    await expect(page.locator("#correction-form-field-label")).not.toBeVisible();
+    await expect(page.locator("#correction-form-proposed")).not.toBeVisible();
     await mkdir(evidenceRoot, { recursive: true });
     await page.screenshot({
       path: path.join(evidenceRoot, "mobile-dark-correction-capture.png"),
       fullPage: true,
     });
   });
+
+  test("conditional Field label / Proposed correction visibility", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    page.on("dialog", (dialog) => dialog.accept());
+    await installDebugBundle(page);
+    await setUiLocale(page, "en");
+
+    await ensureTargetToSource(page);
+    await page.locator("#searchInput").fill("alpha_mnk");
+    await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.locator("#searchResults .result-open").first().click();
+    await page.locator("#entry-suggest-correction").click();
+    await expect(page.locator(".ux2-correction-form")).toBeVisible();
+
+    const fieldLabel = page.locator("#correction-form-field-label");
+    const proposed = page.locator("#correction-form-proposed");
+    const description = page.locator("#correction-form-description");
+
+    await expect(fieldLabel).not.toBeVisible();
+    await expect(proposed).not.toBeVisible();
+    await expectHiddenFieldDisplayNone(page, "#correction-form-field-label");
+    await expectHiddenFieldDisplayNone(page, "#correction-form-proposed");
+
+    await page.locator("#correction-form-target").selectOption("other_field");
+    await expect(fieldLabel).toBeVisible();
+    await expect(fieldLabel).toBeEnabled();
+
+    await page.locator("#correction-form-target").selectOption("entry");
+    await expect(fieldLabel).not.toBeVisible();
+    await expectHiddenFieldDisplayNone(page, "#correction-form-field-label");
+
+    await page.locator("#correction-form-mode-proposed_correction").check();
+    await expect(proposed).toBeVisible();
+    await expect(proposed).toBeEnabled();
+
+    // Stable node: same textarea remains after mode toggle (CF2I6A caret/IME).
+    await proposed.evaluate((el) => {
+      (window as unknown as { __ux2PropNode?: Element }).__ux2PropNode = el;
+    });
+    await page.locator("#correction-form-mode-problem_report").check();
+    await expect(proposed).not.toBeVisible();
+    await expectHiddenFieldDisplayNone(page, "#correction-form-proposed");
+    expect(
+      await proposed.evaluate(
+        (el) => el === (window as unknown as { __ux2PropNode?: Element }).__ux2PropNode,
+      ),
+    ).toBe(true);
+
+    await description.fill("stable description node");
+    await description.evaluate((el) => {
+      (window as unknown as { __ux2DescNode?: Element }).__ux2DescNode = el;
+    });
+    await page.locator("#correction-form-mode-proposed_correction").check();
+    await page.locator("#correction-form-mode-problem_report").check();
+    expect(
+      await description.evaluate(
+        (el) => el === (window as unknown as { __ux2DescNode?: Element }).__ux2DescNode,
+      ),
+    ).toBe(true);
+    await expect(description).toHaveValue("stable description node");
+  });
 });
+
+async function expectHiddenFieldDisplayNone(page: Page, controlSelector: string): Promise<void> {
+  const display = await page.locator(controlSelector).evaluate((el) => {
+    const field = el.closest(".field");
+    if (!(field instanceof HTMLElement)) return null;
+    return getComputedStyle(field).display;
+  });
+  expect(display).toBe("none");
+}
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
   await navigateUx2Primary(page, "more");
