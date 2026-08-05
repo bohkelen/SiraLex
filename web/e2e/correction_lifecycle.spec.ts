@@ -11,7 +11,11 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Download, type Page, type Request } from "@playwright/test";
 
-import { navigateUx2Primary, openMoreAnd } from "./helpers/ux2_nav";
+import {
+  ensureTargetToSource,
+  navigateUx2Primary,
+  openMoreAnd,
+} from "./helpers/ux2_nav";
 
 import {
   CORRECTION_FEEDBACK_AUTHORITY_LABEL,
@@ -486,7 +490,9 @@ test.describe("CF1I5 correction lifecycle", () => {
     await navigateUx2Primary(page, "search");
 
     await openLexiconEntry(page, LEX_QUERY);
-    await expect(page.locator("#entry-suggest-correction")).toHaveText("Suggérer une correction");
+    await expect(page.locator("#entry-suggest-correction")).toHaveText(
+      "Suggérer une correction →",
+    );
     await page.locator("#entry-suggest-correction").click();
     await expect(page.locator("#correction-form-heading")).toHaveText("Suggérer une correction");
     await expect(page.locator("#correction-form-save")).toHaveText(
@@ -666,11 +672,7 @@ async function createQuickDraft(
 
 async function openLexiconEntry(page: Page, query: string): Promise<void> {
   await navigateUx2Primary(page, "search");
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  if (!/Maninka|Target|Cible/.test(label.split("→")[0] ?? "")) {
-    await toggle.click();
-  }
+  await ensureTargetToSource(page);
   await page.locator("#searchInput").fill(query);
   await expect(page.locator("#searchResults .result-open").first()).toContainText(query, {
     timeout: 15_000,

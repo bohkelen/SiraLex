@@ -43,7 +43,7 @@ describe("CF1I3 entry Suggest a correction affordance", () => {
     setCurrentLocale("en");
   });
 
-  it("shows Suggest after lexical content and before meta on lexicon entries", () => {
+  it("shows Suggest in the entry action area before senses on lexicon entries", () => {
     const onSuggest = vi.fn();
     const { root } = renderEntryDetail(LEXICON_RECORD, {
       onBack: () => undefined,
@@ -51,19 +51,19 @@ describe("CF1I3 entry Suggest a correction affordance", () => {
     });
     const suggest = root.querySelector<HTMLButtonElement>("#entry-suggest-correction");
     expect(suggest).not.toBeNull();
-    expect(suggest!.textContent).toBe("Suggest a correction");
+    expect(suggest!.textContent).toBe("Suggest correction →");
 
+    const header = root.querySelector(".entry-header");
+    const actions = root.querySelector(".ux2-entry-actions");
     const senses = root.querySelector(".entry-senses");
-    const actions = root.querySelector(".entry-correction-actions");
-    const meta = root.querySelector(".entry-meta");
-    expect(senses).not.toBeNull();
+    expect(header).not.toBeNull();
     expect(actions).not.toBeNull();
-    expect(meta).not.toBeNull();
+    expect(senses).not.toBeNull();
     expect(
-      senses!.compareDocumentPosition(actions!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      header!.compareDocumentPosition(actions!) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      actions!.compareDocumentPosition(meta!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      actions!.compareDocumentPosition(senses!) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
     suggest!.click();
@@ -85,7 +85,7 @@ describe("CF1I3 entry Suggest a correction affordance", () => {
       onSuggestCorrection: () => undefined,
     });
     expect(root.querySelector("#entry-suggest-correction")?.textContent).toBe(
-      "Suggérer une correction",
+      "Suggérer une correction →",
     );
   });
 });

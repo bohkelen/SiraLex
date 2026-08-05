@@ -135,6 +135,21 @@ describe("i18n translations", () => {
     setCurrentLocale(previous);
   });
 
+  it("resolves UX2I4 Entry Detail labels in English and French", () => {
+    const previous = getCurrentLocale();
+    setCurrentLocale("en");
+    expect(t("entry.back")).toBe("← Back to results");
+    expect(t("entry.backToSaved")).toBe("← Back to saved");
+    expect(t("entry.suggestCorrection")).toBe("Suggest correction →");
+    expect(t("entry.section.examples")).toBe("Examples");
+    setCurrentLocale("fr");
+    expect(t("entry.back")).toBe("← Retour aux résultats");
+    expect(t("entry.backToSaved")).toBe("← Retour aux enregistrés");
+    expect(t("entry.suggestCorrection")).toBe("Suggérer une correction →");
+    expect(t("entry.section.examples")).toBe("Exemples");
+    setCurrentLocale(previous);
+  });
+
   it("resolves UX2I3 Search Home/Results labels in English and French", () => {
     const previous = getCurrentLocale();
     setCurrentLocale("en");

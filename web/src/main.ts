@@ -252,7 +252,7 @@ async function performConfiguredFeedbackHandoff(
 }
 
 app.innerHTML = `
-  <div class="ux2-app-shell" id="ux2AppShell" data-primary="search">
+  <div class="ux2-app-shell" id="ux2AppShell" data-primary="search" data-search-view="search">
     <header class="ux2-app-header">
       <div class="ux2-wordmark ux2-type-wordmark" id="ux2Wordmark">SiraLex</div>
       <div id="ux2PrimaryNavHost" class="ux2-primary-nav-host"></div>
@@ -2401,6 +2401,13 @@ function setPrimaryDestination(destination: PrimaryDestination): void {
   primaryNavView?.setActive(destination);
 }
 
+/** Presentation-only Search workspace mode (not persisted). */
+type SearchViewMode = "search" | "entry";
+
+function setSearchView(view: SearchViewMode): void {
+  appShell.dataset.searchView = view;
+}
+
 function focusPrimaryHeading(destination: PrimaryDestination): void {
   if (destination === "search") {
     searchHeading.focus();
@@ -2501,6 +2508,7 @@ function navigatePrimary(destination: PrimaryDestination): void {
   if (destination === "saved") {
     hideMoreLanding();
     manageDictionariesPanel.open = false;
+    setSearchView("search");
     showSavedVocabulary();
     return;
   }
@@ -2508,6 +2516,7 @@ function navigatePrimary(destination: PrimaryDestination): void {
   if (destination === "review") {
     hideMoreLanding();
     manageDictionariesPanel.open = false;
+    setSearchView("search");
     showReviewSurface();
     return;
   }
@@ -2521,6 +2530,7 @@ function navigatePrimary(destination: PrimaryDestination): void {
   savedVocabularyGeneration += 1;
   entryDetailGeneration += 1;
   resultsHostContext = "search";
+  setSearchView("search");
   searchResults.innerHTML = "";
   manageDictionariesPanel.open = false;
   setPrimaryDestination("more");
@@ -2974,6 +2984,7 @@ type EntryNavOrigin =
 
 function showNoResultSearchSurface(query: string): void {
   resultsHostContext = "search";
+  setSearchView("search");
   disposeActiveCorrectionForm();
   disposeActiveCorrectionManagement();
   disposeActiveSearchFeedbackForm();
@@ -3051,6 +3062,7 @@ function showSearchFeedbackCapture(): void {
   disposeActiveReviewHost();
   const generation = ++searchFeedbackFormGeneration;
   resultsHostContext = "search";
+  setSearchView("search");
   entryDetailGeneration += 1;
   searchResults.innerHTML = "";
 
@@ -3105,6 +3117,7 @@ function showSearchFeedbackCapture(): void {
 
 function showResultsList() {
   resultsHostContext = "search";
+  setSearchView("search");
   disposeActiveCorrectionForm();
   disposeActiveCorrectionManagement();
   disposeActiveSearchFeedbackForm();
@@ -3317,6 +3330,9 @@ function showCorrectionForm(record: EnrichedRecord, origin: EntryNavOrigin): voi
   entryDetailGeneration += 1;
   const generation = ++correctionFormGeneration;
   resultsHostContext = origin.kind === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
+  if (origin.kind === "search") {
+    setSearchView("entry");
+  }
   searchResults.innerHTML = "";
 
   let viewUpdate: ((vm: ReturnType<CorrectionFormController["getViewModel"]>) => void) | undefined;
@@ -3379,6 +3395,9 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
   disposeActiveSearchFeedbackManagement();
   if (origin.kind === "search") {
     savedVocabularyGeneration += 1;
+    setSearchView("entry");
+  } else {
+    setSearchView("search");
   }
   searchResults.innerHTML = "";
 
@@ -3404,8 +3423,11 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
 
   let entryRoot: HTMLElement | null = null;
   const view = renderEntryDetail(record, {
+    backLabel:
+      origin.kind === "saved_vocabulary" ? t("entry.backToSaved") : t("entry.back"),
     onBack: () => {
       if (origin.kind === "saved_vocabulary") {
+        setSearchView("search");
         showSavedVocabulary();
         return;
       }

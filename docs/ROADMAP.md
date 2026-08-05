@@ -146,6 +146,7 @@ UX2I1 — Design Tokens and Visual Foundation — Complete
 UX2I1A — Accessible Action Text Token Amendment — Complete
 UX2I2 — Responsive Application Shell and Primary Navigation — Complete
 UX2I3 — Search Home and Search Results — Complete
+UX2I4 — Lexical Entry Detail — Complete
 FH1 — Feedback Review Handoff — Complete (Accepted)
 FH1A — Explicit Review Destination Amendment — Complete
 PV1A — Production Identity and Desktop Smoke — VERIFIED
@@ -167,6 +168,8 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **UX2I1A** complete (`docs/reports/ux2i1_design_tokens_visual_foundation_report.md`, `UX2I1A_ACCESSIBLE_ACTION_TEXT_IMPLEMENTED`): adds `--color-action-text` for normal-text terracotta actions/links/nav labels; brand `--color-accent` / `--color-focus` unchanged; legacy `--accent` not remapped.
 - **UX2I2** complete (`docs/reports/ux2i2_responsive_shell_navigation_report.md`, `UX2I2_RESPONSIVE_SHELL_NAVIGATION_IMPLEMENTED`): Search/Saved/Review/More primary destinations; mobile bottom + desktop top nav; More transitional bridge (Theme/Locale/management); Review is a stable top-level destination (`UX2_NAVIGATION_AMENDMENT`); domain contracts unchanged.
 - **UX2I3** complete (`docs/reports/ux2i3_search_results_report.md`, `UX2I3_SEARCH_RESULTS_IMPLEMENTED`): ordinary Search Home + Results migrated to Contemporary West African Modernism; bundle-derived direction swap; desktop Search rail; CF2 Search-surface CTA restyle only; search algorithms/ordering/CF2 lifecycle unchanged.
+- **UX2I4** complete (`docs/reports/ux2i4_lexical_entry_detail_report.md`, `UX2I4_LEXICAL_ENTRY_DETAIL_IMPLEMENTED`): Entry Detail as a dictionary reading surface; Latin/N’Ko orthography; senses/examples/secondary fields; Learning Save + CF1 entry affordances restyled; mobile dedicated-entry (`data-search-view`); domain contracts unchanged.
+- **UX2I8 follow-up (tracked, non-blocking from UX2I3):** ready-state diagnostic text is still visually clipped rather than removed from the accessibility tree; ordinary assistive-technology users should ultimately not receive hidden technical status noise.
 - **FH1** accepted (`docs/reports/fh1_feedback_review_handoff_report.md`, `FH1_FEEDBACK_REVIEW_HANDOFF_IMPLEMENTED`): transport-only “Send for review”; reuses CF1/CF2 governed packages; Web Share or download+mailto; drafts stay `draft`.
 - **FH1A** complete (`docs/reports/fh1a_review_destination_amendment_report.md`, `FH1_REVIEW_DESTINATION_AMENDMENT_IMPLEMENTED`): configured `VITE_FEEDBACK_EMAIL` shown in confirm UI and Web Share text; mailto remains pre-addressed.
 - **PVR1** verified (`docs/reports/pvr1_theme_feedback_production_resmoke_report.md`, `PVR1_THEME_AND_FEEDBACK_PRODUCTION_VERIFIED`): Theme + FH1/FH1A + CF1/CF2 handoff preparation PASS on production; operator-confirmed real inbox receipt (Linux Thunderbird + iPhone Gmail/Proton). FH1 production handoff is **OPERATIONAL**. Next: PV1B.

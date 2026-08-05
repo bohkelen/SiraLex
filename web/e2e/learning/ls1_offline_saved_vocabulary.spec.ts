@@ -4,7 +4,11 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { navigateUx2Primary, openMoreAnd } from "../helpers/ux2_nav";
+import {
+  ensureTargetToSource,
+  navigateUx2Primary,
+  openMoreAnd,
+} from "../helpers/ux2_nav";
 
 /**
  * LS1I4 — minimal offline Saved Vocabulary browser verification.
@@ -29,7 +33,7 @@ test.describe("LS1 offline Saved Vocabulary", () => {
     await expect(page.locator("#openSavedVocabulary")).toBeVisible();
 
     // Target → source so we open a lexicon_entry directly.
-    await page.locator("#langToggle").click();
+    await ensureTargetToSource(page);
     await page.locator("#searchInput").fill("alpha_mnk");
     await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
       timeout: 15_000,
