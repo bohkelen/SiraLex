@@ -153,6 +153,7 @@ UX2I6A — More Landing, Preferences, and Management Routing — Complete
 UX2I6B1 — Dictionary Management Consumer Surface — Complete
 UX2I6B2 — Learning Data / Backup & Restore Surface — Complete
 UX2I7A — CF1 Consumer Visual Migration — Complete
+UX2I7B — CF2 Search Feedback Consumer Visual Migration — Complete
 FH1 — Feedback Review Handoff — Complete (Accepted)
 FH1A — Explicit Review Destination Amendment — Complete
 PV1A — Production Identity and Desktop Smoke — VERIFIED
@@ -181,7 +182,8 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **UX2I6B1** complete (`docs/reports/ux2i6b1_dictionary_management_report.md`, `UX2I6B1_DICTIONARY_MANAGEMENT_IMPLEMENTED`): Dictionaries consumer surface above unchanged bundle lifecycle; Dictionaries/Learning Data mode separation; Advanced collapsed; Delete DB out of ordinary Dictionaries; LP1 visual migration deferred to **UX2I6B2**; CF1/CF2 visuals deferred to UX2I7.
 - **UX2I6B2** complete (`docs/reports/ux2i6b2_learning_data_report.md`, `UX2I6B2_LEARNING_DATA_IMPLEMENTED`): Learning Data / LP1 Backup & Restore presentation migrated; package/restore state machine unchanged; Dictionaries separation retained; CF1/CF2 visuals deferred to UX2I7.
 - **UX2I7A** complete (`docs/reports/ux2i7a_cf1_consumer_experience_report.md`, `UX2I7A_CF1_CONSUMER_EXPERIENCE_IMPLEMENTED`): CF1 capture/management/export/FH1 presentation migrated; schema/store/export/handoff semantics unchanged; CF2 visual migration deferred to **UX2I7B**.
-- **Next UX2 slice:** UX2I7B — CF2 Search Feedback consumer visual migration.
+- **UX2I7B** complete (`docs/reports/ux2i7b_cf2_consumer_experience_report.md`, `UX2I7B_CF2_CONSUMER_EXPERIENCE_IMPLEMENTED`): CF2 capture/management/export/FH1 presentation migrated; schema/store/export/handoff semantics unchanged; Search algorithms unchanged.
+- **Next UX2 slice:** UX2I8 — ready-state accessibility cleanup / advanced internal separation (tracked).
 - **UX2I8 follow-up (tracked, non-blocking from UX2I3):** ready-state diagnostic text is still visually clipped rather than removed from the accessibility tree; ordinary assistive-technology users should ultimately not receive hidden technical status noise.
 - **FH1** accepted (`docs/reports/fh1_feedback_review_handoff_report.md`, `FH1_FEEDBACK_REVIEW_HANDOFF_IMPLEMENTED`): transport-only “Send for review”; reuses CF1/CF2 governed packages; Web Share or download+mailto; drafts stay `draft`.
 - **FH1A** complete (`docs/reports/fh1a_review_destination_amendment_report.md`, `FH1_REVIEW_DESTINATION_AMENDMENT_IMPLEMENTED`): configured `VITE_FEEDBACK_EMAIL` shown in confirm UI and Web Share text; mailto remains pre-addressed.

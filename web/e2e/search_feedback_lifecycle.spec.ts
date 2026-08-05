@@ -151,7 +151,9 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     await expect(page.locator(".search-feedback-manage-export-warning")).toContainText(
       "does not establish that dictionary entries are missing",
     );
-    await expect(page.locator(".search-feedback-manage-privacy")).toContainText("plain JSON");
+    await expect(page.locator(".search-feedback-manage-privacy")).toContainText(
+      "These are searches you chose to report",
+    );
 
     await page.locator("[data-testid='search-feedback-manage-row']").first().click();
     await expect(page.locator(".search-feedback-manage-detail-query")).toContainText(NO_RESULT_QUERY);

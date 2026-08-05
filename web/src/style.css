@@ -1037,119 +1037,255 @@ a {
   outline-offset: var(--focus-ring-offset);
 }
 
-/* --- Search failure feedback capture (CF2I3) --- */
+/* --- Search failure feedback capture (CF2 / UX2I7B) --- */
 
 .search-feedback-entry {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
 
 .search-feedback-entry-message,
 .search-feedback-entry-prompt {
   margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  color: var(--color-text-muted);
 }
 
 .search-feedback-report-btn {
   align-self: flex-start;
 }
 
-.search-feedback-capture {
+.search-feedback-capture.ux2-search-feedback-capture {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-4);
+  max-width: var(--ux2-content-max, 42rem);
+  min-width: 0;
+  padding-bottom: var(--space-6);
 }
 
 .search-feedback-capture-heading {
   margin: 0;
-  font-size: 1.25rem;
+  font-family: var(--font-serif, var(--font-display, Georgia, serif));
+  font-size: var(--type-page-title-size, 1.75rem);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.search-feedback-capture-search .label {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
 .search-feedback-capture-query {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-serif, var(--font-display, Georgia, serif));
+  font-size: var(--type-body-size);
   font-weight: 600;
+  color: var(--color-text-primary);
   white-space: pre-wrap;
 }
 
 .search-feedback-capture-search-meta {
-  margin: 4px 0 0;
-  font-size: 0.9rem;
-  opacity: 0.9;
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
 }
 
-.search-feedback-capture-privacy {
+.search-feedback-capture-privacy.ux2-search-feedback-privacy {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 0.92rem;
-  opacity: 0.92;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
 }
 
 .search-feedback-capture-privacy p {
   margin: 0;
 }
 
+.search-feedback-capture .field.search-feedback-capture-field,
+.search-feedback-manage .field.search-feedback-manage-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Author display:flex must not override HTML hidden (UX2I7A1 lesson). */
+.search-feedback-capture .field.search-feedback-capture-field[hidden],
+.search-feedback-manage .field.search-feedback-manage-field[hidden],
+.search-feedback-capture [hidden],
+.search-feedback-manage [hidden] {
+  display: none !important;
+}
+
+.search-feedback-capture .field .label,
+.search-feedback-manage .field .label {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.search-feedback-capture textarea,
+.search-feedback-manage textarea {
+  width: 100%;
+  max-width: 100%;
+  min-height: 7rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.search-feedback-capture textarea:focus-visible,
+.search-feedback-manage textarea:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
 .search-feedback-capture-help,
-.search-feedback-capture-counter {
-  margin: 4px 0 0;
-  font-size: 0.85rem;
+.search-feedback-capture-counter,
+.ux2-search-feedback-success-body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
 }
 
 .search-feedback-capture-counter-over,
 .search-feedback-capture-field-error,
 .search-feedback-capture-stale,
 .search-feedback-capture-error-summary {
-  color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
+  color: var(--color-text-primary);
+}
+
+.search-feedback-capture-field-error {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
 }
 
 .search-feedback-capture-error-summary {
-  border: 1px solid color-mix(in oklab, var(--text) 35%, #f87171 40%);
-  padding: 10px 12px;
-  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  padding: var(--space-3);
+  border-radius: 0;
+  background: transparent;
 }
 
 .search-feedback-capture-error-summary-title {
-  margin: 0 0 6px;
+  margin: 0 0 var(--space-2);
   font-weight: 600;
 }
 
-.search-feedback-capture-field textarea {
-  width: 100%;
-  min-height: 72px;
-  resize: vertical;
-}
-
-.search-feedback-capture-actions {
+.search-feedback-capture-actions.ux2-search-feedback-actions,
+.ux2-search-feedback-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-3);
+  align-items: center;
 }
 
-/* --- Search feedback management (CF2I4) --- */
+.ux2-search-feedback-primary-btn,
+.ux2-search-feedback-secondary-btn,
+.ux2-search-feedback-back {
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  padding: var(--space-2) var(--space-4);
+  border-radius: 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ux2-search-feedback-primary-btn {
+  border: 1px solid var(--color-accent);
+  background: var(--color-surface);
+  color: var(--color-action-text);
+}
+
+.ux2-search-feedback-secondary-btn,
+.ux2-search-feedback-back {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
+.ux2-search-feedback-primary-btn:disabled,
+.ux2-search-feedback-secondary-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ux2-search-feedback-primary-btn:focus-visible,
+.ux2-search-feedback-secondary-btn:focus-visible,
+.ux2-search-feedback-back:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* --- Search feedback management (CF2 / UX2I7B) --- */
 
 .search-feedback-manage-delete-reminder {
   margin: 0;
-  font-size: 0.92rem;
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
 }
 
-.search-feedback-manage {
+.search-feedback-manage.ux2-search-feedback-manage {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-4);
+  max-width: var(--ux2-content-max, 42rem);
+  min-width: 0;
+  padding-bottom: var(--space-6);
 }
 
 .search-feedback-manage-heading {
   margin: 0;
-  font-size: 1.05rem;
+  font-family: var(--font-serif, var(--font-display, Georgia, serif));
+  font-size: var(--type-page-title-size, 1.75rem);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.search-feedback-manage-heading:focus,
+.search-feedback-manage-status:focus,
+.search-feedback-manage-error-summary:focus,
+.search-feedback-manage-delete-confirm:focus,
+.search-feedback-manage-list:focus {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .search-feedback-manage-privacy,
 .search-feedback-manage-export-warning,
 .search-feedback-manage-empty,
-.search-feedback-manage-status {
+.search-feedback-manage-status,
+.search-feedback-manage-send-unavailable {
   margin: 0;
-  font-size: 0.92rem;
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
 }
 
 .search-feedback-manage-export-warning {
@@ -1162,7 +1298,12 @@ a {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
+}
+
+.search-feedback-manage-row {
+  margin: 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .search-feedback-manage-row-button {
@@ -1170,17 +1311,30 @@ a {
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in oklab, var(--text) 18%, transparent);
-  border-radius: 6px;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-4) 0;
+  min-height: var(--touch-target-min);
+  border: none;
+  border-radius: 0;
   background: transparent;
   color: inherit;
   cursor: pointer;
+  font-family: var(--font-sans);
 }
 
-.search-feedback-manage-row-query {
+.search-feedback-manage-row-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.search-feedback-manage-row-query,
+.search-feedback-manage-detail-query {
+  margin: 0;
+  font-family: var(--font-serif, var(--font-display, Georgia, serif));
+  font-size: var(--type-body-size);
   font-weight: 600;
+  color: var(--color-text-primary);
   white-space: pre-wrap;
 }
 
@@ -1190,70 +1344,95 @@ a {
 .search-feedback-manage-availability,
 .search-feedback-manage-detail-meta,
 .search-feedback-manage-timestamps,
-.search-feedback-manage-counter {
-  font-size: 0.9rem;
-  opacity: 0.92;
+.search-feedback-manage-counter,
+.search-feedback-manage-detail-meaning,
+.search-feedback-manage-detail-details {
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
 }
 
-.search-feedback-manage-detail-query {
-  margin: 0;
-  font-weight: 600;
-  white-space: pre-wrap;
-}
-
-.search-feedback-manage-error-summary,
-.search-feedback-manage-delete-confirm,
-.search-feedback-manage-counter-over {
-  color: color-mix(in oklab, var(--text) 70%, #f87171 30%);
+.search-feedback-manage-availability[data-state="dictionary_unavailable"]::before,
+.search-feedback-manage-availability[data-state="dictionary_content_differs"]::before {
+  content: "· ";
 }
 
 .search-feedback-manage-error-summary,
 .search-feedback-manage-delete-confirm {
-  border: 1px solid color-mix(in oklab, var(--text) 35%, #f87171 40%);
-  padding: 10px 12px;
-  border-radius: 6px;
+  color: var(--color-text-primary);
+  border: none;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: var(--space-4) 0;
+  background: transparent;
 }
 
-.search-feedback-manage-handoff-confirm {
+.search-feedback-manage-counter-over {
+  color: var(--color-text-primary);
+}
+
+#search-feedback-manage-handoff-confirm.ux2-search-feedback-handoff-confirm,
+#search-feedback-manage-handoff-confirm {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in oklab, var(--text) 18%, transparent);
-  border-radius: 6px;
-  font-size: 0.8rem;
+  gap: var(--space-3);
+  font-size: var(--type-body-size);
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
-.search-feedback-manage-handoff-confirm .search-feedback-manage-handoff-heading {
+#search-feedback-manage-handoff-confirm .search-feedback-manage-handoff-heading {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 1.1rem;
   font-weight: 600;
 }
 
-.search-feedback-manage-handoff-confirm p {
+#search-feedback-manage-handoff-confirm p {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
 }
 
-.search-feedback-manage-handoff-confirm .feedback-handoff-email {
+#search-feedback-manage-handoff-confirm .feedback-handoff-email {
   font-size: inherit;
+  color: var(--color-action-text);
 }
 
 .search-feedback-manage-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-3);
+}
+
+.search-feedback-manage-provenance {
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.search-feedback-manage-provenance summary {
+  min-height: var(--touch-target-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 600;
 }
 
 .search-feedback-manage-provenance-body {
-  margin-top: 8px;
-  font-size: 0.85rem;
+  margin-top: var(--space-2);
+  font-size: var(--type-helper-size);
 }
 
-.search-feedback-manage field textarea {
-  width: 100%;
-  min-height: 72px;
-  resize: vertical;
+.search-feedback-manage-transport-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
 }
 
 /* --- Saved vocabulary (LS1I3 / UX2I5A) --- */

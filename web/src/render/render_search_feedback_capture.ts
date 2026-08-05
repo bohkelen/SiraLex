@@ -197,7 +197,7 @@ export function renderSearchFeedbackCapture(
   initialVm: SearchFeedbackCaptureViewModel,
   callbacks: SearchFeedbackCaptureRendererCallbacks,
 ): SearchFeedbackCaptureView {
-  const root = el("div", "search-feedback-capture");
+  const root = el("div", "search-feedback-capture ux2-search-feedback-capture");
   root.setAttribute("data-testid", "search-feedback-capture");
 
   let layout: "none" | "editing" | "saved" = "none";
@@ -220,15 +220,15 @@ export function renderSearchFeedbackCapture(
     root.appendChild(heading);
 
     root.appendChild(
-      el("p", undefined, t("searchFeedback.capture.success.body1")),
+      el("p", "ux2-search-feedback-success-body", t("searchFeedback.capture.success.body1")),
     );
     root.appendChild(
-      el("p", undefined, t("searchFeedback.capture.success.body2")),
+      el("p", "ux2-search-feedback-success-body", t("searchFeedback.capture.success.body2")),
     );
 
     const back = el(
       "button",
-      "btn search-feedback-capture-back",
+      "btn search-feedback-capture-back ux2-search-feedback-primary-btn",
       t("searchFeedback.capture.backToSearch"),
     );
     back.type = "button";
@@ -317,15 +317,6 @@ export function renderSearchFeedbackCapture(
     );
     root.appendChild(searchBlock);
 
-    const privacy = el("div", "search-feedback-capture-privacy");
-    privacy.appendChild(
-      el("p", undefined, t("searchFeedback.capture.privacy.authority")),
-    );
-    privacy.appendChild(
-      el("p", undefined, t("searchFeedback.capture.privacy.localOnly")),
-    );
-    root.appendChild(privacy);
-
     const staleHost = el("div", "search-feedback-capture-stale-host");
     root.appendChild(staleHost);
 
@@ -400,10 +391,19 @@ export function renderSearchFeedbackCapture(
     );
     root.appendChild(detailsField);
 
-    const actions = el("div", "search-feedback-capture-actions");
+    const privacy = el("div", "search-feedback-capture-privacy ux2-search-feedback-privacy");
+    privacy.appendChild(
+      el("p", undefined, t("searchFeedback.capture.privacy.authority")),
+    );
+    privacy.appendChild(
+      el("p", undefined, t("searchFeedback.capture.privacy.localOnly")),
+    );
+    root.appendChild(privacy);
+
+    const actions = el("div", "search-feedback-capture-actions ux2-search-feedback-actions");
     const saveBtn = el(
       "button",
-      "btn search-feedback-capture-save",
+      "btn search-feedback-capture-save ux2-search-feedback-primary-btn",
       t("searchFeedback.capture.save"),
     ) as HTMLButtonElement;
     saveBtn.type = "button";
@@ -412,7 +412,7 @@ export function renderSearchFeedbackCapture(
 
     const cancelBtn = el(
       "button",
-      "btn search-feedback-capture-cancel",
+      "btn search-feedback-capture-cancel ux2-search-feedback-secondary-btn",
       t("searchFeedback.capture.cancel"),
     ) as HTMLButtonElement;
     cancelBtn.type = "button";

@@ -683,7 +683,7 @@ const MESSAGES = {
     "searchFeedback.capture.privacy.authority":
       "This saves a local report about this search. It does not add a word to the dictionary or determine why the search did not meet your need.",
     "searchFeedback.capture.privacy.localOnly":
-      "Your exact search text will be stored on this device as part of the report. Nothing is sent online.",
+      "The exact search text is stored on this device as part of the report. Nothing is sent online when Save is pressed.",
     "searchFeedback.capture.save": "Save search feedback",
     "searchFeedback.capture.saving": "Saving…",
     "searchFeedback.capture.cancel": "Cancel",
@@ -712,7 +712,7 @@ const MESSAGES = {
       "The report could not be saved on this device.",
     "searchFeedback.manage.open": "Manage Search Feedback",
     "searchFeedback.manage.heading": "Search feedback",
-    "searchFeedback.manage.back": "← Back",
+    "searchFeedback.manage.back": "← Back to More",
     "searchFeedback.manage.backToList": "Back to list",
     "searchFeedback.manage.loading": "Loading search feedback…",
     "searchFeedback.manage.empty": "No search feedback yet",
@@ -747,7 +747,7 @@ const MESSAGES = {
     "searchFeedback.manage.optional": "optional",
     "searchFeedback.manage.counter": "{count} / {max}",
     "searchFeedback.manage.privacy":
-      "Search feedback includes the exact searches you chose to report and any notes you added. Exported files are plain JSON.",
+      "These are searches you chose to report. They remain local until exported or explicitly shared.",
     "searchFeedback.manage.export.button": "Export",
     "searchFeedback.manage.export.progress": "Preparing export…",
     "searchFeedback.manage.export.success":
@@ -1439,7 +1439,7 @@ const MESSAGES = {
     "searchFeedback.capture.privacy.authority":
       "Cela enregistre un rapport local sur cette recherche. Cela n’ajoute pas de mot au dictionnaire et ne détermine pas pourquoi la recherche n’a pas répondu à votre besoin.",
     "searchFeedback.capture.privacy.localOnly":
-      "Le texte exact de votre recherche sera stocké sur cet appareil dans le rapport. Rien n’est envoyé en ligne.",
+      "Le texte exact de la recherche est stocké sur cet appareil dans le rapport. Rien n’est envoyé en ligne lorsque Enregistrer est pressé.",
     "searchFeedback.capture.save": "Enregistrer le retour sur la recherche",
     "searchFeedback.capture.saving": "Enregistrement…",
     "searchFeedback.capture.cancel": "Annuler",
@@ -1473,7 +1473,7 @@ const MESSAGES = {
       "Le rapport n’a pas pu être enregistré sur cet appareil.",
     "searchFeedback.manage.open": "Gérer les retours sur la recherche",
     "searchFeedback.manage.heading": "Retours sur la recherche",
-    "searchFeedback.manage.back": "← Retour",
+    "searchFeedback.manage.back": "← Retour à Plus",
     "searchFeedback.manage.backToList": "Retour à la liste",
     "searchFeedback.manage.loading": "Chargement des retours sur la recherche…",
     "searchFeedback.manage.empty": "Aucun retour sur la recherche",
@@ -1509,7 +1509,7 @@ const MESSAGES = {
     "searchFeedback.manage.optional": "facultatif",
     "searchFeedback.manage.counter": "{count} / {max}",
     "searchFeedback.manage.privacy":
-      "Les retours sur la recherche incluent les recherches exactes que vous avez choisi de signaler et les notes que vous avez ajoutées. Les fichiers exportés sont du JSON brut.",
+      "Ce sont des recherches que vous avez choisi de signaler. Elles restent locales jusqu’à export ou partage explicite.",
     "searchFeedback.manage.export.button": "Exporter",
     "searchFeedback.manage.export.progress": "Préparation de l’export…",
     "searchFeedback.manage.export.success":

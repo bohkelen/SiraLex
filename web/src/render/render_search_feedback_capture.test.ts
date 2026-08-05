@@ -85,6 +85,7 @@ describe("render search feedback capture", () => {
     const { root } = renderSearchFeedbackCapture(baseVm(), cb);
     document.body.appendChild(root);
 
+    expect(root.classList.contains("ux2-search-feedback-capture")).toBe(true);
     expect(root.querySelector("#search-feedback-capture-heading")?.textContent).toBe(
       t("searchFeedback.capture.heading"),
     );

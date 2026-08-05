@@ -1,7 +1,5 @@
 /**
  * UX2I7A / UX2I7A1 — CF1 correction consumer presentation smoke.
- *
- * CF2_VISUAL_MIGRATION_DEFERRED_TO_UX2I7B (out of scope here)
  */
 
 import { access, mkdir } from "node:fs/promises";

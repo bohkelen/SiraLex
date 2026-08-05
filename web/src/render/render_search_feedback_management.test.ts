@@ -86,6 +86,7 @@ describe("renderSearchFeedbackManagement", () => {
     setCurrentLocale("en");
     const { root } = renderSearchFeedbackManagement(baseVm(), callbacks());
     document.body.appendChild(root);
+    expect(root.classList.contains("ux2-search-feedback-manage")).toBe(true);
     expect(root.querySelector("#search-feedback-manage-heading")?.textContent).toBe(
       "Search feedback",
     );
@@ -93,7 +94,8 @@ describe("renderSearchFeedbackManagement", () => {
     expect(root.textContent).toContain("Export");
     expect(root.textContent).toContain("Send for review");
     expect(root.textContent).toContain("unreviewed search feedback");
-    expect(root.textContent).toContain("plain JSON");
+    expect(root.textContent).toContain("These are searches you chose to report");
+    expect(root.textContent).toContain("← Back to More");
     expect(root.textContent).not.toMatch(/missing entry|Submit|submitted successfully/i);
     const row = root.querySelector("[data-testid='search-feedback-manage-row']");
     expect(row?.textContent).toContain('"  kùn  "');

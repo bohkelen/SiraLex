@@ -156,7 +156,7 @@ export function renderSearchFeedbackManagement(
   initial: SearchFeedbackManagementVm,
   callbacks: SearchFeedbackManagementRendererCallbacks,
 ): SearchFeedbackManagementView {
-  const root = el("div", "search-feedback-manage");
+  const root = el("div", "search-feedback-manage ux2-search-feedback-manage");
   root.setAttribute("data-testid", "search-feedback-manage");
 
   type StableEdit = {
@@ -195,10 +195,10 @@ export function renderSearchFeedbackManagement(
     warning.textContent = t("searchFeedback.manage.export.authority");
     root.appendChild(warning);
 
-    const actions = el("div", "row search-feedback-manage-transport-actions");
+    const actions = el("div", "row search-feedback-manage-transport-actions ux2-search-feedback-actions");
     const exportBtn = el(
       "button",
-      "btn search-feedback-manage-export",
+      "btn search-feedback-manage-export ux2-search-feedback-secondary-btn",
       vm.phase === "exporting"
         ? t("searchFeedback.manage.export.progress")
         : t("searchFeedback.manage.export.button"),
@@ -216,7 +216,7 @@ export function renderSearchFeedbackManagement(
 
     const sendBtn = el(
       "button",
-      "btn search-feedback-manage-send",
+      "btn search-feedback-manage-send ux2-search-feedback-primary-btn",
       vm.phase === "handoff_preparing"
         ? t("searchFeedback.manage.send.progress")
         : t("searchFeedback.manage.send.button"),
@@ -262,7 +262,7 @@ export function renderSearchFeedbackManagement(
       );
       const ack = el(
         "button",
-        "btn",
+        "btn ux2-search-feedback-secondary-btn",
         t("searchFeedback.manage.export.acknowledge"),
       );
       ack.type = "button";
@@ -272,7 +272,7 @@ export function renderSearchFeedbackManagement(
     }
 
     if (vm.phase === "confirm_handoff") {
-      const box = el("div", "search-feedback-manage-handoff-confirm");
+      const box = el("div", "search-feedback-manage-handoff-confirm ux2-search-feedback-handoff-confirm");
       box.id = "search-feedback-manage-handoff-confirm";
       const email = vm.reviewEmail ?? "";
       box.appendChild(
@@ -290,12 +290,20 @@ export function renderSearchFeedbackManagement(
         "search-feedback-manage-handoff-destination",
       );
       box.appendChild(el("p", undefined, t("searchFeedback.manage.send.destinationHint")));
-      const row = el("div", "row");
-      const cancel = el("button", "btn", t("searchFeedback.manage.send.cancel"));
+      const row = el("div", "row ux2-search-feedback-actions");
+      const cancel = el(
+        "button",
+        "btn ux2-search-feedback-secondary-btn",
+        t("searchFeedback.manage.send.cancel"),
+      );
       cancel.type = "button";
       cancel.id = "search-feedback-manage-handoff-cancel";
       cancel.addEventListener("click", () => callbacks.onCancelSendForReview());
-      const cont = el("button", "btn", t("searchFeedback.manage.send.continue"));
+      const cont = el(
+        "button",
+        "btn ux2-search-feedback-primary-btn",
+        t("searchFeedback.manage.send.continue"),
+      );
       cont.type = "button";
       cont.id = "search-feedback-manage-handoff-continue";
       cont.addEventListener("click", () => callbacks.onConfirmSendForReview());
@@ -321,7 +329,11 @@ export function renderSearchFeedbackManagement(
             : t("searchFeedback.manage.send.successShare"),
         ),
       );
-      const ack = el("button", "btn", t("searchFeedback.manage.send.acknowledge"));
+      const ack = el(
+        "button",
+        "btn ux2-search-feedback-secondary-btn",
+        t("searchFeedback.manage.send.acknowledge"),
+      );
       ack.type = "button";
       ack.id = "search-feedback-manage-handoff-acknowledge";
       ack.addEventListener("click", () => callbacks.onAcknowledgeHandoff());
@@ -419,7 +431,7 @@ export function renderSearchFeedbackManagement(
 
     const backList = el(
       "button",
-      "btn search-feedback-manage-back-list",
+      "btn search-feedback-manage-back-list ux2-search-feedback-secondary-btn",
       t("searchFeedback.manage.backToList"),
     );
     backList.type = "button";
@@ -531,16 +543,20 @@ export function renderSearchFeedbackManagement(
       confirm.appendChild(
         el("p", undefined, t("searchFeedback.manage.deleteConfirmBody")),
       );
-      const actions = el("div", "search-feedback-manage-actions");
+      const actions = el("div", "search-feedback-manage-actions ux2-search-feedback-actions");
       const yes = el(
         "button",
-        "btn",
+        "btn ux2-search-feedback-primary-btn",
         t("searchFeedback.manage.deleteConfirmAction"),
       );
       yes.type = "button";
       yes.disabled = vm.busy;
       yes.addEventListener("click", () => callbacks.onConfirmDelete());
-      const no = el("button", "btn", t("searchFeedback.manage.cancel"));
+      const no = el(
+        "button",
+        "btn ux2-search-feedback-secondary-btn",
+        t("searchFeedback.manage.cancel"),
+      );
       no.type = "button";
       no.disabled = vm.busy;
       no.addEventListener("click", () => callbacks.onCancelDelete());
@@ -550,12 +566,20 @@ export function renderSearchFeedbackManagement(
       return;
     }
 
-    const actions = el("div", "search-feedback-manage-actions");
-    const edit = el("button", "btn", t("searchFeedback.manage.edit"));
+    const actions = el("div", "search-feedback-manage-actions ux2-search-feedback-actions");
+    const edit = el(
+      "button",
+      "btn ux2-search-feedback-primary-btn",
+      t("searchFeedback.manage.edit"),
+    );
     edit.type = "button";
     edit.disabled = vm.busy;
     edit.addEventListener("click", () => callbacks.onStartEdit());
-    const del = el("button", "btn", t("searchFeedback.manage.delete"));
+    const del = el(
+      "button",
+      "btn ux2-search-feedback-secondary-btn",
+      t("searchFeedback.manage.delete"),
+    );
     del.type = "button";
     del.disabled = vm.busy;
     del.addEventListener("click", () => callbacks.onRequestDelete());
@@ -569,7 +593,7 @@ export function renderSearchFeedbackManagement(
 
     paintError(vm);
 
-    const meaningField = el("div", "field");
+    const meaningField = el("div", "field search-feedback-manage-field");
     const meaningLabel = el(
       "label",
       "label",
@@ -592,7 +616,7 @@ export function renderSearchFeedbackManagement(
     meaningField.append(meaningLabel, meaningInput, meaningCounter);
     root.appendChild(meaningField);
 
-    const detailsField = el("div", "field");
+    const detailsField = el("div", "field search-feedback-manage-field");
     const detailsLabel = el(
       "label",
       "label",
@@ -615,10 +639,10 @@ export function renderSearchFeedbackManagement(
     detailsField.append(detailsLabel, detailsInput, detailsCounter);
     root.appendChild(detailsField);
 
-    const actions = el("div", "search-feedback-manage-actions");
+    const actions = el("div", "search-feedback-manage-actions ux2-search-feedback-actions");
     const save = el(
       "button",
-      "btn",
+      "btn ux2-search-feedback-primary-btn",
       vm.busy
         ? t("searchFeedback.manage.saving")
         : t("searchFeedback.manage.saveEdit"),
@@ -628,7 +652,7 @@ export function renderSearchFeedbackManagement(
     save.addEventListener("click", () => callbacks.onSaveEdit());
     const cancel = el(
       "button",
-      "btn",
+      "btn ux2-search-feedback-secondary-btn",
       t("searchFeedback.manage.cancel"),
     ) as HTMLButtonElement;
     cancel.type = "button";
@@ -677,7 +701,11 @@ export function renderSearchFeedbackManagement(
     root.replaceChildren();
     root.setAttribute("aria-busy", vm.busy ? "true" : "false");
 
-    const back = el("button", "btn search-feedback-manage-back", t("searchFeedback.manage.back"));
+    const back = el(
+      "button",
+      "btn search-feedback-manage-back ux2-search-feedback-back",
+      t("searchFeedback.manage.back"),
+    );
     back.type = "button";
     back.addEventListener("click", () => callbacks.onBack());
     root.appendChild(back);
