@@ -1,5 +1,8 @@
 /**
- * LS1I3 / LS2I4 / LS3I2 — Saved Vocabulary surface renderer (presentation only).
+ * LS1I3 / LS2I4 / LS3I2 / UX2I5A — Saved Vocabulary surface renderer (presentation only).
+ *
+ * Top-level Saved destination: no permanent Back-to-search control.
+ * Progress/Review action derive only from the session model.
  */
 
 import { getCurrentLocale, t, type Locale, type TranslationKey } from "../i18n";
@@ -18,6 +21,14 @@ function el(tag: string, cls?: string, text?: string): HTMLElement {
   return e;
 }
 
+function nkoText(text: string, cls: string): HTMLElement {
+  const node = el("div", cls, text);
+  node.classList.add("ux2-text-nko");
+  node.setAttribute("lang", "nqo");
+  node.dir = "rtl";
+  return node;
+}
+
 /** Deterministic locale-aware date for last-reviewed (no relative timers). */
 export function formatReviewTimestamp(iso: string, locale: Locale = getCurrentLocale()): string | undefined {
   const ms = Date.parse(iso);
@@ -34,7 +45,8 @@ export function formatReviewTimestamp(iso: string, locale: Locale = getCurrentLo
 }
 
 export type SavedVocabularyCallbacks = {
-  onBack: () => void;
+  /** Empty-state contextual action → Search destination (not a Back control). */
+  onSearch: () => void;
   onOpen: (row: SavedVocabularyRowVm & { state: "resolved" }) => void;
   onRemove: (row: SavedVocabularyRowVm) => void;
   onStartReview: () => void;
@@ -49,23 +61,23 @@ export type SavedVocabularyView = {
   heading: HTMLElement | null;
 };
 
-function appendReviewStatus(main: HTMLElement, status: SavedVocabularyReviewStatus): void {
+function appendReviewStatus(host: HTMLElement, status: SavedVocabularyReviewStatus): void {
   if (status.state === "unknown") {
     return;
   }
 
-  const label = el("div", "saved-vocab-review-status", t(status.labelKey));
+  const label = el("div", "saved-vocab-review-status ux2-type-metadata", t(status.labelKey));
   label.setAttribute("data-review-status", status.state);
-  main.appendChild(label);
+  host.appendChild(label);
+}
 
-  if (status.state === "still_learning" || status.state === "remembered") {
-    const formatted = formatReviewTimestamp(status.last_reviewed);
-    if (formatted) {
-      main.appendChild(
-        el("div", "saved-vocab-last-reviewed", t("review.lastReviewed", { date: formatted })),
-      );
-    }
-  }
+function appendLastReviewed(host: HTMLElement, status: SavedVocabularyReviewStatus): void {
+  if (status.state !== "still_learning" && status.state !== "remembered") return;
+  const formatted = formatReviewTimestamp(status.last_reviewed);
+  if (!formatted) return;
+  host.appendChild(
+    el("div", "saved-vocab-last-reviewed ux2-type-helper", t("review.lastReviewed", { date: formatted })),
+  );
 }
 
 function appendMetric(dl: HTMLElement, labelKey: TranslationKey, value: number, testId: string): void {
@@ -83,10 +95,10 @@ function appendMetric(dl: HTMLElement, labelKey: TranslationKey, value: number, 
 }
 
 function renderProgressSummary(progress: SavedVocabularyProgressVm): HTMLElement {
-  const section = el("section", "saved-vocab-progress");
+  const section = el("section", "saved-vocab-progress ux2-saved-progress");
   section.setAttribute("aria-labelledby", "saved-vocab-progress-heading");
 
-  const heading = el("h3", "saved-vocab-progress-heading", t("progress.heading"));
+  const heading = el("h3", "saved-vocab-progress-heading ux2-type-section-heading", t("progress.heading"));
   heading.id = "saved-vocab-progress-heading";
   section.appendChild(heading);
 
@@ -121,23 +133,10 @@ function renderReturnCue(progress: SavedVocabularyProgressVm): HTMLElement | nul
 }
 
 function renderStartReviewRegion(
-  model:
-    | { surface: "loading" }
-    | Extract<SavedVocabularyModel, { surface: "populated" | "removing" }>,
+  model: Extract<SavedVocabularyModel, { surface: "populated" | "removing" }>,
   callbacks: SavedVocabularyCallbacks,
 ): { region: HTMLElement; button: HTMLButtonElement | null } {
-  const region = el("div", "saved-vocab-start-review-region");
-
-  if (model.surface === "loading") {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "btn saved-vocab-start-review";
-    button.id = "saved-vocab-start-review";
-    button.textContent = t("progress.startReview");
-    button.disabled = true;
-    region.appendChild(button);
-    return { region, button };
-  }
+  const region = el("div", "saved-vocab-start-review-region ux2-saved-review-region");
 
   const action = model.progress.reviewAction;
   if (action.state === "hidden") {
@@ -146,7 +145,7 @@ function renderStartReviewRegion(
 
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "btn saved-vocab-start-review";
+  button.className = "btn saved-vocab-start-review ux2-saved-review-cta";
   button.id = "saved-vocab-start-review";
   button.textContent =
     action.state === "enabled" && action.label === "continue"
@@ -173,59 +172,58 @@ function renderStartReviewRegion(
   return { region, button };
 }
 
-function renderRow(
-  row: SavedVocabularyRowVm,
+function renderResolvedRow(
+  row: SavedVocabularyRowVm & { state: "resolved" },
   callbacks: SavedVocabularyCallbacks,
-  removingKey: string | undefined,
+  busy: boolean,
   rowError: string | undefined,
 ): HTMLElement {
   const key = rowKey(row.bundle_id, row.ir_id);
-  const li = el("li", "saved-vocab-row");
+  const li = el("li", "saved-vocab-row ux2-saved-row ux2-saved-row-resolved");
   li.setAttribute("data-row-key", key);
 
-  const main = el("div", "saved-vocab-row-main");
-  const title = el("div", "saved-vocab-primary");
-  const primaryText =
-    row.primaryText.trim() !== "" ? row.primaryText : t("learning.unresolvedFallback");
-  title.textContent = primaryText;
-  main.appendChild(title);
+  const body = el("div", "ux2-saved-row-body");
 
+  const openBtn = document.createElement("button");
+  openBtn.type = "button";
+  openBtn.className = "saved-vocab-open ux2-saved-row-open";
+  openBtn.disabled = busy;
+  openBtn.setAttribute(
+    "aria-label",
+    t("learning.openEntry", { headword: row.primaryText.trim() || t("learning.unresolvedFallback") }),
+  );
+
+  const lexical = el("div", "ux2-saved-row-lexical");
+  const title = el(
+    "div",
+    "saved-vocab-primary ux2-type-headword-medium",
+    row.primaryText.trim() !== "" ? row.primaryText : t("learning.unresolvedFallback"),
+  );
+  lexical.appendChild(title);
   if (row.nkoText) {
-    main.appendChild(el("div", "saved-vocab-nko", row.nkoText));
+    lexical.appendChild(nkoText(row.nkoText, "saved-vocab-nko ux2-saved-row-nko"));
   }
   if (row.secondaryText) {
-    main.appendChild(el("div", "saved-vocab-secondary", row.secondaryText));
+    lexical.appendChild(el("div", "saved-vocab-secondary", row.secondaryText));
   }
+  openBtn.appendChild(lexical);
 
-  appendReviewStatus(main, row.reviewStatus);
+  const meta = el("div", "ux2-saved-row-meta");
+  appendReviewStatus(meta, row.reviewStatus);
+  openBtn.appendChild(meta);
 
-  if (row.state === "unresolved") {
-    const badge = el("div", "saved-vocab-unresolved", t("learning.unresolved"));
-    badge.setAttribute("data-reason", row.reason);
-    main.appendChild(badge);
-  }
+  openBtn.addEventListener("click", () => {
+    if (busy) return;
+    callbacks.onOpen(row);
+  });
+  body.appendChild(openBtn);
 
-  li.appendChild(main);
-
-  const actions = el("div", "saved-vocab-actions");
-  const busy = removingKey === key;
-
-  if (row.state === "resolved") {
-    const openBtn = document.createElement("button");
-    openBtn.type = "button";
-    openBtn.className = "btn saved-vocab-open";
-    openBtn.textContent = t("learning.open");
-    openBtn.disabled = busy;
-    openBtn.addEventListener("click", () => {
-      if (busy) return;
-      callbacks.onOpen(row);
-    });
-    actions.appendChild(openBtn);
-  }
+  const footer = el("div", "ux2-saved-row-footer");
+  appendLastReviewed(footer, row.reviewStatus);
 
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
-  removeBtn.className = "btn saved-vocab-remove";
+  removeBtn.className = "saved-vocab-remove ux2-saved-remove";
   removeBtn.textContent = t("learning.remove");
   removeBtn.disabled = busy;
   removeBtn.setAttribute("aria-busy", busy ? "true" : "false");
@@ -233,22 +231,109 @@ function renderRow(
     if (busy) return;
     callbacks.onRemove(row);
   });
-  actions.appendChild(removeBtn);
-  li.appendChild(actions);
+  footer.appendChild(removeBtn);
+  body.appendChild(footer);
 
   if (rowError) {
     const err = el("div", "saved-vocab-row-error", t("learning.removeError"));
     err.id = `saved-vocab-error-${key.replace(/\0/g, "-")}`;
     err.setAttribute("role", "status");
     removeBtn.setAttribute("aria-describedby", err.id);
-    li.appendChild(err);
+    body.appendChild(err);
   }
 
-  if (busy) {
-    li.setAttribute("aria-busy", "true");
-  }
-
+  li.appendChild(body);
+  if (busy) li.setAttribute("aria-busy", "true");
   return li;
+}
+
+function renderUnresolvedRow(
+  row: SavedVocabularyRowVm & { state: "unresolved" },
+  callbacks: SavedVocabularyCallbacks,
+  busy: boolean,
+  rowError: string | undefined,
+): HTMLElement {
+  const key = rowKey(row.bundle_id, row.ir_id);
+  const li = el("li", "saved-vocab-row ux2-saved-row ux2-saved-row-unresolved");
+  li.setAttribute("data-row-key", key);
+
+  const body = el("div", "ux2-saved-row-body");
+  const lexical = el("div", "ux2-saved-row-lexical");
+  const primaryText =
+    row.primaryText.trim() !== "" ? row.primaryText : t("learning.unresolvedFallback");
+  lexical.appendChild(el("div", "saved-vocab-primary ux2-type-headword-medium", primaryText));
+  if (row.nkoText) {
+    lexical.appendChild(nkoText(row.nkoText, "saved-vocab-nko ux2-saved-row-nko"));
+  }
+  if (row.secondaryText) {
+    lexical.appendChild(el("div", "saved-vocab-secondary", row.secondaryText));
+  }
+  body.appendChild(lexical);
+
+  const badge = el("div", "saved-vocab-unresolved", t("learning.unresolved"));
+  badge.setAttribute("data-reason", row.reason);
+  body.appendChild(badge);
+
+  const meta = el("div", "ux2-saved-row-meta");
+  appendReviewStatus(meta, row.reviewStatus);
+  body.appendChild(meta);
+
+  const footer = el("div", "ux2-saved-row-footer");
+  appendLastReviewed(footer, row.reviewStatus);
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "saved-vocab-remove ux2-saved-remove";
+  removeBtn.textContent = t("learning.remove");
+  removeBtn.disabled = busy;
+  removeBtn.setAttribute("aria-busy", busy ? "true" : "false");
+  removeBtn.addEventListener("click", () => {
+    if (busy) return;
+    callbacks.onRemove(row);
+  });
+  footer.appendChild(removeBtn);
+  body.appendChild(footer);
+
+  if (rowError) {
+    const err = el("div", "saved-vocab-row-error", t("learning.removeError"));
+    err.id = `saved-vocab-error-${key.replace(/\0/g, "-")}`;
+    err.setAttribute("role", "status");
+    removeBtn.setAttribute("aria-describedby", err.id);
+    body.appendChild(err);
+  }
+
+  li.appendChild(body);
+  if (busy) li.setAttribute("aria-busy", "true");
+  return li;
+}
+
+function renderRow(
+  row: SavedVocabularyRowVm,
+  callbacks: SavedVocabularyCallbacks,
+  removingKey: string | undefined,
+  rowError: string | undefined,
+): HTMLElement {
+  const key = rowKey(row.bundle_id, row.ir_id);
+  const busy = removingKey === key;
+  if (row.state === "resolved") {
+    return renderResolvedRow(row, callbacks, busy, rowError);
+  }
+  return renderUnresolvedRow(row, callbacks, busy, rowError);
+}
+
+function renderEmptyState(callbacks: SavedVocabularyCallbacks): {
+  root: HTMLElement;
+  searchBtn: HTMLButtonElement;
+} {
+  const wrap = el("div", "ux2-saved-empty");
+  wrap.appendChild(el("p", "saved-vocab-status ux2-saved-empty-lead", t("learning.emptyLead")));
+  wrap.appendChild(el("p", "saved-vocab-status ux2-saved-empty-hint", t("learning.emptyHint")));
+  const searchBtn = document.createElement("button");
+  searchBtn.type = "button";
+  searchBtn.className = "ux2-saved-search-cta";
+  searchBtn.textContent = t("learning.searchForWord");
+  searchBtn.addEventListener("click", () => callbacks.onSearch());
+  wrap.appendChild(searchBtn);
+  return { root: wrap, searchBtn };
 }
 
 /**
@@ -258,56 +343,63 @@ export function renderSavedVocabulary(
   model: SavedVocabularyModel,
   callbacks: SavedVocabularyCallbacks,
 ): SavedVocabularyView {
-  const root = el("div", "saved-vocab-surface");
+  const root = el("div", "saved-vocab-surface ux2-saved-surface");
 
-  const backBtn = document.createElement("button");
-  backBtn.type = "button";
-  backBtn.className = "btn entry-back saved-vocab-back";
-  backBtn.textContent = t("learning.backToSearch");
-  backBtn.addEventListener("click", () => callbacks.onBack());
-  root.appendChild(backBtn);
+  const layout = el("div", "ux2-saved-layout");
+  const context = el("div", "ux2-saved-context");
+  const collection = el("div", "ux2-saved-collection");
 
-  const heading = el("h2", "saved-vocab-title", t("learning.savedVocabulary"));
+  const heading = el("h2", "saved-vocab-title ux2-type-page-title", t("learning.savedVocabulary"));
   heading.id = "saved-vocab-heading";
   heading.tabIndex = -1;
-  root.appendChild(heading);
+  context.appendChild(heading);
 
   let focusAfterRemove: HTMLElement | null = null;
   let startReviewButton: HTMLButtonElement | null = null;
 
   if (model.surface === "loading") {
-    const { region, button } = renderStartReviewRegion(model, callbacks);
-    root.appendChild(region);
-    startReviewButton = button;
     const status = el("p", "saved-vocab-status", t("learning.loading"));
     status.setAttribute("role", "status");
     status.setAttribute("aria-busy", "true");
-    root.appendChild(status);
-    return { root, focusAfterRemove: null, startReviewButton, heading };
+    context.appendChild(status);
+    layout.appendChild(context);
+    layout.appendChild(collection);
+    root.appendChild(layout);
+    return { root, focusAfterRemove: null, startReviewButton: null, heading };
   }
 
   if (model.surface === "unavailable") {
-    root.appendChild(el("p", "saved-vocab-status", t("learning.noActiveBundle")));
-    focusAfterRemove = backBtn;
+    context.appendChild(el("p", "saved-vocab-status", t("learning.noActiveBundle")));
+    layout.appendChild(context);
+    layout.appendChild(collection);
+    root.appendChild(layout);
+    focusAfterRemove = heading;
     return { root, focusAfterRemove, startReviewButton: null, heading };
   }
 
   if (model.surface === "error") {
     const err = el("p", "saved-vocab-status saved-vocab-page-error", t("learning.listError"));
     err.setAttribute("role", "alert");
-    root.appendChild(err);
-    focusAfterRemove = backBtn;
+    context.appendChild(err);
+    layout.appendChild(context);
+    layout.appendChild(collection);
+    root.appendChild(layout);
+    focusAfterRemove = heading;
     return { root, focusAfterRemove, startReviewButton: null, heading };
   }
 
   if (model.surface === "empty") {
-    root.appendChild(el("p", "saved-vocab-status", t("learning.empty")));
-    focusAfterRemove = backBtn;
+    const empty = renderEmptyState(callbacks);
+    collection.appendChild(empty.root);
+    layout.appendChild(context);
+    layout.appendChild(collection);
+    root.appendChild(layout);
+    focusAfterRemove = empty.searchBtn;
     return { root, focusAfterRemove, startReviewButton: null, heading };
   }
 
   // populated | removing
-  root.appendChild(renderProgressSummary(model.progress));
+  context.appendChild(renderProgressSummary(model.progress));
 
   if (model.progress.showUnavailable) {
     const explanation = el(
@@ -316,18 +408,18 @@ export function renderSavedVocabulary(
       t("progress.unavailableExplanation"),
     );
     explanation.id = "saved-vocab-unavailable-explanation";
-    root.appendChild(explanation);
+    context.appendChild(explanation);
   }
 
   const cue = renderReturnCue(model.progress);
-  if (cue) root.appendChild(cue);
+  if (cue) context.appendChild(cue);
 
   const { region, button } = renderStartReviewRegion(model, callbacks);
-  root.appendChild(region);
+  context.appendChild(region);
   startReviewButton = button;
 
   const list = document.createElement("ul");
-  list.className = "saved-vocab-list";
+  list.className = "saved-vocab-list ux2-saved-list";
   list.setAttribute("aria-labelledby", heading.id);
 
   for (const row of model.rows) {
@@ -335,10 +427,14 @@ export function renderSavedVocabulary(
     const rowError = model.rowErrors[key];
     list.appendChild(renderRow(row, callbacks, model.removingKey, rowError));
   }
-  root.appendChild(list);
+  collection.appendChild(list);
+
+  layout.appendChild(context);
+  layout.appendChild(collection);
+  root.appendChild(layout);
 
   const firstAction =
-    list.querySelector<HTMLButtonElement>(".saved-vocab-open, .saved-vocab-remove") ?? backBtn;
+    list.querySelector<HTMLButtonElement>(".saved-vocab-open, .saved-vocab-remove") ?? heading;
   focusAfterRemove = firstAction;
 
   return { root, focusAfterRemove, startReviewButton, heading };

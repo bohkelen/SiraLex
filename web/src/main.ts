@@ -3207,7 +3207,7 @@ function showSavedVocabulary() {
       return;
     }
     const view = renderSavedVocabulary(model, {
-      onBack: () => {
+      onSearch: () => {
         savedVocabularyGeneration += 1;
         navigatePrimary("search");
       },

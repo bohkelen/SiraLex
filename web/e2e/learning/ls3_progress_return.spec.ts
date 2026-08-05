@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { navigateUx2Primary, openMoreAnd } from "../helpers/ux2_nav";
+import { ensureTargetToSource, navigateUx2Primary, openMoreAnd } from "../helpers/ux2_nav";
 
 /**
  * LS3I4 — offline Progress & Return browser verification.
@@ -262,7 +262,7 @@ test.describe("LS3 Progress & Return offline lifecycle", () => {
     await page.locator(".saved-vocab-remove").click();
     await expect(page.locator(".saved-vocab-progress")).toHaveCount(0, { timeout: 15_000 });
     await expect(page.locator("#saved-vocab-start-review")).toHaveCount(0);
-    await expect(page.locator(".saved-vocab-status")).toContainText(/No saved words|Aucun mot/);
+    await expect(page.locator(".ux2-saved-empty-lead")).toContainText(/No saved words|Aucun mot/);
   });
 
   test("French Progress smoke Start → Continue", async ({ page }) => {
@@ -325,8 +325,8 @@ test.describe("LS3 Progress & Return offline lifecycle", () => {
     await expect(page.locator("#saved-vocab-start-review")).toHaveText("Continue review");
     await expect(page.locator("#saved-vocab-start-review")).toBeFocused();
 
-    await page.locator(".saved-vocab-back").click();
-    await page.locator("#openSavedVocabulary").click();
+    await navigateUx2Primary(page, "search");
+    await navigateUx2Primary(page, "saved");
     await expect(page.locator("#saved-vocab-start-review")).toBeEnabled({ timeout: 15_000 });
     await expect(page.locator("#saved-vocab-start-review")).not.toBeFocused();
   });
@@ -377,11 +377,7 @@ async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
 }
 
 async function saveLexiconByQuery(page: Page, query: string): Promise<void> {
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  if (!/Maninka|Target|Cible/.test(label.split("→")[0] ?? "")) {
-    await toggle.click();
-  }
+  await ensureTargetToSource(page);
   await page.locator("#searchInput").fill(query);
   await expect(page.locator("#searchResults .result-open").first()).toContainText(query, {
     timeout: 15_000,
@@ -416,7 +412,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await openManageDictionaries(page);
+  await openMoreAnd(page, "dictionaries");
 
   const quickImportInput = page.locator("#quickImportFiles");
   await expect(quickImportInput).toBeAttached();

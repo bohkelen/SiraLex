@@ -30,7 +30,7 @@ test.describe("LS1 offline Saved Vocabulary", () => {
 
     await installDebugBundle(page);
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
-    await expect(page.locator("#openSavedVocabulary")).toBeVisible();
+    await expect(page.locator('[data-testid="ux2-nav-saved"]')).toBeVisible();
 
     // Target → source so we open a lexicon_entry directly.
     await ensureTargetToSource(page);
@@ -49,7 +49,7 @@ test.describe("LS1 offline Saved Vocabulary", () => {
       timeout: 15_000,
     });
 
-    await page.locator("#openSavedVocabulary").click();
+    await navigateUx2Primary(page, "saved");
     await expect(page.locator("#saved-vocab-heading")).toBeVisible();
     await expect(page.locator(".saved-vocab-list .saved-vocab-row")).toHaveCount(1, {
       timeout: 15_000,
@@ -61,7 +61,7 @@ test.describe("LS1 offline Saved Vocabulary", () => {
     await page.reload({ waitUntil: "domcontentloaded", timeout: offlineTimeoutMs });
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: offlineTimeoutMs });
 
-    await page.locator("#openSavedVocabulary").click();
+    await navigateUx2Primary(page, "saved");
     await expect(page.locator(".saved-vocab-list .saved-vocab-row")).toHaveCount(1, {
       timeout: 15_000,
     });
@@ -79,17 +79,17 @@ test.describe("LS1 offline Saved Vocabulary", () => {
     await expect(page.locator(".saved-vocab-list .saved-vocab-row")).toHaveCount(0, {
       timeout: 15_000,
     });
-    await expect(page.locator(".saved-vocab-status")).toContainText(/No saved words|Aucun mot/, {
+    await expect(page.locator(".ux2-saved-empty-lead")).toContainText(/No saved words|Aucun mot/, {
       timeout: 15_000,
     });
 
     await page.reload({ waitUntil: "domcontentloaded", timeout: offlineTimeoutMs });
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: offlineTimeoutMs });
-    await page.locator("#openSavedVocabulary").click();
+    await navigateUx2Primary(page, "saved");
     await expect(page.locator(".saved-vocab-list .saved-vocab-row")).toHaveCount(0, {
       timeout: 15_000,
     });
-    await expect(page.locator(".saved-vocab-status")).toContainText(/No saved words|Aucun mot/);
+    await expect(page.locator(".ux2-saved-empty-lead")).toContainText(/No saved words|Aucun mot/);
   });
 });
 

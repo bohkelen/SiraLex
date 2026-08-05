@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { navigateUx2Primary, openMoreAnd } from "../helpers/ux2_nav";
+import { ensureTargetToSource, navigateUx2Primary, openMoreAnd } from "../helpers/ux2_nav";
 
 /**
  * LS2I5 — offline Review and Reflect browser verification.
@@ -281,11 +281,7 @@ async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
 
 async function saveLexiconByQuery(page: Page, query: string): Promise<void> {
   // Target → Source opens lexicon_entry rows for this fixture.
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  if (!/Maninka|Target|Cible/.test(label.split("→")[0] ?? "")) {
-    await toggle.click();
-  }
+  await ensureTargetToSource(page);
   await page.locator("#searchInput").fill(query);
   // Wait for the *new* result — stale prior results remain until debounce/search completes.
   await expect(page.locator("#searchResults .result-open").first()).toContainText(query, {
@@ -354,7 +350,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await openManageDictionaries(page);
+  await openMoreAnd(page, "dictionaries");
 
   const quickImportInput = page.locator("#quickImportFiles");
   await expect(quickImportInput).toBeAttached();

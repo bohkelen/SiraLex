@@ -612,7 +612,7 @@ describe("LS2I5 review lifecycle verification", () => {
       progress: deriveSavedVocabularyProgress(rows).progress,
     };
     const { root } = renderSavedVocabulary(model, {
-      onBack: () => undefined,
+      onSearch: () => undefined,
       onOpen: () => undefined,
       onRemove: () => undefined,
       onStartReview: () => undefined,

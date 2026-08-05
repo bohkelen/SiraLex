@@ -21,6 +21,7 @@
     "test:e2e:ux2-shell": "npm run build && playwright test -c playwright.config.ts e2e/ux2_shell_navigation.spec.ts",
     "test:e2e:ux2-search": "npm run build && playwright test -c playwright.config.ts e2e/ux2_search_results.spec.ts",
     "test:e2e:ux2-entry": "npm run build && playwright test -c playwright.config.ts e2e/ux2_entry_detail.spec.ts",
+    "test:e2e:ux2-saved": "npm run build && playwright test -c playwright.config.ts e2e/ux2_saved_vocabulary.spec.ts",
     "test:e2e:handoff": "playwright test -c playwright.handoff.config.ts",
     "test:e2e:pv1a": "playwright test -c playwright.pv1a.config.ts",
     "test:e2e:pvr1": "playwright test -c playwright.pvr1.config.ts",

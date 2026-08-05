@@ -119,7 +119,7 @@ function createHarness(db: IDBDatabase, activeMeta: () => ActiveBundleMeta): Har
       if (generation !== savedGen || hostContext !== "saved_vocabulary") return;
       lastModel = model;
       const view = renderSavedVocabulary(model, {
-        onBack: () => undefined,
+        onSearch: () => undefined,
         onOpen: () => undefined,
         onRemove: (row) => {
           void session.remove(row.bundle_id, row.ir_id);
