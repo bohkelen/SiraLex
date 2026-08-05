@@ -237,7 +237,7 @@ export function renderCorrectionForm(
   initialVm: CorrectionFormViewModel,
   callbacks: CorrectionFormRendererCallbacks,
 ): CorrectionFormView {
-  const root = el("div", "correction-form");
+  const root = el("div", "correction-form ux2-correction-form");
   root.setAttribute("data-testid", "correction-form");
 
   let layout: "none" | "editing" | "saved" = "none";
@@ -249,15 +249,15 @@ export function renderCorrectionForm(
     root.replaceChildren();
     root.setAttribute("aria-busy", "false");
 
-    const heading = el("h2", "correction-form-heading", t("correctionFeedback.form.success.heading"));
+    const heading = el("h2", "correction-form-heading ux2-type-page-title", t("correctionFeedback.form.success.heading"));
     heading.id = "correction-form-success-heading";
     heading.tabIndex = -1;
     root.appendChild(heading);
-    root.appendChild(el("p", undefined, t("correctionFeedback.form.success.body1")));
-    root.appendChild(el("p", undefined, t("correctionFeedback.form.success.body2")));
+    root.appendChild(el("p", "ux2-correction-success-body", t("correctionFeedback.form.success.body1")));
+    root.appendChild(el("p", "ux2-correction-success-body", t("correctionFeedback.form.success.body2")));
     const back = document.createElement("button");
     back.type = "button";
-    back.className = "btn correction-form-back";
+    back.className = "btn correction-form-back ux2-correction-primary-btn";
     back.id = "correction-form-back";
     back.textContent = t("correctionFeedback.form.backToEntry");
     back.addEventListener("click", () => {
@@ -341,7 +341,7 @@ export function renderCorrectionForm(
     root.replaceChildren();
     layout = "editing";
 
-    const heading = el("h2", "correction-form-heading", t("correctionFeedback.form.heading"));
+    const heading = el("h2", "correction-form-heading ux2-type-page-title", t("correctionFeedback.form.heading"));
     heading.id = "correction-form-heading";
     root.appendChild(heading);
 
@@ -367,7 +367,8 @@ export function renderCorrectionForm(
       root.appendChild(nkoEl);
     }
 
-    const privacy = el("div", "correction-form-privacy");
+    const privacy = el("div", "correction-form-privacy ux2-correction-privacy");
+    privacy.setAttribute("role", "note");
     privacy.appendChild(el("p", undefined, t("correctionFeedback.form.privacy.localOnly")));
     privacy.appendChild(el("p", undefined, t("correctionFeedback.form.privacy.exportLater")));
     privacy.appendChild(el("p", undefined, t("correctionFeedback.form.privacy.unreviewed")));
@@ -450,7 +451,7 @@ export function renderCorrectionForm(
     root.appendChild(otherField);
 
     // Mode
-    const modeFieldset = el("fieldset", "correction-form-mode");
+    const modeFieldset = el("fieldset", "correction-form-mode ux2-correction-mode");
     modeFieldset.appendChild(el("legend", undefined, t("correctionFeedback.form.modeLabel")));
     const modeProblemWrap = radioOption(
       "problem_report",
@@ -515,17 +516,17 @@ export function renderCorrectionForm(
     propField.append(propLabel, propInput, propHelp, propCounter, propError);
     root.appendChild(propField);
 
-    const actions = el("div", "correction-form-actions");
+    const actions = el("div", "correction-form-actions ux2-correction-actions");
     const saveBtn = document.createElement("button");
     saveBtn.type = "button";
-    saveBtn.className = "btn correction-form-save";
+    saveBtn.className = "btn correction-form-save ux2-correction-primary-btn";
     saveBtn.id = "correction-form-save";
     saveBtn.addEventListener("click", () => {
       callbacks.onSave();
     });
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
-    cancelBtn.className = "btn correction-form-cancel";
+    cancelBtn.className = "btn correction-form-cancel ux2-correction-secondary-btn";
     cancelBtn.id = "correction-form-cancel";
     cancelBtn.textContent = t("correctionFeedback.form.cancel");
     cancelBtn.addEventListener("click", () => {

@@ -59,25 +59,25 @@ describe("render search feedback capture", () => {
   it("renders EN/FR zero-result and results-not-useful entry copy", () => {
     setCurrentLocale("en");
     const enZero = renderNoResultSearchFeedbackEntry("xyzzy", () => undefined);
-    expect(enZero.textContent).toContain('No results for “xyzzy”');
-    expect(enZero.textContent).toContain("Report this search");
+    expect(enZero.textContent).toContain("Looking for something else?");
+    expect(enZero.textContent).toContain("Report this search →");
     expect(enZero.textContent).not.toMatch(/missing word/i);
 
     const enUseful = renderResultsNotUsefulSearchFeedbackEntry(() => undefined);
     expect(enUseful.textContent).toContain("Didn't find what you needed?");
-    expect(enUseful.textContent).toContain("Report this search");
+    expect(enUseful.textContent).toContain("Tell us what you were looking for →");
 
     setCurrentLocale("fr");
     const frZero = renderNoResultSearchFeedbackEntry("xyzzy", () => undefined);
-    expect(frZero.textContent).toContain("Aucun résultat pour « xyzzy »");
-    expect(frZero.textContent).toContain("Signaler cette recherche");
+    expect(frZero.textContent).toContain("Vous cherchiez autre chose ?");
+    expect(frZero.textContent).toContain("Signaler cette recherche →");
     expect(frZero.textContent).not.toMatch(/Report this search/);
 
     const frUseful = renderResultsNotUsefulSearchFeedbackEntry(() => undefined);
     expect(frUseful.textContent).toContain(
       "Vous n’avez pas trouvé ce que vous cherchiez ?",
     );
-    expect(frUseful.textContent).toContain("Signaler cette recherche");
+    expect(frUseful.textContent).toContain("Dites-nous ce que vous cherchiez →");
   });
 
   it("renders form heading, exact query, optional fields, counters, privacy; no Submit/Send/diagnosis/internal IDs", () => {
@@ -85,6 +85,7 @@ describe("render search feedback capture", () => {
     const { root } = renderSearchFeedbackCapture(baseVm(), cb);
     document.body.appendChild(root);
 
+    expect(root.classList.contains("ux2-search-feedback-capture")).toBe(true);
     expect(root.querySelector("#search-feedback-capture-heading")?.textContent).toBe(
       t("searchFeedback.capture.heading"),
     );

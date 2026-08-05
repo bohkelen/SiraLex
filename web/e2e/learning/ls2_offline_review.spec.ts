@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { ensureTargetToSource, navigateUx2Primary, openMoreAnd } from "../helpers/ux2_nav";
+
 /**
  * LS2I5 — offline Review and Reflect browser verification.
  * Uses the local debug directional bundle (same fixture as LS1 offline Saved Vocabulary).
@@ -237,8 +239,8 @@ test.describe("LS2 offline Review lifecycle", () => {
       timeout: 15_000,
     });
     await page.locator(".review-reveal").click();
-    await expect(page.locator(".review-still-learning")).toContainText("Encore en apprentissage");
-    await expect(page.locator(".review-remembered")).toContainText("Mémorisé");
+    await expect(page.locator(".review-still-learning")).toContainText("Pas encore");
+    await expect(page.locator(".review-remembered")).toContainText("Je l’ai");
   });
 
   test("double Start Review keeps a single Review surface", async ({ page }) => {
@@ -265,19 +267,21 @@ async function expectHiddenMeaning(page: Page, gloss: string): Promise<void> {
 }
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
+  await navigateUx2Primary(page, "more");
   const select = page.locator("#localeSelect");
   if ((await select.inputValue()) !== locale) {
     await select.selectOption(locale);
+    await page.waitForLoadState("domcontentloaded");
+    await navigateUx2Primary(page, "search");
+    await expect(page.locator("#searchInput")).toBeVisible({ timeout: 30_000 });
+  } else {
+    await navigateUx2Primary(page, "search");
   }
 }
 
 async function saveLexiconByQuery(page: Page, query: string): Promise<void> {
   // Target → Source opens lexicon_entry rows for this fixture.
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  if (!/Maninka|Target|Cible/.test(label.split("→")[0] ?? "")) {
-    await toggle.click();
-  }
+  await ensureTargetToSource(page);
   await page.locator("#searchInput").fill(query);
   // Wait for the *new* result — stale prior results remain until debounce/search completes.
   await expect(page.locator("#searchResults .result-open").first()).toContainText(query, {
@@ -346,9 +350,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "dictionaries");
 
   const quickImportInput = page.locator("#quickImportFiles");
   await expect(quickImportInput).toBeAttached();
@@ -359,6 +361,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   await expect(page.locator("#importProgress")).toContainText(/Installing|Complete|already installed/i, {
     timeout: 30_000,
   });
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
   await expect(page.locator("#activeDictionarySummary")).not.toContainText(
     /No dictionary added|Aucun dictionnaire ajouté/,

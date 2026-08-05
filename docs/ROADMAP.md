@@ -142,6 +142,18 @@ CF2I5 — Offline Search Feedback Lifecycle Verification — Implemented
 CF2I6 — Closure — Complete
 CF2I6A — Feedback Renderer Input Stability Amendment — Complete
 UXT1 — Appearance / Theme Preference — Complete
+UX2I1 — Design Tokens and Visual Foundation — Complete
+UX2I1A — Accessible Action Text Token Amendment — Complete
+UX2I2 — Responsive Application Shell and Primary Navigation — Complete
+UX2I3 — Search Home and Search Results — Complete
+UX2I4 — Lexical Entry Detail — Complete
+UX2I5A — Saved Vocabulary and Progress — Complete
+UX2I5B — Review and Reflect Experience — Complete
+UX2I6A — More Landing, Preferences, and Management Routing — Complete
+UX2I6B1 — Dictionary Management Consumer Surface — Complete
+UX2I6B2 — Learning Data / Backup & Restore Surface — Complete
+UX2I7A — CF1 Consumer Visual Migration — Complete
+UX2I7B — CF2 Search Feedback Consumer Visual Migration — Complete
 FH1 — Feedback Review Handoff — Complete (Accepted)
 FH1A — Explicit Review Destination Amendment — Complete
 PV1A — Production Identity and Desktop Smoke — VERIFIED
@@ -159,6 +171,20 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **CF2 delivered:** `search_failure_feedback_draft_v1` + `siralex_search_feedback_v1`; IndexedDB `search_failure_feedback` (v6); Report this search capture; Manage Search Feedback; deterministic export-all; bundle retention; EN/FR; Chromium offline lifecycle evidence.
 - **CF2I6A** post-closure amendment (`docs/reports/cf2i6a_feedback_input_stability_amendment_report.md`): renderer input lifecycle fix so ordinary CF1/CF2 typing preserves textarea DOM nodes/focus; product contracts unchanged; CF1/CF2 remain CLOSED.
 - **UXT1** complete (`docs/reports/uxt1_appearance_preference_report.md`, `UXT1_APPEARANCE_PREFERENCE_IMPLEMENTED`): System / Light / Dark theme preference via `siralex.ui_theme`, CSS variables, offline local persistence, no-reload apply; System follows OS `prefers-color-scheme`. UI label Theme/Thème (dropdown).
+- **UX2I1** complete (`docs/reports/ux2i1_design_tokens_visual_foundation_report.md`, `UX2I1_DESIGN_FOUNDATION_IMPLEMENTED`): Contemporary West African Modernism semantic design tokens (color, type, spacing, focus, responsive, N’Ko primitive) extracted from Figma handoff; UXT1 theme contract preserved; screens not redesigned.
+- **UX2I1A** complete (`docs/reports/ux2i1_design_tokens_visual_foundation_report.md`, `UX2I1A_ACCESSIBLE_ACTION_TEXT_IMPLEMENTED`): adds `--color-action-text` for normal-text terracotta actions/links/nav labels; brand `--color-accent` / `--color-focus` unchanged; legacy `--accent` not remapped.
+- **UX2I2** complete (`docs/reports/ux2i2_responsive_shell_navigation_report.md`, `UX2I2_RESPONSIVE_SHELL_NAVIGATION_IMPLEMENTED`): Search/Saved/Review/More primary destinations; mobile bottom + desktop top nav; More transitional bridge (Theme/Locale/management); Review is a stable top-level destination (`UX2_NAVIGATION_AMENDMENT`); domain contracts unchanged.
+- **UX2I3** complete (`docs/reports/ux2i3_search_results_report.md`, `UX2I3_SEARCH_RESULTS_IMPLEMENTED`): ordinary Search Home + Results migrated to Contemporary West African Modernism; bundle-derived direction swap; desktop Search rail; CF2 Search-surface CTA restyle only; search algorithms/ordering/CF2 lifecycle unchanged.
+- **UX2I4** complete (`docs/reports/ux2i4_lexical_entry_detail_report.md`, `UX2I4_LEXICAL_ENTRY_DETAIL_IMPLEMENTED`): Entry Detail as a dictionary reading surface; Latin/N’Ko orthography; senses/examples/secondary fields; Learning Save + CF1 entry affordances restyled; mobile dedicated-entry (`data-search-view`); domain contracts unchanged.
+- **UX2I5A** complete (`docs/reports/ux2i5a_saved_vocabulary_progress_report.md`, `UX2I5A_SAVED_VOCABULARY_PROGRESS_IMPLEMENTED`): Saved Vocabulary + Progress migrated to Contemporary West African Modernism; top-level Saved nav (`UX2_SAVED_TOP_LEVEL_NAVIGATION_AMENDMENT`); Progress truthfulness preserved; Review visual migration deferred to UX2I5B.
+- **UX2I5B** complete (`docs/reports/ux2i5b_review_reflect_report.md`, `UX2I5B_REVIEW_REFLECT_IMPLEMENTED`): Review/Reflect presentation migrated; live lexical authority and LS2 session architecture preserved; conversational reflection labels (`UX2_REVIEW_ACTION_LABEL_AMENDMENT`) map to still_learning / remembered.
+- **UX2I6A** complete (`docs/reports/ux2i6a_more_preferences_routing_report.md`, `UX2I6A_MORE_PREFERENCES_ROUTING_IMPLEMENTED`): consumer More landing (Contribute / Dictionary & data / Preferences / About); Learning Data first-class entry; Back → More management bridge; Theme/Locale/APP_VERSION preserved; Dictionaries/LP1/CF1/CF2 internals deferred.
+- **UX2I6B1** complete (`docs/reports/ux2i6b1_dictionary_management_report.md`, `UX2I6B1_DICTIONARY_MANAGEMENT_IMPLEMENTED`): Dictionaries consumer surface above unchanged bundle lifecycle; Dictionaries/Learning Data mode separation; Advanced collapsed; Delete DB out of ordinary Dictionaries; LP1 visual migration deferred to **UX2I6B2**; CF1/CF2 visuals deferred to UX2I7.
+- **UX2I6B2** complete (`docs/reports/ux2i6b2_learning_data_report.md`, `UX2I6B2_LEARNING_DATA_IMPLEMENTED`): Learning Data / LP1 Backup & Restore presentation migrated; package/restore state machine unchanged; Dictionaries separation retained; CF1/CF2 visuals deferred to UX2I7.
+- **UX2I7A** complete (`docs/reports/ux2i7a_cf1_consumer_experience_report.md`, `UX2I7A_CF1_CONSUMER_EXPERIENCE_IMPLEMENTED`): CF1 capture/management/export/FH1 presentation migrated; schema/store/export/handoff semantics unchanged; CF2 visual migration deferred to **UX2I7B**.
+- **UX2I7B** complete (`docs/reports/ux2i7b_cf2_consumer_experience_report.md`, `UX2I7B_CF2_CONSUMER_EXPERIENCE_IMPLEMENTED`): CF2 capture/management/export/FH1 presentation migrated; schema/store/export/handoff semantics unchanged; Search algorithms unchanged.
+- **Next UX2 slice:** UX2I8 — ready-state accessibility cleanup / advanced internal separation (tracked).
+- **UX2I8 follow-up (tracked, non-blocking from UX2I3):** ready-state diagnostic text is still visually clipped rather than removed from the accessibility tree; ordinary assistive-technology users should ultimately not receive hidden technical status noise.
 - **FH1** accepted (`docs/reports/fh1_feedback_review_handoff_report.md`, `FH1_FEEDBACK_REVIEW_HANDOFF_IMPLEMENTED`): transport-only “Send for review”; reuses CF1/CF2 governed packages; Web Share or download+mailto; drafts stay `draft`.
 - **FH1A** complete (`docs/reports/fh1a_review_destination_amendment_report.md`, `FH1_REVIEW_DESTINATION_AMENDMENT_IMPLEMENTED`): configured `VITE_FEEDBACK_EMAIL` shown in confirm UI and Web Share text; mailto remains pre-addressed.
 - **PVR1** verified (`docs/reports/pvr1_theme_feedback_production_resmoke_report.md`, `PVR1_THEME_AND_FEEDBACK_PRODUCTION_VERIFIED`): Theme + FH1/FH1A + CF1/CF2 handoff preparation PASS on production; operator-confirmed real inbox receipt (Linux Thunderbird + iPhone Gmail/Proton). FH1 production handoff is **OPERATIONAL**. Next: PV1B.

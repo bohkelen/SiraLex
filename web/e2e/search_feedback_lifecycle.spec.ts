@@ -12,6 +12,12 @@ import { fileURLToPath } from "node:url";
 import { expect, test, type Download, type Page, type Request } from "@playwright/test";
 
 import {
+  ensureSourceToTarget,
+  navigateUx2Primary,
+  openMoreAnd,
+} from "./helpers/ux2_nav";
+
+import {
   SEARCH_FEEDBACK_AUTHORITY_LABEL,
   SEARCH_FEEDBACK_PACKAGE_SCHEMA,
   parseSearchFeedbackJson,
@@ -63,7 +69,9 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     await installDebugBundle(page);
     await setUiLocale(page, "en");
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
+    await navigateUx2Primary(page, "more");
     await expect(page.locator("#openManageSearchFeedback")).toBeVisible();
+    await navigateUx2Primary(page, "search");
     storageScopeId = (await getActiveStorageScopeId(page)) ?? "";
 
     await openManageDictionaries(page);
@@ -77,7 +85,10 @@ test.describe("CF2I5 search feedback lifecycle", () => {
       timeout: 15_000,
     });
     await expect(page.locator("[data-testid='search-feedback-report']")).toBeVisible();
-    await expect(page.locator("[data-testid='search-feedback-entry-no-result']")).toContainText(
+    // Exact query stays on #searchMeta; the calm CF2 invitation no longer repeats it.
+    await expect(page.locator("#searchMeta")).toContainText(NO_RESULT_QUERY);
+    await expect(page.locator("[data-testid='search-feedback-entry-no-result']")).toHaveAttribute(
+      "data-query",
       NO_RESULT_QUERY,
     );
 
@@ -125,7 +136,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     await expect(page.locator("#learningBackupDeleteReminder")).toBeHidden();
     mark(scenarioResults, "deletion_reminder_after_create", "PASS");
 
-    await page.locator("#openManageSearchFeedback").click();
+    await openMoreAnd(page, "search-feedback");
     await expect(page.locator("[data-testid='search-feedback-manage']")).toBeVisible();
     await expect(page.locator("#search-feedback-manage-heading")).toBeFocused({ timeout: 5_000 });
     await expect(page.locator("[data-testid='search-feedback-manage-row']")).toHaveCount(1, {
@@ -140,7 +151,9 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     await expect(page.locator(".search-feedback-manage-export-warning")).toContainText(
       "does not establish that dictionary entries are missing",
     );
-    await expect(page.locator(".search-feedback-manage-privacy")).toContainText("plain JSON");
+    await expect(page.locator(".search-feedback-manage-privacy")).toContainText(
+      "These are searches you chose to report",
+    );
 
     await page.locator("[data-testid='search-feedback-manage-row']").first().click();
     await expect(page.locator(".search-feedback-manage-detail-query")).toContainText(NO_RESULT_QUERY);
@@ -169,7 +182,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     await openManageDictionaries(page);
     await expect(page.locator("#searchFeedbackDeleteReminder")).toBeVisible();
 
-    await page.locator("#openManageSearchFeedback").click();
+    await openMoreAnd(page, "search-feedback");
     await expect(page.locator("#search-feedback-manage-export")).toBeEnabled({ timeout: 15_000 });
     const downloadPromise = page.waitForEvent("download", { timeout: 30_000 });
     await page.locator("#search-feedback-manage-export").click();
@@ -204,7 +217,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
 
     await page.reload({ waitUntil: "domcontentloaded", timeout: offlineTimeoutMs });
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
-    await page.locator("#openManageSearchFeedback").click();
+    await openMoreAnd(page, "search-feedback");
     await expect(page.locator("[data-testid='search-feedback-manage-row']")).toHaveCount(1, {
       timeout: 15_000,
     });
@@ -311,7 +324,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
       { timeout: 15_000 },
     );
 
-    await page.locator("#openManageSearchFeedback").click();
+    await openMoreAnd(page, "search-feedback");
     await expect(page.locator("[data-testid='search-feedback-manage-row']")).toHaveCount(1, {
       timeout: 15_000,
     });
@@ -351,7 +364,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     if (offlineReloadStatus === "PASS") {
       await page.reload({ waitUntil: "domcontentloaded", timeout: offlineTimeoutMs });
       await expect(page.locator("#searchInput")).toBeEnabled({ timeout: offlineTimeoutMs });
-      await page.locator("#openManageSearchFeedback").click();
+      await openMoreAnd(page, "search-feedback");
       await expect(page.locator("[data-testid='search-feedback-manage-row']")).toHaveCount(1, {
         timeout: 15_000,
       });
@@ -384,10 +397,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     };
 
     await openManageDictionaries(page);
-    await page
-      .locator("#installedBundleList .catalog-item .btn", { hasText: /Remove|Retirer/ })
-      .first()
-      .click();
+    await page.locator(".ux2-dict-action-remove").first().click();
     await expect(page.locator("#importProgress")).toContainText(/removed|retiré/i, {
       timeout: 30_000,
     });
@@ -399,8 +409,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     expect(after[0]?.storage_scope_id).toBe(provenance.storage_scope_id);
     expect(after[0]?.query_raw).toBe(provenance.query_raw);
 
-    await expect(page.locator("#openManageSearchFeedback")).toBeVisible();
-    await page.locator("#openManageSearchFeedback").click();
+    await openMoreAnd(page, "search-feedback");
     await expect(page.locator("[data-testid='search-feedback-manage-row']")).toHaveCount(1);
     await page.locator("[data-testid='search-feedback-manage-row']").first().click();
     await expect(page.locator(".search-feedback-manage-availability")).toContainText(
@@ -492,14 +501,16 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     page.on("dialog", (dialog) => dialog.accept());
     await installDebugBundle(page);
     await setUiLocale(page, "fr");
-    await expect(page.locator("#openManageSearchFeedback")).toHaveText(
-      "Gérer les retours sur la recherche",
+    await navigateUx2Primary(page, "more");
+    await expect(page.locator("#openManageSearchFeedback .ux2-more-row-title")).toHaveText(
+      "Retours de recherche",
     );
+    await navigateUx2Primary(page, "search");
 
     await ensureSourceToTarget(page);
     await runSearch(page, "zzzz_cf2_fr");
     await expect(page.locator("[data-testid='search-feedback-report']")).toHaveText(
-      "Signaler cette recherche",
+      "Signaler cette recherche →",
     );
     await page.locator("[data-testid='search-feedback-report']").click();
     await expect(page.locator("#search-feedback-capture-heading")).toHaveText(
@@ -517,7 +528,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
       timeout: 15_000,
     });
 
-    await page.locator("#openManageSearchFeedback").click();
+    await openMoreAnd(page, "search-feedback");
     await expect(page.locator("#search-feedback-manage-heading")).toHaveText(
       "Retours sur la recherche",
     );
@@ -547,7 +558,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     await page.keyboard.press("Enter");
     await expect(page.locator("#search-feedback-capture-heading")).toBeFocused({ timeout: 15_000 });
 
-    await page.locator("#openManageSearchFeedback").click();
+    await openMoreAnd(page, "search-feedback");
     await expect(page.locator("#search-feedback-manage-heading")).toBeFocused({ timeout: 5_000 });
     await page.locator("[data-testid='search-feedback-manage-row']").first().focus();
     await page.keyboard.press("Enter");
@@ -579,7 +590,8 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     expect(await countQueryLogs(page)).toBe(logsOffBefore);
     mark(scenarioResults, "query_log_isolation_off", "PASS");
 
-    // Logging ON: open Diagnostics panel (toggle lives in a closed <details>).
+    // Logging ON: open More management bridge so Diagnostics (advanced) is reachable.
+    await openMoreAnd(page, "dictionaries");
     await page.locator("details", { has: page.locator("#queryLoggingToggle") }).evaluate((el) => {
       if (el instanceof HTMLDetailsElement) el.open = true;
     });
@@ -587,6 +599,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     await page.locator("#queryLoggingToggle").click();
     // Consent dialog may appear — accept already wired.
     await page.waitForTimeout(300);
+    await navigateUx2Primary(page, "search");
     await runSearch(page, "zzzz_cf2_qlon");
     await page.waitForTimeout(1000); // settle delay for query log
     const logsAfterSearch = await countQueryLogs(page);
@@ -597,7 +610,7 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     });
     expect(await countQueryLogs(page)).toBe(logsAfterSearch);
 
-    await page.locator("#openManageSearchFeedback").click();
+    await openMoreAnd(page, "search-feedback");
     await expect(page.locator("#search-feedback-manage-export")).toBeEnabled({ timeout: 15_000 });
     const logsBeforeExport = await countQueryLogs(page);
     const downloadPromise = page.waitForEvent("download", { timeout: 30_000 });
@@ -729,6 +742,7 @@ async function createQuickNoResultFeedback(page: Page, meaning?: string): Promis
 }
 
 async function runSearch(page: Page, query: string): Promise<void> {
+  await navigateUx2Primary(page, "search");
   await page.locator("#searchInput").fill(query);
   // Debounced search (~150ms); wait for either results or no-result CTA / meta.
   await page.waitForTimeout(250);
@@ -741,31 +755,20 @@ async function runSearch(page: Page, query: string): Promise<void> {
   ]).catch(() => undefined);
 }
 
-async function ensureSourceToTarget(page: Page): Promise<void> {
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  // Default product direction is source→target. If currently target→source, flip once.
-  if (/→/.test(label)) {
-    const left = label.split("→")[0] ?? "";
-    if (/Maninka|Target|Cible|mnk/i.test(left)) {
-      await toggle.click();
-    }
-  }
-}
-
 async function openManageDictionaries(page: Page): Promise<void> {
-  await page.locator("#openManageDictionaries").click();
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "dictionaries");
 }
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
+  await navigateUx2Primary(page, "more");
   const select = page.locator("#localeSelect");
   if ((await select.inputValue()) !== locale) {
     await select.selectOption(locale);
     await page.waitForLoadState("domcontentloaded");
+    await navigateUx2Primary(page, "search");
     await expect(page.locator("#searchInput")).toBeVisible({ timeout: offlineTimeoutMs });
+  } else {
+    await navigateUx2Primary(page, "search");
   }
 }
 
@@ -797,9 +800,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openManageDictionaries(page);
   const quickImportInput = page.locator("#quickImportFiles");
   await expect(quickImportInput).toBeAttached();
   await quickImportInput.setInputFiles(files);
@@ -812,6 +813,7 @@ async function installDebugBundle(page: Page): Promise<void> {
     /Installing|Complete|already installed/i,
     { timeout: 30_000 },
   );
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
   await expect(page.locator("#activeDictionarySummary")).not.toContainText(
     /No dictionary added|Aucun dictionnaire ajouté/,

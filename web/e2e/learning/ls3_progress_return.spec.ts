@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { ensureTargetToSource, navigateUx2Primary, openMoreAnd } from "../helpers/ux2_nav";
+
 /**
  * LS3I4 — offline Progress & Return browser verification.
  * Uses the local debug directional bundle (same fixture as LS1/LS2 learning e2e).
@@ -260,7 +262,7 @@ test.describe("LS3 Progress & Return offline lifecycle", () => {
     await page.locator(".saved-vocab-remove").click();
     await expect(page.locator(".saved-vocab-progress")).toHaveCount(0, { timeout: 15_000 });
     await expect(page.locator("#saved-vocab-start-review")).toHaveCount(0);
-    await expect(page.locator(".saved-vocab-status")).toContainText(/No saved words|Aucun mot/);
+    await expect(page.locator(".ux2-saved-empty-lead")).toContainText(/No saved words|Aucun mot/);
   });
 
   test("French Progress smoke Start → Continue", async ({ page }) => {
@@ -323,8 +325,8 @@ test.describe("LS3 Progress & Return offline lifecycle", () => {
     await expect(page.locator("#saved-vocab-start-review")).toHaveText("Continue review");
     await expect(page.locator("#saved-vocab-start-review")).toBeFocused();
 
-    await page.locator(".saved-vocab-back").click();
-    await page.locator("#openSavedVocabulary").click();
+    await navigateUx2Primary(page, "search");
+    await navigateUx2Primary(page, "saved");
     await expect(page.locator("#saved-vocab-start-review")).toBeEnabled({ timeout: 15_000 });
     await expect(page.locator("#saved-vocab-start-review")).not.toBeFocused();
   });
@@ -362,18 +364,20 @@ async function expectProgress(
 }
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
+  await navigateUx2Primary(page, "more");
   const select = page.locator("#localeSelect");
   if ((await select.inputValue()) !== locale) {
     await select.selectOption(locale);
+    await page.waitForLoadState("domcontentloaded");
+    await navigateUx2Primary(page, "search");
+    await expect(page.locator("#searchInput")).toBeVisible({ timeout: 30_000 });
+  } else {
+    await navigateUx2Primary(page, "search");
   }
 }
 
 async function saveLexiconByQuery(page: Page, query: string): Promise<void> {
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  if (!/Maninka|Target|Cible/.test(label.split("→")[0] ?? "")) {
-    await toggle.click();
-  }
+  await ensureTargetToSource(page);
   await page.locator("#searchInput").fill(query);
   await expect(page.locator("#searchResults .result-open").first()).toContainText(query, {
     timeout: 15_000,
@@ -408,9 +412,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "dictionaries");
 
   const quickImportInput = page.locator("#quickImportFiles");
   await expect(quickImportInput).toBeAttached();
@@ -421,6 +423,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   await expect(page.locator("#importProgress")).toContainText(/Installing|Complete|already installed/i, {
     timeout: 30_000,
   });
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
   await expect(page.locator("#activeDictionarySummary")).not.toContainText(
     /No dictionary added|Aucun dictionnaire ajouté/,

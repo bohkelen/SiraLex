@@ -64,7 +64,10 @@ describe("LS1I2 entry Save affordance rendering", () => {
       },
     });
     expect(root.querySelector(".entry-learning-save")).not.toBeNull();
-    expect(getSaveButton(root).textContent).toBe("Save");
+    expect(getSaveButton(root).querySelector(".entry-learning-save-label")?.textContent).toBe(
+      "Save",
+    );
+    expect(getSaveButton(root).querySelector(".entry-learning-save-icon")).not.toBeNull();
   });
 
   it("does not show Learning control on index mappings", () => {
@@ -90,36 +93,42 @@ describe("LS1I2 entry Save affordance rendering", () => {
       },
     });
     const btn = getSaveButton(root);
+    const label = () => btn.querySelector(".entry-learning-save-label")?.textContent;
     const err = getErrorEl(root);
-    expect(btn.textContent).toBe("Checking saved status…");
+    expect(label()).toBe("Checking saved status…");
     expect(btn.disabled).toBe(true);
     expect(btn.getAttribute("aria-busy")).toBe("true");
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
 
     setLearningSaveState!("not_saved");
-    expect(btn.textContent).toBe("Save");
+    expect(label()).toBe("Save");
     expect(btn.disabled).toBe(false);
     expect(btn.getAttribute("aria-pressed")).toBe("false");
 
     setLearningSaveState!("saved");
-    expect(btn.textContent).toBe("Saved");
+    expect(label()).toBe("Saved");
     expect(btn.getAttribute("aria-pressed")).toBe("true");
 
     setLearningSaveState!("saving");
-    expect(btn.textContent).toBe("Saving…");
+    expect(label()).toBe("Saving…");
     expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
 
     setLearningSaveState!("removing");
-    expect(btn.textContent).toBe("Removing…");
+    expect(label()).toBe("Removing…");
     expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
 
     setLearningSaveState!("error_not_saved");
-    expect(btn.textContent).toBe("Save");
+    expect(label()).toBe("Save");
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
     expect(err.hidden).toBe(false);
     expect(err.textContent).toContain("Couldn't save");
     expect(btn.getAttribute("aria-describedby")).toBe(err.id);
 
     setLearningSaveState!("error_saved");
-    expect(btn.textContent).toBe("Saved");
+    expect(label()).toBe("Saved");
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
     expect(err.textContent).toContain("Couldn't remove");
   });
 

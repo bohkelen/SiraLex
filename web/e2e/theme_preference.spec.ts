@@ -1,5 +1,5 @@
 /**
- * UXT1 — Theme preference browser smoke.
+ * UXT1 — Theme preference browser smoke (UX2I2 shell navigation).
  *
  * Narrow checks for system/light/dark resolution, persistence, OS follow,
  * labels, and representative surface readability via CSS tokens.
@@ -10,6 +10,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
+
+import {
+  ensureSourceToTarget,
+  ensureTargetToSource,
+  navigateUx2Primary,
+  openMoreAnd,
+} from "./helpers/ux2_nav";
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const usageBundleDir = path.join(webRoot, "public/debug-bundles/test_directional_bundle");
@@ -28,6 +35,7 @@ test.describe("UXT1 theme preference", () => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.evaluate((key) => localStorage.removeItem(key), THEME_KEY);
     await page.reload({ waitUntil: "domcontentloaded" });
+    await openMoreTheme(page);
     await expect(page.locator("#themeSelect")).toHaveValue("system");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await expectTokensReadable(page);
@@ -35,6 +43,7 @@ test.describe("UXT1 theme preference", () => {
     // 2. Clean context + OS dark → System → data-theme=dark
     await page.emulateMedia({ colorScheme: "dark" });
     await page.reload({ waitUntil: "domcontentloaded" });
+    await openMoreTheme(page);
     await expect(page.locator("#themeSelect")).toHaveValue("system");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expectTokensReadable(page);
@@ -51,6 +60,7 @@ test.describe("UXT1 theme preference", () => {
     page.off("framenavigated", onNav);
     expect(await page.evaluate((key) => localStorage.getItem(key), THEME_KEY)).toBe("light");
     await page.reload({ waitUntil: "domcontentloaded" });
+    await openMoreTheme(page);
     await expect(page.locator("#themeSelect")).toHaveValue("light");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
@@ -60,6 +70,7 @@ test.describe("UXT1 theme preference", () => {
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     expect(await page.evaluate((key) => localStorage.getItem(key), THEME_KEY)).toBe("dark");
     await page.reload({ waitUntil: "domcontentloaded" });
+    await openMoreTheme(page);
     await expect(page.locator("#themeSelect")).toHaveValue("dark");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
@@ -75,16 +86,19 @@ test.describe("UXT1 theme preference", () => {
     await page.evaluate((key) => localStorage.setItem(key, "sepia"), THEME_KEY);
     await page.emulateMedia({ colorScheme: "dark" });
     await page.reload({ waitUntil: "domcontentloaded" });
+    await openMoreTheme(page);
     await expect(page.locator("#themeSelect")).toHaveValue("system");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
     // 7. EN / FR labels
     await setUiLocale(page, "en");
+    await openMoreTheme(page);
     await expect(page.locator("#themeSelectorLabel")).toHaveText("Theme");
     await expect(page.locator("#themeSelect option[value='system']")).toHaveText("System");
     await expect(page.locator("#themeSelect option[value='light']")).toHaveText("Light");
     await expect(page.locator("#themeSelect option[value='dark']")).toHaveText("Dark");
     await setUiLocale(page, "fr");
+    await openMoreTheme(page);
     await expect(page.locator("#themeSelectorLabel")).toHaveText("Thème");
     await expect(page.locator("#themeSelect option[value='system']")).toHaveText("Système");
     await expect(page.locator("#themeSelect option[value='light']")).toHaveText("Clair");
@@ -107,6 +121,7 @@ test.describe("UXT1 theme preference", () => {
     const page = await context.newPage();
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await openMoreTheme(page);
     await expect(page.locator("#themeSelect")).toHaveValue("system");
     await context.close();
   });
@@ -117,11 +132,13 @@ test.describe("UXT1 theme preference", () => {
     await setUiLocale(page, "en");
 
     for (const theme of ["light", "dark"] as const) {
+      await openMoreTheme(page);
       await page.locator("#themeSelect").selectOption(theme);
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       await expectTokensReadable(page);
 
       // Search
+      await navigateUx2Primary(page, "search");
       await expect(page.locator("#searchInput")).toBeVisible();
       await ensureSourceToTarget(page);
       await page.locator("#searchInput").fill("alpha_fr");
@@ -136,27 +153,23 @@ test.describe("UXT1 theme preference", () => {
       });
       await expectTokensReadable(page);
 
-      // Saved Vocabulary (+ Progress inside)
-      await page.locator("#openSavedVocabulary").click();
+      // Saved Vocabulary via primary nav
+      await navigateUx2Primary(page, "saved");
       await expect(page.locator("#saved-vocab-heading")).toBeVisible({ timeout: 15_000 });
       await expectTokensReadable(page);
 
-      // Review affordance when present (empty queue may hide/disable it)
       const startReview = page.locator("#saved-vocab-start-review");
       if (await startReview.count()) {
         await expect(startReview.first()).toBeVisible();
       }
-      await page.locator(".saved-vocab-back").click();
 
-      // Manage Dictionaries
-      await page.locator("#openManageDictionaries").click();
-      await page.locator("#manageDictionariesPanel").evaluate((el) => {
-        if (el instanceof HTMLDetailsElement) el.open = true;
-      });
+      // Manage Dictionaries via More
+      await openMoreAnd(page, "dictionaries");
       await expect(page.locator("#manageDictionariesPanel")).toBeVisible();
       await expectTokensReadable(page);
 
       // CF2 capture affordance from a miss
+      await navigateUx2Primary(page, "search");
       await page.locator("#searchInput").fill("zzzz_uxt1_theme_miss");
       await page.waitForTimeout(250);
       const report = page.locator("[data-testid='search-feedback-report']");
@@ -171,14 +184,7 @@ test.describe("UXT1 theme preference", () => {
       }
 
       // CF1 form from a resolved target entry
-      const toggle = page.locator("#langToggle");
-      const label = (await toggle.textContent()) ?? "";
-      if (/→/.test(label)) {
-        const left = label.split("→")[0] ?? "";
-        if (!/Maninka|Target|Cible|mnk/i.test(left)) {
-          await toggle.click();
-        }
-      }
+      await ensureTargetToSource(page);
       await page.locator("#searchInput").fill("alpha_mnk");
       await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
         timeout: 15_000,
@@ -195,14 +201,14 @@ test.describe("UXT1 theme preference", () => {
         if (await cancelCf1.isVisible()) await cancelCf1.click();
       }
 
-      // Manage Corrections / Manage Search Feedback shells
-      await page.locator("#openManageCorrections").click();
+      // Manage Corrections / Manage Search Feedback via More
+      await openMoreAnd(page, "corrections");
       await expect(
         page.locator("[data-testid='correction-manage'], .correction-manage").first(),
       ).toBeVisible({ timeout: 15_000 });
       await expectTokensReadable(page);
 
-      await page.locator("#openManageSearchFeedback").click();
+      await openMoreAnd(page, "search-feedback");
       await expect(
         page.locator("[data-testid='search-feedback-manage'], .search-feedback-manage").first(),
       ).toBeVisible({ timeout: 15_000 });
@@ -210,6 +216,11 @@ test.describe("UXT1 theme preference", () => {
     }
   });
 });
+
+async function openMoreTheme(page: Page): Promise<void> {
+  await navigateUx2Primary(page, "more");
+  await expect(page.locator("#themeSelect")).toBeVisible();
+}
 
 async function expectTokensReadable(page: Page): Promise<void> {
   const tokens = await page.evaluate(() => {
@@ -234,37 +245,24 @@ async function expectTokensReadable(page: Page): Promise<void> {
     expect(value.length, `${name} should be non-empty`).toBeGreaterThan(0);
   }
 
-  // Foreground/background must differ (guards accidental identical tokens).
   expect(tokens.text.toLowerCase()).not.toBe(tokens.background.toLowerCase());
   expect(tokens.text.toLowerCase()).not.toBe(tokens.surface.toLowerCase());
   expect(tokens.border.toLowerCase()).not.toBe(tokens.background.toLowerCase());
 }
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
+  await navigateUx2Primary(page, "more");
   const select = page.locator("#localeSelect");
   if ((await select.inputValue()) !== locale) {
     await select.selectOption(locale);
     await page.waitForLoadState("domcontentloaded");
+    await navigateUx2Primary(page, "more");
     await expect(page.locator("#themeSelect")).toBeVisible({ timeout: 30_000 });
   }
 }
 
-async function ensureSourceToTarget(page: Page): Promise<void> {
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  if (/→/.test(label)) {
-    const left = label.split("→")[0] ?? "";
-    if (/Maninka|Target|Cible|mnk/i.test(left)) {
-      await toggle.click();
-    }
-  }
-}
-
 async function openManageDictionaries(page: Page): Promise<void> {
-  await page.locator("#openManageDictionaries").click();
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "dictionaries");
 }
 
 async function getActiveBundleId(page: Page): Promise<string | undefined> {
@@ -315,9 +313,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openManageDictionaries(page);
   await page.locator("#quickImportFiles").setInputFiles(files);
   await page.evaluate(() => {
     document
@@ -328,5 +324,6 @@ async function installDebugBundle(page: Page): Promise<void> {
     /Installing|Complete|already installed/i,
     { timeout: 30_000 },
   );
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
 }

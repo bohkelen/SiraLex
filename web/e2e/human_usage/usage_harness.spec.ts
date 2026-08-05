@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 
+import { navigateUx2Primary, openMoreAnd } from "../helpers/ux2_nav";
+
 import {
   applyRecurrence,
   createUsageEvidenceRow,
@@ -146,6 +148,7 @@ async function installDictionaryPackage(page: Page, packagePath: string, notes: 
   await expect(page.locator("#importProgress")).toContainText(/Preparing|Verifying|Installing|Dictionary installed/i, {
     timeout: 30_000,
   });
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
   await expect(page.locator("#activeDictionarySummary")).not.toContainText(/No dictionary added|Aucun dictionnaire ajouté/, {
     timeout: 30_000,
@@ -170,6 +173,7 @@ async function installLegacyBundleDir(page: Page, bundleDir: string, notes: stri
   await expect(page.locator("#importProgress")).toContainText(/Installing|Complete|already installed/i, {
     timeout: 30_000,
   });
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
   await expect(page.locator("#activeDictionarySummary")).not.toContainText(/No dictionary added|Aucun dictionnaire ajouté/, {
     timeout: 30_000,
@@ -177,9 +181,7 @@ async function installLegacyBundleDir(page: Page, bundleDir: string, notes: stri
 }
 
 async function openManageDictionariesPanel(page: Page): Promise<void> {
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "dictionaries");
 }
 
 async function dispatchChange(page: Page, elementId: string): Promise<void> {

@@ -112,6 +112,83 @@ describe("i18n translations", () => {
     setCurrentLocale(previous);
   });
 
+  it("resolves UX2 primary navigation and More labels in English and French", () => {
+    const previous = getCurrentLocale();
+    setCurrentLocale("en");
+    expect(t("nav.primaryAriaLabel")).toBe("Primary");
+    expect(t("nav.search")).toBe("Search");
+    expect(t("nav.saved")).toBe("Saved");
+    expect(t("nav.review")).toBe("Review");
+    expect(t("nav.more")).toBe("More");
+    expect(t("more.corrections")).toBe("Corrections");
+    expect(t("more.myCorrections")).toBe("Corrections");
+    expect(t("more.searchFeedback")).toBe("Search feedback");
+    expect(t("more.dictionaries")).toBe("Dictionaries");
+    expect(t("more.learningData")).toBe("Learning data");
+    expect(t("more.contributeSection")).toBe("Contribute");
+    expect(t("more.back")).toBe("← Back to More");
+    expect(t("dictionaries.title")).toBe("Dictionaries");
+    expect(t("dictionaries.advanced")).toBe("Advanced");
+    expect(t("dictionaries.removeFromDevice")).toBe("Remove from device");
+    expect(t("learningBackup.pageIntro")).toContain("saved vocabulary");
+    expect(t("learningBackup.policy.continueReplace")).toBe("Continue");
+    expect(t("learningBackup.policy.restoreAction")).toBe("Restore learning data");
+    expect(t("learningBackup.restore.noLearningChanged")).toBe("No Learning data was changed.");
+    setCurrentLocale("fr");
+    expect(t("nav.primaryAriaLabel")).toBe("Principal");
+    expect(t("nav.search")).toBe("Recherche");
+    expect(t("nav.saved")).toBe("Enregistré");
+    expect(t("nav.review")).toBe("Révision");
+    expect(t("nav.more")).toBe("Plus");
+    expect(t("more.corrections")).toBe("Corrections");
+    expect(t("more.myCorrections")).toBe("Corrections");
+    expect(t("more.searchFeedback")).toBe("Retours de recherche");
+    expect(t("more.dictionaries")).toBe("Dictionnaires");
+    expect(t("more.learningData")).toBe("Données d’apprentissage");
+    expect(t("more.back")).toBe("← Retour à Plus");
+    expect(t("dictionaries.title")).toBe("Dictionnaires");
+    expect(t("dictionaries.advanced")).toBe("Avancé");
+    setCurrentLocale(previous);
+  });
+
+  it("resolves UX2I4 Entry Detail labels in English and French", () => {
+    const previous = getCurrentLocale();
+    setCurrentLocale("en");
+    expect(t("entry.back")).toBe("← Back to results");
+    expect(t("entry.backToSaved")).toBe("← Back to saved");
+    expect(t("entry.suggestCorrection")).toBe("Suggest correction →");
+    expect(t("entry.section.examples")).toBe("Examples");
+    setCurrentLocale("fr");
+    expect(t("entry.back")).toBe("← Retour aux résultats");
+    expect(t("entry.backToSaved")).toBe("← Retour aux enregistrés");
+    expect(t("entry.suggestCorrection")).toBe("Suggérer une correction →");
+    expect(t("entry.section.examples")).toBe("Exemples");
+    setCurrentLocale(previous);
+  });
+
+  it("resolves UX2I3 Search Home/Results labels in English and French", () => {
+    const previous = getCurrentLocale();
+    setCurrentLocale("en");
+    expect(t("search.switchDirection", { from: "French", to: "Maninka" })).toBe(
+      "Switch search direction: French to Maninka",
+    );
+    expect(t("search.resultMeta", { count: 4 })).toBe("4 results");
+    expect(t("searchFeedback.capture.resultsNotUsefulAction")).toContain(
+      "Tell us what you were looking for",
+    );
+    expect(t("search.lookingForSomethingElse")).toBe("Looking for something else?");
+    setCurrentLocale("fr");
+    expect(t("search.switchDirection", { from: "Français", to: "Maninka" })).toBe(
+      "Changer le sens de recherche : Français vers Maninka",
+    );
+    expect(t("search.resultMeta", { count: 4 })).toBe("4 résultats");
+    expect(t("searchFeedback.capture.resultsNotUsefulAction")).toContain(
+      "Dites-nous ce que vous cherchiez",
+    );
+    expect(t("search.lookingForSomethingElse")).toBe("Vous cherchiez autre chose ?");
+    setCurrentLocale(previous);
+  });
+
   it("resolves Progress keys in English and French", () => {
     const previous = getCurrentLocale();
 

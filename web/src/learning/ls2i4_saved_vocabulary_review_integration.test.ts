@@ -145,7 +145,7 @@ describe("LS2I4 Saved Vocabulary ↔ Review navigation", () => {
         const apply = (model: SavedVocabularyModel) => {
           if (generation !== savedGen || hostContext !== "saved_vocabulary") return;
           const view = renderSavedVocabulary(model, {
-            onBack: () => undefined,
+            onSearch: () => undefined,
             onOpen: () => undefined,
             onRemove: () => undefined,
             onStartReview: () => {
@@ -278,7 +278,7 @@ describe("LS2I4 Saved Vocabulary ↔ Review navigation", () => {
           updates.push(m);
           if (m.surface === "populated" || m.surface === "removing" || m.surface === "loading") {
             const view = renderSavedVocabulary(m, {
-              onBack: () => undefined,
+              onSearch: () => undefined,
               onOpen: () => undefined,
               onRemove: () => undefined,
               onStartReview: () => undefined,
@@ -286,7 +286,7 @@ describe("LS2I4 Saved Vocabulary ↔ Review navigation", () => {
             mount.replaceChildren(view.root);
           } else {
             const view = renderSavedVocabulary(m, {
-              onBack: () => undefined,
+              onSearch: () => undefined,
               onOpen: () => undefined,
               onRemove: () => undefined,
               onStartReview: () => undefined,
@@ -303,7 +303,7 @@ describe("LS2I4 Saved Vocabulary ↔ Review navigation", () => {
 
       const emptyMount = document.createElement("div");
       const emptyView = renderSavedVocabulary({ surface: "empty" }, {
-        onBack: () => undefined,
+        onSearch: () => undefined,
         onOpen: () => undefined,
         onRemove: () => undefined,
         onStartReview: () => undefined,

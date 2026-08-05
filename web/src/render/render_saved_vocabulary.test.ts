@@ -114,7 +114,7 @@ function populatedModel(
 
 function callbacks(extra: Partial<Parameters<typeof renderSavedVocabulary>[1]> = {}) {
   return {
-    onBack: vi.fn(),
+    onSearch: vi.fn(),
     onOpen: vi.fn(),
     onRemove: vi.fn(),
     onStartReview: vi.fn(),
@@ -122,29 +122,37 @@ function callbacks(extra: Partial<Parameters<typeof renderSavedVocabulary>[1]> =
   };
 }
 
-describe("LS1I3 / LS2I4 / LS3I2 Saved Vocabulary renderer", () => {
+describe("LS1I3 / LS2I4 / LS3I2 / UX2I5A Saved Vocabulary renderer", () => {
   beforeEach(() => {
     setCurrentLocale("en");
   });
 
-  it("renders loading, empty, unavailable, and error states without Progress", () => {
+  it("renders loading, empty, unavailable, and error without Progress or permanent Back", () => {
     for (const surface of ["loading", "empty", "unavailable", "error"] as const) {
       const { root } = renderSavedVocabulary({ surface }, callbacks());
       expect(root.querySelector("#saved-vocab-heading")?.textContent).toBe("Saved vocabulary");
-      expect(root.querySelector(".saved-vocab-back")).not.toBeNull();
+      expect(root.querySelector(".saved-vocab-back")).toBeNull();
       expect(root.querySelector(".saved-vocab-list")).toBeNull();
       expect(root.querySelector(".saved-vocab-progress")).toBeNull();
       expect(root.querySelector(".saved-vocab-return-cue")).toBeNull();
+      expect(root.querySelector("#saved-vocab-start-review")).toBeNull();
     }
   });
 
-  it("omits Start Review on empty and shows it disabled while loading", () => {
+  it("omits Start Review on empty and loading; empty offers Search CTA", () => {
     const empty = renderSavedVocabulary({ surface: "empty" }, callbacks());
     expect(empty.startReviewButton).toBeNull();
+    expect(empty.root.querySelector(".saved-vocab-progress")).toBeNull();
+    expect(empty.root.textContent).toContain("No saved words yet.");
+    expect(empty.root.textContent).toContain("Save words from dictionary entries");
+    expect(empty.root.querySelector(".ux2-saved-search-cta")?.textContent).toBe(
+      "Search for a word →",
+    );
 
     const loading = renderSavedVocabulary({ surface: "loading" }, callbacks());
-    expect(loading.startReviewButton?.disabled).toBe(true);
-    expect(loading.startReviewButton?.textContent).toBe("Start review");
+    expect(loading.startReviewButton).toBeNull();
+    expect(loading.root.querySelector(".saved-vocab-progress")).toBeNull();
+    expect(loading.root.textContent).toContain("Loading saved vocabulary");
   });
 
   it("renders Progress summary for populated and removing", () => {
@@ -227,6 +235,8 @@ describe("LS1I3 / LS2I4 / LS3I2 Saved Vocabulary renderer", () => {
     expect(root.textContent).not.toContain("review_count");
     expect(root.textContent).not.toMatch(/%/);
     expect(root.textContent).not.toMatch(/mastered/i);
+    expect(root.textContent).not.toMatch(/mastery/i);
+    expect(root.textContent).not.toMatch(/accuracy|success rate|retention|streak|overdue|due\b/i);
     expect(root.querySelector(".saved-vocab-review-count")).toBeNull();
   });
 
@@ -370,15 +380,17 @@ describe("LS1I3 / LS2I4 / LS3I2 Saved Vocabulary renderer", () => {
     expect(cueOrAction!.compareDocumentPosition(list!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("preserves row statuses, Open/Remove, and last-reviewed without Progress conflict", () => {
+  it("preserves row statuses, Open/Remove, N’Ko semantics, and row order", () => {
     const cb = callbacks();
     const model = populatedModel([
       resolvedRow({
         ir_id: "a",
+        primaryText: "alpha",
         reviewStatus: { state: "not_reviewed", labelKey: "review.notReviewed" },
       }),
       resolvedRow({
         ir_id: "b",
+        primaryText: "beta",
         learningRecord: makeLearningRecord({
           ir_id: "b",
           review_count: 1,
@@ -400,12 +412,28 @@ describe("LS1I3 / LS2I4 / LS3I2 Saved Vocabulary renderer", () => {
       }),
     ]);
     const { root } = renderSavedVocabulary(model, cb);
+    const primaries = [...root.querySelectorAll(".saved-vocab-primary")].map((n) => n.textContent);
+    expect(primaries).toEqual(["alpha", "beta", "ghost"]);
     expect(root.textContent).toContain("Not reviewed");
     expect(root.textContent).toContain("Still learning");
     expect(root.textContent).toContain("Remembered");
     expect(root.textContent).toContain("Last reviewed:");
     expect(root.querySelectorAll(".saved-vocab-open").length).toBe(2);
-    root.querySelector<HTMLButtonElement>(".saved-vocab-open")!.click();
+    expect(root.querySelector(".ux2-saved-row-unresolved .saved-vocab-open")).toBeNull();
+    expect(root.querySelector(".saved-vocab-unresolved")?.textContent).toContain(
+      "Unavailable in this dictionary",
+    );
+
+    const nko = root.querySelector(".saved-vocab-nko");
+    expect(nko?.getAttribute("lang")).toBe("nqo");
+    expect(nko?.getAttribute("dir")).toBe("rtl");
+    expect(nko?.classList.contains("ux2-text-nko")).toBe(true);
+
+    const openBtn = root.querySelector<HTMLButtonElement>(".saved-vocab-open")!;
+    expect(openBtn.tagName).toBe("BUTTON");
+    expect(openBtn.getAttribute("aria-label")).toContain("alpha");
+    expect(openBtn.querySelector(".saved-vocab-remove")).toBeNull();
+    openBtn.click();
     expect(cb.onOpen).toHaveBeenCalledTimes(1);
     root.querySelectorAll<HTMLButtonElement>(".saved-vocab-remove").forEach((btn) => btn.click());
     expect(cb.onRemove).toHaveBeenCalledTimes(3);
@@ -419,6 +447,7 @@ describe("LS1I3 / LS2I4 / LS3I2 Saved Vocabulary renderer", () => {
     });
     const { root, startReviewButton } = renderSavedVocabulary(model, callbacks());
     expect(startReviewButton?.disabled).toBe(true);
+    expect(root.querySelector(".saved-vocab-progress")).not.toBeNull();
     expect(root.querySelector<HTMLButtonElement>(".saved-vocab-open")!.disabled).toBe(true);
     expect(root.querySelector<HTMLButtonElement>(".saved-vocab-remove")!.disabled).toBe(true);
 
@@ -426,16 +455,19 @@ describe("LS1I3 / LS2I4 / LS3I2 Saved Vocabulary renderer", () => {
       rowErrors: { [key]: "remove_failed" },
     });
     const view = renderSavedVocabulary(errored, callbacks());
-    expect(view.root.querySelector(".saved-vocab-row-error")?.textContent).toContain(
-      "Couldn't remove",
-    );
+    const err = view.root.querySelector(".saved-vocab-row-error");
+    expect(err?.textContent).toContain("Couldn't remove");
+    expect(
+      view.root.querySelector(".saved-vocab-remove")?.getAttribute("aria-describedby"),
+    ).toBe(err?.id);
   });
 
-  it("fires Back callback", () => {
+  it("fires Search callback from empty-state CTA, not Back", () => {
     const cb = callbacks();
     const { root } = renderSavedVocabulary({ surface: "empty" }, cb);
-    root.querySelector<HTMLButtonElement>(".saved-vocab-back")!.click();
-    expect(cb.onBack).toHaveBeenCalledTimes(1);
+    expect(root.querySelector(".saved-vocab-back")).toBeNull();
+    root.querySelector<HTMLButtonElement>(".ux2-saved-search-cta")!.click();
+    expect(cb.onSearch).toHaveBeenCalledTimes(1);
   });
 
   it("formats last-reviewed timestamps for EN and FR", () => {
@@ -445,7 +477,7 @@ describe("LS1I3 / LS2I4 / LS3I2 Saved Vocabulary renderer", () => {
     expect(formatReviewTimestamp("not-a-date", "en")).toBeUndefined();
   });
 
-  it("renders French Progress copy", () => {
+  it("renders French Progress and empty-state copy", () => {
     setCurrentLocale("fr");
     const { root, startReviewButton } = renderSavedVocabulary(
       populatedModel([resolvedRow(), unresolvedRow()], {
@@ -494,5 +526,9 @@ describe("LS1I3 / LS2I4 / LS3I2 Saved Vocabulary renderer", () => {
     expect(again.root.querySelector(".saved-vocab-return-cue")?.textContent).toBe(
       "Réviser à nouveau le vocabulaire enregistré",
     );
+
+    const empty = renderSavedVocabulary({ surface: "empty" }, callbacks());
+    expect(empty.root.querySelector(".ux2-saved-search-cta")?.textContent).toBe("Chercher un mot →");
+    expect(empty.root.textContent).toContain("Aucun mot enregistré.");
   });
 });

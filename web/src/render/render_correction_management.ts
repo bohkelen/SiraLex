@@ -203,7 +203,7 @@ export function renderCorrectionManagement(
   initial: CorrectionManagementVm,
   callbacks: CorrectionManagementRendererCallbacks,
 ): CorrectionManagementView {
-  const root = el("div", "correction-manage");
+  const root = el("div", "correction-manage ux2-correction-manage");
   root.setAttribute("data-testid", "correction-manage");
 
   let stableEdit: StableEdit | null = null;
@@ -215,12 +215,16 @@ export function renderCorrectionManagement(
 
     const back = document.createElement("button");
     back.type = "button";
-    back.className = "btn correction-manage-back";
+    back.className = "btn correction-manage-back ux2-correction-back";
     back.textContent = t("correctionFeedback.manage.back");
     back.addEventListener("click", () => callbacks.onBack());
     root.appendChild(back);
 
-    const heading = el("h2", "correction-manage-heading", t("correctionFeedback.manage.heading"));
+    const heading = el(
+      "h2",
+      "correction-manage-heading ux2-type-page-title",
+      t("correctionFeedback.manage.heading"),
+    );
     heading.id = "correction-manage-heading";
     heading.tabIndex = -1;
     root.appendChild(heading);
@@ -310,7 +314,7 @@ export function renderCorrectionManagement(
     const actions = el("div", "row correction-manage-transport-actions");
     const exportBtn = document.createElement("button");
     exportBtn.type = "button";
-    exportBtn.className = "btn correction-manage-export";
+    exportBtn.className = "btn correction-manage-export ux2-correction-secondary-btn";
     exportBtn.id = "correction-manage-export";
     exportBtn.textContent = t("correctionFeedback.manage.export.button");
     exportBtn.disabled =
@@ -324,7 +328,7 @@ export function renderCorrectionManagement(
 
     const sendBtn = document.createElement("button");
     sendBtn.type = "button";
-    sendBtn.className = "btn correction-manage-send";
+    sendBtn.className = "btn correction-manage-send ux2-correction-primary-btn";
     sendBtn.id = "correction-manage-send";
     sendBtn.textContent = t("correctionFeedback.manage.send.button");
     sendBtn.disabled =
@@ -346,7 +350,7 @@ export function renderCorrectionManagement(
   }
 
   function paintHandoffConfirm(vm: CorrectionManagementVm): void {
-    const box = el("div", "correction-manage-delete-confirm");
+    const box = el("div", "correction-manage-delete-confirm ux2-correction-handoff-confirm");
     box.id = "correction-manage-handoff-confirm";
     const email = vm.reviewEmail ?? "";
     box.appendChild(
@@ -362,16 +366,16 @@ export function renderCorrectionManagement(
     box.appendChild(
       el("p", undefined, t("correctionFeedback.manage.send.destinationHint")),
     );
-    const row = el("div", "row");
+    const row = el("div", "row ux2-correction-actions");
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.className = "btn";
+    cancel.className = "btn ux2-correction-secondary-btn";
     cancel.id = "correction-manage-handoff-cancel";
     cancel.textContent = t("correctionFeedback.manage.send.cancel");
     cancel.addEventListener("click", () => callbacks.onCancelSendForReview());
     const cont = document.createElement("button");
     cont.type = "button";
-    cont.className = "btn";
+    cont.className = "btn ux2-correction-primary-btn";
     cont.id = "correction-manage-handoff-continue";
     cont.textContent = t("correctionFeedback.manage.send.continue");
     cont.addEventListener("click", () => callbacks.onConfirmSendForReview());
@@ -459,16 +463,16 @@ export function renderCorrectionManagement(
     tech.appendChild(el("p", "mono", `storage_scope_id: ${d.storage_scope_id}`));
     root.appendChild(tech);
 
-    const actions = el("div", "correction-manage-actions");
+    const actions = el("div", "correction-manage-actions ux2-correction-actions");
     const edit = document.createElement("button");
     edit.type = "button";
-    edit.className = "btn";
+    edit.className = "btn ux2-correction-primary-btn";
     edit.textContent = t("correctionFeedback.manage.edit");
     edit.disabled = vm.busy;
     edit.addEventListener("click", () => callbacks.onStartEdit());
     const del = document.createElement("button");
     del.type = "button";
-    del.className = "btn";
+    del.className = "btn ux2-correction-secondary-btn";
     del.textContent = t("correctionFeedback.manage.delete");
     del.disabled = vm.busy;
     del.addEventListener("click", () => callbacks.onRequestDelete());

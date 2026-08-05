@@ -4,6 +4,12 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import {
+  ensureTargetToSource,
+  navigateUx2Primary,
+  openMoreAnd,
+} from "../helpers/ux2_nav";
+
 /**
  * LS1I4 — minimal offline Saved Vocabulary browser verification.
  * Uses the local debug directional bundle (not the featured full package).
@@ -24,10 +30,10 @@ test.describe("LS1 offline Saved Vocabulary", () => {
 
     await installDebugBundle(page);
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
-    await expect(page.locator("#openSavedVocabulary")).toBeVisible();
+    await expect(page.locator('[data-testid="ux2-nav-saved"]')).toBeVisible();
 
     // Target → source so we open a lexicon_entry directly.
-    await page.locator("#langToggle").click();
+    await ensureTargetToSource(page);
     await page.locator("#searchInput").fill("alpha_mnk");
     await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
       timeout: 15_000,
@@ -43,7 +49,7 @@ test.describe("LS1 offline Saved Vocabulary", () => {
       timeout: 15_000,
     });
 
-    await page.locator("#openSavedVocabulary").click();
+    await navigateUx2Primary(page, "saved");
     await expect(page.locator("#saved-vocab-heading")).toBeVisible();
     await expect(page.locator(".saved-vocab-list .saved-vocab-row")).toHaveCount(1, {
       timeout: 15_000,
@@ -55,7 +61,7 @@ test.describe("LS1 offline Saved Vocabulary", () => {
     await page.reload({ waitUntil: "domcontentloaded", timeout: offlineTimeoutMs });
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: offlineTimeoutMs });
 
-    await page.locator("#openSavedVocabulary").click();
+    await navigateUx2Primary(page, "saved");
     await expect(page.locator(".saved-vocab-list .saved-vocab-row")).toHaveCount(1, {
       timeout: 15_000,
     });
@@ -73,17 +79,17 @@ test.describe("LS1 offline Saved Vocabulary", () => {
     await expect(page.locator(".saved-vocab-list .saved-vocab-row")).toHaveCount(0, {
       timeout: 15_000,
     });
-    await expect(page.locator(".saved-vocab-status")).toContainText(/No saved words|Aucun mot/, {
+    await expect(page.locator(".ux2-saved-empty-lead")).toContainText(/No saved words|Aucun mot/, {
       timeout: 15_000,
     });
 
     await page.reload({ waitUntil: "domcontentloaded", timeout: offlineTimeoutMs });
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: offlineTimeoutMs });
-    await page.locator("#openSavedVocabulary").click();
+    await navigateUx2Primary(page, "saved");
     await expect(page.locator(".saved-vocab-list .saved-vocab-row")).toHaveCount(0, {
       timeout: 15_000,
     });
-    await expect(page.locator(".saved-vocab-status")).toContainText(/No saved words|Aucun mot/);
+    await expect(page.locator(".ux2-saved-empty-lead")).toContainText(/No saved words|Aucun mot/);
   });
 });
 
@@ -103,9 +109,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "dictionaries");
 
   const quickImportInput = page.locator("#quickImportFiles");
   await expect(quickImportInput).toBeAttached();
@@ -116,6 +120,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   await expect(page.locator("#importProgress")).toContainText(/Installing|Complete|already installed/i, {
     timeout: 30_000,
   });
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
   await expect(page.locator("#activeDictionarySummary")).not.toContainText(
     /No dictionary added|Aucun dictionnaire ajouté/,

@@ -4,6 +4,12 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Download, type Page } from "@playwright/test";
 
+import {
+  ensureTargetToSource,
+  navigateUx2Primary,
+  openMoreAnd,
+} from "../helpers/ux2_nav";
+
 /**
  * LP1I5 — Learning backup/restore browser lifecycle verification.
  * Uses the local debug directional bundle (same fixture as LS1–LS3 learning e2e).
@@ -146,7 +152,7 @@ test.describe("LP1 Learning backup and restore", () => {
     await page.locator('input[name="learning-backup-policy"][value="replace_all"]').check();
     await expect(page.locator('input[name="learning-backup-policy"][value="replace_all"]')).toBeChecked();
     await page
-      .locator(".learning-backup-actions .btn", { hasText: "Replace all learning records" })
+      .locator(".learning-backup-actions .btn", { hasText: "Continue" })
       .click();
     await expect(page.locator("dialog.learning-backup-confirm-dialog")).toBeVisible({
       timeout: 15_000,
@@ -158,7 +164,7 @@ test.describe("LP1 Learning backup and restore", () => {
 
     await page.locator('input[name="learning-backup-policy"][value="replace_all"]').check();
     await page
-      .locator(".learning-backup-actions .btn", { hasText: "Replace all learning records" })
+      .locator(".learning-backup-actions .btn", { hasText: "Continue" })
       .click();
     await expect(page.locator("dialog.learning-backup-confirm-dialog")).toBeVisible({
       timeout: 15_000,
@@ -282,7 +288,7 @@ test.describe("LP1 Learning backup and restore", () => {
     await expect(page.locator("#learning-backup-preview-heading")).toBeVisible({ timeout: 15_000 });
     await page.locator('input[value="replace_all"]').check();
     await page
-      .locator(".learning-backup-actions .btn", { hasText: "Replace all learning records" })
+      .locator(".learning-backup-actions .btn", { hasText: "Continue" })
       .click();
     await page
       .locator("dialog.learning-backup-confirm-dialog button", {
@@ -427,7 +433,7 @@ test.describe("LP1 Learning backup and restore", () => {
     await expect(page.locator("#learning-backup-preview-heading")).toBeVisible({ timeout: 15_000 });
     await page.locator('input[value="replace_all"]').check();
     await page
-      .locator(".learning-backup-actions .btn", { hasText: "Replace all learning records" })
+      .locator(".learning-backup-actions .btn", { hasText: "Continue" })
       .click();
     await page
       .locator("dialog.learning-backup-confirm-dialog button", {
@@ -470,7 +476,7 @@ test.describe("LP1 Learning backup and restore", () => {
 
     await page.locator('input[value="replace_all"]').check();
     await page
-      .locator(".learning-backup-actions .btn", { hasText: "Replace all learning records" })
+      .locator(".learning-backup-actions .btn", { hasText: "Continue" })
       .click();
     await expect(page.locator("#learning-backup-confirm-heading")).toBeVisible();
     await page.locator("dialog.learning-backup-confirm-dialog button", { hasText: "Cancel" }).click();
@@ -496,11 +502,7 @@ async function readDownloadedPackage(download: Download): Promise<{
 }
 
 async function openManageLearningData(page: Page): Promise<void> {
-  await page.locator("#openManageDictionaries").click();
-  await expect(page.locator("#manageDictionariesPanel")).toBeVisible();
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "learning-data");
   await expect(page.locator("#learning-backup-heading")).toBeVisible({ timeout: 15_000 });
 }
 
@@ -592,20 +594,24 @@ async function expectProgress(
 }
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
+  await navigateUx2Primary(page, "more");
   const select = page.locator("#localeSelect");
   if ((await select.inputValue()) !== locale) {
     await select.selectOption(locale);
     await page.waitForLoadState("domcontentloaded");
+    await navigateUx2Primary(page, "search");
     await expect(page.locator("#searchInput")).toBeVisible({ timeout: offlineTimeoutMs });
+  } else {
+    await navigateUx2Primary(page, "search");
   }
 }
 
 async function saveLexiconByQuery(page: Page, query: string): Promise<void> {
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  if (!/Maninka|Target|Cible/.test(label.split("→")[0] ?? "")) {
-    await toggle.click();
-  }
+  // Saved/Review/More hide #searchInput; always return to Search first.
+  await navigateUx2Primary(page, "search");
+  // UX2 swap control is icon-only; use visible source-language label (same as LS1–LS3).
+  await ensureTargetToSource(page);
+  await expect(page.locator("#searchInput")).toBeVisible({ timeout: 15_000 });
   await page.locator("#searchInput").fill(query);
   await expect(page.locator("#searchResults .result-open").first()).toContainText(query, {
     timeout: 15_000,
@@ -642,9 +648,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "dictionaries");
 
   const quickImportInput = page.locator("#quickImportFiles");
   await expect(quickImportInput).toBeAttached();
@@ -652,9 +656,11 @@ async function installDebugBundle(page: Page): Promise<void> {
   await page.evaluate(() => {
     document.getElementById("quickImportFiles")?.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await expect(page.locator("#importProgress")).toContainText(/Installing|Complete|already installed/i, {
+  // Wait for terminal status — matching "Installing" alone races mid-import.
+  await expect(page.locator("#importProgress")).toContainText(/Complete|already installed/i, {
     timeout: 30_000,
   });
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
   await expect(page.locator("#activeDictionarySummary")).not.toContainText(
     /No dictionary added|Aucun dictionnaire ajouté/,

@@ -47,6 +47,20 @@ const LEXICON_RECORD: EnrichedRecord = {
   },
 };
 
+const LEXICON_MINIMAL: EnrichedRecord = {
+  ir_id: "record-minimal",
+  ir_kind: "lexicon_entry",
+  source_id: "src-test",
+  norm_version: "norm-test",
+  preferred_form: "bólo",
+  variant_forms: ["bólo"],
+  search_keys: {},
+  display: {
+    headword_latin: "bólo",
+    senses: [],
+  },
+};
+
 function makeContext(
   record: EnrichedRecord,
   overrides: Partial<ResultDisplayContext> = {},
@@ -63,23 +77,69 @@ function makeContext(
   };
 }
 
-describe("Phase 7G result rendering", () => {
+describe("UX2I3 result presentation", () => {
   beforeEach(() => {
     setCurrentLocale("fr");
   });
 
-  it("renders compact labels for an exact source match", () => {
-    const list = renderResultsList([makeContext(INDEX_RECORD)], () => undefined);
+  it("renders lexicon_entry headword as primary lexical content with POS and gloss when available", () => {
+    const list = renderResultsList(
+      [
+        makeContext(LEXICON_RECORD, {
+          rawQuery: "Kun",
+          searchDirection: "target_to_source",
+          matched_key: "kun",
+        }),
+      ],
+      () => undefined,
+    );
 
-    expect(list).not.toBeNull();
-    expect(list?.textContent).toContain("Direction :Français → Maninka");
-    expect(list?.textContent).toContain("Entrée trouvée :main");
-    expect(list?.textContent).toContain("Traductions possibles :bólo, bólofɛdɛ");
-    expect(list?.textContent).toContain("+ 1 autres");
-    expect(list?.querySelector(".result-query-hint")).toBeNull();
+    expect(list?.querySelector(".ux2-result-row-lexicon")).not.toBeNull();
+    expect(list?.querySelector(".ux2-result-headword")?.textContent).toBe("Kun");
+    expect(list?.querySelector(".ux2-result-pos")?.textContent).toBe("v");
+    expect(list?.querySelector(".ux2-result-gloss")?.textContent).toBe("fermer la bouche");
+    expect(list?.textContent).not.toContain("Direction :");
+    expect(list?.textContent).not.toContain("Sens possible :");
+    expect(list?.textContent).not.toContain("best");
+    expect(list?.querySelector(".ux2-result-rank")).toBeNull();
   });
 
-  it("shows neutral query-diff copy for a plural alias-style match", () => {
+  it("omits POS and gloss cleanly when unavailable", () => {
+    const list = renderResultsList(
+      [makeContext(LEXICON_MINIMAL, { rawQuery: "bólo", matched_key: "bolo" })],
+      () => undefined,
+    );
+
+    expect(list?.querySelector(".ux2-result-headword")?.textContent).toBe("bólo");
+    expect(list?.querySelector(".ux2-result-pos")).toBeNull();
+    expect(list?.querySelector(".ux2-result-gloss")).toBeNull();
+  });
+
+  it("does not mislabel index_mapping as lexicon_entry", () => {
+    const list = renderResultsList([makeContext(INDEX_RECORD)], () => undefined);
+
+    expect(list?.querySelector(".ux2-result-row-mapping")).not.toBeNull();
+    expect(list?.querySelector(".ux2-result-row-lexicon")).toBeNull();
+    expect(list?.querySelector(".ux2-result-headword")).toBeNull();
+    expect(list?.querySelector(".ux2-result-source")?.textContent).toBe("main");
+    expect(list?.querySelector(".ux2-result-targets")?.textContent).toContain("bólo · bólofɛdɛ");
+    expect(list?.querySelector(".ux2-result-pos")).toBeNull();
+  });
+
+  it("preserves result order and adds no best-match decoration", () => {
+    const list = renderResultsList(
+      [makeContext(INDEX_RECORD), makeContext(LEXICON_RECORD, { rawQuery: "Kun" })],
+      () => undefined,
+    );
+    const rows = list?.querySelectorAll(".ux2-result-row");
+    expect(rows?.length).toBe(2);
+    expect(rows?.[0]?.classList.contains("ux2-result-row-mapping")).toBe(true);
+    expect(rows?.[1]?.classList.contains("ux2-result-row-lexicon")).toBe(true);
+    expect(list?.textContent).not.toMatch(/best match|meilleur|recommended|preferr/i);
+    expect(list?.querySelector("[data-rank], .ux2-result-rank-bar")).toBeNull();
+  });
+
+  it("keeps neutral query hint and Why-this-result semantics", () => {
     const list = renderResultsList(
       [makeContext(INDEX_RECORD, { rawQuery: "mains", matched_key: "mains" })],
       () => undefined,
@@ -88,56 +148,13 @@ describe("Phase 7G result rendering", () => {
     expect(list?.querySelector(".result-query-hint")?.textContent).toBe(
       "Résultat trouvé pour « mains ».",
     );
+    expect(list?.querySelector(".result-why summary")?.textContent).toBe("Pourquoi ce résultat ?");
     expect(list?.textContent).toContain("Même entrée que « main ».");
     expect(list?.textContent).not.toContain("Alias validé");
     expect(list?.textContent).not.toContain("Supplément validé");
   });
 
-  it("uses neutral query-diff copy for a supplement-style match", () => {
-    const sourceRecord: EnrichedRecord = {
-      ...INDEX_RECORD,
-      ir_id: "record-poil",
-      preferred_form: "poil",
-      display: {
-        ...INDEX_RECORD.display!,
-        source_term: "poil",
-        target_entries: [{ lexicon_url: "../lexicon/p.htm", anchor: "e9", display_text: "sí" }],
-      },
-    };
-
-    const list = renderResultsList(
-      [makeContext(sourceRecord, { rawQuery: "poils", matched_key: "poils" })],
-      () => undefined,
-    );
-
-    expect(list?.querySelector(".result-query-hint")?.textContent).toBe(
-      "Résultat trouvé pour « poils ».",
-    );
-    expect(list?.textContent).toContain("Entrée source : « poil ».");
-    expect(list?.textContent).not.toContain("source-index supplement");
-    expect(list?.textContent).not.toContain("Provenance revue");
-  });
-
-  it("renders target-side direction and meaning labels clearly", () => {
-    const list = renderResultsList(
-      [
-        makeContext(LEXICON_RECORD, {
-          rawQuery: "Kun",
-          searchDirection: "target_to_source",
-          sourceLabel: "Français",
-          targetLabel: "Maninka",
-          matched_key: "kun",
-        }),
-      ],
-      () => undefined,
-    );
-
-    expect(list?.textContent).toContain("Direction :Maninka → Français");
-    expect(list?.textContent).toContain("Entrée trouvée :Kun");
-    expect(list?.textContent).toContain("Sens possible :fermer la bouche");
-  });
-
-  it("keeps internal match metadata out of result cards", () => {
+  it("keeps internal match metadata out of ordinary result summary", () => {
     const list = renderResultsList(
       [makeContext(INDEX_RECORD, { rawQuery: "mains", matched_key: "mains" })],
       () => undefined,
@@ -146,12 +163,19 @@ describe("Phase 7G result rendering", () => {
     expect(list?.textContent).not.toContain("matched_key");
     expect(list?.textContent).not.toContain("casefold");
     expect(list?.textContent).not.toContain("ir_id");
+    expect(list?.textContent).not.toContain("record-main");
     expect(list?.textContent).not.toContain("source index");
+  });
+});
+
+describe("Phase 7G result rendering", () => {
+  beforeEach(() => {
+    setCurrentLocale("fr");
   });
 
   it("returns improved empty-state copy", () => {
     expect(getNoResultMessage("inconnu")).toBe(
-      "Aucun résultat pour « inconnu ». Essayez une autre orthographe ou une autre forme.",
+      "Aucun résultat pour « inconnu ». Essayez une autre orthographe ou un autre mot.",
     );
   });
 
@@ -184,7 +208,7 @@ describe("Phase 7N2E4J3 minimal phrase guidance", () => {
     setCurrentLocale("fr");
     const singleWordMiss = getNoResultMessage("inconnu");
     expect(singleWordMiss).toBe(
-      "Aucun résultat pour « inconnu ». Essayez une autre orthographe ou une autre forme.",
+      "Aucun résultat pour « inconnu ». Essayez une autre orthographe ou un autre mot.",
     );
     expect(singleWordMiss).not.toContain("un mot à la fois");
     expect(singleWordMiss).not.toContain("sens de recherche");
@@ -192,7 +216,7 @@ describe("Phase 7N2E4J3 minimal phrase guidance", () => {
     setCurrentLocale("en");
     const enSingleWordMiss = getNoResultMessage("unknownlemma");
     expect(enSingleWordMiss).toBe(
-      'No results for "unknownlemma". Try another spelling or form.',
+      'No results for "unknownlemma". Try another spelling or another word.',
     );
     expect(enSingleWordMiss).not.toBe("Try searching one word at a time.");
     expect(enSingleWordMiss).not.toContain("search direction");
@@ -208,9 +232,6 @@ describe("Phase 7N2E4J3 minimal phrase guidance", () => {
   });
 
   it("documents that phrase guidance is miss-path only (hits never call getNoResultMessage)", () => {
-    // Search hits render result cards via renderResultsList; getNoResultMessage is only
-    // used when ir_ids.length === 0. A phrase-like query that hits therefore never shows
-    // phrase guidance. This assertion keeps the miss helper contract explicit.
     setCurrentLocale("en");
     expect(typeof getNoResultMessage).toBe("function");
     expect(getNoResultMessage("some multiword miss")).toBe(

@@ -97,6 +97,7 @@ describe("renderCorrectionManagement", () => {
     const cbs = callbacks();
     const { root, update } = renderCorrectionManagement(baseVm({ phase: "loading", draftCount: 0, items: [] }), cbs);
     document.body.appendChild(root);
+    expect(root.classList.contains("ux2-correction-manage")).toBe(true);
     expect(root.querySelector("#correction-manage-heading")?.textContent).toBe(
       t("correctionFeedback.manage.heading"),
     );

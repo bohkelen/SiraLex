@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { navigateUx2Primary, openMoreAnd } from "../helpers/ux2_nav";
+
 /**
  * Post-LS1 — Source→Target target links open lexicon entries by ir_id
  * (no second search). Uses debug directional bundle.
@@ -19,8 +21,10 @@ test.describe("Source→Target direct entry navigation", () => {
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
 
     // Stay in Source → Target (French → Maninka for this fixture).
-    await expect(page.locator("#langToggle")).toContainText(
-      /French\s*→\s*Maninka|Source\s*→\s*Target|Source\s*→\s*Cible/,
+    await expect(page.locator("#searchSourceLanguage")).toHaveText(/French|Français|Source/i);
+    await expect(page.locator("#searchTargetLanguage")).toHaveText(/Maninka|Target|Cible/i);
+    await expect(page.locator("#searchLabel")).toContainText(
+      /French\s*→\s*Maninka|Source\s*→\s*Target|Source\s*→\s*Cible|Français\s*→\s*Maninka/,
     );
 
     await page.locator("#searchInput").fill("alpha_fr");
@@ -37,8 +41,10 @@ test.describe("Source→Target direct entry navigation", () => {
     await expect(page.locator(".entry-detail.entry-lexicon")).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(".entry-headword")).toContainText("alpha_mnk");
     await expect(page.locator("#entry-learning-save")).toBeVisible();
-    await expect(page.locator("#langToggle")).toContainText(
-      /Maninka\s*→\s*French|Target\s*→\s*Source|Cible\s*→\s*Source/,
+    await expect(page.locator("#searchSourceLanguage")).toHaveText(/Maninka|Target|Cible/i);
+    await expect(page.locator("#searchTargetLanguage")).toHaveText(/French|Français|Source/i);
+    await expect(page.locator("#searchLabel")).toContainText(
+      /Maninka\s*→\s*French|Target\s*→\s*Source|Cible\s*→\s*Source|Maninka\s*→\s*Français/,
     );
     await expect(page.locator("#searchInput")).toHaveValue("alpha_fr");
 
@@ -46,8 +52,10 @@ test.describe("Source→Target direct entry navigation", () => {
     await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.locator("#langToggle")).toContainText(
-      /French\s*→\s*Maninka|Source\s*→\s*Target|Source\s*→\s*Cible/,
+    await expect(page.locator("#searchSourceLanguage")).toHaveText(/French|Français|Source/i);
+    await expect(page.locator("#searchTargetLanguage")).toHaveText(/Maninka|Target|Cible/i);
+    await expect(page.locator("#searchLabel")).toContainText(
+      /French\s*→\s*Maninka|Source\s*→\s*Target|Source\s*→\s*Cible|Français\s*→\s*Maninka/,
     );
     await expect(page.locator("#searchInput")).toHaveValue("alpha_fr");
     await expect(page.locator("#searchResults")).toContainText(/alpha_fr|alpha_mnk/);
@@ -70,9 +78,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "dictionaries");
 
   const quickImportInput = page.locator("#quickImportFiles");
   await expect(quickImportInput).toBeAttached();
@@ -83,5 +89,6 @@ async function installDebugBundle(page: Page): Promise<void> {
   await expect(page.locator("#importProgress")).toContainText(/Installing|Complete|already installed/i, {
     timeout: 30_000,
   });
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
 }

@@ -162,7 +162,7 @@ async function loadProgress(
 
 function renderProgressHtml(model: SavedVocabularyModel): HTMLElement {
   const { root } = renderSavedVocabulary(model, {
-    onBack: () => undefined,
+    onSearch: () => undefined,
     onOpen: () => undefined,
     onRemove: () => undefined,
     onStartReview: () => undefined,

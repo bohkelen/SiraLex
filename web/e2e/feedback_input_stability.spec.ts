@@ -10,6 +10,13 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import {
+  ensureSourceToTarget,
+  ensureTargetToSource,
+  navigateUx2Primary,
+  openMoreAnd,
+} from "./helpers/ux2_nav";
+
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const usageBundleDir = path.join(webRoot, "public/debug-bundles/test_directional_bundle");
 const installTimeoutMs = 90_000;
@@ -39,7 +46,7 @@ test.describe("CF2I6A feedback input stability", () => {
     });
 
     // --- CF2 management edit ---
-    await page.locator("#openManageSearchFeedback").click();
+    await openMoreAnd(page, "search-feedback");
     await expect(page.locator("[data-testid='search-feedback-manage-row']")).toHaveCount(1, {
       timeout: 15_000,
     });
@@ -56,14 +63,12 @@ test.describe("CF2I6A feedback input stability", () => {
       timeout: 15_000,
     });
     await page.locator(".search-feedback-manage-back").click();
+    await expect(page.locator("#moreHeading")).toBeVisible({ timeout: 15_000 });
 
     // --- CF1 suggest correction (FR label: Décrivez le problème) ---
     await setUiLocale(page, "fr");
-    const toggle = page.locator("#langToggle");
-    const label = (await toggle.textContent()) ?? "";
-    if (!/Maninka|Target|Cible/.test(label.split("→")[0] ?? "")) {
-      await toggle.click();
-    }
+    await navigateUx2Primary(page, "search");
+    await ensureTargetToSource(page);
     await page.locator("#searchInput").fill("alpha_mnk");
     await expect(page.locator("#searchResults .result-open").first()).toContainText("alpha_mnk", {
       timeout: 15_000,
@@ -85,7 +90,7 @@ test.describe("CF2I6A feedback input stability", () => {
     });
 
     // --- CF1 manage edit (same FR description field; residual focus-steal path) ---
-    await page.locator("#openManageCorrections").click();
+    await openMoreAnd(page, "corrections");
     await expect(page.locator("[data-testid='correction-manage']")).toBeVisible({
       timeout: 15_000,
     });
@@ -113,30 +118,20 @@ async function typeAndAssertFocus(
 }
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {
+  await navigateUx2Primary(page, "more");
   const select = page.locator("#localeSelect");
   if ((await select.inputValue()) !== locale) {
     await select.selectOption(locale);
     await page.waitForLoadState("domcontentloaded");
+    await navigateUx2Primary(page, "search");
     await expect(page.locator("#searchInput")).toBeVisible({ timeout: 30_000 });
-  }
-}
-
-async function ensureSourceToTarget(page: Page): Promise<void> {
-  const toggle = page.locator("#langToggle");
-  const label = (await toggle.textContent()) ?? "";
-  if (/→/.test(label)) {
-    const left = label.split("→")[0] ?? "";
-    if (/Maninka|Target|Cible|mnk/i.test(left)) {
-      await toggle.click();
-    }
+  } else {
+    await navigateUx2Primary(page, "search");
   }
 }
 
 async function openManageDictionaries(page: Page): Promise<void> {
-  await page.locator("#openManageDictionaries").click();
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openMoreAnd(page, "dictionaries");
 }
 
 async function getActiveBundleId(page: Page): Promise<string | undefined> {
@@ -187,9 +182,7 @@ async function installDebugBundle(page: Page): Promise<void> {
   ];
   await Promise.all(files.map((file) => access(file)));
 
-  await page.locator("#manageDictionariesPanel").evaluate((el) => {
-    if (el instanceof HTMLDetailsElement) el.open = true;
-  });
+  await openManageDictionaries(page);
   await page.locator("#quickImportFiles").setInputFiles(files);
   await page.evaluate(() => {
     document
@@ -200,5 +193,6 @@ async function installDebugBundle(page: Page): Promise<void> {
     /Installing|Complete|already installed/i,
     { timeout: 30_000 },
   );
+  await navigateUx2Primary(page, "search");
   await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
 }

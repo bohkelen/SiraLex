@@ -1,5 +1,5 @@
 /**
- * LP1I4 — Manage Learning Data renderer (presentation only).
+ * LP1 / UX2I6B2 — Manage Learning Data renderer (presentation only).
  */
 
 import { t, type TranslationKey } from "../i18n";
@@ -54,58 +54,92 @@ function applyFocus(target: LearningBackupFocusTarget, map: Record<string, HTMLE
   return node;
 }
 
+function appendNonMutationBoundary(parent: HTMLElement): void {
+  parent.appendChild(el("p", "ux2-learning-boundary", tt("learningBackup.restore.noLearningChanged")));
+  parent.appendChild(el("p", "ux2-learning-boundary", tt("learningBackup.restore.noDataChanged")));
+}
+
 export function renderLearningBackupSurface(
   host: HTMLElement,
   vm: LearningBackupSurfaceVm,
   callbacks: LearningBackupRenderCallbacks,
 ): LearningBackupRenderResult {
   host.replaceChildren();
-  const root = el("section", "learning-backup-surface");
+  const root = el("section", "learning-backup-surface ux2-learning-backup");
   root.setAttribute("aria-labelledby", "learning-backup-heading");
   if (vm.surfaceBusy) root.setAttribute("aria-busy", "true");
 
-  const heading = el("h2", "title learning-backup-heading", tt("learningBackup.heading"));
+  const heading = el(
+    "h2",
+    "title learning-backup-heading ux2-type-page-title ux2-learning-title",
+    tt("learningBackup.heading"),
+  );
   heading.id = "learning-backup-heading";
+  heading.tabIndex = -1;
   root.appendChild(heading);
 
-  root.appendChild(el("p", "subtitle", tt("learningBackup.localOnly")));
+  root.appendChild(el("p", "subtitle ux2-learning-intro", tt("learningBackup.pageIntro")));
+  root.appendChild(el("p", "ux2-learning-local-only", tt("learningBackup.localOnly")));
 
-  const privacy = el("div", "learning-backup-privacy");
+  const privacy = el("div", "learning-backup-privacy ux2-learning-privacy");
   privacy.setAttribute("role", "note");
   privacy.appendChild(el("p", undefined, tt("learningBackup.privacy.contains")));
   privacy.appendChild(el("p", undefined, tt("learningBackup.privacy.store")));
-  privacy.appendChild(el("p", undefined, tt("learningBackup.privacy.trust")));
   root.appendChild(privacy);
 
-  // --- Export ---
-  const exportBlock = el("div", "learning-backup-export");
-  const exportHeading = el("h3", "learning-backup-subheading", tt("learningBackup.export.title"));
-  exportBlock.appendChild(exportHeading);
+  const layout = el("div", "ux2-learning-layout");
+  const phase = vm.restore.phase;
+  const previewActive =
+    phase === "preview" || phase === "confirming" || phase === "restoring";
+  if (previewActive) {
+    layout.classList.add("ux2-learning-layout--preview");
+  }
+
+  // --- Export / Backup ---
+  const exportBlock = el("div", "learning-backup-export ux2-learning-section");
+  exportBlock.appendChild(
+    el("h3", "learning-backup-subheading ux2-type-section-heading", tt("learningBackup.export.title")),
+  );
+  exportBlock.appendChild(
+    el("p", "ux2-learning-section-help", tt("learningBackup.backupSectionHelp")),
+  );
 
   if (vm.recordCount === null) {
-    exportBlock.appendChild(el("p", "mono", tt("learningBackup.export.loading")));
+    exportBlock.appendChild(el("p", "ux2-learning-count", tt("learningBackup.export.loading")));
   } else if (vm.recordCount === 0) {
-    exportBlock.appendChild(el("p", undefined, tt("learningBackup.export.empty")));
+    exportBlock.appendChild(el("p", "ux2-learning-count", tt("learningBackup.export.empty")));
   } else {
     exportBlock.appendChild(
-      el("p", "mono", tt("learningBackup.export.count", { count: vm.recordCount })),
+      el("p", "ux2-learning-count", tt("learningBackup.export.count", { count: vm.recordCount })),
     );
   }
 
   const exportBtn = document.createElement("button");
   exportBtn.type = "button";
-  exportBtn.className = "btn";
+  exportBtn.className = "btn ux2-learning-primary-btn";
   exportBtn.textContent = tt("learningBackup.export.button");
   exportBtn.disabled = !vm.exportEnabled;
   exportBtn.addEventListener("click", () => callbacks.onExport());
   exportBlock.appendChild(exportBtn);
-  root.appendChild(exportBlock);
+  layout.appendChild(exportBlock);
 
   // --- Restore ---
-  const restoreBlock = el("div", "learning-backup-restore");
-  restoreBlock.appendChild(el("h3", "learning-backup-subheading", tt("learningBackup.restore.title")));
+  const restoreBlock = el("div", "learning-backup-restore ux2-learning-section");
+  restoreBlock.appendChild(
+    el("h3", "learning-backup-subheading ux2-type-section-heading", tt("learningBackup.restore.title")),
+  );
+  restoreBlock.appendChild(
+    el("p", "ux2-learning-section-help", tt("learningBackup.restoreSectionHelp")),
+  );
+  restoreBlock.appendChild(
+    el("p", "ux2-learning-trust", tt("learningBackup.privacy.trust")),
+  );
 
-  const fileLabel = el("label", "label learning-backup-file-label", tt("learningBackup.restore.chooseFile"));
+  const fileLabel = el(
+    "label",
+    "label learning-backup-file-label ux2-learning-file-label",
+    tt("learningBackup.restore.chooseFile"),
+  );
   fileLabel.setAttribute("for", "learning-backup-file-input");
   const fileInput = document.createElement("input");
   fileInput.id = "learning-backup-file-input";
@@ -127,12 +161,10 @@ export function renderLearningBackupSurface(
   let policyAdd: HTMLInputElement | null = null;
   let policyReplace: HTMLInputElement | null = null;
 
-  const phase = vm.restore.phase;
-
   if (phase === "reading" || phase === "validating") {
     const status = el(
       "p",
-      "learning-backup-status",
+      "learning-backup-status ux2-learning-status",
       phase === "reading"
         ? tt("learningBackup.restore.reading", { filename: vm.restore.filename })
         : tt("learningBackup.restore.validating", { filename: vm.restore.filename }),
@@ -142,34 +174,40 @@ export function renderLearningBackupSurface(
   }
 
   if (phase === "invalid") {
-    invalidHeading = el("h3", "learning-backup-subheading", tt("learningBackup.restore.invalidHeading"));
+    invalidHeading = el(
+      "h3",
+      "learning-backup-subheading ux2-type-section-heading",
+      tt("learningBackup.restore.invalidHeading"),
+    );
     invalidHeading.tabIndex = -1;
     restoreBlock.appendChild(invalidHeading);
+    const err = el("p", "ux2-learning-error", tt(vm.restore.error.messageKey));
+    err.setAttribute("role", "alert");
+    restoreBlock.appendChild(err);
     restoreBlock.appendChild(
-      el("p", undefined, tt(vm.restore.error.messageKey)),
+      el("p", "ux2-learning-meta-secondary", tt("learningBackup.restore.selectedFile", {
+        filename: vm.restore.filename,
+      })),
     );
-    restoreBlock.appendChild(
-      el("p", "mono", tt("learningBackup.restore.selectedFile", { filename: vm.restore.filename })),
-    );
+    appendNonMutationBoundary(restoreBlock);
   }
 
   if (phase === "preview" || phase === "confirming" || phase === "restoring") {
     const preview = vm.restore.preview;
-    previewHeading = el("h3", "learning-backup-subheading", tt("learningBackup.preview.heading"));
+    previewHeading = el(
+      "h3",
+      "learning-backup-subheading ux2-type-section-heading",
+      tt("learningBackup.preview.heading"),
+    );
     previewHeading.id = "learning-backup-preview-heading";
     previewHeading.tabIndex = -1;
     restoreBlock.appendChild(previewHeading);
 
-    restoreBlock.appendChild(
-      el("p", "mono", tt("learningBackup.restore.selectedFile", { filename: vm.restore.filename })),
-    );
-    restoreBlock.appendChild(
+    const backupMeta = el("div", "ux2-learning-preview-meta");
+    backupMeta.appendChild(
       el("p", undefined, tt("learningBackup.preview.exportedAt", { value: preview.exported_at })),
     );
-    restoreBlock.appendChild(
-      el("p", undefined, tt("learningBackup.preview.schema", { value: preview.package_schema })),
-    );
-    restoreBlock.appendChild(
+    backupMeta.appendChild(
       el(
         "p",
         undefined,
@@ -180,9 +218,24 @@ export function renderLearningBackupSurface(
         }),
       ),
     );
+    backupMeta.appendChild(
+      el(
+        "p",
+        "ux2-learning-meta-secondary",
+        tt("learningBackup.preview.schema", { value: preview.package_schema }),
+      ),
+    );
+    backupMeta.appendChild(
+      el(
+        "p",
+        "ux2-learning-meta-secondary",
+        tt("learningBackup.restore.selectedFile", { filename: vm.restore.filename }),
+      ),
+    );
+    restoreBlock.appendChild(backupMeta);
 
     if (preview.local_validation.state === "invalid") {
-      const warn = el("div", "learning-backup-local-invalid");
+      const warn = el("div", "learning-backup-local-invalid ux2-learning-local-invalid");
       warn.appendChild(
         el(
           "p",
@@ -196,10 +249,14 @@ export function renderLearningBackupSurface(
       restoreBlock.appendChild(warn);
     }
 
-    const compatHeading = el("h4", "learning-backup-subheading", tt("learningBackup.compat.heading"));
+    const compatHeading = el(
+      "h4",
+      "learning-backup-subheading ux2-learning-compat-heading",
+      tt("learningBackup.compat.heading"),
+    );
     restoreBlock.appendChild(compatHeading);
     const table = document.createElement("table");
-    table.className = "learning-backup-compat-table";
+    table.className = "learning-backup-compat-table ux2-learning-compat-table";
     table.setAttribute("aria-label", tt("learningBackup.compat.heading"));
     const thead = document.createElement("thead");
     const hr = document.createElement("tr");
@@ -231,13 +288,14 @@ export function renderLearningBackupSurface(
     restoreBlock.appendChild(table);
 
     const fieldset = document.createElement("fieldset");
-    fieldset.className = "learning-backup-policies";
+    fieldset.className = "learning-backup-policies ux2-learning-policies";
     fieldset.disabled = phase !== "preview" || vm.restoreBusy;
     const legend = document.createElement("legend");
     legend.textContent = tt("learningBackup.policy.legend");
     fieldset.appendChild(legend);
 
     const addAvailable = preview.add_missing.state === "available";
+    const addPanel = el("div", "ux2-learning-policy-panel");
     const addLabel = el("label", "learning-backup-policy-option");
     policyAdd = document.createElement("input");
     policyAdd.type = "radio";
@@ -251,14 +309,14 @@ export function renderLearningBackupSurface(
       if (policyAdd?.checked) callbacks.onSelectPolicy("add_missing");
     });
     addLabel.appendChild(policyAdd);
-    addLabel.appendChild(document.createTextNode(tt("learningBackup.policy.addMissing")));
-    fieldset.appendChild(addLabel);
-    fieldset.appendChild(el("p", "subtitle", tt("learningBackup.policy.addMissingHelp")));
+    addLabel.appendChild(document.createTextNode(` ${tt("learningBackup.policy.addMissing")}`));
+    addPanel.appendChild(addLabel);
+    addPanel.appendChild(el("p", "subtitle ux2-learning-policy-help", tt("learningBackup.policy.addMissingHelp")));
     if (addAvailable && preview.add_missing.state === "available") {
-      fieldset.appendChild(
+      addPanel.appendChild(
         el(
           "p",
-          "mono",
+          "ux2-learning-policy-counts",
           tt("learningBackup.policy.addMissingCounts", {
             add: preview.add_missing.add_count,
             skip: preview.add_missing.skipped_existing_count,
@@ -266,9 +324,13 @@ export function renderLearningBackupSurface(
         ),
       );
     } else {
-      fieldset.appendChild(el("p", "subtitle", tt("learningBackup.localInvalid.addUnavailable")));
+      addPanel.appendChild(
+        el("p", "subtitle ux2-learning-policy-help", tt("learningBackup.localInvalid.addUnavailable")),
+      );
     }
+    fieldset.appendChild(addPanel);
 
+    const replacePanel = el("div", "ux2-learning-policy-panel ux2-learning-policy-panel--replace");
     const replaceLabel = el("label", "learning-backup-policy-option");
     policyReplace = document.createElement("input");
     policyReplace.type = "radio";
@@ -283,35 +345,38 @@ export function renderLearningBackupSurface(
       if (policyReplace?.checked) callbacks.onSelectPolicy("replace_all");
     });
     replaceLabel.appendChild(policyReplace);
-    replaceLabel.appendChild(document.createTextNode(tt("learningBackup.policy.replaceAll")));
-    fieldset.appendChild(replaceLabel);
-    fieldset.appendChild(el("p", "subtitle", tt("learningBackup.policy.replaceAllHelp")));
-    fieldset.appendChild(
+    replaceLabel.appendChild(document.createTextNode(` ${tt("learningBackup.policy.replaceAll")}`));
+    replacePanel.appendChild(replaceLabel);
+    replacePanel.appendChild(
+      el("p", "subtitle ux2-learning-policy-help", tt("learningBackup.policy.replaceAllHelp")),
+    );
+    replacePanel.appendChild(
       el(
         "p",
-        "mono",
+        "ux2-learning-policy-counts",
         tt("learningBackup.policy.replaceAllCounts", {
           previous: preview.replace_all.previous_count,
           restored: preview.replace_all.restored_count,
         }),
       ),
     );
+    fieldset.appendChild(replacePanel);
     restoreBlock.appendChild(fieldset);
 
     if (phase === "preview") {
-      const actions = el("div", "row learning-backup-actions");
+      const actions = el("div", "row learning-backup-actions ux2-learning-actions");
       const commitBtn = document.createElement("button");
       commitBtn.type = "button";
-      commitBtn.className = "btn";
+      commitBtn.className = "btn ux2-learning-primary-btn";
       commitBtn.textContent =
         vm.restore.selectedPolicy === "replace_all"
-          ? tt("learningBackup.policy.replaceAll")
-          : tt("learningBackup.policy.addMissing");
+          ? tt("learningBackup.policy.continueReplace")
+          : tt("learningBackup.policy.restoreAction");
       commitBtn.disabled = vm.restore.selectedPolicy == null || vm.surfaceBusy;
       commitBtn.addEventListener("click", () => callbacks.onRequestCommit());
       const cancelBtn = document.createElement("button");
       cancelBtn.type = "button";
-      cancelBtn.className = "btn";
+      cancelBtn.className = "btn ux2-learning-secondary-btn";
       cancelBtn.textContent = tt("learningBackup.cancel");
       cancelBtn.disabled = vm.surfaceBusy;
       cancelBtn.addEventListener("click", () => callbacks.onCancelRestore());
@@ -320,7 +385,11 @@ export function renderLearningBackupSurface(
     }
 
     if (phase === "restoring") {
-      const status = el("p", "learning-backup-status", tt("learningBackup.restore.restoring"));
+      const status = el(
+        "p",
+        "learning-backup-status ux2-learning-status",
+        tt("learningBackup.restore.restoring"),
+      );
       status.setAttribute("role", "status");
       restoreBlock.appendChild(status);
     }
@@ -328,17 +397,21 @@ export function renderLearningBackupSurface(
 
   if (phase === "confirming") {
     const dialog = document.createElement("dialog");
-    dialog.className = "learning-backup-confirm-dialog";
+    dialog.className = "learning-backup-confirm-dialog ux2-learning-confirm-dialog";
     dialog.setAttribute("aria-labelledby", "learning-backup-confirm-heading");
-    confirmHeading = el("h3", "learning-backup-subheading", tt("learningBackup.confirm.heading"));
+    confirmHeading = el(
+      "h3",
+      "learning-backup-subheading ux2-type-section-heading",
+      tt("learningBackup.confirm.heading"),
+    );
     confirmHeading.id = "learning-backup-confirm-heading";
     confirmHeading.tabIndex = -1;
     dialog.appendChild(confirmHeading);
     dialog.appendChild(el("p", undefined, tt("learningBackup.confirm.replaceWarning")));
-    const actions = el("div", "row");
+    const actions = el("div", "row ux2-learning-actions");
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
-    cancelBtn.className = "btn";
+    cancelBtn.className = "btn ux2-learning-secondary-btn";
     cancelBtn.textContent = tt("learningBackup.cancel");
     cancelBtn.addEventListener("click", () => {
       dialog.close();
@@ -346,7 +419,7 @@ export function renderLearningBackupSurface(
     });
     const confirmBtn = document.createElement("button");
     confirmBtn.type = "button";
-    confirmBtn.className = "btn";
+    confirmBtn.className = "btn ux2-learning-primary-btn";
     confirmBtn.textContent = tt("learningBackup.confirm.replaceAction");
     confirmBtn.addEventListener("click", () => {
       dialog.close();
@@ -355,18 +428,21 @@ export function renderLearningBackupSurface(
     actions.append(cancelBtn, confirmBtn);
     dialog.appendChild(actions);
     restoreBlock.appendChild(dialog);
-    // showModal requires a connected dialog — defer until host.appendChild(root) below.
   }
 
   if (phase === "success") {
-    resultHeading = el("h3", "learning-backup-subheading", tt("learningBackup.restore.completed"));
+    resultHeading = el(
+      "h3",
+      "learning-backup-subheading ux2-type-section-heading",
+      tt("learningBackup.restore.completed"),
+    );
     resultHeading.tabIndex = -1;
     restoreBlock.appendChild(resultHeading);
     if (vm.restore.policy === "add_missing") {
       restoreBlock.appendChild(
         el(
           "p",
-          undefined,
+          "ux2-learning-success-detail",
           tt("learningBackup.restore.successAdd", {
             added: vm.restore.added_count ?? 0,
             kept: vm.restore.unchanged_count ?? 0,
@@ -377,7 +453,7 @@ export function renderLearningBackupSurface(
       restoreBlock.appendChild(
         el(
           "p",
-          undefined,
+          "ux2-learning-success-detail",
           tt("learningBackup.restore.successReplace", {
             previous: vm.restore.previous_count ?? 0,
             restored: vm.restore.restored_count ?? 0,
@@ -388,7 +464,7 @@ export function renderLearningBackupSurface(
     if (callbacks.onOpenSavedVocabulary) {
       const openBtn = document.createElement("button");
       openBtn.type = "button";
-      openBtn.className = "btn";
+      openBtn.className = "btn ux2-learning-primary-btn";
       openBtn.textContent = tt("learningBackup.openSaved");
       openBtn.addEventListener("click", () => callbacks.onOpenSavedVocabulary?.());
       restoreBlock.appendChild(openBtn);
@@ -396,21 +472,32 @@ export function renderLearningBackupSurface(
   }
 
   if (phase === "error") {
-    resultHeading = el("h3", "learning-backup-subheading", tt("learningBackup.restore.failedHeading"));
+    resultHeading = el(
+      "h3",
+      "learning-backup-subheading ux2-type-section-heading",
+      tt("learningBackup.restore.failedHeading"),
+    );
     resultHeading.tabIndex = -1;
     restoreBlock.appendChild(resultHeading);
-    restoreBlock.appendChild(el("p", undefined, tt(vm.restore.messageKey)));
-    restoreBlock.appendChild(el("p", undefined, tt("learningBackup.restore.noDataChanged")));
+    const err = el("p", "ux2-learning-error", tt(vm.restore.messageKey));
+    err.setAttribute("role", "alert");
+    restoreBlock.appendChild(err);
+    appendNonMutationBoundary(restoreBlock);
   }
 
-  root.appendChild(restoreBlock);
+  layout.appendChild(restoreBlock);
+  root.appendChild(layout);
 
   // Export / shared result region
-  const resultRegion = el("div", "learning-backup-result");
+  const resultRegion = el("div", "learning-backup-result ux2-learning-result");
   resultRegion.setAttribute("role", "status");
   if (vm.exportResult?.kind === "success") {
     if (!resultHeading) {
-      resultHeading = el("h3", "learning-backup-subheading", tt("learningBackup.export.created"));
+      resultHeading = el(
+        "h3",
+        "learning-backup-subheading ux2-type-section-heading",
+        tt("learningBackup.export.created"),
+      );
       resultHeading.tabIndex = -1;
       resultRegion.appendChild(resultHeading);
     }
@@ -426,18 +513,23 @@ export function renderLearningBackupSurface(
     );
   } else if (vm.exportResult?.kind === "error") {
     if (!resultHeading) {
-      resultHeading = el("h3", "learning-backup-subheading", tt("learningBackup.export.failedHeading"));
+      resultHeading = el(
+        "h3",
+        "learning-backup-subheading ux2-type-section-heading",
+        tt("learningBackup.export.failedHeading"),
+      );
       resultHeading.tabIndex = -1;
       resultRegion.appendChild(resultHeading);
     }
-    resultRegion.appendChild(el("p", undefined, tt(vm.exportResult.messageKey)));
-    resultRegion.appendChild(el("p", undefined, tt("learningBackup.restore.noDataChanged")));
+    const err = el("p", "ux2-learning-error", tt(vm.exportResult.messageKey));
+    err.setAttribute("role", "alert");
+    resultRegion.appendChild(err);
+    appendNonMutationBoundary(resultRegion);
   }
   root.appendChild(resultRegion);
 
   host.appendChild(root);
 
-  // HTMLDialogElement.showModal() requires a document-connected dialog.
   const confirmDialog = root.querySelector("dialog.learning-backup-confirm-dialog");
   if (confirmDialog instanceof HTMLDialogElement) {
     if (confirmDialog.isConnected && typeof confirmDialog.showModal === "function") {

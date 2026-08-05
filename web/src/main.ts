@@ -6,7 +6,6 @@ import { probeJsonlFile } from "./bundle_probe";
 import {
   buildLanguageMetaFromManifest,
   getBundleDisplayName,
-  getSearchDirectionText,
   getSearchPlaceholder,
   getSourceLabel,
   getTargetLabel,
@@ -115,6 +114,7 @@ import {
   renderResultsList,
   type ResultDisplayContext,
 } from "./render/render_results";
+import { applySearchDirectionPresentation } from "./render/render_search_chrome";
 import { renderEntryDetail, showTargetEntryUnavailable } from "./render/render_entry";
 import { renderCorrectionForm } from "./render/render_correction_form";
 import {
@@ -123,6 +123,13 @@ import {
   renderSearchFeedbackCapture,
 } from "./render/render_search_feedback_capture";
 import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
+import { renderMore } from "./render/render_more";
+import { renderInstalledDictionaryList } from "./render/render_dictionary_management";
+import {
+  renderPrimaryNavigation,
+  type PrimaryDestination,
+  type PrimaryNavigationView,
+} from "./render/render_primary_navigation";
 import {
   createSearchFeedbackCaptureController,
   type SearchFeedbackCaptureController,
@@ -180,7 +187,6 @@ const DEFAULT_LOCALE = resolveDefaultLocale(
 );
 setCurrentLocale(DEFAULT_LOCALE);
 initUiTheme();
-const DEFAULT_UI_THEME = getCurrentUiThemePreference();
 
 const FEATURED_CATALOG_URL =
   import.meta.env.VITE_FEATURED_CATALOG_URL?.trim() || "/catalog.json";
@@ -247,132 +253,128 @@ async function performConfiguredFeedbackHandoff(
 }
 
 app.innerHTML = `
-  <div class="container">
-    <div class="card">
-      <div class="row" style="align-items: start; justify-content: space-between; gap: 12px">
-        <div>
-          <h1 class="title">SiraLex</h1>
-          <p class="subtitle">${t("app.subtitle")}</p>
-        </div>
-        <div class="header-prefs">
-          <div class="field theme-control">
-            <div class="label" id="themeSelectorLabel">${t("theme.selectorLabel")}</div>
-            <select id="themeSelect" aria-labelledby="themeSelectorLabel">
-              <option value="system" ${DEFAULT_UI_THEME === "system" ? "selected" : ""}>${t("theme.system")}</option>
-              <option value="light" ${DEFAULT_UI_THEME === "light" ? "selected" : ""}>${t("theme.light")}</option>
-              <option value="dark" ${DEFAULT_UI_THEME === "dark" ? "selected" : ""}>${t("theme.dark")}</option>
-            </select>
-          </div>
-          <div class="field locale-control">
-            <div class="label">${t("locale.selectorLabel")}</div>
-            <select id="localeSelect">
-              <option value="fr" ${DEFAULT_LOCALE === "fr" ? "selected" : ""}>${t("locale.french")}</option>
-              <option value="en" ${DEFAULT_LOCALE === "en" ? "selected" : ""}>${t("locale.english")}</option>
-            </select>
-          </div>
-        </div>
-      </div>
-    </div>
+  <div class="ux2-app-shell" id="ux2AppShell" data-primary="search" data-search-view="search">
+    <header class="ux2-app-header">
+      <div class="ux2-wordmark ux2-type-wordmark" id="ux2Wordmark">SiraLex</div>
+      <div id="ux2PrimaryNavHost" class="ux2-primary-nav-host"></div>
+    </header>
 
-    <div class="card" style="margin-top: 16px">
-      <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("search.title")}</h2>
-      <p class="subtitle">${t("search.subtitle")}</p>
-      <div id="dictStatus" class="mono"></div>
-      <div id="firstRun" style="display: none; margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
-        <div class="label">${t("firstRun.title")}</div>
-        <p class="subtitle" style="margin: 6px 0 0 0">${t("firstRun.intro")}</p>
-        <div id="featuredInstallStatus" class="mono"></div>
-        <div class="row" style="margin-top: 10px; gap: 8px">
-          <button id="featuredInstall" class="btn">${t("firstRun.install")}</button>
-          <button id="retryFeaturedInstall" class="btn" style="display: none">${t("firstRun.retryInstall")}</button>
-        </div>
-      </div>
-
-      <div id="activeDictionaryRow" style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
-        <div class="row" style="align-items: center; justify-content: space-between; gap: 8px">
-          <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
-          <div class="row" style="gap: 8px; flex-wrap: wrap">
-            <button id="openSavedVocabulary" class="btn" type="button">${t("learning.openSaved")}</button>
-            <button id="openManageCorrections" class="btn" type="button">${t("correctionFeedback.manage.open")}</button>
-            <button id="openManageSearchFeedback" class="btn" type="button">${t("searchFeedback.manage.open")}</button>
-            <button id="openManageDictionaries" class="btn" type="button">${t("manage.open")}</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="searchControlsRow" class="row" style="display: none; margin-top: 12px; align-items: center">
-        <div class="field" style="flex: 1">
-          <div class="label" id="searchLabel">${t("search.queryLabel", { direction: `${t("language.source")} → ${t("language.target")}` })}</div>
-          <input id="searchInput" type="text" placeholder="${t("search.placeholder", { language: t("language.source") })}" disabled autocomplete="off" />
-        </div>
-        <button id="langToggle" class="btn" disabled>${t("language.source")} → ${t("language.target")}</button>
-      </div>
-
-      <div id="searchMeta" class="mono" style="margin-top: 12px"></div>
-      <div id="searchResults" style="margin-top: 12px"></div>
-    </div>
-
-    <details id="manageDictionariesPanel" style="margin-top: 16px">
-      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("manage.summary")}</summary>
-      <div class="card" style="margin-top: 8px">
-        <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("manage.title")}</h2>
-        <p class="subtitle" style="margin: 0 0 8px 0">${t("manage.surfaceHint")}</p>
-        <div class="row" style="margin-top: 12px; align-items: center">
-          <div class="field" style="flex: 1">
-            <div class="label">${t("manage.installedLabel")}</div>
-            <select id="bundleSelect" disabled>
-              <option value="">${t("manage.noneInstalled")}</option>
-            </select>
-          </div>
-        </div>
-        <div id="installedBundleStatus" class="mono" style="margin-top: 12px"></div>
-        <div id="installedBundleList" style="margin-top: 12px"></div>
-
-        <div style="margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px">
-          <div class="label">${t("import.packageTitle")}</div>
-          <p class="subtitle" style="margin: 6px 0 0 0">${t("import.packageChooseHint")}</p>
+    <main class="ux2-main">
+      <div id="searchChrome" class="ux2-search-chrome" data-search-ready="false">
+        <h2 class="ux2-visually-hidden" id="searchHeading" tabindex="-1">${t("search.title")}</h2>
+        <p class="subtitle ux2-search-setup-copy">${t("search.subtitle")}</p>
+        <div id="dictStatus" class="mono ux2-search-diagnostic"></div>
+        <div id="firstRun" class="ux2-search-first-run" style="display: none">
+          <div class="label">${t("firstRun.title")}</div>
+          <p class="subtitle" style="margin: 6px 0 0 0">${t("firstRun.intro")}</p>
+          <div id="featuredInstallStatus" class="mono"></div>
           <div class="row" style="margin-top: 10px; gap: 8px">
-            <button id="packageImport" class="btn" type="button">${t("import.packageChooseButton")}</button>
-            <input id="packageImportFile" type="file" accept=".siralex.zip,application/zip" style="display: none" />
+            <button id="featuredInstall" class="btn">${t("firstRun.install")}</button>
+            <button id="retryFeaturedInstall" class="btn" style="display: none">${t("firstRun.retryInstall")}</button>
           </div>
         </div>
 
-        <details style="margin-top: 12px">
-          <summary style="color: var(--muted); font-size: 13px; cursor: pointer">${t("advancedSetup.summary")}</summary>
-          <p class="subtitle" style="margin: 8px 0 0 0">${t("advancedSetup.surfaceHint")}</p>
-          <div class="row" style="margin-top: 12px; align-items: end">
-            <div class="field" style="flex: 1">
-              <div class="label">${t("catalog.urlLabel")}</div>
-              <input id="catalogUrl" type="text" placeholder="${t("catalog.urlPlaceholder")}" autocomplete="off" />
-            </div>
-            <button id="loadCatalog" class="btn">${t("catalog.load")}</button>
+        <div id="activeDictionaryRow" class="ux2-search-diagnostic ux2-active-dictionary-row">
+          <div class="mono" id="activeDictionarySummary">${t("activeDictionary.none")}</div>
+        </div>
+
+        <div id="searchControlsRow" class="ux2-search-controls" style="display: none">
+          <div class="ux2-search-direction" data-testid="ux2-search-direction">
+            <span id="searchSourceLanguage" class="ux2-search-language"></span>
+            <button id="langToggle" class="ux2-search-swap" type="button" disabled aria-label="${t("search.switchDirection", { from: t("language.source"), to: t("language.target") })}"></button>
+            <span id="searchTargetLanguage" class="ux2-search-language"></span>
           </div>
-          <div id="catalogStatus" class="mono" style="margin-top: 12px"></div>
-          <div id="catalogList" style="margin-top: 12px"></div>
-          <div style="margin-top: 12px">
+          <label class="ux2-visually-hidden" id="searchLabel" for="searchInput">${t("search.queryLabel", { direction: `${t("language.source")} → ${t("language.target")}` })}</label>
+          <div class="ux2-search-field">
+            <span class="ux2-search-field-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+            <input id="searchInput" type="search" enterkeyhint="search" placeholder="${t("search.placeholder", { language: t("language.source") })}" disabled autocomplete="off" />
+          </div>
+        </div>
+
+        <div id="searchMeta" class="ux2-search-meta" aria-live="polite"></div>
+      </div>
+
+      <div id="searchResults" class="ux2-surface-host ux2-search-results"></div>
+
+      <section id="moreDestination" class="ux2-more-landing" hidden></section>
+
+    <div id="moreManagementHost" class="ux2-more-management-host" hidden>
+      <button id="moreManagementBack" class="ux2-more-management-back" type="button">${t("more.back")}</button>
+
+    <section id="dictionaryManagementSurface" class="ux2-dictionary-management" aria-labelledby="dictionary-management-heading">
+      <div id="manageDictionariesPanel" class="ux2-manage-dictionaries-panel">
+        <h2 id="dictionary-management-heading" class="ux2-type-page-title ux2-dict-title" tabindex="-1">${t("dictionaries.title")}</h2>
+
+        <div class="ux2-dict-layout">
+          <section class="ux2-dict-section ux2-dict-installed-section" aria-labelledby="dictionaries-installed-heading">
+            <h3 id="dictionaries-installed-heading" class="ux2-type-section-heading ux2-dict-section-heading">${t("dictionaries.installed")}</h3>
+            <div class="ux2-dict-active-control">
+              <label class="ux2-dict-active-label" for="bundleSelect" id="bundleSelectLabel">${t("dictionaries.activeDictionary")}</label>
+              <select id="bundleSelect" disabled aria-labelledby="bundleSelectLabel">
+                <option value="">${t("manage.noneInstalled")}</option>
+              </select>
+            </div>
+            <div id="installedBundleList" class="ux2-dict-installed-host"></div>
+          </section>
+
+          <section class="ux2-dict-section ux2-dict-add-section" aria-labelledby="dictionaries-add-heading">
+            <h3 id="dictionaries-add-heading" class="ux2-type-section-heading ux2-dict-section-heading">${t("dictionaries.add")}</h3>
+            <p class="ux2-dict-add-help">${t("dictionaries.addHelp")}</p>
+            <div class="ux2-dict-add-actions">
+              <button id="packageImport" class="ux2-dict-package-btn" type="button">${t("dictionaries.chooseFile")}</button>
+              <input id="packageImportFile" type="file" accept=".siralex.zip,application/zip" style="display: none" />
+            </div>
+            <div id="importProgress" class="ux2-dict-progress" role="status" style="display: none"></div>
+          </section>
+        </div>
+
+        <details id="dictionariesAdvanced" class="ux2-dict-advanced">
+          <summary>${t("dictionaries.advanced")}</summary>
+          <p class="ux2-dict-advanced-hint">${t("advancedSetup.surfaceHint")}</p>
+          <div id="installedBundleStatus" class="mono ux2-dict-tech-status"></div>
+          <div class="ux2-dict-advanced-block">
+            <div class="label">${t("catalog.urlLabel")}</div>
+            <div class="row" style="margin-top: 8px; align-items: end">
+              <div class="field" style="flex: 1">
+                <input id="catalogUrl" type="text" placeholder="${t("catalog.urlPlaceholder")}" autocomplete="off" />
+              </div>
+              <button id="loadCatalog" class="btn">${t("catalog.load")}</button>
+            </div>
+            <div id="catalogStatus" class="mono" style="margin-top: 12px"></div>
+            <div id="catalogList" style="margin-top: 12px"></div>
+          </div>
+          <div class="ux2-dict-advanced-block">
             <div class="label">${t("import.legacyThreeFileLabel")}</div>
             <p class="subtitle" style="margin: 4px 0 0 0">${t("import.legacyThreeFileHint")}</p>
-          </div>
-          <div class="row" style="margin-top: 8px">
-            <button id="quickImport" class="btn">${t("import.legacyThreeFileButton")}</button>
-            <input id="quickImportFiles" type="file" multiple style="display: none" />
-            <button id="cancelInstall" class="btn" style="display: none">${t("import.cancel")}</button>
+            <div class="row" style="margin-top: 8px">
+              <button id="quickImport" class="btn">${t("import.legacyThreeFileButton")}</button>
+              <input id="quickImportFiles" type="file" multiple style="display: none" />
+              <button id="cancelInstall" class="btn" style="display: none">${t("import.cancel")}</button>
+            </div>
           </div>
         </details>
-
-        <div id="importProgress" class="mono" style="margin-top: 12px; display: none"></div>
-        <div id="learningBackupHost" class="learning-backup-host" style="margin-top: 12px"></div>
-        <div class="row" style="margin-top: 12px; flex-direction: column; align-items: flex-start; gap: 8px">
-          <p id="learningBackupDeleteReminder" class="learning-backup-delete-reminder" hidden></p>
-          <p id="correctionFeedbackDeleteReminder" class="correction-manage-delete-reminder" hidden></p>
-          <p id="searchFeedbackDeleteReminder" class="search-feedback-manage-delete-reminder" hidden></p>
-          <button id="clearDb" class="btn">${t("db.delete")}</button>
-        </div>
       </div>
-    </details>
+    </section>
 
-    <details style="margin-top: 16px">
-      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("diagnostics.summary")}</summary>
+    <section id="learningDataSurface" class="ux2-learning-data-surface" aria-label="${t("more.learningData")}" hidden>
+      <div id="learningBackupHost" class="learning-backup-host"></div>
+    </section>
+
+    <section id="dictionariesDestructive" class="ux2-dict-destructive" aria-labelledby="dictionaries-data-heading">
+      <h3 id="dictionaries-data-heading" class="ux2-type-section-heading ux2-dict-section-heading">${t("dictionaries.dataManagement")}</h3>
+      <p class="ux2-dict-destructive-hint">${t("dictionaries.dataManagementHelp")}</p>
+      <div class="ux2-dict-destructive-body">
+        <p id="learningBackupDeleteReminder" class="learning-backup-delete-reminder" hidden></p>
+        <p id="correctionFeedbackDeleteReminder" class="correction-manage-delete-reminder" hidden></p>
+        <p id="searchFeedbackDeleteReminder" class="search-feedback-manage-delete-reminder" hidden></p>
+        <button id="clearDb" class="btn ux2-dict-clear-db" type="button">${t("db.delete")}</button>
+      </div>
+    </section>
+
+    <details class="ux2-more-legacy-advanced">
+      <summary>${t("diagnostics.summary")}</summary>
       <div class="card" style="margin-top: 8px">
         <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("diagnostics.title")}</h2>
         <p class="subtitle" style="margin: 0 0 8px 0">${t("diagnostics.surfaceHint")}</p>
@@ -407,7 +409,7 @@ app.innerHTML = `
       </div>
     </details>
 
-    <details style="margin-top: 16px">
+    <details class="ux2-more-legacy-advanced" style="margin-top: 16px">
       <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("dev.summary")}</summary>
 
       <div class="card" style="margin-top: 8px">
@@ -458,6 +460,8 @@ app.innerHTML = `
         <div id="probeOut" class="mono" style="margin-top: 12px"></div>
       </div>
     </details>
+    </div>
+    </main>
   </div>
 `;
 
@@ -470,17 +474,20 @@ function mustGetEl<T extends Element>(selector: string): T {
 }
 
 // Primary UI elements
-const localeSelect = mustGetEl<HTMLSelectElement>("#localeSelect");
-const themeSelect = mustGetEl<HTMLSelectElement>("#themeSelect");
+const appShell = mustGetEl<HTMLDivElement>("#ux2AppShell");
+const primaryNavHost = mustGetEl<HTMLDivElement>("#ux2PrimaryNavHost");
+const searchHeading = mustGetEl<HTMLHeadingElement>("#searchHeading");
+const moreDestination = mustGetEl<HTMLElement>("#moreDestination");
+const moreManagementHost = mustGetEl<HTMLElement>("#moreManagementHost");
+const moreManagementBackBtn = mustGetEl<HTMLButtonElement>("#moreManagementBack");
+let moreHeading: HTMLHeadingElement | null = null;
+const dictionaryManagementSurface = mustGetEl<HTMLElement>("#dictionaryManagementSurface");
+const learningDataSurface = mustGetEl<HTMLElement>("#learningDataSurface");
+const dictionaryManagementHeading = mustGetEl<HTMLHeadingElement>("#dictionary-management-heading");
+const manageDictionariesPanel = mustGetEl<HTMLElement>("#manageDictionariesPanel");
+const dictionariesAdvanced = mustGetEl<HTMLDetailsElement>("#dictionariesAdvanced");
 const dictStatus = mustGetEl<HTMLDivElement>("#dictStatus");
 const activeDictionarySummary = mustGetEl<HTMLDivElement>("#activeDictionarySummary");
-const openSavedVocabularyBtn = mustGetEl<HTMLButtonElement>("#openSavedVocabulary");
-const openManageCorrectionsBtn = mustGetEl<HTMLButtonElement>("#openManageCorrections");
-const openManageSearchFeedbackBtn = mustGetEl<HTMLButtonElement>(
-  "#openManageSearchFeedback",
-);
-const openManageDictionariesBtn = mustGetEl<HTMLButtonElement>("#openManageDictionaries");
-const manageDictionariesPanel = mustGetEl<HTMLDetailsElement>("#manageDictionariesPanel");
 const featuredInstallStatus = mustGetEl<HTMLDivElement>("#featuredInstallStatus");
 const featuredInstallBtn = mustGetEl<HTMLButtonElement>("#featuredInstall");
 const retryFeaturedInstallBtn = mustGetEl<HTMLButtonElement>("#retryFeaturedInstall");
@@ -507,8 +514,11 @@ const correctionFeedbackDeleteReminder = mustGetEl<HTMLParagraphElement>(
 const searchFeedbackDeleteReminder = mustGetEl<HTMLParagraphElement>(
   "#searchFeedbackDeleteReminder",
 );
+const searchChrome = mustGetEl<HTMLDivElement>("#searchChrome");
 const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
-const searchLabel = mustGetEl<HTMLDivElement>("#searchLabel");
+const searchLabel = mustGetEl<HTMLLabelElement>("#searchLabel");
+const searchSourceLanguage = mustGetEl<HTMLSpanElement>("#searchSourceLanguage");
+const searchTargetLanguage = mustGetEl<HTMLSpanElement>("#searchTargetLanguage");
 const searchMeta = mustGetEl<HTMLDivElement>("#searchMeta");
 const searchResults = mustGetEl<HTMLDivElement>("#searchResults");
 const searchControlsRow = mustGetEl<HTMLDivElement>("#searchControlsRow");
@@ -677,8 +687,6 @@ function getCatalogEntryRuntimeState(entry: BundleCatalogEntryV1): {
 }
 
 function renderInstalledBundleManager() {
-  installedBundleList.innerHTML = "";
-
   const knownPayloadBytes = getKnownBundlePayloadBytes(installedBundles);
   const unknownSizeCount = installedBundles.filter((bundle) => bundle.storage_bytes === undefined).length;
   const statusLines = [
@@ -697,147 +705,71 @@ function renderInstalledBundleManager() {
   }
   installedBundleStatus.textContent = statusLines.join("\n");
 
-  if (installedBundles.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "catalog-empty";
-    empty.textContent = t("manage.noInstalledMetadata");
-    installedBundleList.appendChild(empty);
-    return;
-  }
-
-  const list = document.createElement("div");
-  list.className = "catalog-list";
-
-  for (const bundle of installedBundles) {
-    const item = document.createElement("article");
-    item.className = "catalog-item";
-
-    const header = document.createElement("div");
-    header.className = "catalog-item-header";
-
-    const titleBlock = document.createElement("div");
-    const title = document.createElement("div");
-    title.className = "catalog-item-title";
-    title.textContent = getInstalledBundleName(bundle);
-    const bundleId = document.createElement("div");
-    bundleId.className = "catalog-item-subtitle";
-    bundleId.textContent = bundle.bundle_id;
-    titleBlock.append(title, bundleId);
-
-    const isActive = currentActiveBundle?.bundle_id === bundle.bundle_id;
+  const rows = installedBundles.map((bundle) => {
     const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
     const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
-    const updateAvailable = catalogState?.comparison.state === "update_available";
-    const badges = document.createElement("div");
-    badges.className = "row";
-    if (isActive) {
-      const activeBadge = document.createElement("span");
-      activeBadge.className = "catalog-badge catalog-badge-active";
-      activeBadge.textContent = t("catalog.badge.active");
-      badges.appendChild(activeBadge);
-    }
-    if (updateAvailable) {
-      const updateBadge = document.createElement("span");
-      updateBadge.className = "catalog-badge catalog-badge-update";
-      updateBadge.textContent = t("catalog.badge.updateAvailable");
-      badges.appendChild(updateBadge);
-    } else if (!isActive) {
-      const installedBadge = document.createElement("span");
-      installedBadge.className = "catalog-badge catalog-badge-installed";
-      installedBadge.textContent = t("catalog.badge.installed");
-      badges.appendChild(installedBadge);
-    }
-    header.append(titleBlock, badges);
+    return {
+      bundleId: bundle.bundle_id,
+      displayName: getInstalledBundleName(bundle),
+      versionLabel: bundle.version
+        ? t("catalog.meta.version", { value: bundle.version })
+        : undefined,
+      languageDirection: `${getLocalizedSourceLabel(bundle.language_meta)} → ${getLocalizedTargetLabel(bundle.language_meta)}`,
+      isActive: currentActiveBundle?.bundle_id === bundle.bundle_id,
+      updateAvailable: catalogState?.comparison.state === "update_available",
+    };
+  });
 
-    const meta = document.createElement("div");
-    meta.className = "catalog-item-meta";
-    const labels = `${getLocalizedSourceLabel(bundle.language_meta)} → ${getLocalizedTargetLabel(bundle.language_meta)}`;
-    const metaParts = [
-      bundle.version ? t("catalog.meta.version", { value: bundle.version }) : undefined,
-      labels,
-      t("catalog.meta.records", { count: bundle.records_count ?? "n/a" }),
-      t("catalog.meta.indexEntries", { count: bundle.index_entries_count ?? "n/a" }),
-      fmtBytes(bundle.storage_bytes),
-    ].filter((part): part is string => part !== undefined);
-    meta.textContent = metaParts.join(" | ");
-
-    const note = document.createElement("div");
-    note.className = "catalog-item-note";
-    note.textContent =
-      `${t("catalog.note.installed", { value: formatInstalledAt(bundle.imported_at_iso) })}\n` +
-      `${t("catalog.note.storageScope", { value: getBundleStorageScopeId(bundle) })}\n` +
-      t("catalog.note.normalizationSchema", {
-        normalization: bundle.normalization_ruleset,
-        schema: `${bundle.record_schema_id}@${bundle.record_schema_version}`,
-      });
-    if (updateAvailable && catalogEntry) {
-      note.textContent +=
-        `\n${t("catalog.note.installedHash", { value: bundle.expected_content_sha256 ?? "unknown" })}` +
-        `\n${t("catalog.note.catalogHash", { value: catalogEntry.content_sha256 })}`;
-    }
-
-    const actions = document.createElement("div");
-    actions.className = "row";
-
-    if (updateAvailable && catalogEntry) {
-      const updateBtn = document.createElement("button");
-      updateBtn.className = "btn";
-      updateBtn.textContent = t("catalog.action.update");
-      updateBtn.disabled = busy || !loadedCatalogUrl;
-      updateBtn.addEventListener("click", () => {
-        void withSingleWriterLock(`update bundle ${bundle.bundle_id}`, async () => {
-          await installCatalogEntry(catalogEntry, catalogState?.activateOnCommit ?? isActive);
-        });
-      });
-      actions.appendChild(updateBtn);
-    }
-
-    const useBtn = document.createElement("button");
-    useBtn.className = "btn";
-    useBtn.textContent = isActive ? t("catalog.badge.active") : t("catalog.action.use");
-    useBtn.disabled = busy || isActive;
-    useBtn.addEventListener("click", () => {
-      void withSingleWriterLock(`switch active bundle ${bundle.bundle_id}`, async () => {
+  const list = renderInstalledDictionaryList(rows, {
+    isBusy: () => busy,
+    onUse: (bundleId) => {
+      void withSingleWriterLock(`switch active bundle ${bundleId}`, async () => {
         const db = await openSiralexDb();
         try {
-          await setActiveBundleId(db, bundle.bundle_id);
+          await setActiveBundleId(db, bundleId);
         } finally {
           db.close();
         }
         importProgress.style.display = "";
-        importProgress.textContent = t("bundle.activeSet", { bundleId: bundle.bundle_id });
+        importProgress.textContent = t("bundle.activeSet", { bundleId });
+        await refreshDbStatus();
       });
-    });
-
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "btn";
-    removeBtn.textContent = t("catalog.action.remove");
-    removeBtn.disabled = busy;
-    removeBtn.addEventListener("click", () => {
+    },
+    onRemove: (bundleId) => {
       const confirmed =
         typeof window === "undefined" ||
-        window.confirm(t("bundle.removeConfirm", { bundleId: bundle.bundle_id }));
+        window.confirm(t("bundle.removeConfirm", { bundleId }));
       if (!confirmed) return;
-      void withSingleWriterLock(`remove bundle ${bundle.bundle_id}`, async () => {
+      void withSingleWriterLock(`remove bundle ${bundleId}`, async () => {
         const db = await openSiralexDb();
         try {
-          await deleteBundleData(db, bundle.bundle_id);
+          await deleteBundleData(db, bundleId);
         } finally {
           db.close();
         }
         learningBackupSurface?.invalidatePreviewForBundleChange();
         importProgress.style.display = "";
-        importProgress.textContent = t("bundle.removed", { bundleId: bundle.bundle_id });
+        importProgress.textContent = t("bundle.removed", { bundleId });
         await refreshDbStatus();
       });
-    });
-
-    actions.append(useBtn, removeBtn);
-    item.append(header, meta, note, actions);
-    list.appendChild(item);
-  }
-
-  installedBundleList.appendChild(list);
+    },
+    onUpdate: (bundleId) => {
+      if (!loadedCatalogUrl) return;
+      const bundle = installedBundles.find((b) => b.bundle_id === bundleId);
+      if (!bundle) return;
+      const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
+      const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
+      if (!catalogEntry || catalogState?.comparison.state !== "update_available") return;
+      void withSingleWriterLock(`update bundle ${bundle.bundle_id}`, async () => {
+        await installCatalogEntry(
+          catalogEntry,
+          catalogState?.activateOnCommit ??
+            currentActiveBundle?.bundle_id === bundle.bundle_id,
+        );
+      });
+    },
+  });
+  installedBundleList.replaceChildren(list);
 }
 
 function updatePackageImportControls() {
@@ -1041,41 +973,8 @@ updateCatalogControls();
 updateInstallControls();
 updateFeaturedInstallControls();
 
-localeSelect.addEventListener("change", () => {
-  const nextLocale = localeSelect.value;
-  if (nextLocale !== "fr" && nextLocale !== "en") return;
-  if (nextLocale === getCurrentLocale()) return;
-  setCurrentLocaleWithPersistence(nextLocale as Locale);
-  if (typeof window !== "undefined") {
-    window.location.reload();
-  }
-});
-
-themeSelect.addEventListener("change", () => {
-  const nextTheme = themeSelect.value;
-  if (nextTheme !== "system" && nextTheme !== "light" && nextTheme !== "dark") return;
-  if (nextTheme === getCurrentUiThemePreference()) return;
-  setUiThemePreferenceWithPersistence(nextTheme as UiThemePreference);
-});
-
-openManageDictionariesBtn.addEventListener("click", () => {
-  manageDictionariesPanel.open = true;
-  manageDictionariesPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-  void learningBackupSurface?.refreshCount();
-  void updateCorrectionFeedbackDeleteReminder();
-  void updateSearchFeedbackDeleteReminder();
-});
-
-openSavedVocabularyBtn.addEventListener("click", () => {
-  showSavedVocabulary();
-});
-
-openManageCorrectionsBtn.addEventListener("click", () => {
-  showCorrectionManagement();
-});
-
-openManageSearchFeedbackBtn.addEventListener("click", () => {
-  showSearchFeedbackManagement();
+moreManagementBackBtn.addEventListener("click", () => {
+  closeMoreManagementBridge();
 });
 
 catalogUrlInput.addEventListener("input", () => {
@@ -1374,6 +1273,7 @@ async function refreshDbStatus() {
   }
   renderCatalogList();
   searchControlsRow.style.display = hasActiveBundle ? "" : "none";
+  searchChrome.dataset.searchReady = hasActiveBundle ? "true" : "false";
   searchInput.disabled = !hasActiveBundle || busy;
   langToggle.disabled = !hasActiveBundle || busy;
   updateFeaturedInstallControls();
@@ -1382,6 +1282,13 @@ async function refreshDbStatus() {
     searchResults.innerHTML = "";
   }
   updateLangToggle();
+  if (
+    appShell.dataset.primary === "more" &&
+    appShell.dataset.moreView === "landing" &&
+    !moreDestination.hidden
+  ) {
+    mountMoreLanding();
+  }
 }
 
 // --- Writer lock (prevents concurrent import/delete operations) ---
@@ -2201,22 +2108,33 @@ async function renderQueryLoggingToggle() {
 }
 
 function updateLangToggle() {
-  const directionText = getSearchDirectionText(
-    searchDirection,
+  const locale = getCurrentLocale();
+  const sourceLanguageLabel = getSourceLabel(
     currentActiveBundle?.language_meta,
     t("language.source"),
-    t("language.target"),
-    getCurrentLocale(),
+    locale,
   );
-  langToggle.textContent = directionText;
-  searchLabel.textContent = t("search.queryLabel", { direction: directionText });
+  const targetLanguageLabel = getTargetLabel(
+    currentActiveBundle?.language_meta,
+    t("language.target"),
+    locale,
+  );
+  applySearchDirectionPresentation({
+    sourceLabelEl: searchSourceLanguage,
+    targetLabelEl: searchTargetLanguage,
+    swapButton: langToggle,
+    searchLabelEl: searchLabel,
+    direction: searchDirection,
+    sourceLanguageLabel,
+    targetLanguageLabel,
+  });
   searchInput.placeholder = getSearchPlaceholder(
     searchDirection,
     currentActiveBundle?.language_meta,
     t("language.source"),
     t("language.target"),
     (label) => t("search.placeholder", { language: label }),
-    getCurrentLocale(),
+    locale,
   );
 }
 
@@ -2363,6 +2281,251 @@ type ResultsHostContext =
   | "review";
 let resultsHostContext: ResultsHostContext = "search";
 
+/**
+ * UX2I2 — top-level consumer destination (separate from ResultsHostContext).
+ * UX2_NAVIGATION_AMENDMENT: Review is a stable primary destination.
+ */
+let primaryDestination: PrimaryDestination = "search";
+let primaryNavView: PrimaryNavigationView | undefined;
+type ManagementReturnTo = "more" | "search";
+
+function setPrimaryDestination(destination: PrimaryDestination): void {
+  primaryDestination = destination;
+  appShell.dataset.primary = destination;
+  primaryNavView?.setActive(destination);
+}
+
+/** Presentation-only Search workspace mode (not persisted). */
+type SearchViewMode = "search" | "entry";
+
+function setSearchView(view: SearchViewMode): void {
+  appShell.dataset.searchView = view;
+}
+
+function focusPrimaryHeading(destination: PrimaryDestination): void {
+  if (destination === "search") {
+    searchHeading.focus();
+    return;
+  }
+  if (destination === "more") {
+    moreHeading?.focus();
+    return;
+  }
+  if (destination === "saved") {
+    const heading = searchResults.querySelector<HTMLElement>("#saved-vocab-heading");
+    heading?.setAttribute("tabindex", "-1");
+    heading?.focus();
+    return;
+  }
+  if (destination === "review") {
+    const heading = searchResults.querySelector<HTMLElement>(
+      ".review-title, #review-heading, [data-testid='review-title']",
+    );
+    heading?.setAttribute("tabindex", "-1");
+    heading?.focus();
+  }
+}
+
+type MoreViewMode = "landing" | "management";
+type MoreManagementMode = "dictionaries" | "learning_data";
+
+function setMoreView(view: MoreViewMode): void {
+  appShell.dataset.moreView = view;
+}
+
+function hideMoreLanding(): void {
+  moreDestination.hidden = true;
+}
+
+function hideMoreManagementHost(): void {
+  moreManagementHost.hidden = true;
+  delete appShell.dataset.moreManagement;
+  dictionaryManagementSurface.hidden = true;
+  learningDataSurface.hidden = true;
+}
+
+function setMoreManagementMode(mode: MoreManagementMode): void {
+  const token = mode === "learning_data" ? "learning-data" : "dictionaries";
+  appShell.dataset.moreManagement = token;
+  const showDictionaries = mode === "dictionaries";
+  dictionaryManagementSurface.hidden = !showDictionaries;
+  learningDataSurface.hidden = showDictionaries;
+}
+
+function openMoreManagement(mode: MoreManagementMode): void {
+  setPrimaryDestination("more");
+  hideMoreLanding();
+  disposeActiveReviewHost();
+  disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
+  disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackManagement();
+  searchResults.innerHTML = "";
+  setMoreView("management");
+  setMoreManagementMode(mode);
+  moreManagementHost.hidden = false;
+  void updateCorrectionFeedbackDeleteReminder();
+  void updateSearchFeedbackDeleteReminder();
+  if (mode === "learning_data") {
+    learningBackupHost.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Await count refresh so remounted heading receives focus (presentation glue).
+    void (async () => {
+      await learningBackupSurface?.refreshCount();
+      if (appShell.dataset.moreManagement !== "learning-data") return;
+      const backupHeading =
+        learningBackupHost.querySelector<HTMLElement>("#learning-backup-heading") ??
+        learningBackupHost.querySelector<HTMLElement>("h2, h3, .title");
+      backupHeading?.setAttribute("tabindex", "-1");
+      backupHeading?.focus();
+    })();
+    return;
+  }
+  void learningBackupSurface?.refreshCount();
+  dictionariesAdvanced.open = false;
+  dictionaryManagementHeading.focus();
+}
+
+function mountMoreLanding(): void {
+  const view = renderMore(
+    {
+      theme: getCurrentUiThemePreference(),
+      locale: getCurrentLocale(),
+      appVersion: APP_VERSION,
+      hasActiveDictionary: hasActiveBundle,
+    },
+    {
+      onOpenCorrections: () => {
+        showCorrectionManagement({ returnTo: "more" });
+      },
+      onOpenSearchFeedback: () => {
+        showSearchFeedbackManagement({ returnTo: "more" });
+      },
+      onOpenDictionaries: () => {
+        openMoreManagement("dictionaries");
+      },
+      onOpenLearningData: () => {
+        openMoreManagement("learning_data");
+      },
+      onThemeChange: (theme) => {
+        if (theme === getCurrentUiThemePreference()) return;
+        setUiThemePreferenceWithPersistence(theme);
+        if (appShell.dataset.primary === "more" && appShell.dataset.moreView === "landing") {
+          mountMoreLanding();
+        }
+      },
+      onLocaleChange: (locale) => {
+        if (locale === getCurrentLocale()) return;
+        setCurrentLocaleWithPersistence(locale);
+        if (typeof window !== "undefined") {
+          window.location.reload();
+        }
+      },
+    },
+  );
+  moreDestination.replaceChildren(view.root);
+  moreHeading = view.heading as HTMLHeadingElement;
+}
+
+function showMoreLandingSurface(): void {
+  hideMoreManagementHost();
+  setMoreView("landing");
+  mountMoreLanding();
+  moreDestination.hidden = false;
+}
+
+function closeMoreManagementBridge(): void {
+  hideMoreManagementHost();
+  setPrimaryDestination("more");
+  showMoreLandingSurface();
+  focusPrimaryHeading("more");
+}
+
+/** @deprecated Prefer openMoreManagement("dictionaries") */
+function openDictionariesFromMore(): void {
+  openMoreManagement("dictionaries");
+}
+
+function restoreSearchDestinationSurface(): void {
+  disposeActiveCorrectionForm();
+  disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackForm();
+  disposeActiveSearchFeedbackManagement();
+  if (lastSearchResults.length > 0) {
+    showResultsList();
+    return;
+  }
+  if (lastExecutedSearch?.result_state === "no_result") {
+    showNoResultSearchSurface(lastExecutedSearch.query_raw);
+    return;
+  }
+  invalidateCollectionAndReviewContexts();
+  resultsHostContext = "search";
+  searchResults.innerHTML = "";
+}
+
+/**
+ * Application-owned primary navigation coordinator (UX2I2).
+ * Preserves search query/direction/results; does not persist destination.
+ */
+function navigatePrimary(destination: PrimaryDestination): void {
+  if (destination === "search") {
+    hideMoreLanding();
+    hideMoreManagementHost();
+    setPrimaryDestination("search");
+    if (
+      resultsHostContext === "search" &&
+      (lastSearchResults.length > 0 || lastExecutedSearch?.result_state === "no_result")
+    ) {
+      // Already on Search with a valid surface — keep it.
+      if (searchResults.childElementCount === 0) {
+        restoreSearchDestinationSurface();
+      }
+      focusPrimaryHeading("search");
+      return;
+    }
+    if (resultsHostContext === "entry_from_search") {
+      restoreSearchDestinationSurface();
+      focusPrimaryHeading("search");
+      return;
+    }
+    restoreSearchDestinationSurface();
+    focusPrimaryHeading("search");
+    return;
+  }
+
+  if (destination === "saved") {
+    hideMoreLanding();
+    hideMoreManagementHost();
+    setSearchView("search");
+    showSavedVocabulary();
+    return;
+  }
+
+  if (destination === "review") {
+    hideMoreLanding();
+    hideMoreManagementHost();
+    setSearchView("search");
+    showReviewSurface();
+    return;
+  }
+
+  // more
+  disposeActiveReviewHost();
+  disposeActiveCorrectionForm();
+  disposeActiveSearchFeedbackForm();
+  disposeActiveCorrectionManagement();
+  disposeActiveSearchFeedbackManagement();
+  savedVocabularyGeneration += 1;
+  entryDetailGeneration += 1;
+  resultsHostContext = "search";
+  setSearchView("search");
+  searchResults.innerHTML = "";
+  hideMoreManagementHost();
+  setPrimaryDestination("more");
+  showMoreLandingSurface();
+  focusPrimaryHeading("more");
+}
+
 function disposeActiveReviewHost() {
   activeReviewHost?.dispose();
   activeReviewHost = undefined;
@@ -2412,7 +2575,7 @@ async function updateSearchFeedbackDeleteReminder(): Promise<void> {
         link.className = "btn";
         link.textContent = t("searchFeedback.manage.deleteReminderAction");
         link.addEventListener("click", () => {
-          showSearchFeedbackManagement();
+          showSearchFeedbackManagement({ returnTo: "more" });
         });
         searchFeedbackDeleteReminder.appendChild(link);
       } else {
@@ -2458,7 +2621,7 @@ async function updateCorrectionFeedbackDeleteReminder(): Promise<void> {
         link.className = "btn";
         link.textContent = t("correctionFeedback.manage.deleteReminderAction");
         link.addEventListener("click", () => {
-          showCorrectionManagement();
+          showCorrectionManagement({ returnTo: "more" });
         });
         correctionFeedbackDeleteReminder.appendChild(link);
       } else {
@@ -2474,7 +2637,10 @@ async function updateCorrectionFeedbackDeleteReminder(): Promise<void> {
   }
 }
 
-function showSearchFeedbackManagement(): void {
+function showSearchFeedbackManagement(
+  options: { returnTo?: ManagementReturnTo } = {},
+): void {
+  const returnTo = options.returnTo ?? "more";
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
   disposeActiveSearchFeedbackForm();
@@ -2484,6 +2650,9 @@ function showSearchFeedbackManagement(): void {
   resultsHostContext = "search";
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
+  hideMoreLanding();
+  hideMoreManagementHost();
+  setPrimaryDestination("more");
   searchResults.innerHTML = "";
 
   let viewUpdate:
@@ -2539,6 +2708,10 @@ function showSearchFeedbackManagement(): void {
     onAcknowledgeHandoff: () => session.acknowledgeHandoff(),
     onBack: () => {
       disposeActiveSearchFeedbackManagement();
+      if (returnTo === "more") {
+        navigatePrimary("more");
+        return;
+      }
       if (lastSearchResults.length > 0) {
         showResultsList();
       } else if (lastExecutedSearch?.result_state === "no_result") {
@@ -2553,7 +2726,8 @@ function showSearchFeedbackManagement(): void {
   void session.load();
 }
 
-function showCorrectionManagement(): void {
+function showCorrectionManagement(options: { returnTo?: ManagementReturnTo } = {}): void {
+  const returnTo = options.returnTo ?? "more";
   disposeActiveReviewHost();
   disposeActiveCorrectionForm();
   disposeActiveSearchFeedbackForm();
@@ -2563,6 +2737,9 @@ function showCorrectionManagement(): void {
   resultsHostContext = "search";
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
+  hideMoreLanding();
+  hideMoreManagementHost();
+  setPrimaryDestination("more");
   searchResults.innerHTML = "";
 
   let viewUpdate: ((vm: ReturnType<CorrectionManagementSession["getVm"]>) => void) | undefined;
@@ -2620,6 +2797,10 @@ function showCorrectionManagement(): void {
     onAcknowledgeHandoff: () => session.acknowledgeHandoff(),
     onBack: () => {
       disposeActiveCorrectionManagement();
+      if (returnTo === "more") {
+        navigatePrimary("more");
+        return;
+      }
       if (lastSearchResults.length > 0) {
         showResultsList();
       } else {
@@ -2709,8 +2890,7 @@ async function updateLearningBackupDeleteReminder(): Promise<void> {
     link.className = "btn";
     link.textContent = t("learningBackup.deleteReminderAction");
     link.addEventListener("click", () => {
-      manageDictionariesPanel.open = true;
-      learningBackupHost.scrollIntoView({ behavior: "smooth", block: "start" });
+      openMoreManagement("learning_data");
     });
     learningBackupDeleteReminder.appendChild(link);
   } else {
@@ -2793,6 +2973,7 @@ type EntryNavOrigin =
 
 function showNoResultSearchSurface(query: string): void {
   resultsHostContext = "search";
+  setSearchView("search");
   disposeActiveCorrectionForm();
   disposeActiveCorrectionManagement();
   disposeActiveSearchFeedbackForm();
@@ -2870,6 +3051,7 @@ function showSearchFeedbackCapture(): void {
   disposeActiveReviewHost();
   const generation = ++searchFeedbackFormGeneration;
   resultsHostContext = "search";
+  setSearchView("search");
   entryDetailGeneration += 1;
   searchResults.innerHTML = "";
 
@@ -2924,6 +3106,7 @@ function showSearchFeedbackCapture(): void {
 
 function showResultsList() {
   resultsHostContext = "search";
+  setSearchView("search");
   disposeActiveCorrectionForm();
   disposeActiveCorrectionManagement();
   disposeActiveSearchFeedbackForm();
@@ -2965,6 +3148,9 @@ function showReviewSurface() {
   entryDetailGeneration += 1;
   savedVocabularyGeneration += 1;
   focusReviewActionOnce = false;
+  hideMoreLanding();
+  hideMoreManagementHost();
+  setPrimaryDestination("review");
   searchResults.innerHTML = "";
 
   const host = createReviewSurfaceHost({
@@ -2976,12 +3162,14 @@ function showReviewSurface() {
     onBack: () => {
       disposeActiveReviewHost();
       focusReviewActionOnce = true;
+      // UX2: Review Back returns to Saved and syncs primary nav.
       showSavedVocabulary();
     },
   });
   // Ownership: only this host may present while active; dispose before replace.
   activeReviewHost = host;
   host.start();
+  queueMicrotask(() => focusPrimaryHeading("review"));
 }
 
 function showSavedVocabulary() {
@@ -2993,6 +3181,9 @@ function showSavedVocabulary() {
   const generation = ++savedVocabularyGeneration;
   resultsHostContext = "saved_vocabulary";
   entryDetailGeneration += 1;
+  hideMoreLanding();
+  hideMoreManagementHost();
+  setPrimaryDestination("saved");
   searchResults.innerHTML = "";
 
   let lastFocusTarget: HTMLElement | null = null;
@@ -3005,9 +3196,9 @@ function showSavedVocabulary() {
       return;
     }
     const view = renderSavedVocabulary(model, {
-      onBack: () => {
+      onSearch: () => {
         savedVocabularyGeneration += 1;
-        showResultsList();
+        navigatePrimary("search");
       },
       onOpen: (row) => {
         showEntryDetail(row.liveEntry, { kind: "saved_vocabulary" });
@@ -3040,6 +3231,10 @@ function showSavedVocabulary() {
       } else if (view.heading) {
         view.heading.focus();
       }
+    } else if (!restoreReviewActionFocus && !didRestoreFocus && model.surface !== "loading") {
+      didRestoreFocus = true;
+      view.heading?.setAttribute("tabindex", "-1");
+      view.heading?.focus();
     }
   };
 
@@ -3055,6 +3250,13 @@ function showSavedVocabulary() {
   applyModel({ surface: "loading" });
   void session.load();
 }
+
+primaryNavView = renderPrimaryNavigation("search", {
+  onNavigate: (destination) => {
+    navigatePrimary(destination);
+  },
+});
+primaryNavHost.appendChild(primaryNavView.root);
 
 function setSearchDirection(direction: SearchDirection) {
   if (searchDirection === direction) {
@@ -3117,6 +3319,9 @@ function showCorrectionForm(record: EnrichedRecord, origin: EntryNavOrigin): voi
   entryDetailGeneration += 1;
   const generation = ++correctionFormGeneration;
   resultsHostContext = origin.kind === "saved_vocabulary" ? "entry_from_saved" : "entry_from_search";
+  if (origin.kind === "search") {
+    setSearchView("entry");
+  }
   searchResults.innerHTML = "";
 
   let viewUpdate: ((vm: ReturnType<CorrectionFormController["getViewModel"]>) => void) | undefined;
@@ -3179,6 +3384,9 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
   disposeActiveSearchFeedbackManagement();
   if (origin.kind === "search") {
     savedVocabularyGeneration += 1;
+    setSearchView("entry");
+  } else {
+    setSearchView("search");
   }
   searchResults.innerHTML = "";
 
@@ -3204,8 +3412,11 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
 
   let entryRoot: HTMLElement | null = null;
   const view = renderEntryDetail(record, {
+    backLabel:
+      origin.kind === "saved_vocabulary" ? t("entry.backToSaved") : t("entry.back"),
     onBack: () => {
       if (origin.kind === "saved_vocabulary") {
+        setSearchView("search");
         showSavedVocabulary();
         return;
       }
@@ -3329,7 +3540,6 @@ async function runSearch(query: string) {
     if (seq !== searchSeq) return;
 
     searchMeta.textContent = t("search.resultMeta", {
-      query,
       count: records.length,
     });
 

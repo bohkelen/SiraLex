@@ -1,8 +1,9 @@
 /**
- * Phase 2.0.4 — Results list rendering.
+ * Phase 2.0.4 / UX2I3 — Results list rendering.
  *
  * Builds a list of search results from enriched records plus search context.
  * Cards stay consumer-facing: no internal IDs, search keys, or provenance labels.
+ * Visual hierarchy follows UX2 Contemporary West African Modernism tokens.
  */
 
 import type { SearchDirection } from "../bundle_labels";
@@ -31,8 +32,9 @@ export type ResultDisplayContext = {
 };
 
 type Summary = {
-  foundEntry: string;
-  meaning: string;
+  primary: string;
+  pos?: string;
+  secondary: string;
   sourceTerm?: string;
   isIndexMapping: boolean;
 };
@@ -50,9 +52,11 @@ function summarizeLexicon(d: LexiconDisplayFields): Summary {
   const firstSense = d.senses?.[0];
   const firstGloss =
     firstSense?.gloss_fr ?? firstSense?.gloss_en ?? firstSense?.gloss_ru ?? "";
+  const pos = (d.ps_raw ?? d.pos_hint)?.trim() || undefined;
   return {
-    foundEntry: d.headword_latin,
-    meaning: firstGloss || t("render.noTranslation"),
+    primary: d.headword_latin,
+    pos,
+    secondary: firstGloss,
     sourceTerm: d.headword_latin,
     isIndexMapping: false,
   };
@@ -61,14 +65,13 @@ function summarizeLexicon(d: LexiconDisplayFields): Summary {
 function summarizeIndexMapping(d: IndexMappingDisplayFields): Summary {
   const targets = d.target_entries?.map((target) => target.display_text) ?? [];
   const visibleTargets = targets.slice(0, MAX_VISIBLE_TARGETS);
-  const remainingCount = targets.length - visibleTargets.length;
-  let targetText = visibleTargets.join(", ");
-  if (remainingCount > 0) {
-    targetText += `, ${t("render.moreTargets", { count: remainingCount })}`;
+  let targetText = visibleTargets.join(" · ");
+  if (targets.length > visibleTargets.length) {
+    targetText += " · …";
   }
   return {
-    foundEntry: d.source_term,
-    meaning: targetText || t("render.noTranslation"),
+    primary: d.source_term,
+    secondary: targetText,
     sourceTerm: d.source_term,
     isIndexMapping: true,
   };
@@ -80,35 +83,15 @@ function normalizeForDisplayCompare(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
 
-function getDirectionLabel(context: ResultDisplayContext): string {
-  return context.searchDirection === "source_to_target"
-    ? `${context.sourceLabel} → ${context.targetLabel}`
-    : `${context.targetLabel} → ${context.sourceLabel}`;
-}
-
 function shouldShowQueryHint(context: ResultDisplayContext, summary: Summary): boolean {
   const query = normalizeForDisplayCompare(context.rawQuery);
-  const sourceTerm = normalizeForDisplayCompare(summary.sourceTerm ?? summary.foundEntry);
+  const sourceTerm = normalizeForDisplayCompare(summary.sourceTerm ?? summary.primary);
   return query !== "" && sourceTerm !== "" && query !== sourceTerm;
-}
-
-function getMeaningLabel(context: ResultDisplayContext, summary: Summary): string {
-  if (context.searchDirection === "target_to_source") {
-    return t("render.meaningPossible");
-  }
-  return summary.isIndexMapping ? t("render.possibleTranslations") : t("render.meaningPossible");
-}
-
-function renderLabeledLine(label: string, value: string, cls: string): HTMLElement {
-  const line = el("div", `result-line ${cls}`);
-  line.appendChild(el("span", "result-label", label));
-  line.appendChild(el("span", "result-value", value));
-  return line;
 }
 
 function renderWhyDisclosure(context: ResultDisplayContext, summary: Summary): HTMLElement {
   const details = document.createElement("details");
-  details.className = "result-why";
+  details.className = "result-why ux2-result-why";
 
   const disclosureSummary = document.createElement("summary");
   disclosureSummary.textContent = t("render.whyThisResult");
@@ -122,7 +105,7 @@ function renderWhyDisclosure(context: ResultDisplayContext, summary: Summary): H
       body.appendChild(el("div", undefined, t("render.sameEntryAs", { sourceTerm: summary.sourceTerm })));
     }
   } else {
-    body.appendChild(el("div", undefined, t("render.relatedEntry", { sourceTerm: summary.foundEntry })));
+    body.appendChild(el("div", undefined, t("render.relatedEntry", { sourceTerm: summary.primary })));
   }
   details.appendChild(body);
 
@@ -139,6 +122,7 @@ export function getNoResultMessage(query: string): string {
 /**
  * Build a DOM element containing the results list.
  * Returns null if no renderable records.
+ * Order is preserved exactly as provided (bundle/runtime order).
  */
 export function renderResultsList(
   results: ResultDisplayContext[],
@@ -147,7 +131,7 @@ export function renderResultsList(
   if (results.length === 0) return null;
 
   const list = document.createElement("div");
-  list.className = "results-list";
+  list.className = "results-list ux2-results-list";
 
   for (const context of results) {
     const { record } = context;
@@ -162,26 +146,51 @@ export function renderResultsList(
     }
 
     const item = document.createElement("div");
-    item.className = "result-item";
+    item.className = "result-item ux2-result-row";
+    if (summary.isIndexMapping) {
+      item.classList.add("ux2-result-row-mapping");
+    } else {
+      item.classList.add("ux2-result-row-lexicon");
+    }
 
     const openButton = document.createElement("button");
     openButton.className = "result-open";
     openButton.type = "button";
     openButton.addEventListener("click", () => onSelect(record));
 
-    openButton.appendChild(
-      renderLabeledLine(t("render.direction"), getDirectionLabel(context), "result-direction"),
+    const primaryRow = el("div", "ux2-result-primary-row");
+    const headword = el(
+      "span",
+      summary.isIndexMapping
+        ? "ux2-result-source ux2-type-headword-medium"
+        : "ux2-result-headword ux2-type-headword-medium result-value",
+      summary.primary,
     );
-    openButton.appendChild(
-      renderLabeledLine(t("render.foundEntry"), summary.foundEntry, "result-found-entry"),
-    );
-    openButton.appendChild(
-      renderLabeledLine(getMeaningLabel(context, summary), summary.meaning, "result-translation"),
-    );
+    // Compatibility: found-entry line class retained for existing tests/selectors.
+    headword.classList.add("result-found-entry");
+    primaryRow.appendChild(headword);
+
+    if (summary.pos) {
+      primaryRow.appendChild(el("span", "ux2-result-pos ux2-type-metadata", summary.pos));
+    }
+
+    openButton.appendChild(primaryRow);
+
+    if (summary.secondary) {
+      openButton.appendChild(
+        el(
+          "div",
+          summary.isIndexMapping
+            ? "ux2-result-targets ux2-type-body result-translation"
+            : "ux2-result-gloss ux2-type-body result-translation",
+          summary.secondary,
+        ),
+      );
+    }
 
     if (shouldShowQueryHint(context, summary)) {
       openButton.appendChild(
-        el("div", "result-query-hint", t("render.foundForQuery", { query: context.rawQuery })),
+        el("div", "result-query-hint ux2-result-hint", t("render.foundForQuery", { query: context.rawQuery })),
       );
     }
 
