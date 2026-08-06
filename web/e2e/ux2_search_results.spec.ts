@@ -45,10 +45,19 @@ test.describe("UX2I3 Search Home and Results", () => {
     expect(inputBox && chromeBox).toBeTruthy();
     expect(inputBox!.width / chromeBox!.width).toBeGreaterThan(0.7);
 
-    // Ready-state diagnostics remain in the DOM for compatibility but must not be visible.
+    // Ready-state diagnostics remain in the DOM for compatibility but must not be
+    // visible or available to ordinary assistive technology (UX2I8).
     await expect(page.locator("#dictStatus")).not.toBeInViewport();
     await expect(page.locator("#activeDictionarySummary")).not.toBeInViewport();
     await expect(page.locator("#searchChrome .ux2-search-setup-copy")).not.toBeInViewport();
+    await expect(page.locator("#dictStatus")).toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator("#dictStatus")).toBeHidden();
+    await expect(page.locator("#activeDictionaryRow")).toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator("#activeDictionaryRow")).toBeHidden();
+    await expect(page.locator("#searchChrome .ux2-search-setup-copy")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
     await expect(page.locator("#dbOut")).toBeHidden();
     await expect(page.locator("#searchChrome #openManageDictionaries")).toHaveCount(0);
     await expect(page.locator("#moreDestination")).toBeHidden();

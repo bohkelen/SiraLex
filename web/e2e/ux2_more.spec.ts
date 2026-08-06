@@ -61,7 +61,7 @@ test.describe("UX2I6A More landing and preferences", () => {
     await expect(page.locator("#openManageLearningData")).toBeVisible();
     await expect(page.locator("#themeSelect")).toBeVisible();
     await expect(page.locator("#localeSelect")).toBeVisible();
-    await expect(page.locator(".ux2-more-about-version")).toContainText(/Version/i);
+    await expect(page.locator(".ux2-more-about-version")).toContainText(/Version 1\.0\.0/i);
     await expect(page.locator(".ux2-more-about-local")).toContainText(
       /Dictionary stored on this device|No dictionary stored/i,
     );

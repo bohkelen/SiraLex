@@ -75,6 +75,7 @@ const MESSAGES = {
     "theme.light": "Light",
     "theme.dark": "Dark",
     "nav.primaryAriaLabel": "Primary",
+    "nav.home": "SiraLex home — Search",
     "nav.search": "Search",
     "nav.saved": "Saved",
     "nav.review": "Review",
@@ -114,7 +115,7 @@ const MESSAGES = {
     "dictionaries.advanced": "Advanced",
     "dictionaries.dataManagement": "Data management",
     "dictionaries.dataManagementHelp":
-      "Deleting the whole database is different from removing one dictionary. Export Learning data and feedback first if you need them.",
+      "This permanently deletes the whole local database. It is not the same as removing one dictionary from this device. Export Learning data, correction drafts, and search feedback first if you need them.",
     "search.title": "Search",
     "search.subtitle": "Add a dictionary once, then search for words and expressions.",
     "firstRun.title": "Start here",
@@ -814,6 +815,7 @@ const MESSAGES = {
     "theme.light": "Clair",
     "theme.dark": "Sombre",
     "nav.primaryAriaLabel": "Principal",
+    "nav.home": "Accueil SiraLex — Recherche",
     "nav.search": "Recherche",
     "nav.saved": "Enregistré",
     "nav.review": "Révision",
@@ -856,7 +858,7 @@ const MESSAGES = {
     "dictionaries.advanced": "Avancé",
     "dictionaries.dataManagement": "Gestion des données",
     "dictionaries.dataManagementHelp":
-      "Supprimer toute la base de données est différent de retirer un dictionnaire. Exportez d’abord les données d’apprentissage et les retours si vous en avez besoin.",
+      "Cela supprime définitivement toute la base de données locale. Ce n’est pas la même chose que retirer un dictionnaire de cet appareil. Exportez d’abord les données d’apprentissage, les brouillons de correction et les retours sur la recherche si vous en avez besoin.",
     "search.title": "Recherche",
     "search.subtitle": "Ajoutez un dictionnaire, puis recherchez des mots et expressions.",
     "firstRun.title": "Commencer ici",

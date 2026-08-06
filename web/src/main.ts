@@ -255,7 +255,7 @@ async function performConfiguredFeedbackHandoff(
 app.innerHTML = `
   <div class="ux2-app-shell" id="ux2AppShell" data-primary="search" data-search-view="search">
     <header class="ux2-app-header">
-      <div class="ux2-wordmark ux2-type-wordmark" id="ux2Wordmark">SiraLex</div>
+      <button type="button" class="ux2-wordmark ux2-type-wordmark ux2-focus-ring" id="ux2Wordmark" aria-label="${t("nav.home")}">SiraLex</button>
       <div id="ux2PrimaryNavHost" class="ux2-primary-nav-host"></div>
     </header>
 
@@ -354,6 +354,94 @@ app.innerHTML = `
               <button id="cancelInstall" class="btn" style="display: none">${t("import.cancel")}</button>
             </div>
           </div>
+
+          <details class="ux2-more-legacy-advanced">
+            <summary>${t("diagnostics.summary")}</summary>
+            <div class="card" style="margin-top: 8px">
+              <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("diagnostics.title")}</h2>
+              <p class="subtitle" style="margin: 0 0 8px 0">${t("diagnostics.surfaceHint")}</p>
+              <div class="row" style="align-items: center; justify-content: space-between; gap: 12px">
+                <div>
+                  <div class="label">${t("logging.label")}</div>
+                  <div id="queryLoggingStatus" class="mono">${t("logging.off")}</div>
+                  <div id="queryLoggingStats" class="mono" style="margin-top: 4px">${t("logging.statsLine", { count: 0, oldest: t("logging.statsOldestNone") })}</div>
+                  <div id="queryLoggingConsentStatus" class="mono" style="margin-top: 4px">${t("logging.consentStatusNotRecorded")}</div>
+                </div>
+                <button id="queryLoggingToggle" class="btn" type="button">${t("logging.turnOn")}</button>
+              </div>
+              <div class="row" style="margin-top: 8px; gap: 8px">
+                <button id="queryLogExport" class="btn" type="button">${t("logging.export")}</button>
+                <button id="queryLogClear" class="btn" type="button">${t("logging.clear")}</button>
+                <button id="queryLogCopyDiagnostics" class="btn" type="button">${t("logging.copyDiagnostics")}</button>
+              </div>
+              <p class="subtitle" style="margin: 8px 0 0 0">
+                ${t("logging.localOnly")}
+              </p>
+              <div id="queryLogMessage" class="mono" style="margin-top: 8px"></div>
+              <div style="margin-top: 12px">
+                <div class="label">${t("logging.recentTitle")}</div>
+                <p id="recentQueryLogsOffNote" class="mono" style="margin: 8px 0 0 0; display: none">${t("logging.offNote")}</p>
+                <div id="recentQueryLogsActive" style="display: none; margin-top: 8px">
+                  <div class="row" style="margin-bottom: 8px">
+                    <button id="recentQueryLogsRefresh" class="btn" type="button">${t("logging.refresh")}</button>
+                  </div>
+                  <div id="recentQueryLogsTableHost"></div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <details class="ux2-more-legacy-advanced" style="margin-top: 16px">
+            <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("dev.summary")}</summary>
+
+            <div class="card" style="margin-top: 8px">
+              <h3 class="title" style="font-size: 14px; margin-bottom: 8px">${t("dev.gatingTitle")}</h3>
+              <p class="subtitle">
+                ${t("dev.gatingSubtitle")}
+              </p>
+
+              <div class="row" style="margin-top: 12px">
+                <div class="field">
+                  <div class="label">bundle.manifest.json</div>
+                  <input id="manifestFile" type="file" accept=".json,application/json" />
+                </div>
+              </div>
+
+              <div class="row" style="margin-top: 12px">
+                <div class="field">
+                  <div class="label">${t("dev.recordsLabel")}</div>
+                  <input id="recordsFile" type="file" />
+                </div>
+                <div class="field">
+                  <div class="label">search_index.jsonl</div>
+                  <input id="indexFile" type="file" />
+                </div>
+              </div>
+
+              <div class="row" style="margin-top: 12px">
+                <button id="validateManifest" class="btn" disabled>${t("dev.validateManifest")}</button>
+                <button id="importBundle" class="btn" disabled>${t("dev.importBundle")}</button>
+              </div>
+
+              <div id="manifestOut" class="mono" style="margin-top: 12px"></div>
+              <div id="dbOut" class="mono" style="margin-top: 12px"></div>
+            </div>
+
+            <div class="card" style="margin-top: 8px">
+              <h3 class="title" style="font-size: 14px; margin-bottom: 8px">${t("dev.probeTitle")}</h3>
+              <p class="subtitle">
+                ${t("dev.probeSubtitle")}
+              </p>
+
+              <div class="row" style="margin-top: 12px">
+                <button id="probeRecords" class="btn" disabled>${t("dev.probeRecords")}</button>
+                <button id="probeIndex" class="btn" disabled>${t("dev.probeIndex")}</button>
+                <button id="probeAll" class="btn" disabled>${t("dev.probeBoth")}</button>
+              </div>
+
+              <div id="probeOut" class="mono" style="margin-top: 12px"></div>
+            </div>
+          </details>
         </details>
       </div>
     </section>
@@ -372,94 +460,6 @@ app.innerHTML = `
         <button id="clearDb" class="btn ux2-dict-clear-db" type="button">${t("db.delete")}</button>
       </div>
     </section>
-
-    <details class="ux2-more-legacy-advanced">
-      <summary>${t("diagnostics.summary")}</summary>
-      <div class="card" style="margin-top: 8px">
-        <h2 class="title" style="font-size: 16px; margin-bottom: 8px">${t("diagnostics.title")}</h2>
-        <p class="subtitle" style="margin: 0 0 8px 0">${t("diagnostics.surfaceHint")}</p>
-        <div class="row" style="align-items: center; justify-content: space-between; gap: 12px">
-          <div>
-            <div class="label">${t("logging.label")}</div>
-            <div id="queryLoggingStatus" class="mono">${t("logging.off")}</div>
-            <div id="queryLoggingStats" class="mono" style="margin-top: 4px">${t("logging.statsLine", { count: 0, oldest: t("logging.statsOldestNone") })}</div>
-            <div id="queryLoggingConsentStatus" class="mono" style="margin-top: 4px">${t("logging.consentStatusNotRecorded")}</div>
-          </div>
-          <button id="queryLoggingToggle" class="btn" type="button">${t("logging.turnOn")}</button>
-        </div>
-        <div class="row" style="margin-top: 8px; gap: 8px">
-          <button id="queryLogExport" class="btn" type="button">${t("logging.export")}</button>
-          <button id="queryLogClear" class="btn" type="button">${t("logging.clear")}</button>
-          <button id="queryLogCopyDiagnostics" class="btn" type="button">${t("logging.copyDiagnostics")}</button>
-        </div>
-        <p class="subtitle" style="margin: 8px 0 0 0">
-          ${t("logging.localOnly")}
-        </p>
-        <div id="queryLogMessage" class="mono" style="margin-top: 8px"></div>
-        <div style="margin-top: 12px">
-          <div class="label">${t("logging.recentTitle")}</div>
-          <p id="recentQueryLogsOffNote" class="mono" style="margin: 8px 0 0 0; display: none">${t("logging.offNote")}</p>
-          <div id="recentQueryLogsActive" style="display: none; margin-top: 8px">
-            <div class="row" style="margin-bottom: 8px">
-              <button id="recentQueryLogsRefresh" class="btn" type="button">${t("logging.refresh")}</button>
-            </div>
-            <div id="recentQueryLogsTableHost"></div>
-          </div>
-        </div>
-      </div>
-    </details>
-
-    <details class="ux2-more-legacy-advanced" style="margin-top: 16px">
-      <summary style="color: var(--muted); font-size: 13px; cursor: pointer; padding: 8px 0">${t("dev.summary")}</summary>
-
-      <div class="card" style="margin-top: 8px">
-        <h3 class="title" style="font-size: 14px; margin-bottom: 8px">${t("dev.gatingTitle")}</h3>
-        <p class="subtitle">
-          ${t("dev.gatingSubtitle")}
-        </p>
-
-        <div class="row" style="margin-top: 12px">
-          <div class="field">
-            <div class="label">bundle.manifest.json</div>
-            <input id="manifestFile" type="file" accept=".json,application/json" />
-          </div>
-        </div>
-
-        <div class="row" style="margin-top: 12px">
-          <div class="field">
-            <div class="label">${t("dev.recordsLabel")}</div>
-            <input id="recordsFile" type="file" />
-          </div>
-          <div class="field">
-            <div class="label">search_index.jsonl</div>
-            <input id="indexFile" type="file" />
-          </div>
-        </div>
-
-        <div class="row" style="margin-top: 12px">
-          <button id="validateManifest" class="btn" disabled>${t("dev.validateManifest")}</button>
-          <button id="importBundle" class="btn" disabled>${t("dev.importBundle")}</button>
-        </div>
-
-        <div id="manifestOut" class="mono" style="margin-top: 12px"></div>
-        <div id="dbOut" class="mono" style="margin-top: 12px"></div>
-      </div>
-
-      <div class="card" style="margin-top: 8px">
-        <h3 class="title" style="font-size: 14px; margin-bottom: 8px">${t("dev.probeTitle")}</h3>
-        <p class="subtitle">
-          ${t("dev.probeSubtitle")}
-        </p>
-
-        <div class="row" style="margin-top: 12px">
-          <button id="probeRecords" class="btn" disabled>${t("dev.probeRecords")}</button>
-          <button id="probeIndex" class="btn" disabled>${t("dev.probeIndex")}</button>
-          <button id="probeAll" class="btn" disabled>${t("dev.probeBoth")}</button>
-        </div>
-
-        <div id="probeOut" class="mono" style="margin-top: 12px"></div>
-      </div>
-    </details>
     </div>
     </main>
   </div>
@@ -476,6 +476,7 @@ function mustGetEl<T extends Element>(selector: string): T {
 // Primary UI elements
 const appShell = mustGetEl<HTMLDivElement>("#ux2AppShell");
 const primaryNavHost = mustGetEl<HTMLDivElement>("#ux2PrimaryNavHost");
+const ux2Wordmark = mustGetEl<HTMLButtonElement>("#ux2Wordmark");
 const searchHeading = mustGetEl<HTMLHeadingElement>("#searchHeading");
 const moreDestination = mustGetEl<HTMLElement>("#moreDestination");
 const moreManagementHost = mustGetEl<HTMLElement>("#moreManagementHost");
@@ -1274,6 +1275,7 @@ async function refreshDbStatus() {
   renderCatalogList();
   searchControlsRow.style.display = hasActiveBundle ? "" : "none";
   searchChrome.dataset.searchReady = hasActiveBundle ? "true" : "false";
+  syncSearchReadyConsumerAccessibility(hasActiveBundle);
   searchInput.disabled = !hasActiveBundle || busy;
   langToggle.disabled = !hasActiveBundle || busy;
   updateFeaturedInstallControls();
@@ -2337,6 +2339,26 @@ function hideMoreLanding(): void {
   moreDestination.hidden = true;
 }
 
+/**
+ * UX2I8 — when Search is ready for ordinary use, demoted setup/diagnostic
+ * nodes must leave the accessibility tree (not merely CSS-clipped).
+ * Errors / first-run / no-dictionary states remain perceivable when not ready.
+ */
+function syncSearchReadyConsumerAccessibility(ready: boolean): void {
+  const nodes = searchChrome.querySelectorAll<HTMLElement>(
+    ".ux2-search-setup-copy, .ux2-search-diagnostic",
+  );
+  for (const node of nodes) {
+    if (ready) {
+      node.hidden = true;
+      node.setAttribute("aria-hidden", "true");
+    } else {
+      node.hidden = false;
+      node.removeAttribute("aria-hidden");
+    }
+  }
+}
+
 function hideMoreManagementHost(): void {
   moreManagementHost.hidden = true;
   delete appShell.dataset.moreManagement;
@@ -3257,6 +3279,10 @@ primaryNavView = renderPrimaryNavigation("search", {
   },
 });
 primaryNavHost.appendChild(primaryNavView.root);
+
+ux2Wordmark.addEventListener("click", () => {
+  navigatePrimary("search");
+});
 
 function setSearchDirection(direction: SearchDirection) {
   if (searchDirection === direction) {

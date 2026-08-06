@@ -23,9 +23,9 @@
   /* --- Type scale (Figma handoff; mobile / desktop where split) --- */
   --type-wordmark-size: 18px;
   --type-wordmark-size-desktop: 20px;
-  --type-wordmark-weight: 400;
+  --type-wordmark-weight: 700;
   --type-wordmark-line-height: 1;
-  --type-wordmark-tracking: -0.01em;
+  --type-wordmark-tracking: -0.02em;
 
   --type-headword-large-size: 44px;
   --type-headword-large-size-desktop: 72px;
@@ -3109,8 +3109,38 @@ button.target-link .target-text {
 }
 
 .ux2-wordmark {
-  color: var(--color-text-primary);
+  appearance: none;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-action-text);
+  cursor: pointer;
   flex-shrink: 0;
+  text-align: start;
+}
+
+/* Expand tap target without growing the compact header chrome. */
+.ux2-wordmark::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: max(100%, var(--touch-target-min));
+  height: var(--touch-target-min);
+  transform: translateY(-50%);
+}
+
+.ux2-wordmark:hover {
+  color: var(--color-accent-hover);
+}
+
+.ux2-wordmark:active {
+  color: var(--color-accent-pressed);
 }
 
 .ux2-primary-nav-host {
@@ -3805,6 +3835,12 @@ button.target-link .target-text {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* UX2I8: HTML hidden must win so clipped diagnostics leave the a11y tree. */
+.ux2-search-chrome .ux2-search-setup-copy[hidden],
+.ux2-search-chrome .ux2-search-diagnostic[hidden] {
+  display: none !important;
 }
 
 .ux2-search-first-run {

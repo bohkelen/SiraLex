@@ -61,22 +61,31 @@ test.describe("UX2I6B1 dictionary management", () => {
     await expect(advanced).toBeVisible();
     expect(await advanced.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false);
 
-    await advanced.locator("summary").click();
+    await advanced.locator(":scope > summary").click();
     expect(await advanced.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(true);
     await expect(page.locator("#catalogUrl")).toBeVisible();
     await expect(page.locator("#quickImport")).toBeVisible();
+    await expect(page.locator("#dictionariesAdvanced")).toContainText(/Advanced diagnostics|Developer/i);
 
     await mkdir(evidenceRoot, { recursive: true });
     await page.screenshot({
       path: path.join(evidenceRoot, "mobile-light-dictionaries-advanced.png"),
       fullPage: true,
     });
-    await advanced.locator("summary").click();
+    await advanced.locator(":scope > summary").click();
 
     await expect(page.locator(".ux2-dict-row-title").first()).toBeVisible();
     await expect(page.locator(".ux2-dict-row-active").first()).toBeVisible();
+    // Delete DB remains below Advanced on Dictionaries (not on Learning Data).
+    await expect(page.locator("#dictionariesDestructive")).toBeVisible();
+    await expect(page.locator("#clearDb")).toBeVisible();
+    await expect(page.locator("#dictionariesDestructive")).toContainText(
+      /whole local database|not the same as removing one dictionary/i,
+    );
+    // Closed Advanced: Diagnostics / Developer tools are not peer open controls.
+    await expect(page.locator("#queryLoggingToggle")).not.toBeVisible();
     await expect(page.locator("#dictionaryManagementSurface")).not.toContainText(
-      /Manage dictionaries \(optional\)|Validation diagnostics|Developer tools/i,
+      /Manage dictionaries \(optional\)/i,
     );
 
     await page.screenshot({

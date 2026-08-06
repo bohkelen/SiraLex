@@ -41,7 +41,18 @@ export async function openMoreAnd(
 /** Open Dictionaries including the subordinate data-management / Delete DB area. */
 export async function openDictionariesDataManagement(page: Page): Promise<void> {
   await openMoreAnd(page, "dictionaries");
+  await expect(page.locator("#dictionariesDestructive")).toBeVisible();
   await expect(page.locator("#clearDb")).toBeVisible();
+}
+
+/** Open Dictionaries Advanced disclosure (catalog / Diagnostics / Developer tools). */
+export async function openDictionariesAdvanced(page: Page): Promise<void> {
+  await openMoreAnd(page, "dictionaries");
+  const advanced = page.locator("#dictionariesAdvanced");
+  await advanced.evaluate((el) => {
+    if (el instanceof HTMLDetailsElement) el.open = true;
+  });
+  await expect(advanced).toHaveAttribute("open", "");
 }
 
 /** Visible search-from language (left label in UX2 direction row). */

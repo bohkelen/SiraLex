@@ -4,7 +4,7 @@ This roadmap documents the execution path to a usable, offline-first **French/En
 
 Guiding constraints:
 
-- **N'Ko is always available**: generated deterministically when not provided, with **uncertainty marked** when Latin input is underspecified.
+- **N’Ko is a first-class orthography when authoritative N’Ko data is available.** Current consumer surfaces do not synthesize missing N’Ko. Deterministic Latin → N’Ko transliteration remains deferred to Branch C and requires a separate decision before activation.
 - **Offline-first**: the dictionary must remain usable without connectivity.
 - **Provenance-first**: store provenance at **entry**, **sense**, and **example** levels.
 - **Community trust**: no hallucinated language; uncertainty is surfaced.
@@ -154,6 +154,8 @@ UX2I6B1 — Dictionary Management Consumer Surface — Complete
 UX2I6B2 — Learning Data / Backup & Restore Surface — Complete
 UX2I7A — CF1 Consumer Visual Migration — Complete
 UX2I7B — CF2 Search Feedback Consumer Visual Migration — Complete
+UX2I8 — Integration / Accessibility / Boundary Closure — Complete
+UX2I8A — N’Ko Authority Documentation Reconciliation — Complete
 FH1 — Feedback Review Handoff — Complete (Accepted)
 FH1A — Explicit Review Destination Amendment — Complete
 PV1A — Production Identity and Desktop Smoke — VERIFIED
@@ -183,8 +185,8 @@ PV1B — Physical Device Validation — Parallel, hardware-gated / not run
 - **UX2I6B2** complete (`docs/reports/ux2i6b2_learning_data_report.md`, `UX2I6B2_LEARNING_DATA_IMPLEMENTED`): Learning Data / LP1 Backup & Restore presentation migrated; package/restore state machine unchanged; Dictionaries separation retained; CF1/CF2 visuals deferred to UX2I7.
 - **UX2I7A** complete (`docs/reports/ux2i7a_cf1_consumer_experience_report.md`, `UX2I7A_CF1_CONSUMER_EXPERIENCE_IMPLEMENTED`): CF1 capture/management/export/FH1 presentation migrated; schema/store/export/handoff semantics unchanged; CF2 visual migration deferred to **UX2I7B**.
 - **UX2I7B** complete (`docs/reports/ux2i7b_cf2_consumer_experience_report.md`, `UX2I7B_CF2_CONSUMER_EXPERIENCE_IMPLEMENTED`): CF2 capture/management/export/FH1 presentation migrated; schema/store/export/handoff semantics unchanged; Search algorithms unchanged.
-- **Next UX2 slice:** UX2I8 — ready-state accessibility cleanup / advanced internal separation (tracked).
-- **UX2I8 follow-up (tracked, non-blocking from UX2I3):** ready-state diagnostic text is still visually clipped rather than removed from the accessibility tree; ordinary assistive-technology users should ultimately not receive hidden technical status noise.
+- **UX2I8** — Complete (`docs/reports/ux2_final_closure_report.md`, `UX2_COMPLETE`): integration/accessibility/boundary closure; ready-state Search diagnostics leave the ordinary accessibility tree; Diagnostics/Developer Tools are subordinate to Dictionaries Advanced; Delete DB boundary clarified; UX2I8A reconciled the stale N’Ko authority documentation; no high-risk behavioral contract changes.
+- **UX2 redesign program:** CLOSED at UX2I8 (`UX2_COMPLETE`). UX2I8A documentation reconciliation accepted. Next product work is outside UX2 presentation.
 - **FH1** accepted (`docs/reports/fh1_feedback_review_handoff_report.md`, `FH1_FEEDBACK_REVIEW_HANDOFF_IMPLEMENTED`): transport-only “Send for review”; reuses CF1/CF2 governed packages; Web Share or download+mailto; drafts stay `draft`.
 - **FH1A** complete (`docs/reports/fh1a_review_destination_amendment_report.md`, `FH1_REVIEW_DESTINATION_AMENDMENT_IMPLEMENTED`): configured `VITE_FEEDBACK_EMAIL` shown in confirm UI and Web Share text; mailto remains pre-addressed.
 - **PVR1** verified (`docs/reports/pvr1_theme_feedback_production_resmoke_report.md`, `PVR1_THEME_AND_FEEDBACK_PRODUCTION_VERIFIED`): Theme + FH1/FH1A + CF1/CF2 handoff preparation PASS on production; operator-confirmed real inbox receipt (Linux Thunderbird + iPhone Gmail/Proton). FH1 production handoff is **OPERATIONAL**. Next: PV1B.
@@ -262,15 +264,17 @@ Frozen artifacts:
 
 ### Phase 1.3 — Transliteration layer (Latin → N'Ko) *(deferred → Branch C)*
 
-- Deterministic transliteration module:
-  - generate N'Ko for all display surfaces when missing
-  - **mark uncertainty** when Latin is underspecified
+Historical / deferred roadmap material. **Not current runtime behavior.** Do not treat the bullets below as shipped product contracts.
+
+Potential future capability (Branch C — requires a separate product/data decision before implementation):
+- Deterministic Latin → N’Ko generation when authoritative N’Ko is absent
+- **Uncertainty marking** where Latin input is underspecified
 - Round-trip `N'Ko → Latin normalized` can wait until later phases
 
-DoD:
+Potential future DoD (not met; not claimed):
 - Any record can be displayed in Latin and N'Ko, with uncertainty clearly indicated.
 
-> **Status:** Deferred. Transliteration generation is postponed until there are real users, search logs, and correction data to inform the rules. See [Deferred — Branch C](#deferred--branch-c-linguistic-depth) below.
+> **Status:** **DEFERRED / NOT CURRENT RUNTIME BEHAVIOR.** Phase 1.3 is **not** complete. Current shipped surfaces show genuine/authoritative N’Ko when present and omit missing N’Ko (no placeholders, no automatic transliteration). Transliteration generation remains postponed until a separate Branch C decision, informed by real users, search logs, and correction data. See [Deferred — Branch C](#deferred--branch-c-linguistic-depth) below.
 
 ### Phase 1.4 — Search index + Offline bundle pipeline
 

@@ -590,11 +590,17 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     expect(await countQueryLogs(page)).toBe(logsOffBefore);
     mark(scenarioResults, "query_log_isolation_off", "PASS");
 
-    // Logging ON: open More management bridge so Diagnostics (advanced) is reachable.
+    // Logging ON: open Dictionaries → Advanced → Diagnostics (nested disclosures).
     await openMoreAnd(page, "dictionaries");
-    await page.locator("details", { has: page.locator("#queryLoggingToggle") }).evaluate((el) => {
+    await page.locator("#dictionariesAdvanced").evaluate((el) => {
       if (el instanceof HTMLDetailsElement) el.open = true;
     });
+    await page
+      .locator("#dictionariesAdvanced .ux2-more-legacy-advanced")
+      .first()
+      .evaluate((el) => {
+        if (el instanceof HTMLDetailsElement) el.open = true;
+      });
     await expect(page.locator("#queryLoggingToggle")).toBeVisible();
     await page.locator("#queryLoggingToggle").click();
     // Consent dialog may appear — accept already wired.
