@@ -27,6 +27,46 @@ function makeJsonlFile(name: string, rows: unknown[]): File {
 }
 
 describe("Phase 3 manifest parsing", () => {
+  it("accepts additive multilingual capability metadata", () => {
+    const result = parseAndValidateManifestJson(
+      JSON.stringify({
+        manifest_schema_version: "bundle_manifest_v1",
+        bundle_id: "bundle_full_20260710_337619ff",
+        bundle_type: "full",
+        bundle_format: "directory",
+        compression: "none",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        rule_versions: { normalization: "norm_v3", en_gloss_key: "en_gloss_key_v1" },
+        sources: { included: ["src_malipense"], excluded: [] },
+        reconciliation_action: "REPLACE_ALL",
+        update_mode: "REPLACE_ALL",
+        search_index_directional: true,
+        search_key_families: ["en", "src", "tgt"],
+        languages: {
+          source_lang: "fr",
+          target_lang: "mnk",
+          lexical_language: "mnk",
+          lookup_languages: ["fr", "en", "mnk"],
+        },
+        files: [
+          { path: "records.jsonl", byte_length: 1, sha256: "sha256:aa" },
+          { path: "search_index.jsonl", byte_length: 1, sha256: "sha256:bb" },
+        ],
+        content_sha256: "sha256:" + "a".repeat(64),
+      }),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.manifest?.search_key_families).toEqual(["en", "src", "tgt"]);
+    expect(result.manifest?.languages).toEqual({
+      source_lang: "fr",
+      target_lang: "mnk",
+      lexical_language: "mnk",
+      lookup_languages: ["fr", "en", "mnk"],
+    });
+    expect(result.manifest?.rule_versions.en_gloss_key).toBe("en_gloss_key_v1");
+  });
+
   it("accepts legacy manifests without language metadata", () => {
     const result = parseAndValidateManifestJson(
       JSON.stringify({

@@ -7,6 +7,8 @@ export type BundleManifestV1FileEntry = {
 export type BundleManifestLanguages = {
   source_lang?: string;
   target_lang?: string;
+  lexical_language?: string;
+  lookup_languages?: string[];
 };
 
 export type BundleManifestLanguageLabels = {
@@ -37,6 +39,7 @@ export type BundleManifestV1 = {
   reconciliation_action: string;
   update_mode: string;
   search_index_directional?: boolean;
+  search_key_families?: string[];
   files: BundleManifestV1FileEntry[];
   content_sha256: string;
   languages?: BundleManifestLanguages;
@@ -98,16 +101,35 @@ function getOptionalStringObject(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+function getOptionalStringArray(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const filtered = raw.filter((v): v is string => typeof v === "string" && v.trim() !== "");
+  return filtered.length > 0 ? filtered : undefined;
+}
+
 function getOptionalStringArrayObject(
   raw: unknown,
   key: string,
 ): Record<string, string[]> | undefined {
   if (!isObject(raw)) return undefined;
   const values = raw[key];
-  if (!Array.isArray(values)) return undefined;
-  const filtered = values.filter((v): v is string => typeof v === "string" && v.trim() !== "");
-  if (filtered.length === 0) return undefined;
+  const filtered = getOptionalStringArray(values);
+  if (!filtered) return undefined;
   return { [key]: filtered };
+}
+
+function parseManifestLanguages(raw: unknown): BundleManifestLanguages | undefined {
+  if (!isObject(raw)) return undefined;
+  const out: BundleManifestLanguages = {};
+  const sourceLang = getString(raw, "source_lang");
+  const targetLang = getString(raw, "target_lang");
+  const lexicalLanguage = getString(raw, "lexical_language");
+  const lookupLanguages = getOptionalStringArray(raw["lookup_languages"]);
+  if (sourceLang) out.source_lang = sourceLang;
+  if (targetLang) out.target_lang = targetLang;
+  if (lexicalLanguage) out.lexical_language = lexicalLanguage;
+  if (lookupLanguages) out.lookup_languages = lookupLanguages;
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function fmtExpected(actual: string | undefined, expected: string): string {
@@ -140,9 +162,8 @@ export function parseAndValidateManifestJson(text: string): BundleManifestValida
   const update_mode = getString(raw, "update_mode");
   const search_index_directional = getOptionalBoolean(raw, "search_index_directional");
   const content_sha256 = getString(raw, "content_sha256");
-  const languages = getOptionalStringObject(raw["languages"], ["source_lang", "target_lang"]) as
-    | BundleManifestLanguages
-    | undefined;
+  const languages = parseManifestLanguages(raw["languages"]);
+  const search_key_families = getOptionalStringArray(raw["search_key_families"]);
   const languageLabels = getOptionalStringObject(raw["language_labels"], ["source", "target"]) as
     | BundleManifestLanguageLabels
     | undefined;
@@ -269,6 +290,7 @@ export function parseAndValidateManifestJson(text: string): BundleManifestValida
     reconciliation_action: reconciliation_action!,
     update_mode: update_mode!,
     search_index_directional,
+    search_key_families,
     files,
     content_sha256: content_sha256!,
     languages,

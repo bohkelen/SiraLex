@@ -102,6 +102,25 @@ new bundle_id
 = distinct dictionary lineage / intentionally separate Learning namespace
 ```
 
+### Physical artifact directory name (publisher tooling)
+
+Logical `bundle_id` and immutable `content_sha256` MAY map to a filesystem directory whose name differs from `bundle_id` so multiple content versions of one product line can coexist under one output root.
+
+Recommended deterministic shape when publishing compatible updates with an explicit logical id:
+
+```text
+{bundle_id}__{first_8_hex_of_content_sha256}
+```
+
+Example: `bundle_full_20260710_337619ff__d076558b`.
+
+Normative constraints:
+
+- Manifest `bundle_id` remains the logical product-line id (unchanged by directory naming).
+- Directory naming MUST NOT be used as Learning / CF primary identity.
+- A versioned/publish-safe builder MUST NOT destructively replace an existing immutable artifact directory when the recorded `content_sha256` differs (fail closed). Identical rebuilds MAY be idempotent.
+- Convenience builds that mint a fresh generated `bundle_id` MAY continue to use directory name == `bundle_id`.
+
 ## Manifest (required)
 
 Every bundle MUST include a manifest file (e.g., `bundle.manifest.json`) containing:

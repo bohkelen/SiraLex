@@ -548,9 +548,118 @@ class TestProcessNormalizedFile:
                     )
 
 
-# ===========================================================================
-# Category 4: Featured-record rebuild preserves frozen 7L posting order
-# ===========================================================================
+    def test_english_gloss_emits_en_keys_and_preserves_tgt(self):
+        record = {
+            "ir_id": "211060723bc2edc5",
+            "ir_kind": "lexicon_entry",
+            "norm_version": "norm_v3",
+            "search_keys": {
+                "casefold": ["bón"],
+                "diacritics_insensitive": ["bon"],
+                "punct_stripped": ["bon"],
+                "nospace": ["bon"],
+            },
+            "display": {
+                "senses": [
+                    {
+                        "gloss_en": "house",
+                        "examples": [{"trans_en": "The house is big"}],
+                        "sub_entries": [{"gloss_en": "to build a house"}],
+                    }
+                ]
+            },
+        }
+        index = build_inverted_index([record])
+        assert index[("tgt_casefold", "bón")] == ["211060723bc2edc5"]
+        assert index[("en_casefold", "house")] == ["211060723bc2edc5"]
+        # example / subentry English must not become keys
+        assert ("en_casefold", "the house is big") not in index
+        assert ("en_casefold", "to build a house") not in index
+        assert ("en_casefold", "build") not in index
+
+    def test_english_comma_alternatives_and_ordering(self):
+        records = [
+            {
+                "ir_id": "bbbb",
+                "ir_kind": "lexicon_entry",
+                "norm_version": "norm_v3",
+                "search_keys": {"casefold": ["x"]},
+                "display": {"senses": [{"gloss_en": "hand, arm"}]},
+            },
+            {
+                "ir_id": "aaaa",
+                "ir_kind": "lexicon_entry",
+                "norm_version": "norm_v3",
+                "search_keys": {"casefold": ["y"]},
+                "display": {"senses": [{"gloss_en": "hand"}]},
+            },
+        ]
+        index = build_inverted_index(records)
+        assert index[("en_casefold", "hand")] == ["aaaa", "bbbb"]
+        assert index[("en_casefold", "arm")] == ["bbbb"]
+        assert ("en_casefold", "hand, arm") not in index
+
+    def test_english_disabled_emits_no_en_keys(self):
+        record = {
+            "ir_id": "211060723bc2edc5",
+            "ir_kind": "lexicon_entry",
+            "norm_version": "norm_v3",
+            "search_keys": {"casefold": ["bón"]},
+            "display": {"senses": [{"gloss_en": "house"}]},
+        }
+        index = build_inverted_index([record], emit_english_keys=False)
+        assert ("en_casefold", "house") not in index
+        assert index[("tgt_casefold", "bón")] == ["211060723bc2edc5"]
+
+
+    def test_base_index_merge_preserves_src_tgt_and_adds_en(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            records_path = Path(tmpdir) / "records.jsonl"
+            base_index_path = Path(tmpdir) / "base_index.jsonl"
+            out_path = Path(tmpdir) / "out_index.jsonl"
+            self._write_jsonl(
+                records_path,
+                [
+                    {
+                        "ir_id": "211060723bc2edc5",
+                        "ir_kind": "lexicon_entry",
+                        "norm_version": "norm_v3",
+                        "search_keys": {"casefold": ["bón"]},
+                        "display": {"senses": [{"gloss_en": "house"}]},
+                    }
+                ],
+            )
+            self._write_jsonl(
+                base_index_path,
+                [
+                    {
+                        "key": "maison",
+                        "key_type": "src_casefold",
+                        "ir_ids": ["map1"],
+                    },
+                    {
+                        "key": "bón",
+                        "key_type": "tgt_casefold",
+                        "ir_ids": ["211060723bc2edc5"],
+                    },
+                ],
+            )
+            stats = process_normalized_file(
+                records_path,
+                out_path,
+                emit_english_keys=True,
+                base_search_index_path=base_index_path,
+            )
+            entries = self._read_jsonl(out_path)
+            by = {(e["key_type"], e["key"]): e["ir_ids"] for e in entries}
+            assert by[("src_casefold", "maison")] == ["map1"]
+            assert by[("tgt_casefold", "bón")] == ["211060723bc2edc5"]
+            assert by[("en_casefold", "house")] == ["211060723bc2edc5"]
+            assert stats["total_index_entries"] == 6  # 2 base + 4 en ladder rungs
+            assert all(
+                not kt.startswith("src_") or (kt, key) in {("src_casefold", "maison")}
+                for kt, key in by
+            )
 
 class TestFeaturedRecordRebuildOrdering:
     """Rebuild from featured records must match frozen 7L posting contracts."""

@@ -34,15 +34,23 @@ def cmd_build(args: argparse.Namespace) -> None:
         source_label=args.source_label,
         target_label=args.target_label,
         target_scripts=args.target_script,
+        bundle_id=args.bundle_id,
+        lexical_language=args.lexical_language,
+        lookup_languages=args.lookup_language or None,
+        versioned_output=args.versioned_output,
     )
 
     print("=" * 50)
     print("Bundle Build Results")
     print("=" * 50)
-    print(f"Bundle ID:       {result['bundle_id']}")
-    print(f"Bundle dir:      {result['bundle_dir']}")
-    print(f"Content SHA-256: {result['content_sha256']}")
-    print(f"Payload files:   {result['files_count']}")
+    print(f"Bundle ID:          {result['bundle_id']}")
+    print(f"Artifact dir name:  {result['artifact_dir_name']}")
+    print(f"Bundle dir:         {result['bundle_dir']}")
+    print(f"Content SHA-256:    {result['content_sha256']}")
+    print(f"Versioned output:   {result['versioned_output']}")
+    if result.get("skipped_because_identical"):
+        print("Note:             identical artifact already present (idempotent)")
+    print(f"Payload files:      {result['files_count']}")
     print("=" * 50)
 
 
@@ -149,6 +157,47 @@ def main():
         action="append",
         default=[],
         help="Optional supported target script label (repeatable)",
+    )
+    build_parser.add_argument(
+        "--bundle-id",
+        default=None,
+        help=(
+            "Optional explicit logical bundle_id. When omitted, a convenience id "
+            "is generated from type/date/content hash. Compatible product-line "
+            "updates should pass the stable logical id."
+        ),
+    )
+    build_parser.add_argument(
+        "--lexical-language",
+        default=None,
+        help="Optional lexical language code for manifest languages.lexical_language",
+    )
+    build_parser.add_argument(
+        "--lookup-language",
+        action="append",
+        default=[],
+        help="Optional lookup language code (repeatable) for languages.lookup_languages",
+    )
+    versioned = build_parser.add_mutually_exclusive_group()
+    versioned.add_argument(
+        "--versioned-output",
+        dest="versioned_output",
+        action="store_true",
+        default=None,
+        help=(
+            "Write physical artifact as {bundle_id}__{content_prefix} and never "
+            "destructively overwrite an existing immutable artifact directory. "
+            "Default when --bundle-id is supplied."
+        ),
+    )
+    versioned.add_argument(
+        "--no-versioned-output",
+        dest="versioned_output",
+        action="store_false",
+        help=(
+            "Force convenience directory naming (directory name == bundle_id). "
+            "May replace an existing same-named convenience directory."
+        ),
     )
 
     # Verify subcommand

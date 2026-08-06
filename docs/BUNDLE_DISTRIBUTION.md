@@ -71,6 +71,18 @@ Local install scope (not a catalog field; computed by the installer):
 
 Stable `bundle_id` does **not** mean mutable artifact bytes. Each published payload remains immutable and addressable by `content_sha256`. A replacement install creates a new `storage_scope_id` and retires the previous dictionary payload scope while retaining personal records according to existing Learning/CF lifecycle rules.
 
+### Physical artifact directories (publisher tooling)
+
+On disk, publishers SHOULD keep one directory per immutable content version. When building with an explicit logical `--bundle-id`, the bundle builder defaults to a **versioned artifact directory name**:
+
+```text
+{bundle_id}__{content_sha256_prefix8}
+```
+
+Example: logical `bundle_full_20260710_337619ff` with content hash starting `d076558b…` → directory `bundle_full_20260710_337619ff__d076558b`.
+
+The directory name is a physical packaging convenience. It is **not** Learning identity and does **not** replace `manifest.bundle_id`. Catalog `url_base` points at the chosen published directory for that content version.
+
 See `shared/specs/offline-bundle-versioning.md` (Bundle identifiers) for the normative reuse / mint rules.
 
 ## URL Rules
