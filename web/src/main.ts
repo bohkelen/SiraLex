@@ -255,7 +255,7 @@ async function performConfiguredFeedbackHandoff(
 app.innerHTML = `
   <div class="ux2-app-shell" id="ux2AppShell" data-primary="search" data-search-view="search">
     <header class="ux2-app-header">
-      <div class="ux2-wordmark ux2-type-wordmark" id="ux2Wordmark">SiraLex</div>
+      <button type="button" class="ux2-wordmark ux2-type-wordmark ux2-focus-ring" id="ux2Wordmark" aria-label="${t("nav.home")}">SiraLex</button>
       <div id="ux2PrimaryNavHost" class="ux2-primary-nav-host"></div>
     </header>
 
@@ -476,6 +476,7 @@ function mustGetEl<T extends Element>(selector: string): T {
 // Primary UI elements
 const appShell = mustGetEl<HTMLDivElement>("#ux2AppShell");
 const primaryNavHost = mustGetEl<HTMLDivElement>("#ux2PrimaryNavHost");
+const ux2Wordmark = mustGetEl<HTMLButtonElement>("#ux2Wordmark");
 const searchHeading = mustGetEl<HTMLHeadingElement>("#searchHeading");
 const moreDestination = mustGetEl<HTMLElement>("#moreDestination");
 const moreManagementHost = mustGetEl<HTMLElement>("#moreManagementHost");
@@ -3278,6 +3279,10 @@ primaryNavView = renderPrimaryNavigation("search", {
   },
 });
 primaryNavHost.appendChild(primaryNavView.root);
+
+ux2Wordmark.addEventListener("click", () => {
+  navigatePrimary("search");
+});
 
 function setSearchDirection(direction: SearchDirection) {
   if (searchDirection === direction) {

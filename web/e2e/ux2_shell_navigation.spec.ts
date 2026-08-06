@@ -74,6 +74,15 @@ test.describe("UX2I2 shell navigation", () => {
 
     await expect(page.locator(".ux2-app-header .ux2-primary-nav")).toBeVisible();
     await expect(page.locator("#ux2Wordmark")).toBeVisible();
+    await expect(page.locator("#ux2Wordmark")).toHaveAttribute(
+      "aria-label",
+      /SiraLex home|Accueil SiraLex/i,
+    );
+
+    await navigateUx2Primary(page, "more");
+    await expect(page.locator("#ux2AppShell")).toHaveAttribute("data-primary", "more");
+    await page.locator("#ux2Wordmark").click();
+    await expect(page.locator("#ux2AppShell")).toHaveAttribute("data-primary", "search");
 
     for (const destination of ["search", "saved", "review", "more"] as const) {
       await navigateUx2Primary(page, destination);
