@@ -58,12 +58,20 @@ In the current SiraLex runtime, the schema field name is `catalog_schema_version
 
 Field meanings:
 
-- `bundle_id`: stable bundle identifier used by the app for install/update state.
+- `bundle_id`: stable **logical dictionary / product-line** identity used by the app for install/update state and for personal-data continuity (Learning, CF1, CF2). Compatible releases of the same product line reuse this id; a new `bundle_id` is a distinct dictionary lineage.
 - `name`: human-readable dictionary name shown in the UI.
-- `version`: publisher-facing release label.
-- `url_base`: directory prefix for the bundle assets.
-- `content_sha256`: authoritative bundle identity for update detection.
+- `version`: publisher-facing release label (not the integrity identity).
+- `url_base`: directory prefix for the bundle assets of this published content version.
+- `content_sha256`: immutable **content / artifact version** identity. Authoritative for update detection: same `bundle_id` + new `content_sha256` means a compatible in-line update; identical pair means already current.
 - `size_bytes`: bundle payload size in bytes for display and planning.
+
+Local install scope (not a catalog field; computed by the installer):
+
+- `storage_scope_id` = `` `${bundle_id}::${content_sha256}` ``
+
+Stable `bundle_id` does **not** mean mutable artifact bytes. Each published payload remains immutable and addressable by `content_sha256`. A replacement install creates a new `storage_scope_id` and retires the previous dictionary payload scope while retaining personal records according to existing Learning/CF lifecycle rules.
+
+See `shared/specs/offline-bundle-versioning.md` (Bundle identifiers) for the normative reuse / mint rules.
 
 ## URL Rules
 
