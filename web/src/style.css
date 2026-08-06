@@ -3807,6 +3807,12 @@ button.target-link .target-text {
   border: 0;
 }
 
+/* UX2I8: HTML hidden must win so clipped diagnostics leave the a11y tree. */
+.ux2-search-chrome .ux2-search-setup-copy[hidden],
+.ux2-search-chrome .ux2-search-diagnostic[hidden] {
+  display: none !important;
+}
+
 .ux2-search-first-run {
   margin-top: 0;
   padding: var(--space-3);
