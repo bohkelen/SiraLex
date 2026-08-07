@@ -4,6 +4,7 @@ import {
   assertBundleSupportsLookupMode,
   bundleSupportsEnglishLookup,
   bundleSupportsLookupMode,
+  DEFAULT_LOOKUP_MODE,
   glossFallbackChain,
   indexFamilyForLookupInput,
   isValidLookupMode,
@@ -11,6 +12,8 @@ import {
   lookupModeFromLegacySearchDirection,
   preferredGlossLanguage,
   resolveLookupModeFromFeedbackFields,
+  resolveSupportedLookupMode,
+  swapLookupMode,
   toLegacySearchDirection,
 } from "./lookup_mode";
 
@@ -59,6 +62,48 @@ describe("legacy adapter", () => {
     expect(toLegacySearchDirection({ from: "en", to: "mnk" })).toBe("source_to_target");
     expect(toLegacySearchDirection({ from: "mnk", to: "fr" })).toBe("target_to_source");
     expect(toLegacySearchDirection({ from: "mnk", to: "en" })).toBe("target_to_source");
+  });
+});
+
+describe("swapLookupMode", () => {
+  it("swaps FR↔MNK and EN↔MNK", () => {
+    expect(swapLookupMode({ from: "fr", to: "mnk" })).toEqual({ from: "mnk", to: "fr" });
+    expect(swapLookupMode({ from: "mnk", to: "fr" })).toEqual({ from: "fr", to: "mnk" });
+    expect(swapLookupMode({ from: "en", to: "mnk" })).toEqual({ from: "mnk", to: "en" });
+    expect(swapLookupMode({ from: "mnk", to: "en" })).toEqual({ from: "en", to: "mnk" });
+  });
+
+  it("fail-closes invalid modes", () => {
+    expect(() => swapLookupMode({ from: "fr", to: "en" } as never)).toThrow(
+      LookupCapabilityError,
+    );
+  });
+});
+
+describe("resolveSupportedLookupMode", () => {
+  const enCapable = {
+    lookup_languages: ["fr", "en", "mnk"],
+    search_key_families: ["src", "en", "tgt"],
+  };
+
+  it("preserves supported requested modes", () => {
+    expect(resolveSupportedLookupMode(enCapable, { from: "en", to: "mnk" })).toEqual({
+      from: "en",
+      to: "mnk",
+    });
+    expect(resolveSupportedLookupMode({}, { from: "fr", to: "mnk" })).toEqual({
+      from: "fr",
+      to: "mnk",
+    });
+  });
+
+  it("falls back to FR→MNK when EN is unsupported (never to MNK→FR)", () => {
+    expect(resolveSupportedLookupMode({}, { from: "en", to: "mnk" })).toEqual(
+      DEFAULT_LOOKUP_MODE,
+    );
+    expect(resolveSupportedLookupMode({}, { from: "mnk", to: "en" })).toEqual(
+      DEFAULT_LOOKUP_MODE,
+    );
   });
 });
 

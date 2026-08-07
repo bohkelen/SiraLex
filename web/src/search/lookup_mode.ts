@@ -91,6 +91,17 @@ export function toLegacySearchDirection(mode: LookupMode): SearchDirection {
 }
 
 /**
+ * Reverse LookupMode endpoints (ML1D swap).
+ * fr↔mnk and en↔mnk only — never invents an invalid pair.
+ */
+export function swapLookupMode(mode: LookupMode): LookupMode {
+  assertValidLookupMode(mode);
+  const swapped = { from: mode.to, to: mode.from };
+  assertValidLookupMode(swapped);
+  return swapped;
+}
+
+/**
  * Legacy SearchDirection adapter. Never silently maps source_to_target to English.
  */
 export function lookupModeFromLegacySearchDirection(
@@ -100,6 +111,26 @@ export function lookupModeFromLegacySearchDirection(
     return { from: "fr", to: "mnk" };
   }
   return { from: "mnk", to: "fr" };
+}
+
+/** Deterministic FR→MNK default for consumer Search. */
+export const DEFAULT_LOOKUP_MODE: LookupMode = { from: "fr", to: "mnk" };
+
+/**
+ * When the active bundle cannot support `requested`, fall back to FR→MNK.
+ * Never silently remaps EN→MNK to MNK→FR or another unrelated pair.
+ */
+export function resolveSupportedLookupMode(
+  meta: LookupCapabilityMeta,
+  requested: LookupMode,
+): LookupMode {
+  if (!isValidLookupMode(requested)) {
+    return { ...DEFAULT_LOOKUP_MODE };
+  }
+  if (bundleSupportsLookupMode(meta, requested)) {
+    return { from: requested.from, to: requested.to };
+  }
+  return { ...DEFAULT_LOOKUP_MODE };
 }
 
 /**

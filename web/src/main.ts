@@ -107,8 +107,14 @@ import {
   setQueryLoggingEnabled,
 } from "./query_logging/query_log_runtime";
 import type { QueryLogEvent } from "./query_logging/query_log_types";
-import { searchQuery } from "./search/search_query";
-import { lookupModeFromLegacySearchDirection } from "./search/lookup_mode";
+import { searchQueryForLookupMode } from "./search/search_query";
+import {
+  DEFAULT_LOOKUP_MODE,
+  resolveSupportedLookupMode,
+  swapLookupMode,
+  toLegacySearchDirection,
+  type LookupMode,
+} from "./search/lookup_mode";
 import { resolveRecords } from "./search/resolve_records";
 import {
   getNoResultMessage,
@@ -1174,6 +1180,8 @@ async function refreshDbStatus() {
           : undefined;
       installedBundles = bundles;
       currentActiveBundle = active;
+      revalidateLookupModeForActiveBundle(active ?? undefined);
+      updateLangToggle();
       if (loadedCatalogBundles.length > 0) {
         await backfillInstalledLanguageMetaFromCatalog(loadedCatalogBundles);
       }
@@ -1265,6 +1273,8 @@ async function refreshDbStatus() {
     hasActiveBundle = false;
     installedBundles = [];
     currentActiveBundle = undefined;
+    revalidateLookupModeForActiveBundle(undefined);
+    updateLangToggle();
     currentStorageEstimate = undefined;
     renderBundleSelectOptions(undefined);
     renderInstalledBundleManager();
@@ -1964,7 +1974,26 @@ probeAllBtn.addEventListener("click", () => {
 
 // --- Language toggle ---
 
-let searchDirection: SearchDirection = "source_to_target";
+/** Runtime Search source of truth (ML1D1). Legacy SearchDirection is derived. */
+let currentLookupMode: LookupMode = { ...DEFAULT_LOOKUP_MODE };
+
+function getSearchDirection(): SearchDirection {
+  return toLegacySearchDirection(currentLookupMode);
+}
+
+function revalidateLookupModeForActiveBundle(meta: ActiveBundleMeta | undefined): void {
+  if (!meta) {
+    currentLookupMode = { ...DEFAULT_LOOKUP_MODE };
+    return;
+  }
+  currentLookupMode = resolveSupportedLookupMode(
+    {
+      lookup_languages: meta.lookup_languages,
+      search_key_families: meta.search_key_families,
+    },
+    currentLookupMode,
+  );
+}
 
 const RECENT_QUERY_LOGS_LIMIT = 50;
 
@@ -2122,6 +2151,7 @@ function updateLangToggle() {
     t("language.target"),
     locale,
   );
+  const searchDirection = getSearchDirection();
   applySearchDirectionPresentation({
     sourceLabelEl: searchSourceLanguage,
     targetLabelEl: searchTargetLanguage,
@@ -2210,7 +2240,7 @@ recentQueryLogsRefreshBtn.addEventListener("click", () => {
 });
 
 langToggle.addEventListener("click", () => {
-  searchDirection = searchDirection === "source_to_target" ? "target_to_source" : "source_to_target";
+  currentLookupMode = swapLookupMode(currentLookupMode);
   updateLangToggle();
   // Direction change invalidates any prior executed-search capture context.
   clearExecutedSearchSnapshot();
@@ -2234,8 +2264,8 @@ const QUERY_LOGGING_SETTLE_DELAY_MS = 800;
 type SettledQueryLogPayload = {
   seq: number;
   query: string;
-  direction: SearchDirection;
-  result: Awaited<ReturnType<typeof searchQuery>>;
+  lookupMode: LookupMode;
+  result: Awaited<ReturnType<typeof searchQueryForLookupMode>>;
   activeBundleMeta: ActiveBundleMeta;
   storageScopeId: string;
   latencyMs: number;
@@ -2947,7 +2977,12 @@ function scheduleSettledQueryLog(payload: SettledQueryLogPayload) {
     if (pending.seq !== searchSeq) return;
     if (pending.query.trim() === "") return;
     if (searchInput.value !== pending.query) return;
-    if (searchDirection !== pending.direction) return;
+    if (
+      currentLookupMode.from !== pending.lookupMode.from ||
+      currentLookupMode.to !== pending.lookupMode.to
+    ) {
+      return;
+    }
     if (!currentActiveBundle) return;
     if (currentActiveBundle.bundle_id !== pending.activeBundleMeta.bundle_id) return;
     if (getBundleStorageScopeId(currentActiveBundle) !== pending.storageScopeId) return;
@@ -2955,7 +2990,7 @@ function scheduleSettledQueryLog(payload: SettledQueryLogPayload) {
 
     void appendSearchQueryLogIfEnabled({
       queryRaw: pending.query,
-      direction: pending.direction,
+      lookupMode: pending.lookupMode,
       result: pending.result,
       activeBundleMeta: pending.activeBundleMeta,
       storageScopeId: pending.storageScopeId,
@@ -2991,7 +3026,7 @@ searchInput.addEventListener("input", () => {
 
 /** Origin for entry-detail Back navigation (no router). */
 type EntryNavOrigin =
-  | { kind: "search"; restoreDirection: SearchDirection }
+  | { kind: "search"; restoreLookupMode: LookupMode }
   | { kind: "saved_vocabulary" };
 
 function showNoResultSearchSurface(query: string): void {
@@ -3046,7 +3081,7 @@ function restoreSearchSurfaceAfterFeedback(): void {
     const list = renderResultsList(lastSearchResults, (record) => {
       showEntryDetail(record, {
         kind: "search",
-        restoreDirection: searchDirection,
+        restoreLookupMode: { ...currentLookupMode },
       });
     });
     if (list) searchResults.appendChild(list);
@@ -3141,7 +3176,7 @@ function showResultsList() {
   const list = renderResultsList(lastSearchResults, (record) => {
     showEntryDetail(record, {
       kind: "search",
-      restoreDirection: searchDirection,
+      restoreLookupMode: { ...currentLookupMode },
     });
   });
   if (list) searchResults.appendChild(list);
@@ -3285,12 +3320,21 @@ ux2Wordmark.addEventListener("click", () => {
   navigatePrimary("search");
 });
 
-function setSearchDirection(direction: SearchDirection) {
-  if (searchDirection === direction) {
+function setSearchLookupMode(mode: LookupMode) {
+  const next = currentActiveBundle
+    ? resolveSupportedLookupMode(
+        {
+          lookup_languages: currentActiveBundle.lookup_languages,
+          search_key_families: currentActiveBundle.search_key_families,
+        },
+        mode,
+      )
+    : { ...DEFAULT_LOOKUP_MODE };
+  if (currentLookupMode.from === next.from && currentLookupMode.to === next.to) {
     updateLangToggle();
     return;
   }
-  searchDirection = direction;
+  currentLookupMode = next;
   updateLangToggle();
 }
 
@@ -3299,7 +3343,8 @@ function handleOpenTargetLexiconEntry(target: TargetEntry, mappingRoot: HTMLElem
   const pendingSearchSeq = searchSeq;
   const pendingHost = resultsHostContext;
   const pendingBundleId = currentActiveBundle?.bundle_id;
-  const restoreDirection = searchDirection;
+  const restoreLookupMode: LookupMode = { ...currentLookupMode };
+  const restoreDirection = toLegacySearchDirection(restoreLookupMode);
   const preservedQuery = searchInput.value;
 
   void openTargetLexiconEntry({
@@ -3314,10 +3359,12 @@ function handleOpenTargetLexiconEntry(target: TargetEntry, mappingRoot: HTMLElem
       currentActiveBundle?.bundle_id === pendingBundleId &&
       searchInput.value === preservedQuery,
     setDirectionTargetToSource: () => {
-      setSearchDirection("target_to_source");
+      const glossPartner: "fr" | "en" =
+        restoreLookupMode.from === "en" || restoreLookupMode.to === "en" ? "en" : "fr";
+      setSearchLookupMode({ from: "mnk", to: glossPartner });
     },
-    openEntryDetail: (record, backDirection) => {
-      showEntryDetail(record, { kind: "search", restoreDirection: backDirection });
+    openEntryDetail: (record) => {
+      showEntryDetail(record, { kind: "search", restoreLookupMode });
       const headword = searchResults.querySelector<HTMLElement>(".entry-headword");
       headword?.focus();
     },
@@ -3447,7 +3494,7 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
         showSavedVocabulary();
         return;
       }
-      setSearchDirection(origin.restoreDirection);
+      setSearchLookupMode(origin.restoreLookupMode);
       showResultsList();
     },
     onOpenTargetEntry: (target) => {
@@ -3508,10 +3555,8 @@ async function runSearch(query: string) {
   // New execution invalidates any prior capture context immediately.
   clearExecutedSearchSnapshot();
   activeSearchFeedbackForm?.notifySearchChanged();
-  const executedDirection = searchDirection;
-  // Consumer UI still uses binary SearchDirection only (ML1D owns EN picker).
-  // CF2 provenance records the exact LookupMode for this executed search.
-  const executedLookupMode = lookupModeFromLegacySearchDirection(executedDirection);
+  // Bind LookupMode to this generation — do not re-read after await.
+  const executedLookupMode: LookupMode = { ...currentLookupMode };
   const t0 = performance.now();
   let db: IDBDatabase | undefined;
   try {
@@ -3524,13 +3569,24 @@ async function runSearch(query: string) {
       return;
     }
     const activeStorageScopeId = getBundleStorageScopeId(activeBundleMeta);
+    const capabilityMeta = {
+      lookup_languages: activeBundleMeta.lookup_languages,
+      search_key_families: activeBundleMeta.search_key_families,
+    };
+    // Revalidate against the exact active bundle before probing.
+    const effectiveMode = resolveSupportedLookupMode(capabilityMeta, executedLookupMode);
+    if (effectiveMode.from !== executedLookupMode.from || effectiveMode.to !== executedLookupMode.to) {
+      currentLookupMode = effectiveMode;
+      updateLangToggle();
+    }
 
-    const result = await searchQuery(
+    const result = await searchQueryForLookupMode(
       db,
       activeStorageScopeId,
-      executedDirection,
+      effectiveMode,
       query,
       activeBundleMeta.search_index_directional === true,
+      capabilityMeta,
     );
     if (seq !== searchSeq) return;
 
@@ -3544,9 +3600,9 @@ async function runSearch(query: string) {
         lastExecutedSearch = {
           generation: seq,
           query_raw: query,
-          search_direction: executedDirection,
-          input_lang: executedLookupMode.from,
-          output_lang: executedLookupMode.to,
+          search_direction: toLegacySearchDirection(effectiveMode),
+          input_lang: effectiveMode.from,
+          output_lang: effectiveMode.to,
           result_state: "no_result",
           result_count: 0,
           bundle_id: activeBundleMeta.bundle_id,
@@ -3558,7 +3614,7 @@ async function runSearch(query: string) {
       scheduleSettledQueryLog({
         seq,
         query,
-        direction: executedDirection,
+        lookupMode: effectiveMode,
         result,
         activeBundleMeta,
         storageScopeId: activeStorageScopeId,
@@ -3577,7 +3633,7 @@ async function runSearch(query: string) {
 
     lastSearchResults = records.map((record) => ({
       rawQuery: query,
-      searchDirection: executedDirection,
+      searchDirection: toLegacySearchDirection(effectiveMode),
       matched_key_type: result.matched_key_type,
       matched_key: result.matched_key,
       sourceLabel: getLocalizedSourceLabel(activeBundleMeta.language_meta),
@@ -3590,9 +3646,9 @@ async function runSearch(query: string) {
       lastExecutedSearch = {
         generation: seq,
         query_raw: query,
-        search_direction: executedDirection,
-        input_lang: executedLookupMode.from,
-        output_lang: executedLookupMode.to,
+        search_direction: toLegacySearchDirection(effectiveMode),
+        input_lang: effectiveMode.from,
+        output_lang: effectiveMode.to,
         result_state: "results_not_useful",
         result_count: records.length,
         ...(matchedIrIds !== undefined ? { matched_ir_ids: matchedIrIds } : {}),
@@ -3605,7 +3661,7 @@ async function runSearch(query: string) {
     scheduleSettledQueryLog({
       seq,
       query,
-      direction: executedDirection,
+      lookupMode: effectiveMode,
       result,
       activeBundleMeta,
       storageScopeId: activeStorageScopeId,

@@ -17,6 +17,10 @@ import {
 import { appendQueryLog, appendQueryLogV2, countQueryLogs } from "./query_log_store";
 import { QUERY_LOG_CONSENT_VERSION } from "./query_log_types";
 
+function recentIso(offsetMs = 0): string {
+  return new Date(Date.now() - offsetMs).toISOString();
+}
+
 describe("query log controls", () => {
   beforeEach(async () => {
     try {
@@ -52,7 +56,7 @@ describe("query log controls", () => {
         storage_scope_id: "bundle-a::sha256:1",
         norm_version: "norm_v2",
         app_version: "test",
-        timestamp_iso: "2026-05-08T17:00:00.000Z",
+        timestamp_iso: recentIso(),
         logging_enabled: true,
       });
     } finally {
@@ -121,7 +125,7 @@ describe("query log controls", () => {
         storage_scope_id: "bundle-a::sha256:1",
         norm_version: "norm_v2",
         app_version: "test",
-        timestamp_iso: "2026-05-08T17:00:00.000Z",
+        timestamp_iso: recentIso(),
         logging_enabled: true,
       });
     } finally {
@@ -163,7 +167,7 @@ describe("query log controls", () => {
         storage_scope_id: "bundle-a::sha256:1",
         norm_version: "norm_v2",
         app_version: "test",
-        timestamp_iso: "2026-05-08T17:00:00.000Z",
+        timestamp_iso: recentIso(),
         logging_enabled: true,
       });
     } finally {
@@ -204,7 +208,7 @@ describe("query log controls", () => {
         storage_scope_id: "bundle-a::sha256:1",
         norm_version: "norm_v2",
         app_version: "test",
-        timestamp_iso: "2026-05-08T17:00:00.000Z",
+        timestamp_iso: recentIso(),
         logging_enabled: true,
       });
     } finally {
@@ -228,11 +232,13 @@ describe("query log controls", () => {
   });
 
   it("getQueryLogStatsFromDb reports count and oldest timestamp", async () => {
+    const olderIso = recentIso(2000);
+    const newerIso = recentIso(1000);
     const db = await openSiralexDb();
     try {
       await appendQueryLogV2(db, {
         event_id: "evt-stats-1",
-        timestamp_iso: "2026-06-01T00:00:00.000Z",
+        timestamp_iso: olderIso,
         app_version: "test",
         bundle_id: "bundle-a",
         storage_scope_id: "bundle-a::sha256:1",
@@ -261,7 +267,7 @@ describe("query log controls", () => {
       });
       await appendQueryLogV2(db, {
         event_id: "evt-stats-2",
-        timestamp_iso: "2026-06-18T00:00:00.000Z",
+        timestamp_iso: newerIso,
         app_version: "test",
         bundle_id: "bundle-a",
         storage_scope_id: "bundle-a::sha256:1",
@@ -295,7 +301,7 @@ describe("query log controls", () => {
     const result = await getQueryLogStatsFromDb();
     expect(result.ok).toBe(true);
     expect(result.stats.count).toBe(2);
-    expect(result.stats.oldest_timestamp_iso).toBe("2026-06-01T00:00:00.000Z");
+    expect(result.stats.oldest_timestamp_iso).toBe(olderIso);
     expect(result.message).toBe("2 logs");
   });
 
@@ -307,9 +313,10 @@ describe("query log controls", () => {
       return `${key}:${vars?.count}:${vars?.oldest}`;
     };
 
+    const oldest = "2026-07-01T00:00:00.000Z";
     expect(
-      formatQueryLogStatsLine({ count: 4, oldest_timestamp_iso: "2026-06-01T00:00:00.000Z" }, { translate }),
-    ).toBe("logging.statsLine:4:2026-06-01T00:00:00.000Z");
+      formatQueryLogStatsLine({ count: 4, oldest_timestamp_iso: oldest }, { translate }),
+    ).toBe(`logging.statsLine:4:${oldest}`);
 
     expect(formatQueryLogStatsLine({ count: 0, oldest_timestamp_iso: null }, { translate })).toBe(
       "logging.statsLine:0:—",
@@ -317,11 +324,12 @@ describe("query log controls", () => {
   });
 
   it("builds copy diagnostics text with app/bundle/norm/log stats", async () => {
+    const oldestIso = recentIso(500);
     const db = await openSiralexDb();
     try {
       await appendQueryLogV2(db, {
         event_id: "evt-copy-1",
-        timestamp_iso: "2026-06-01T00:00:00.000Z",
+        timestamp_iso: oldestIso,
         app_version: "test",
         bundle_id: "bundle-a",
         storage_scope_id: "bundle-a::sha256:1",
@@ -404,7 +412,7 @@ describe("query log controls", () => {
     expect(text).toContain("norm_version: norm_v3");
     expect(text).toContain("ui_language: fr");
     expect(text).toContain("query_log_count: 1");
-    expect(text).toContain("query_log_oldest: 2026-06-01T00:00:00.000Z");
+    expect(text).toContain("query_log_oldest: " + oldestIso);
     expect(text).toContain("logging_enabled: true");
     expect(text).toContain(`consent_version: ${QUERY_LOG_CONSENT_VERSION}`);
     expect(text).toContain("session_bucket_prefix: 12345678…");
