@@ -4,12 +4,17 @@
  * Observed failure state only. No missing-entry truth, diagnosis, query-log
  * linkage, Learning fields, or CF1 correction semantics.
  *
+ * Version-aware (ML1C2A):
+ * - V1: frozen historical shape — language fields are unknown_field.
+ * - V2: requires valid input_lang + output_lang LookupMode pair.
+ *
  * Pure module: no IndexedDB, clock, DOM, network, or search execution.
  */
 
 import {
   SEARCH_FEEDBACK_BUNDLE_ID_MAX_CHARS,
-  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION,
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1,
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
   SEARCH_FEEDBACK_ID_MAX_CHARS,
   SEARCH_FEEDBACK_IR_ID_MAX_CHARS,
   SEARCH_FEEDBACK_MATCHED_IR_IDS_MAX,
@@ -18,17 +23,27 @@ import {
   SEARCH_FEEDBACK_REQUESTED_MEANING_MAX_CHARS,
   SEARCH_FEEDBACK_STORAGE_SCOPE_ID_MAX_CHARS,
   SEARCH_FEEDBACK_USER_DESCRIPTION_MAX_CHARS,
-  cloneSearchFeedbackDraft,
+  cloneSearchFeedbackDraftV1,
+  cloneSearchFeedbackDraftV2,
   countUnicodeCharacters,
   hasDisallowedControlCharacters,
   isSearchFeedbackDirection,
+  isSearchFeedbackLookupLanguage,
   isSearchFeedbackResultState,
   isValidCanonicalContentSha256,
   isValidSearchFeedbackIsoTimestamp,
+  type SearchFeedbackDraft,
   type SearchFeedbackDraftV1,
+  type SearchFeedbackDraftV2,
   type SearchFeedbackDirection,
+  type SearchFeedbackLookupLanguage,
   type SearchFeedbackResultState,
 } from "./search_feedback_types";
+import {
+  isValidLookupMode,
+  toLegacySearchDirection,
+  type LookupMode,
+} from "../search/lookup_mode";
 
 export type SearchFeedbackValidationErrorCode =
   | "invalid_top_level"
@@ -38,6 +53,7 @@ export type SearchFeedbackValidationErrorCode =
   | "invalid_provenance"
   | "invalid_query"
   | "invalid_direction"
+  | "invalid_lookup_pair"
   | "invalid_result_state"
   | "invalid_result_count"
   | "invalid_matched_ir_ids"
@@ -55,7 +71,7 @@ export type SearchFeedbackValidationError = {
 export type ValidateSearchFeedbackDraftResult =
   | {
       ok: true;
-      value: SearchFeedbackDraftV1;
+      value: SearchFeedbackDraft;
     }
   | {
       ok: false;
@@ -63,7 +79,8 @@ export type ValidateSearchFeedbackDraftResult =
       truncated: boolean;
     };
 
-const DRAFT_TOP_LEVEL_KEYS = new Set([
+/** Historical V1 allowlist — language fields intentionally absent. */
+const DRAFT_V1_TOP_LEVEL_KEYS = new Set([
   "schema_version",
   "feedback_id",
   "bundle_id",
@@ -71,6 +88,27 @@ const DRAFT_TOP_LEVEL_KEYS = new Set([
   "storage_scope_id",
   "query_raw",
   "search_direction",
+  "result_state",
+  "result_count",
+  "matched_ir_ids",
+  "requested_meaning",
+  "user_description",
+  "created_at",
+  "updated_at",
+  "status",
+]);
+
+/** V2 allowlist — includes required language provenance. */
+const DRAFT_V2_TOP_LEVEL_KEYS = new Set([
+  "schema_version",
+  "feedback_id",
+  "bundle_id",
+  "content_sha256",
+  "storage_scope_id",
+  "query_raw",
+  "search_direction",
+  "input_lang",
+  "output_lang",
   "result_state",
   "result_count",
   "matched_ir_ids",
@@ -258,38 +296,18 @@ function validateMatchedIrIds(
   return out;
 }
 
-/**
- * Strictly validate a CF2 search-feedback draft.
- * Installation-independent. Does not mutate input. Does not insert timestamps.
- * Does not assert missing-entry truth or linguistic cause.
- */
-export function validateSearchFeedbackDraft(
-  value: unknown,
-): ValidateSearchFeedbackDraftResult {
-  const collector: ErrorCollector = { errors: [], truncated: false };
+type SharedValidatedFields = {
+  queryRaw: string | undefined;
+  resultState: SearchFeedbackResultState | undefined;
+  matchedIrIds: string[] | undefined;
+  requestedMeaning: string | undefined;
+  userDescription: string | undefined;
+};
 
-  if (!isPlainObject(value)) {
-    pushError(collector, { code: "invalid_top_level" });
-    return fail(collector);
-  }
-
-  for (const key of Object.keys(value)) {
-    if (!DRAFT_TOP_LEVEL_KEYS.has(key)) {
-      pushError(collector, { code: "unknown_field", path: key });
-    }
-  }
-  if (collector.errors.length > 0) return fail(collector);
-
-  if (value.schema_version !== SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION) {
-    pushError(collector, {
-      code:
-        typeof value.schema_version === "string"
-          ? "unsupported_schema"
-          : "invalid_identity",
-      path: "schema_version",
-    });
-  }
-
+function validateSharedDraftFields(
+  value: Record<string, unknown>,
+  collector: ErrorCollector,
+): SharedValidatedFields {
   if (!isValidBoundedId(value.feedback_id, SEARCH_FEEDBACK_ID_MAX_CHARS)) {
     pushError(collector, { code: "invalid_identity", path: "feedback_id" });
   }
@@ -390,40 +408,196 @@ export function validateSearchFeedbackDraft(
     }
   }
 
+  return {
+    queryRaw,
+    resultState,
+    matchedIrIds,
+    requestedMeaning,
+    userDescription,
+  };
+}
+
+function validateAsV1(
+  value: Record<string, unknown>,
+  collector: ErrorCollector,
+): ValidateSearchFeedbackDraftResult {
+  for (const key of Object.keys(value)) {
+    if (!DRAFT_V1_TOP_LEVEL_KEYS.has(key)) {
+      pushError(collector, { code: "unknown_field", path: key });
+    }
+  }
+  if (collector.errors.length > 0) return fail(collector);
+
+  const shared = validateSharedDraftFields(value, collector);
   if (collector.errors.length > 0) return fail(collector);
 
   const draft: SearchFeedbackDraftV1 = {
-    schema_version: SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION,
+    schema_version: SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1,
     feedback_id: value.feedback_id as string,
     bundle_id: value.bundle_id as string,
     content_sha256: value.content_sha256 as string,
     storage_scope_id: value.storage_scope_id as string,
-    query_raw: queryRaw!,
+    query_raw: shared.queryRaw!,
     search_direction: value.search_direction as SearchFeedbackDirection,
-    result_state: resultState!,
+    result_state: shared.resultState!,
     result_count: value.result_count as number,
-    ...(matchedIrIds !== undefined ? { matched_ir_ids: matchedIrIds } : {}),
-    ...(requestedMeaning !== undefined
-      ? { requested_meaning: requestedMeaning }
+    ...(shared.matchedIrIds !== undefined
+      ? { matched_ir_ids: shared.matchedIrIds }
       : {}),
-    ...(userDescription !== undefined
-      ? { user_description: userDescription }
+    ...(shared.requestedMeaning !== undefined
+      ? { requested_meaning: shared.requestedMeaning }
+      : {}),
+    ...(shared.userDescription !== undefined
+      ? { user_description: shared.userDescription }
       : {}),
     created_at: value.created_at as string,
     updated_at: value.updated_at as string,
     status: "draft",
   };
 
-  return { ok: true, value: cloneSearchFeedbackDraft(draft) };
+  return { ok: true, value: cloneSearchFeedbackDraftV1(draft) };
+}
+
+function validateV2LookupPair(
+  value: Record<string, unknown>,
+  collector: ErrorCollector,
+):
+  | {
+      input_lang: SearchFeedbackLookupLanguage;
+      output_lang: SearchFeedbackLookupLanguage;
+    }
+  | undefined {
+  const hasInputLang = Object.prototype.hasOwnProperty.call(value, "input_lang");
+  const hasOutputLang = Object.prototype.hasOwnProperty.call(value, "output_lang");
+
+  if (!hasInputLang || !hasOutputLang) {
+    pushError(collector, {
+      code: "invalid_lookup_pair",
+      path: !hasInputLang ? "input_lang" : "output_lang",
+    });
+    return undefined;
+  }
+
+  let inputLang: SearchFeedbackLookupLanguage | undefined;
+  let outputLang: SearchFeedbackLookupLanguage | undefined;
+
+  if (!isSearchFeedbackLookupLanguage(value.input_lang)) {
+    pushError(collector, { code: "invalid_lookup_pair", path: "input_lang" });
+  } else {
+    inputLang = value.input_lang;
+  }
+  if (!isSearchFeedbackLookupLanguage(value.output_lang)) {
+    pushError(collector, { code: "invalid_lookup_pair", path: "output_lang" });
+  } else {
+    outputLang = value.output_lang;
+  }
+
+  if (inputLang === undefined || outputLang === undefined) {
+    return undefined;
+  }
+
+  const mode: LookupMode = { from: inputLang, to: outputLang };
+  if (!isValidLookupMode(mode)) {
+    pushError(collector, { code: "invalid_lookup_pair", path: "input_lang" });
+    return undefined;
+  }
+  if (
+    isSearchFeedbackDirection(value.search_direction) &&
+    toLegacySearchDirection(mode) !== value.search_direction
+  ) {
+    pushError(collector, {
+      code: "invalid_lookup_pair",
+      path: "search_direction",
+    });
+    return undefined;
+  }
+
+  return { input_lang: inputLang, output_lang: outputLang };
+}
+
+function validateAsV2(
+  value: Record<string, unknown>,
+  collector: ErrorCollector,
+): ValidateSearchFeedbackDraftResult {
+  for (const key of Object.keys(value)) {
+    if (!DRAFT_V2_TOP_LEVEL_KEYS.has(key)) {
+      pushError(collector, { code: "unknown_field", path: key });
+    }
+  }
+  if (collector.errors.length > 0) return fail(collector);
+
+  const shared = validateSharedDraftFields(value, collector);
+  const langs = validateV2LookupPair(value, collector);
+  if (collector.errors.length > 0) return fail(collector);
+
+  const draft: SearchFeedbackDraftV2 = {
+    schema_version: SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
+    feedback_id: value.feedback_id as string,
+    bundle_id: value.bundle_id as string,
+    content_sha256: value.content_sha256 as string,
+    storage_scope_id: value.storage_scope_id as string,
+    query_raw: shared.queryRaw!,
+    search_direction: value.search_direction as SearchFeedbackDirection,
+    input_lang: langs!.input_lang,
+    output_lang: langs!.output_lang,
+    result_state: shared.resultState!,
+    result_count: value.result_count as number,
+    ...(shared.matchedIrIds !== undefined
+      ? { matched_ir_ids: shared.matchedIrIds }
+      : {}),
+    ...(shared.requestedMeaning !== undefined
+      ? { requested_meaning: shared.requestedMeaning }
+      : {}),
+    ...(shared.userDescription !== undefined
+      ? { user_description: shared.userDescription }
+      : {}),
+    created_at: value.created_at as string,
+    updated_at: value.updated_at as string,
+    status: "draft",
+  };
+
+  return { ok: true, value: cloneSearchFeedbackDraftV2(draft) };
 }
 
 /**
- * Asserting write validator for future store writes and package construction.
+ * Strictly validate a CF2 search-feedback draft.
+ * Installation-independent. Does not mutate input. Does not insert timestamps.
+ * Does not assert missing-entry truth or linguistic cause.
+ */
+export function validateSearchFeedbackDraft(
+  value: unknown,
+): ValidateSearchFeedbackDraftResult {
+  const collector: ErrorCollector = { errors: [], truncated: false };
+
+  if (!isPlainObject(value)) {
+    pushError(collector, { code: "invalid_top_level" });
+    return fail(collector);
+  }
+
+  if (value.schema_version === SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1) {
+    return validateAsV1(value, collector);
+  }
+  if (value.schema_version === SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2) {
+    return validateAsV2(value, collector);
+  }
+
+  pushError(collector, {
+    code:
+      typeof value.schema_version === "string"
+        ? "unsupported_schema"
+        : "invalid_identity",
+    path: "schema_version",
+  });
+  return fail(collector);
+}
+
+/**
+ * Asserting write validator for store writes and package construction.
  */
 export function validateSearchFeedbackDraftForWrite(
   value: unknown,
   label = "search_feedback_draft",
-): asserts value is SearchFeedbackDraftV1 {
+): asserts value is SearchFeedbackDraft {
   const parsed = validateSearchFeedbackDraft(value);
   if (!parsed.ok) {
     const first = parsed.errors[0];

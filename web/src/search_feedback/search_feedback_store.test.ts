@@ -33,7 +33,11 @@ import {
   type LearningRecordV1,
 } from "../learning/learning_record_types";
 import { saveLearningRecord } from "../learning/learning_record_store";
-import { SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION } from "./search_feedback_types";
+import {
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION,
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1,
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
+} from "./search_feedback_types";
 import {
   SearchFeedbackStoreError,
   compareSearchFeedbackDraftsForManagement,
@@ -60,15 +64,24 @@ const SCOPE_B = `${BUNDLE_A}::${HASH_B}`;
 function makeInput(
   overrides: Partial<CreateSearchFeedbackDraftInput> = {},
 ): CreateSearchFeedbackDraftInput {
+  const search_direction = overrides.search_direction ?? "target_to_source";
+  const defaultLangs =
+    search_direction === "source_to_target"
+      ? ({ input_lang: "fr", output_lang: "mnk" } as const)
+      : ({ input_lang: "mnk", output_lang: "fr" } as const);
+  const { search_direction: _sd, input_lang: _il, output_lang: _ol, ...rest } =
+    overrides;
   return {
     bundle_id: BUNDLE_A,
     content_sha256: HASH_A,
     storage_scope_id: SCOPE_A,
     query_raw: "kùn",
-    search_direction: "target_to_source",
     result_state: "no_result",
     result_count: 0,
-    ...overrides,
+    ...rest,
+    search_direction,
+    input_lang: overrides.input_lang ?? defaultLangs.input_lang,
+    output_lang: overrides.output_lang ?? defaultLangs.output_lang,
   };
 }
 
@@ -629,6 +642,115 @@ describe("update", () => {
     if (!cleared.ok) return;
     expect(cleared.draft.requested_meaning).toBeUndefined();
     expect(cleared.draft.user_description).toBeUndefined();
+    db.close();
+  });
+
+  it("preserves input_lang/output_lang on V2 update (immutable search provenance)", async () => {
+    const db = await openSiralexDb();
+    const created = await createSearchFeedbackDraft(
+      db,
+      makeInput({
+        query_raw: "house",
+        search_direction: "source_to_target",
+        input_lang: "en",
+        output_lang: "mnk",
+      }),
+      { now: () => TS_1, generateFeedbackId: () => "upd-lang-1" },
+    );
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    expect(created.draft.schema_version).toBe(SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2);
+    expect(
+      created.draft.schema_version === SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2
+        ? created.draft.input_lang
+        : undefined,
+    ).toBe("en");
+    expect(
+      created.draft.schema_version === SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2
+        ? created.draft.output_lang
+        : undefined,
+    ).toBe("mnk");
+
+    const updated = await updateSearchFeedbackDraft(
+      db,
+      {
+        feedback_id: "upd-lang-1",
+        expected_updated_at: TS_1,
+        requested_meaning: "dwelling",
+      },
+      { now: () => TS_2 },
+    );
+    expect(updated.ok).toBe(true);
+    if (!updated.ok) return;
+    expect(updated.draft.schema_version).toBe(SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2);
+    expect(
+      updated.draft.schema_version === SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2
+        ? updated.draft.input_lang
+        : undefined,
+    ).toBe("en");
+    expect(
+      updated.draft.schema_version === SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2
+        ? updated.draft.output_lang
+        : undefined,
+    ).toBe("mnk");
+    expect(updated.draft.search_direction).toBe("source_to_target");
+    expect(updated.draft.query_raw).toBe("house");
+    db.close();
+  });
+
+  it("creates V2 drafts and can still list/read manually stored V1 rows", async () => {
+    const db = await openSiralexDb();
+    const created = await createSearchFeedbackDraft(db, makeInput(), {
+      now: () => TS_1,
+      generateFeedbackId: () => "create-v2-1",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    expect(created.draft.schema_version).toBe(SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2);
+
+    const v1Row = {
+      schema_version: SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1,
+      feedback_id: "legacy-v1-row",
+      bundle_id: BUNDLE_A,
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      query_raw: "maison",
+      search_direction: "source_to_target" as const,
+      result_state: "no_result" as const,
+      result_count: 0,
+      created_at: TS_1,
+      updated_at: TS_1,
+      status: "draft" as const,
+    };
+    const putTx = db.transaction(STORE_SEARCH_FAILURE_FEEDBACK, "readwrite");
+    putTx.objectStore(STORE_SEARCH_FAILURE_FEEDBACK).put(v1Row);
+    await new Promise<void>((resolve, reject) => {
+      putTx.addEventListener("complete", () => resolve());
+      putTx.addEventListener("error", () => reject(putTx.error));
+    });
+
+    const got = await getSearchFeedbackDraft(db, "legacy-v1-row");
+    expect(got?.schema_version).toBe(SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1);
+    expect(got && "input_lang" in got).toBe(false);
+
+    const listed = await listSearchFeedbackDrafts(db);
+    expect(listed.some((d) => d.feedback_id === "legacy-v1-row")).toBe(true);
+    expect(listed.some((d) => d.feedback_id === "create-v2-1")).toBe(true);
+
+    const updatedV1 = await updateSearchFeedbackDraft(
+      db,
+      {
+        feedback_id: "legacy-v1-row",
+        expected_updated_at: TS_1,
+        requested_meaning: "house",
+      },
+      { now: () => TS_2 },
+    );
+    expect(updatedV1.ok).toBe(true);
+    if (!updatedV1.ok) return;
+    expect(updatedV1.draft.schema_version).toBe(SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1);
+    expect("input_lang" in updatedV1.draft).toBe(false);
+    expect(updatedV1.draft.requested_meaning).toBe("house");
     db.close();
   });
 

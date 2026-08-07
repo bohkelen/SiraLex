@@ -43,6 +43,8 @@ describe("search feedback capture model", () => {
       storage_scope_id: `bundle_a::${HASH}`,
       query_raw: "  kùn  ",
       search_direction: "source_to_target",
+      input_lang: "fr",
+      output_lang: "mnk",
       result_state: "no_result",
       result_count: 0,
       search_generation: 3,
@@ -63,12 +65,55 @@ describe("search feedback capture model", () => {
     );
     expect(ctx?.query_raw).toBe("tête");
     expect(ctx?.search_direction).toBe("target_to_source");
+    expect(ctx?.input_lang).toBe("mnk");
+    expect(ctx?.output_lang).toBe("fr");
     expect(ctx?.result_count).toBe(3);
     expect(ctx?.matched_ir_ids).toEqual(ids);
     expect(ctx?.matched_ir_ids).not.toBe(ids);
     expect(ctx?.bundle_id).toBe("bundle_a");
     expect(ctx?.content_sha256).toBe(HASH);
     expect(ctx?.storage_scope_id).toBe(`bundle_a::${HASH}`);
+  });
+
+  it("preserves explicit EN→MNK and MNK→EN snapshot pairs", () => {
+    const enCtx = buildSearchFeedbackCaptureContext(
+      snapshot({
+        search_direction: "source_to_target",
+        input_lang: "en",
+        output_lang: "mnk",
+        query_raw: "house",
+      }),
+    );
+    expect(enCtx?.input_lang).toBe("en");
+    expect(enCtx?.output_lang).toBe("mnk");
+
+    const mnkEn = buildSearchFeedbackCaptureContext(
+      snapshot({
+        search_direction: "target_to_source",
+        input_lang: "mnk",
+        output_lang: "en",
+        query_raw: "bón",
+      }),
+    );
+    expect(mnkEn?.input_lang).toBe("mnk");
+    expect(mnkEn?.output_lang).toBe("en");
+  });
+
+  it("rejects mismatched or partial language pairs on snapshots", () => {
+    expect(
+      buildSearchFeedbackCaptureContext(
+        snapshot({ input_lang: "en", output_lang: undefined }),
+      ),
+    ).toBeUndefined();
+    expect(
+      buildSearchFeedbackCaptureContext(
+        snapshot({
+          search_direction: "source_to_target",
+          input_lang: "mnk",
+          output_lang: "en",
+        }),
+      ),
+    ).toBeUndefined();
   });
 
   it("rejects blank query and missing provenance for capture offer", () => {
@@ -163,6 +208,8 @@ describe("search feedback capture model", () => {
       expect(keys).not.toContain("diagnosis");
       expect(keys).not.toContain("search_generation");
       expect(validated.input.result_state).toBe("results_not_useful");
+      expect(validated.input.input_lang).toBe("fr");
+      expect(validated.input.output_lang).toBe("mnk");
     }
   });
 });

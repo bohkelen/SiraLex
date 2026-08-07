@@ -48,6 +48,8 @@ function searchInput(): CreateSearchFeedbackDraftInput {
     storage_scope_id: `bundle_a::${HASH}`,
     query_raw: "zzzz_fh1",
     search_direction: "source_to_target",
+    input_lang: "fr",
+    output_lang: "mnk",
     result_state: "no_result",
     result_count: 0,
   };
@@ -120,7 +122,9 @@ describe("FH1 session handoff", () => {
       performHandoff: async (artifact) => {
         const bridged = toFeedbackHandoffArtifact(artifact, "search_feedback");
         seenText = bridged?.text;
-        expect(bridged?.text).toContain("siralex_search_feedback_v1");
+        expect(bridged?.text).toContain("siralex_search_feedback_v2");
+        expect(bridged?.text).toContain('"input_lang": "fr"');
+        expect(bridged?.text).toContain('"output_lang": "mnk"');
         expect(bridged?.text).toBe(artifact.text);
         return { ok: true, method: "download_mailto" };
       },

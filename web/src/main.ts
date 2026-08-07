@@ -108,6 +108,7 @@ import {
 } from "./query_logging/query_log_runtime";
 import type { QueryLogEvent } from "./query_logging/query_log_types";
 import { searchQuery } from "./search/search_query";
+import { lookupModeFromLegacySearchDirection } from "./search/lookup_mode";
 import { resolveRecords } from "./search/resolve_records";
 import {
   getNoResultMessage,
@@ -3508,6 +3509,9 @@ async function runSearch(query: string) {
   clearExecutedSearchSnapshot();
   activeSearchFeedbackForm?.notifySearchChanged();
   const executedDirection = searchDirection;
+  // Consumer UI still uses binary SearchDirection only (ML1D owns EN picker).
+  // CF2 provenance records the exact LookupMode for this executed search.
+  const executedLookupMode = lookupModeFromLegacySearchDirection(executedDirection);
   const t0 = performance.now();
   let db: IDBDatabase | undefined;
   try {
@@ -3541,6 +3545,8 @@ async function runSearch(query: string) {
           generation: seq,
           query_raw: query,
           search_direction: executedDirection,
+          input_lang: executedLookupMode.from,
+          output_lang: executedLookupMode.to,
           result_state: "no_result",
           result_count: 0,
           bundle_id: activeBundleMeta.bundle_id,
@@ -3585,6 +3591,8 @@ async function runSearch(query: string) {
         generation: seq,
         query_raw: query,
         search_direction: executedDirection,
+        input_lang: executedLookupMode.from,
+        output_lang: executedLookupMode.to,
         result_state: "results_not_useful",
         result_count: records.length,
         ...(matchedIrIds !== undefined ? { matched_ir_ids: matchedIrIds } : {}),

@@ -16,18 +16,35 @@ import {
   hasDisallowedControlCharacters,
   isValidCanonicalContentSha256,
   type SearchFeedbackDirection,
+  type SearchFeedbackLookupLanguage,
   type SearchFeedbackResultState,
 } from "./search_feedback_types";
 import type { CreateSearchFeedbackDraftInput } from "./search_feedback_store";
+import {
+  isValidLookupMode,
+  lookupModeFromLegacySearchDirection,
+  lookupModeToLanguagePair,
+  toLegacySearchDirection,
+  type LookupMode,
+} from "../search/lookup_mode";
 
 /**
  * Settled search evidence from the runtime (main/search host).
  * `generation` is controller/runtime only — never persisted on drafts.
+ *
+ * New captures must carry explicit LookupMode provenance (`input_lang` /
+ * `output_lang`). When omitted on a snapshot (tests), context falls back to
+ * the legacy FR↔MNK adapter from `search_direction` only for building
+ * create-input — production Search always supplies the pair from the executed
+ * LookupMode.
  */
 export type ExecutedSearchSnapshot = {
   generation: number;
   query_raw: string;
   search_direction: SearchFeedbackDirection;
+  /** Explicit lookup pair; required for truthful multilingual provenance. */
+  input_lang?: SearchFeedbackLookupLanguage;
+  output_lang?: SearchFeedbackLookupLanguage;
   result_state: SearchFeedbackResultState;
   result_count: number;
   matched_ir_ids?: string[];
@@ -43,6 +60,8 @@ export type SearchFeedbackCaptureContext = {
   storage_scope_id: string;
   query_raw: string;
   search_direction: SearchFeedbackDirection;
+  input_lang: SearchFeedbackLookupLanguage;
+  output_lang: SearchFeedbackLookupLanguage;
   result_state: SearchFeedbackResultState;
   result_count: number;
   matched_ir_ids?: string[];
@@ -118,12 +137,28 @@ export function buildSearchFeedbackCaptureContext(
   snapshot: ExecutedSearchSnapshot,
 ): SearchFeedbackCaptureContext | undefined {
   if (!canOfferSearchFeedbackCapture(snapshot)) return undefined;
+
+  let mode: LookupMode;
+  if (snapshot.input_lang !== undefined && snapshot.output_lang !== undefined) {
+    mode = { from: snapshot.input_lang, to: snapshot.output_lang };
+    if (!isValidLookupMode(mode)) return undefined;
+    if (toLegacySearchDirection(mode) !== snapshot.search_direction) return undefined;
+  } else if (snapshot.input_lang === undefined && snapshot.output_lang === undefined) {
+    // Legacy snapshot shape: map binary direction to FR↔MNK only.
+    mode = lookupModeFromLegacySearchDirection(snapshot.search_direction);
+  } else {
+    return undefined;
+  }
+
+  const pair = lookupModeToLanguagePair(mode);
   return {
     bundle_id: snapshot.bundle_id,
     content_sha256: snapshot.content_sha256,
     storage_scope_id: snapshot.storage_scope_id,
     query_raw: snapshot.query_raw,
     search_direction: snapshot.search_direction,
+    input_lang: pair.input_lang,
+    output_lang: pair.output_lang,
     result_state: snapshot.result_state,
     result_count: snapshot.result_count,
     ...(snapshot.matched_ir_ids !== undefined
@@ -202,6 +237,8 @@ export function validateSearchFeedbackCaptureFields(
       storage_scope_id: context.storage_scope_id,
       query_raw: context.query_raw,
       search_direction: context.search_direction,
+      input_lang: context.input_lang,
+      output_lang: context.output_lang,
       result_state: context.result_state,
       result_count: context.result_count,
       ...(context.matched_ir_ids !== undefined

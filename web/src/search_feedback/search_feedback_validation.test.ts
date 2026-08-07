@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION,
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
   SEARCH_FEEDBACK_MATCHED_IR_IDS_MAX,
   SEARCH_FEEDBACK_MAX_VALIDATION_ERRORS,
   SEARCH_FEEDBACK_QUERY_RAW_MAX_CHARS,
@@ -15,6 +16,7 @@ import {
   hasDisallowedControlCharacters,
   isValidCanonicalContentSha256,
   type SearchFeedbackDraftV1,
+  type SearchFeedbackDraftV2,
 } from "./search_feedback_types";
 import {
   validateSearchFeedbackDraft,
@@ -59,6 +61,28 @@ function makeResultsNotUseful(
     result_state: "results_not_useful",
     result_count: 6,
     matched_ir_ids: ["lex-a", "lex-b", "lex-c"],
+    created_at: TS,
+    updated_at: TS,
+    status: "draft",
+    ...overrides,
+  };
+}
+
+function makeV2(
+  overrides: Partial<SearchFeedbackDraftV2> = {},
+): SearchFeedbackDraftV2 {
+  return {
+    schema_version: SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
+    feedback_id: "cf2-fixture-v2",
+    bundle_id: "bundle_a",
+    content_sha256: HASH,
+    storage_scope_id: `bundle_a::${HASH}`,
+    query_raw: "kùn",
+    search_direction: "target_to_source",
+    input_lang: "mnk",
+    output_lang: "fr",
+    result_state: "no_result",
+    result_count: 0,
     created_at: TS,
     updated_at: TS,
     status: "draft",
@@ -361,6 +385,109 @@ describe("timestamps and write assert", () => {
       validateSearchFeedbackDraftForWrite(makeNoResult({ query_raw: "" })),
     ).toThrow(/invalid_query/);
     expect(() => validateSearchFeedbackDraftForWrite(makeNoResult())).not.toThrow();
+  });
+});
+
+describe("schema versioning (ML1C2A)", () => {
+  it("accepts V1 drafts without language fields", () => {
+    const result = validateSearchFeedbackDraft(
+      makeNoResult({ search_direction: "source_to_target", query_raw: "maison" }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.schema_version).toBe(SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION);
+    expect(
+      Object.prototype.hasOwnProperty.call(result.value, "input_lang"),
+    ).toBe(false);
+    expect(
+      Object.prototype.hasOwnProperty.call(result.value, "output_lang"),
+    ).toBe(false);
+  });
+
+  it("rejects input_lang/output_lang on V1 as unknown_field", () => {
+    const result = validateSearchFeedbackDraft({
+      ...makeNoResult(),
+      input_lang: "fr",
+      output_lang: "mnk",
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.some((e) => e.code === "unknown_field")).toBe(true);
+  });
+
+  it("accepts V2 EN→MNK and MNK→EN pairs and requires both langs", () => {
+    const en = validateSearchFeedbackDraft(
+      makeV2({
+        query_raw: "house",
+        search_direction: "source_to_target",
+        input_lang: "en",
+        output_lang: "mnk",
+      }),
+    );
+    expect(en.ok).toBe(true);
+    if (en.ok && en.value.schema_version === SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2) {
+      expect(en.value.input_lang).toBe("en");
+      expect(en.value.output_lang).toBe("mnk");
+    }
+
+    const mnkEn = validateSearchFeedbackDraft(
+      makeV2({
+        query_raw: "bón",
+        search_direction: "target_to_source",
+        input_lang: "mnk",
+        output_lang: "en",
+      }),
+    );
+    expect(mnkEn.ok).toBe(true);
+    if (
+      mnkEn.ok &&
+      mnkEn.value.schema_version === SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2
+    ) {
+      expect(mnkEn.value.input_lang).toBe("mnk");
+      expect(mnkEn.value.output_lang).toBe("en");
+    }
+
+    const { input_lang: _i, output_lang: _o, ...withoutLangs } = makeV2();
+    expect(validateSearchFeedbackDraft(withoutLangs).ok).toBe(false);
+  });
+
+  it("rejects invalid V2 language pairs and direction mismatches", () => {
+    expect(
+      validateSearchFeedbackDraft(
+        makeV2({
+          search_direction: "source_to_target",
+          input_lang: "fr",
+          output_lang: "en",
+        }),
+      ).ok,
+    ).toBe(false);
+    expect(
+      validateSearchFeedbackDraft(
+        makeV2({
+          search_direction: "target_to_source",
+          input_lang: "mnk",
+          output_lang: "mnk",
+        }),
+      ).ok,
+    ).toBe(false);
+    expect(
+      validateSearchFeedbackDraft(
+        makeV2({
+          search_direction: "source_to_target",
+          input_lang: "en",
+          output_lang: undefined as unknown as "mnk",
+        }),
+      ).ok,
+    ).toBe(false);
+    expect(
+      validateSearchFeedbackDraft(
+        makeV2({
+          search_direction: "source_to_target",
+          input_lang: "mnk",
+          output_lang: "en",
+        }),
+      ).ok,
+    ).toBe(false);
   });
 });
 

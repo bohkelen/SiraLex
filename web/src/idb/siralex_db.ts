@@ -47,6 +47,14 @@ export type ActiveBundleMeta = {
   update_mode: string;
   reconciliation_action: string;
   search_index_directional?: boolean;
+  /**
+   * Optional multilingual search capabilities from the installed manifest.
+   * Absence ⇒ legacy FR↔MNK only (no English lookup).
+   * Additive document fields — no IndexedDB version bump.
+   */
+  lexical_language?: string;
+  lookup_languages?: string[];
+  search_key_families?: string[];
   expected_content_sha256?: string;
   imported_at_iso: string;
   records_count?: number;

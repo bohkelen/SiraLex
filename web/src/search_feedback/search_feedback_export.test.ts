@@ -13,7 +13,7 @@ import {
 } from "../idb/siralex_db";
 import {
   SEARCH_FEEDBACK_AUTHORITY_LABEL,
-  SEARCH_FEEDBACK_PACKAGE_SCHEMA,
+  SEARCH_FEEDBACK_PACKAGE_SCHEMA_V2,
   buildSearchFeedbackFilename,
   parseSearchFeedbackJson,
 } from "./search_feedback_package";
@@ -46,6 +46,8 @@ function makeInput(
     storage_scope_id: `bundle_a::${HASH}`,
     query_raw: "kùn",
     search_direction: "target_to_source",
+    input_lang: "mnk",
+    output_lang: "fr",
     result_state: "no_result",
     result_count: 0,
     ...overrides,
@@ -114,7 +116,7 @@ describe("buildSearchFeedbackExportArtifact", () => {
     const parsed = parseSearchFeedbackJson(result.artifact.text);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.package.package_schema).toBe(SEARCH_FEEDBACK_PACKAGE_SCHEMA);
+    expect(parsed.package.package_schema).toBe(SEARCH_FEEDBACK_PACKAGE_SCHEMA_V2);
     expect(parsed.package.authority_label).toBe(SEARCH_FEEDBACK_AUTHORITY_LABEL);
     expect(parsed.package.feedback_count).toBe(2);
     expect(parsed.package.app_version).toBe("1.2.3");

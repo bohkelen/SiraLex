@@ -270,6 +270,15 @@ function buildInstalledBundleMeta(
     update_mode: manifest.update_mode,
     reconciliation_action: manifest.reconciliation_action,
     search_index_directional: manifest.search_index_directional === true,
+    ...(typeof manifest.languages?.lexical_language === "string"
+      ? { lexical_language: manifest.languages.lexical_language }
+      : {}),
+    ...(Array.isArray(manifest.languages?.lookup_languages)
+      ? { lookup_languages: [...manifest.languages.lookup_languages] }
+      : {}),
+    ...(Array.isArray(manifest.search_key_families)
+      ? { search_key_families: [...manifest.search_key_families] }
+      : {}),
     expected_content_sha256: manifest.content_sha256,
     imported_at_iso: new Date().toISOString(),
     records_count: recordsCount,

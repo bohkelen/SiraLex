@@ -17,6 +17,7 @@
 
 import type { ActiveBundleMeta } from "../idb/siralex_db";
 import { getActiveBundleMeta } from "../idb/siralex_db";
+import { lookupModeFromLegacySearchDirection } from "../search/lookup_mode";
 import {
   createSearchFeedbackDraft,
   type CreateSearchFeedbackDraftDeps,
@@ -112,6 +113,14 @@ function searchEventMatchesBound(
   if (current.generation !== bound.search_generation) return false;
   if (current.query_raw !== bound.query_raw) return false;
   if (current.search_direction !== bound.search_direction) return false;
+  const currentInput =
+    current.input_lang ??
+    lookupModeFromLegacySearchDirection(current.search_direction).from;
+  const currentOutput =
+    current.output_lang ??
+    lookupModeFromLegacySearchDirection(current.search_direction).to;
+  if (currentInput !== bound.input_lang) return false;
+  if (currentOutput !== bound.output_lang) return false;
   if (current.result_state !== bound.result_state) return false;
   if (current.result_count !== bound.result_count) return false;
   if (!matchedIdsEqual(current.matched_ir_ids, bound.matched_ir_ids)) return false;

@@ -14,13 +14,13 @@ import {
   parseSearchFeedbackJson,
   serializeSearchFeedbackPackage,
   type ParseSearchFeedbackPackageResult,
-  type SearchFeedbackPackageV1,
+  type SearchFeedbackPackageV2,
 } from "./search_feedback_package";
 import {
   SearchFeedbackStoreError,
   listSearchFeedbackDrafts,
 } from "./search_feedback_store";
-import type { SearchFeedbackDraftV1 } from "./search_feedback_types";
+import type { SearchFeedbackDraft } from "./search_feedback_types";
 import { validateSearchFeedbackDraftForWrite } from "./search_feedback_validation";
 
 export type SearchFeedbackExportArtifact = {
@@ -55,7 +55,7 @@ export type BuildSearchFeedbackExportArtifactOptions = {
   exportedAt: string;
   appVersion?: string;
   maxBytes?: number;
-  serialize?: (pkg: SearchFeedbackPackageV1) => string;
+  serialize?: (pkg: SearchFeedbackPackageV2) => string;
   parse?: (
     jsonText: string,
     options?: { byteLength?: number },
@@ -112,7 +112,7 @@ function defaultDownloadAdapter(documentRef: Document = document): SearchFeedbac
  * No IndexedDB, clock, DOM, Blob, or mutation.
  */
 export function buildSearchFeedbackExportArtifact(
-  feedbacks: readonly SearchFeedbackDraftV1[],
+  feedbacks: readonly SearchFeedbackDraft[],
   options: BuildSearchFeedbackExportArtifactOptions,
 ): CreateSearchFeedbackExportResult {
   const maxBytes = options.maxBytes ?? SEARCH_FEEDBACK_MAX_BYTES;
@@ -137,7 +137,7 @@ export function buildSearchFeedbackExportArtifact(
     seen.add(draft.feedback_id);
   }
 
-  let pkg: SearchFeedbackPackageV1;
+  let pkg: SearchFeedbackPackageV2;
   try {
     pkg = buildSearchFeedbackPackage(feedbacks, {
       exportedAt: options.exportedAt,
@@ -200,7 +200,7 @@ export async function createSearchFeedbackExport(
     maxBytes?: number;
   },
 ): Promise<CreateSearchFeedbackExportResult> {
-  let feedbacks: SearchFeedbackDraftV1[];
+  let feedbacks: SearchFeedbackDraft[];
   try {
     feedbacks = await listSearchFeedbackDrafts(db);
   } catch (err) {
