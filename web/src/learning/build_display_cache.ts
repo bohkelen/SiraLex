@@ -1,6 +1,10 @@
 /**
  * Build Learning Record display_cache from a live lexicon entry.
  * Pure helper — does not mutate the dictionary entry or invent content.
+ *
+ * Save-time cache remains FR-then-EN (stable offline fallback). Live Saved
+ * Vocabulary presentation may prefer EN via search preference without writing
+ * that preference into Learning Records (ML1D3).
  */
 
 import { isLexiconDisplay, type EnrichedRecord } from "../types/records";

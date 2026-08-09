@@ -67,6 +67,7 @@ function makeContext(
 ): ResultDisplayContext {
   return {
     rawQuery: "main",
+    lookupMode: { from: "fr", to: "mnk" },
     searchDirection: "source_to_target",
     matched_key_type: "casefold",
     matched_key: "main",
@@ -104,7 +105,7 @@ describe("UX2I3 result presentation", () => {
     expect(list?.querySelector(".ux2-result-rank")).toBeNull();
   });
 
-  it("omits POS and gloss cleanly when unavailable", () => {
+  it("shows localized unavailable copy when no FR/EN gloss exists", () => {
     const list = renderResultsList(
       [makeContext(LEXICON_MINIMAL, { rawQuery: "bólo", matched_key: "bolo" })],
       () => undefined,
@@ -112,7 +113,9 @@ describe("UX2I3 result presentation", () => {
 
     expect(list?.querySelector(".ux2-result-headword")?.textContent).toBe("bólo");
     expect(list?.querySelector(".ux2-result-pos")).toBeNull();
-    expect(list?.querySelector(".ux2-result-gloss")).toBeNull();
+    const gloss = list?.querySelector('[data-testid="result-gloss"]');
+    expect(gloss?.getAttribute("data-gloss-unavailable")).toBe("true");
+    expect(gloss?.textContent).toMatch(/pas de traduction|no translation/i);
   });
 
   it("does not mislabel index_mapping as lexicon_entry", () => {
@@ -237,6 +240,78 @@ describe("Phase 7N2E4J3 minimal phrase guidance", () => {
     expect(getNoResultMessage("some multiword miss")).toBe(
       "Try searching one word at a time.",
     );
+  });
+});
+
+describe("ML1D3 LookupMode-aware result glosses", () => {
+  const BILINGUAL: EnrichedRecord = {
+    ir_id: "record-house",
+    ir_kind: "lexicon_entry",
+    source_id: "src-test",
+    norm_version: "norm-test",
+    preferred_form: "house_mnk",
+    variant_forms: ["house_mnk"],
+    search_keys: {},
+    display: {
+      headword_latin: "house_mnk",
+      senses: [{ gloss_fr: "maison", gloss_en: "house", gloss_ru: "дом" }],
+    },
+  };
+
+  beforeEach(() => {
+    setCurrentLocale("en");
+  });
+
+  it("prefers EN then FR for EN→MNK and never Russian", () => {
+    const list = renderResultsList(
+      [
+        makeContext(BILINGUAL, {
+          lookupMode: { from: "en", to: "mnk" },
+          rawQuery: "house",
+        }),
+      ],
+      () => undefined,
+    );
+    const gloss = list?.querySelector('[data-testid="result-gloss"]');
+    expect(gloss?.textContent).toBe("house");
+    expect(gloss?.getAttribute("data-gloss-lang")).toBe("en");
+    expect(list?.textContent).not.toContain("maison");
+    expect(list?.textContent).not.toContain("дом");
+  });
+
+  it("prefers FR then EN for FR→MNK", () => {
+    const list = renderResultsList(
+      [
+        makeContext(BILINGUAL, {
+          lookupMode: { from: "fr", to: "mnk" },
+          rawQuery: "maison",
+        }),
+      ],
+      () => undefined,
+    );
+    const gloss = list?.querySelector('[data-testid="result-gloss"]');
+    expect(gloss?.textContent).toBe("maison");
+    expect(gloss?.getAttribute("data-gloss-lang")).toBe("fr");
+    expect(gloss?.textContent).not.toContain("house");
+  });
+
+  it("keeps immutable result LookupMode when a different mode is current elsewhere", () => {
+    const settled = makeContext(BILINGUAL, {
+      lookupMode: { from: "en", to: "mnk" },
+      rawQuery: "house",
+    });
+    // Re-render as if partner switched to FR without a new search.
+    const list = renderResultsList([settled], () => undefined);
+    expect(list?.querySelector('[data-testid="result-gloss"]')?.textContent).toBe("house");
+  });
+
+  it("UI locale does not change gloss selection for a fixed LookupMode", () => {
+    setCurrentLocale("fr");
+    const list = renderResultsList(
+      [makeContext(BILINGUAL, { lookupMode: { from: "en", to: "mnk" } })],
+      () => undefined,
+    );
+    expect(list?.querySelector('[data-testid="result-gloss"]')?.textContent).toBe("house");
   });
 });
 

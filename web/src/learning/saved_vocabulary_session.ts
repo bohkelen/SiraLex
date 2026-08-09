@@ -19,6 +19,9 @@ import {
   deriveSavedVocabularyProgress,
   type SavedVocabularyProgressVm,
 } from "./saved_vocabulary_progress";
+import type { PreferredGlossLanguage, LookupCapabilityMeta } from "../search/lookup_mode";
+import { resolvePreferredGloss } from "../search/resolve_preferred_gloss";
+import { resolveSavedPresentationPreferredGlossLanguage } from "../search/saved_presentation_gloss_preference";
 
 export type SavedVocabularyReviewStatus =
   | {
@@ -119,23 +122,27 @@ export function deriveSavedVocabularyReviewStatus(
   return { state: "unknown" };
 }
 
-function firstLiveGloss(entry: EnrichedRecord): string | undefined {
+function firstLiveGloss(
+  entry: EnrichedRecord,
+  preferred: PreferredGlossLanguage,
+): string | undefined {
   if (!isLexiconDisplay(entry) || !entry.display.senses) return undefined;
   for (const sense of entry.display.senses) {
-    if (typeof sense.gloss_fr === "string" && sense.gloss_fr.trim() !== "") {
-      return sense.gloss_fr.trim();
-    }
-  }
-  for (const sense of entry.display.senses) {
-    if (typeof sense.gloss_en === "string" && sense.gloss_en.trim() !== "") {
-      return sense.gloss_en.trim();
-    }
+    const resolved = resolvePreferredGloss({
+      glossFr: sense.gloss_fr,
+      glossEn: sense.gloss_en,
+      preferred,
+    });
+    if (resolved.text) return resolved.text;
   }
   return undefined;
 }
 
 /** Build a row VM from a resolution result. Does not mutate display_cache. */
-export function buildSavedVocabularyRowVm(resolution: LearningRecordUiResolution): SavedVocabularyRowVm {
+export function buildSavedVocabularyRowVm(
+  resolution: LearningRecordUiResolution,
+  preferred: PreferredGlossLanguage = "fr",
+): SavedVocabularyRowVm {
   const lr = resolution.learningRecord;
   const reviewStatus = deriveSavedVocabularyReviewStatus(lr);
 
@@ -151,7 +158,7 @@ export function buildSavedVocabularyRowVm(resolution: LearningRecordUiResolution
     if (!primaryText) {
       primaryText = lr.display_cache?.headword_latin?.trim() || "";
     }
-    const secondary = firstLiveGloss(live);
+    const secondary = firstLiveGloss(live, preferred);
     return {
       state: "resolved",
       bundle_id: lr.bundle_id,
@@ -263,7 +270,10 @@ export function createSavedVocabularySession(deps: SavedVocabularySessionDeps) {
         );
         if (!deps.isCurrent()) return;
 
-        rows = resolved.map(buildSavedVocabularyRowVm);
+        const preferred = resolveSavedPresentationPreferredGlossLanguage(
+          meta as LookupCapabilityMeta,
+        );
+        rows = resolved.map((resolution) => buildSavedVocabularyRowVm(resolution, preferred));
         rowErrors = {};
         removingKey = undefined;
         emitPopulated("populated");

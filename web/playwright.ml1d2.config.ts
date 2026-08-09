@@ -6,13 +6,13 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /ml1d2_english_search_picker\.spec\.ts/,
+  testMatch: /ml1d[23]_.*\.spec\.ts/,
   timeout: 900_000,
   expect: {
     timeout: 30_000,
   },
   fullyParallel: false,
-  outputDir: "test-results/ml1d2-picker",
+  outputDir: "test-results/ml1d-picker",
   reporter: [["list"]],
   use: {
     baseURL: "http://127.0.0.1:4175",

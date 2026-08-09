@@ -123,6 +123,7 @@ import {
   readSearchLookupLangPreference,
   writeSearchLookupLangPreference,
 } from "./search/search_lookup_lang_preference";
+import { resolveSavedPresentationPreferredGlossLanguage } from "./search/saved_presentation_gloss_preference";
 import { resolveRecords } from "./search/resolve_records";
 import {
   getNoResultMessage,
@@ -186,6 +187,7 @@ import {
 import { countCorrectionDrafts } from "./corrections/correction_draft_store";
 import { renderCorrectionManagement } from "./render/render_correction_management";
 import { openTargetLexiconEntry } from "./navigation/open_target_lexicon_entry";
+import { bindTargetNavToSearchOrigin } from "./navigation/target_nav_lookup_mode";
 import type { EnrichedRecord, TargetEntry } from "./types/records";
 import { isLexiconDisplay } from "./types/records";
 
@@ -3120,7 +3122,14 @@ searchInput.addEventListener("input", () => {
 
 /** Origin for entry-detail Back navigation (no router). */
 type EntryNavOrigin =
-  | { kind: "search"; restoreLookupMode: LookupMode }
+  | {
+      kind: "search";
+      /**
+       * Immutable LookupMode snapshot for the Search event that opened this
+       * entry. Used for both presentation and Back restore (ML1D3).
+       */
+      restoreLookupMode: LookupMode;
+    }
   | { kind: "saved_vocabulary" };
 
 function showNoResultSearchSurface(query: string): void {
@@ -3172,10 +3181,10 @@ function restoreSearchSurfaceAfterFeedback(): void {
     disposeActiveCorrectionManagement();
     invalidateCollectionAndReviewContexts();
     searchResults.innerHTML = "";
-    const list = renderResultsList(lastSearchResults, (record) => {
+    const list = renderResultsList(lastSearchResults, (record, context) => {
       showEntryDetail(record, {
         kind: "search",
-        restoreLookupMode: { ...currentLookupMode },
+        restoreLookupMode: { ...context.lookupMode },
       });
     });
     if (list) searchResults.appendChild(list);
@@ -3267,10 +3276,10 @@ function showResultsList() {
   searchResults.innerHTML = "";
   if (lastSearchResults.length === 0) return;
 
-  const list = renderResultsList(lastSearchResults, (record) => {
+  const list = renderResultsList(lastSearchResults, (record, context) => {
     showEntryDetail(record, {
       kind: "search",
-      restoreLookupMode: { ...currentLookupMode },
+      restoreLookupMode: { ...context.lookupMode },
     });
   });
   if (list) searchResults.appendChild(list);
@@ -3432,12 +3441,18 @@ function setSearchLookupMode(mode: LookupMode) {
   updateLangToggle();
 }
 
-function handleOpenTargetLexiconEntry(target: TargetEntry, mappingRoot: HTMLElement) {
+function handleOpenTargetLexiconEntry(
+  target: TargetEntry,
+  mappingRoot: HTMLElement,
+  /** Immutable Search-result LookupMode — never live picker state (ML1D3A). */
+  originLookupMode: LookupMode,
+) {
   const pendingEntryGen = entryDetailGeneration;
   const pendingSearchSeq = searchSeq;
   const pendingHost = resultsHostContext;
   const pendingBundleId = currentActiveBundle?.bundle_id;
-  const restoreLookupMode: LookupMode = { ...currentLookupMode };
+  const { restoreLookupMode, chromeLookupMode } =
+    bindTargetNavToSearchOrigin(originLookupMode);
   const restoreDirection = toLegacySearchDirection(restoreLookupMode);
   const preservedQuery = searchInput.value;
 
@@ -3453,9 +3468,7 @@ function handleOpenTargetLexiconEntry(target: TargetEntry, mappingRoot: HTMLElem
       currentActiveBundle?.bundle_id === pendingBundleId &&
       searchInput.value === preservedQuery,
     setDirectionTargetToSource: () => {
-      const glossPartner: "fr" | "en" =
-        restoreLookupMode.from === "en" || restoreLookupMode.to === "en" ? "en" : "fr";
-      setSearchLookupMode({ from: "mnk", to: glossPartner });
+      setSearchLookupMode(chromeLookupMode);
     },
     openEntryDetail: (record) => {
       showEntryDetail(record, { kind: "search", restoreLookupMode });
@@ -3579,9 +3592,21 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
     : undefined;
 
   let entryRoot: HTMLElement | null = null;
+  const presentationLookupMode: LookupMode =
+    origin.kind === "search"
+      ? { ...origin.restoreLookupMode }
+      : (() => {
+          const preferred = resolveSavedPresentationPreferredGlossLanguage(
+            activeLookupCapabilityMeta(),
+          );
+          return preferred === "en"
+            ? ({ from: "en", to: "mnk" } as const)
+            : ({ ...DEFAULT_LOOKUP_MODE } as const);
+        })();
   const view = renderEntryDetail(record, {
     backLabel:
       origin.kind === "saved_vocabulary" ? t("entry.backToSaved") : t("entry.back"),
+    presentationLookupMode,
     onBack: () => {
       if (origin.kind === "saved_vocabulary") {
         setSearchView("search");
@@ -3592,7 +3617,9 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
       showResultsList();
     },
     onOpenTargetEntry: (target) => {
-      if (entryRoot) handleOpenTargetLexiconEntry(target, entryRoot);
+      // Index mappings are Search-origin only; Learning saves lexicon_entry only.
+      if (!entryRoot || origin.kind !== "search") return;
+      handleOpenTargetLexiconEntry(target, entryRoot, origin.restoreLookupMode);
     },
     targetEntriesLabel: getTargetEntriesLabel(
       currentActiveBundle?.language_meta,
@@ -3727,6 +3754,7 @@ async function runSearch(query: string) {
 
     lastSearchResults = records.map((record) => ({
       rawQuery: query,
+      lookupMode: { ...effectiveMode },
       searchDirection: toLegacySearchDirection(effectiveMode),
       matched_key_type: result.matched_key_type,
       matched_key: result.matched_key,

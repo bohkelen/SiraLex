@@ -4,6 +4,8 @@
  * Builds a list of search results from enriched records plus search context.
  * Cards stay consumer-facing: no internal IDs, search keys, or provenance labels.
  * Visual hierarchy follows UX2 Contemporary West African Modernism tokens.
+ *
+ * ML1D3: lexicon glosses follow the immutable LookupMode on each result context.
  */
 
 import type { SearchDirection } from "../bundle_labels";
@@ -14,6 +16,11 @@ import type {
 } from "../types/records";
 import { isLexiconDisplay, isIndexMappingDisplay } from "../types/records";
 import { t } from "../i18n";
+import {
+  preferredGlossLanguage,
+  type LookupMode,
+} from "../search/lookup_mode";
+import { resolvePreferredGloss } from "../search/resolve_preferred_gloss";
 
 type SearchMatchKeyType =
   | "casefold"
@@ -23,6 +30,8 @@ type SearchMatchKeyType =
 
 export type ResultDisplayContext = {
   rawQuery: string;
+  /** Immutable LookupMode that produced this result event (ML1D3). */
+  lookupMode: LookupMode;
   searchDirection: SearchDirection;
   matched_key_type: SearchMatchKeyType | null;
   matched_key: string | null;
@@ -35,6 +44,10 @@ type Summary = {
   primary: string;
   pos?: string;
   secondary: string;
+  /** Present for lexicon glosses; omitted for index_mapping targets. */
+  glossLanguage?: "fr" | "en";
+  glossUsedFallback?: boolean;
+  glossUnavailable?: boolean;
   sourceTerm?: string;
   isIndexMapping: boolean;
 };
@@ -48,15 +61,31 @@ function el(tag: string, cls?: string, text?: string): HTMLElement {
   return e;
 }
 
-function summarizeLexicon(d: LexiconDisplayFields): Summary {
+function summarizeLexicon(d: LexiconDisplayFields, mode: LookupMode): Summary {
+  const preferred = preferredGlossLanguage(mode);
   const firstSense = d.senses?.[0];
-  const firstGloss =
-    firstSense?.gloss_fr ?? firstSense?.gloss_en ?? firstSense?.gloss_ru ?? "";
+  const resolved = resolvePreferredGloss({
+    glossFr: firstSense?.gloss_fr,
+    glossEn: firstSense?.gloss_en,
+    preferred,
+  });
   const pos = (d.ps_raw ?? d.pos_hint)?.trim() || undefined;
+  if (resolved.text && resolved.language) {
+    return {
+      primary: d.headword_latin,
+      pos,
+      secondary: resolved.text,
+      glossLanguage: resolved.language,
+      glossUsedFallback: resolved.usedFallback,
+      sourceTerm: d.headword_latin,
+      isIndexMapping: false,
+    };
+  }
   return {
     primary: d.headword_latin,
     pos,
-    secondary: firstGloss,
+    secondary: t("render.noTranslation"),
+    glossUnavailable: true,
     sourceTerm: d.headword_latin,
     isIndexMapping: false,
   };
@@ -77,7 +106,10 @@ function summarizeIndexMapping(d: IndexMappingDisplayFields): Summary {
   };
 }
 
-export type OnSelectRecord = (record: EnrichedRecord) => void;
+export type OnSelectRecord = (
+  record: EnrichedRecord,
+  context: ResultDisplayContext,
+) => void;
 
 function normalizeForDisplayCompare(value: string): string {
   return value.trim().toLocaleLowerCase();
@@ -123,6 +155,9 @@ export function getNoResultMessage(query: string): string {
  * Build a DOM element containing the results list.
  * Returns null if no renderable records.
  * Order is preserved exactly as provided (bundle/runtime order).
+ *
+ * Lexicon gloss preference uses each result's immutable `lookupMode`, not the
+ * live global partner selection.
  */
 export function renderResultsList(
   results: ResultDisplayContext[],
@@ -138,7 +173,7 @@ export function renderResultsList(
     let summary: Summary;
 
     if (isLexiconDisplay(record)) {
-      summary = summarizeLexicon(record.display);
+      summary = summarizeLexicon(record.display, context.lookupMode);
     } else if (isIndexMappingDisplay(record)) {
       summary = summarizeIndexMapping(record.display);
     } else {
@@ -156,7 +191,7 @@ export function renderResultsList(
     const openButton = document.createElement("button");
     openButton.className = "result-open";
     openButton.type = "button";
-    openButton.addEventListener("click", () => onSelect(record));
+    openButton.addEventListener("click", () => onSelect(record, context));
 
     const primaryRow = el("div", "ux2-result-primary-row");
     const headword = el(
@@ -177,15 +212,26 @@ export function renderResultsList(
     openButton.appendChild(primaryRow);
 
     if (summary.secondary) {
-      openButton.appendChild(
-        el(
-          "div",
-          summary.isIndexMapping
-            ? "ux2-result-targets ux2-type-body result-translation"
-            : "ux2-result-gloss ux2-type-body result-translation",
-          summary.secondary,
-        ),
+      const gloss = el(
+        "div",
+        summary.isIndexMapping
+          ? "ux2-result-targets ux2-type-body result-translation"
+          : "ux2-result-gloss ux2-type-body result-translation",
+        summary.secondary,
       );
+      if (!summary.isIndexMapping) {
+        gloss.setAttribute("data-testid", "result-gloss");
+        if (summary.glossUnavailable) {
+          gloss.setAttribute("data-gloss-unavailable", "true");
+        } else if (summary.glossLanguage) {
+          gloss.setAttribute("data-gloss-lang", summary.glossLanguage);
+          gloss.setAttribute(
+            "data-gloss-fallback",
+            summary.glossUsedFallback ? "true" : "false",
+          );
+        }
+      }
+      openButton.appendChild(gloss);
     }
 
     if (shouldShowQueryHint(context, summary)) {

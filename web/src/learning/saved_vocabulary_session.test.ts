@@ -322,6 +322,84 @@ describe("LS1I3 Saved Vocabulary session", () => {
     }
   });
 
+  it("ML1D3 live secondary prefers EN when preference=en on EN-capable bundle", () => {
+    const lr = {
+      schema_version: "learning_record_v1" as const,
+      bundle_id: BUNDLE_A,
+      ir_id: "lex-house",
+      ir_kind: "lexicon_entry" as const,
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      status: "still_learning" as const,
+      created_at: "2026-07-29T12:00:00.000Z",
+      display_cache: { headword_latin: "house_mnk", gloss_short: "maison" },
+      last_reviewed: null,
+      review_count: 0,
+    };
+    const live: EnrichedRecord = {
+      ir_id: "lex-house",
+      ir_kind: "lexicon_entry",
+      source_id: "s",
+      norm_version: "norm_v3",
+      preferred_form: "house_mnk",
+      variant_forms: [],
+      search_keys: {},
+      display: {
+        headword_latin: "house_mnk",
+        senses: [{ gloss_fr: "maison", gloss_en: "house" }],
+      },
+    };
+    const row = buildSavedVocabularyRowVm(
+      { state: "resolved", learningRecord: lr, liveEntry: live },
+      "en",
+    );
+    expect(row.state).toBe("resolved");
+    if (row.state === "resolved") {
+      expect(row.secondaryText).toBe("house");
+      expect(row.learningRecord.display_cache?.gloss_short).toBe("maison");
+    }
+  });
+
+  it("ML1D3 live secondary clamps to FR when preference=en but capability is FR-only", () => {
+    const lr = {
+      schema_version: "learning_record_v1" as const,
+      bundle_id: BUNDLE_A,
+      ir_id: "lex-house",
+      ir_kind: "lexicon_entry" as const,
+      content_sha256: HASH_A,
+      storage_scope_id: SCOPE_A,
+      status: "still_learning" as const,
+      created_at: "2026-07-29T12:00:00.000Z",
+      display_cache: { headword_latin: "house_mnk", gloss_short: "maison" },
+      last_reviewed: null,
+      review_count: 0,
+    };
+    const live: EnrichedRecord = {
+      ir_id: "lex-house",
+      ir_kind: "lexicon_entry",
+      source_id: "s",
+      norm_version: "norm_v3",
+      preferred_form: "house_mnk",
+      variant_forms: [],
+      search_keys: {},
+      display: {
+        headword_latin: "house_mnk",
+        senses: [{ gloss_fr: "maison", gloss_en: "house" }],
+      },
+    };
+    // Session clamps via resolveSavedPresentationPreferredGlossLanguage; row VM
+    // receives the clamped preferred language ("fr") for FR-only bundles.
+    const row = buildSavedVocabularyRowVm(
+      { state: "resolved", learningRecord: lr, liveEntry: live },
+      "fr",
+    );
+    expect(row.state).toBe("resolved");
+    if (row.state === "resolved") {
+      expect(row.secondaryText).toBe("maison");
+      expect(row.learningRecord.display_cache?.gloss_short).toBe("maison");
+    }
+  });
+
   it("drops late load updates after navigation", async () => {
     const db = await openSiralexDb();
     let current = true;

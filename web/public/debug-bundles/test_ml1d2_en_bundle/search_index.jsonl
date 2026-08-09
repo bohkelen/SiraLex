@@ -38,3 +38,7 @@
 {"key":"housemnk","key_type":"tgt_punct_stripped","ir_ids":["diag_lex_house"]}
 {"key":"house","key_type":"en_nospace","ir_ids":["diag_idx_house"]}
 {"key":"house_mnk","key_type":"tgt_nospace","ir_ids":["diag_lex_house"]}
+{"key":"maison","key_type":"src_casefold","ir_ids":["diag_idx_maison"]}
+{"key":"maison","key_type":"src_diacritics_insensitive","ir_ids":["diag_idx_maison"]}
+{"key":"maison","key_type":"src_punct_stripped","ir_ids":["diag_idx_maison"]}
+{"key":"maison","key_type":"src_nospace","ir_ids":["diag_idx_maison"]}
