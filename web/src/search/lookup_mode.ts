@@ -116,6 +116,43 @@ export function lookupModeFromLegacySearchDirection(
 /** Deterministic FR→MNK default for consumer Search. */
 export const DEFAULT_LOOKUP_MODE: LookupMode = { from: "fr", to: "mnk" };
 
+/** Non-Maninka endpoint of a valid LookupMode (FR or EN). */
+export function partnerLookupLanguage(mode: LookupMode): PreferredGlossLanguage {
+  assertValidLookupMode(mode);
+  if (mode.from === "mnk") {
+    return mode.to === "en" ? "en" : "fr";
+  }
+  return mode.from === "en" ? "en" : "fr";
+}
+
+/**
+ * Change the FR/EN partner while preserving orientation (MNK side stays put).
+ * Does not invoke swap.
+ */
+export function withPartnerLookupLanguage(
+  mode: LookupMode,
+  partner: PreferredGlossLanguage,
+): LookupMode {
+  assertValidLookupMode(mode);
+  if (mode.from === "mnk") {
+    return { from: "mnk", to: partner };
+  }
+  return { from: partner, to: "mnk" };
+}
+
+/**
+ * ML1D2 startup / bundle-change restore: preference + forward orientation → MNK.
+ * Does not restore swap orientation from storage.
+ */
+export function restoreForwardLookupModeFromPreference(
+  preference: PreferredGlossLanguage,
+  meta: LookupCapabilityMeta,
+): LookupMode {
+  const partner = preference === "en" ? "en" : "fr";
+  const requested: LookupMode = { from: partner, to: "mnk" };
+  return resolveSupportedLookupMode(meta, requested);
+}
+
 /**
  * When the active bundle cannot support `requested`, fall back to FR→MNK.
  * Never silently remaps EN→MNK to MNK→FR or another unrelated pair.

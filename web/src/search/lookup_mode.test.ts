@@ -10,11 +10,14 @@ import {
   isValidLookupMode,
   LookupCapabilityError,
   lookupModeFromLegacySearchDirection,
+  partnerLookupLanguage,
   preferredGlossLanguage,
   resolveLookupModeFromFeedbackFields,
   resolveSupportedLookupMode,
+  restoreForwardLookupModeFromPreference,
   swapLookupMode,
   toLegacySearchDirection,
+  withPartnerLookupLanguage,
 } from "./lookup_mode";
 
 describe("LookupMode validation", () => {
@@ -77,6 +80,54 @@ describe("swapLookupMode", () => {
     expect(() => swapLookupMode({ from: "fr", to: "en" } as never)).toThrow(
       LookupCapabilityError,
     );
+  });
+});
+
+describe("partnerLookupLanguage / withPartnerLookupLanguage", () => {
+  it("reads the non-Maninka partner", () => {
+    expect(partnerLookupLanguage({ from: "fr", to: "mnk" })).toBe("fr");
+    expect(partnerLookupLanguage({ from: "en", to: "mnk" })).toBe("en");
+    expect(partnerLookupLanguage({ from: "mnk", to: "fr" })).toBe("fr");
+    expect(partnerLookupLanguage({ from: "mnk", to: "en" })).toBe("en");
+  });
+
+  it("changes partner while preserving orientation", () => {
+    expect(withPartnerLookupLanguage({ from: "fr", to: "mnk" }, "en")).toEqual({
+      from: "en",
+      to: "mnk",
+    });
+    expect(withPartnerLookupLanguage({ from: "mnk", to: "fr" }, "en")).toEqual({
+      from: "mnk",
+      to: "en",
+    });
+    expect(withPartnerLookupLanguage({ from: "mnk", to: "en" }, "fr")).toEqual({
+      from: "mnk",
+      to: "fr",
+    });
+    expect(withPartnerLookupLanguage({ from: "en", to: "mnk" }, "fr")).toEqual({
+      from: "fr",
+      to: "mnk",
+    });
+  });
+});
+
+describe("restoreForwardLookupModeFromPreference", () => {
+  const enCapable = {
+    lookup_languages: ["fr", "en", "mnk"],
+    search_key_families: ["src", "en", "tgt"],
+  };
+
+  it("restores FR→MNK for fr / absent / invalid preference", () => {
+    expect(restoreForwardLookupModeFromPreference("fr", enCapable)).toEqual(DEFAULT_LOOKUP_MODE);
+    expect(restoreForwardLookupModeFromPreference("fr", {})).toEqual(DEFAULT_LOOKUP_MODE);
+  });
+
+  it("restores EN→MNK only when the bundle supports English", () => {
+    expect(restoreForwardLookupModeFromPreference("en", enCapable)).toEqual({
+      from: "en",
+      to: "mnk",
+    });
+    expect(restoreForwardLookupModeFromPreference("en", {})).toEqual(DEFAULT_LOOKUP_MODE);
   });
 });
 

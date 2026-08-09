@@ -57,6 +57,10 @@ export async function openDictionariesAdvanced(page: Page): Promise<void> {
 
 /** Visible search-from language (left label in UX2 direction row). */
 export async function getSearchFromLanguage(page: Page): Promise<string> {
+  const select = page.locator("#searchSourceLanguage select");
+  if ((await select.count()) > 0) {
+    return ((await select.locator("option:checked").textContent()) ?? "").trim();
+  }
   return ((await page.locator("#searchSourceLanguage").textContent()) ?? "").trim();
 }
 

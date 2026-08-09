@@ -1,4 +1,5 @@
 import "./style.css";
+import { installE2ERefreshDbStatusHook } from "./e2e_test_hooks";
 import { registerSW } from "virtual:pwa-register";
 import appPackage from "../package.json";
 
@@ -6,7 +7,6 @@ import { probeJsonlFile } from "./bundle_probe";
 import {
   buildLanguageMetaFromManifest,
   getBundleDisplayName,
-  getSearchPlaceholder,
   getSourceLabel,
   getTargetLabel,
   getTargetEntriesLabel,
@@ -109,19 +109,27 @@ import {
 import type { QueryLogEvent } from "./query_logging/query_log_types";
 import { searchQueryForLookupMode } from "./search/search_query";
 import {
+  bundleSupportsEnglishLookup,
   DEFAULT_LOOKUP_MODE,
   resolveSupportedLookupMode,
+  restoreForwardLookupModeFromPreference,
   swapLookupMode,
   toLegacySearchDirection,
+  withPartnerLookupLanguage,
   type LookupMode,
 } from "./search/lookup_mode";
+import { decideLookupModeActiveBundleSync } from "./search/lookup_mode_active_bundle_sync";
+import {
+  readSearchLookupLangPreference,
+  writeSearchLookupLangPreference,
+} from "./search/search_lookup_lang_preference";
 import { resolveRecords } from "./search/resolve_records";
 import {
   getNoResultMessage,
   renderResultsList,
   type ResultDisplayContext,
 } from "./render/render_results";
-import { applySearchDirectionPresentation } from "./render/render_search_chrome";
+import { applyLookupModePresentation, lookupModeInputLanguageLabel } from "./render/render_lookup_mode_chrome";
 import { renderEntryDetail, showTargetEntryUnavailable } from "./render/render_entry";
 import { renderCorrectionForm } from "./render/render_correction_form";
 import {
@@ -1180,24 +1188,25 @@ async function refreshDbStatus() {
           : undefined;
       installedBundles = bundles;
       currentActiveBundle = active;
-      revalidateLookupModeForActiveBundle(active ?? undefined);
+      const nextBundleId = active?.bundle_id;
+      const nextContentSha = active?.expected_content_sha256;
+      const previousBundleIdForSync = lastKnownActiveBundleId;
+      syncLookupModeForActiveBundle(active ?? undefined, previousBundleIdForSync);
       updateLangToggle();
       if (loadedCatalogBundles.length > 0) {
         await backfillInstalledLanguageMetaFromCatalog(loadedCatalogBundles);
       }
-      const nextBundleId = active?.bundle_id;
-      const nextContentSha = active?.expected_content_sha256;
       if (
         lastKnownActiveBundleId !== nextBundleId ||
         lastKnownActiveContentSha !== nextContentSha
       ) {
-        const bundleIdentityChanged = lastKnownActiveBundleId !== nextBundleId;
+        const identityChanged = lastKnownActiveBundleId !== nextBundleId;
         lastKnownActiveBundleId = nextBundleId;
         lastKnownActiveContentSha = nextContentSha;
         learningBackupSurface?.invalidatePreviewForBundleChange();
         activeCorrectionForm?.notifyBundleLifecycleChanged();
         activeSearchFeedbackForm?.notifyBundleLifecycleChanged();
-        if (bundleIdentityChanged) {
+        if (identityChanged) {
           if (
             resultsHostContext === "review" ||
             resultsHostContext === "saved_vocabulary" ||
@@ -1273,7 +1282,7 @@ async function refreshDbStatus() {
     hasActiveBundle = false;
     installedBundles = [];
     currentActiveBundle = undefined;
-    revalidateLookupModeForActiveBundle(undefined);
+    syncLookupModeForActiveBundle(undefined, lastKnownActiveBundleId);
     updateLangToggle();
     currentStorageEstimate = undefined;
     renderBundleSelectOptions(undefined);
@@ -1898,6 +1907,9 @@ clearDbBtn.addEventListener("click", () => {
       resultsHostContext = "search";
       searchResults.innerHTML = "";
       lastKnownActiveBundleId = undefined;
+      lastKnownActiveContentSha = undefined;
+      lookupPreferenceHydrated = false;
+      lastKnownEnglishAvailable = undefined;
       importProgress.textContent = t("db.deleted");
     } catch (e) {
       importProgress.textContent += t("db.deleteFailed", { error: String(e) });
@@ -1976,23 +1988,116 @@ probeAllBtn.addEventListener("click", () => {
 
 /** Runtime Search source of truth (ML1D1). Legacy SearchDirection is derived. */
 let currentLookupMode: LookupMode = { ...DEFAULT_LOOKUP_MODE };
+/** Skip preference-forward restore until first active-bundle sync completes. */
+let lookupPreferenceHydrated = false;
+/**
+ * Last applied English capability for the active bundle (ML1D2A).
+ * Detects EN unavailable→available recovery independently of bundle_id.
+ */
+let lastKnownEnglishAvailable: boolean | undefined;
 
-function getSearchDirection(): SearchDirection {
-  return toLegacySearchDirection(currentLookupMode);
+function activeLookupCapabilityMeta(
+  meta: ActiveBundleMeta | undefined = currentActiveBundle,
+): { lookup_languages?: string[]; search_key_families?: string[] } {
+  return {
+    lookup_languages: meta?.lookup_languages,
+    search_key_families: meta?.search_key_families,
+  };
 }
 
+function lookupLanguageLabels() {
+  return {
+    fr: t("lookup.lang.fr"),
+    en: t("lookup.lang.en"),
+    mnk: t("lookup.lang.mnk"),
+  };
+}
+
+/**
+ * Capability-only revalidation: preserves orientation when still supported.
+ * Does not read or write the FR/EN preference.
+ */
 function revalidateLookupModeForActiveBundle(meta: ActiveBundleMeta | undefined): void {
   if (!meta) {
     currentLookupMode = { ...DEFAULT_LOOKUP_MODE };
     return;
   }
   currentLookupMode = resolveSupportedLookupMode(
-    {
-      lookup_languages: meta.lookup_languages,
-      search_key_families: meta.search_key_families,
-    },
+    activeLookupCapabilityMeta(meta),
     currentLookupMode,
   );
+}
+
+/**
+ * Restore preferred FR/EN in forward orientation (…→MNK).
+ * Does not erase stored EN when the bundle lacks English.
+ */
+function restoreLookupModeFromPreferenceForBundle(meta: ActiveBundleMeta | undefined): void {
+  if (!meta) {
+    currentLookupMode = { ...DEFAULT_LOOKUP_MODE };
+    return;
+  }
+  currentLookupMode = restoreForwardLookupModeFromPreference(
+    readSearchLookupLangPreference(),
+    activeLookupCapabilityMeta(meta),
+  );
+}
+
+/**
+ * Apply LookupMode sync policy for the current active installed meta.
+ * Tracks English capability transitions without becoming a second state machine.
+ */
+function syncLookupModeForActiveBundle(
+  meta: ActiveBundleMeta | undefined,
+  previousBundleId: string | undefined,
+): void {
+  const nextBundleId = meta?.bundle_id;
+  const nextEnglishAvailable = meta
+    ? bundleSupportsEnglishLookup(activeLookupCapabilityMeta(meta))
+    : false;
+  const action = decideLookupModeActiveBundleSync({
+    hydrated: lookupPreferenceHydrated,
+    previousBundleId,
+    nextBundleId,
+    previousEnglishAvailable: lastKnownEnglishAvailable,
+    nextEnglishAvailable,
+  });
+
+  if (action === "default_fr_mnk") {
+    currentLookupMode = { ...DEFAULT_LOOKUP_MODE };
+  } else if (action === "restore_preference_forward") {
+    restoreLookupModeFromPreferenceForBundle(meta);
+  } else {
+    revalidateLookupModeForActiveBundle(meta);
+  }
+
+  lookupPreferenceHydrated = true;
+  lastKnownEnglishAvailable = meta ? nextEnglishAvailable : undefined;
+}
+
+function setPartnerLookupLanguage(partner: "fr" | "en", options?: { persist?: boolean }): void {
+  const next = withPartnerLookupLanguage(currentLookupMode, partner);
+  const resolved = currentActiveBundle
+    ? resolveSupportedLookupMode(activeLookupCapabilityMeta(), next)
+    : { ...DEFAULT_LOOKUP_MODE };
+  currentLookupMode = resolved;
+  if (options?.persist) {
+    // Persist the user's explicit FR/EN choice, not the capability-clamped result.
+    writeSearchLookupLangPreference(partner);
+  }
+  updateLangToggle();
+  clearExecutedSearchSnapshot();
+  activeSearchFeedbackForm?.notifySearchChanged();
+  if (
+    resultsHostContext === "search" &&
+    !activeSearchFeedbackForm &&
+    lastSearchResults.length > 0
+  ) {
+    showResultsList();
+  } else if (resultsHostContext === "search" && !activeSearchFeedbackForm) {
+    const entry = searchResults.querySelector("[data-testid^='search-feedback-entry']");
+    entry?.remove();
+  }
 }
 
 const RECENT_QUERY_LOGS_LIMIT = 50;
@@ -2140,35 +2245,24 @@ async function renderQueryLoggingToggle() {
 }
 
 function updateLangToggle() {
-  const locale = getCurrentLocale();
-  const sourceLanguageLabel = getSourceLabel(
-    currentActiveBundle?.language_meta,
-    t("language.source"),
-    locale,
-  );
-  const targetLanguageLabel = getTargetLabel(
-    currentActiveBundle?.language_meta,
-    t("language.target"),
-    locale,
-  );
-  const searchDirection = getSearchDirection();
-  applySearchDirectionPresentation({
-    sourceLabelEl: searchSourceLanguage,
-    targetLabelEl: searchTargetLanguage,
+  const labels = lookupLanguageLabels();
+  const englishAvailable = bundleSupportsEnglishLookup(activeLookupCapabilityMeta());
+  applyLookupModePresentation({
+    fromHost: searchSourceLanguage,
+    toHost: searchTargetLanguage,
     swapButton: langToggle,
     searchLabelEl: searchLabel,
-    direction: searchDirection,
-    sourceLanguageLabel,
-    targetLanguageLabel,
+    mode: currentLookupMode,
+    labels,
+    englishAvailable,
+    disabled: !hasActiveBundle || busy,
+    onPartnerChange: (partner) => {
+      setPartnerLookupLanguage(partner, { persist: true });
+    },
   });
-  searchInput.placeholder = getSearchPlaceholder(
-    searchDirection,
-    currentActiveBundle?.language_meta,
-    t("language.source"),
-    t("language.target"),
-    (label) => t("search.placeholder", { language: label }),
-    locale,
-  );
+  searchInput.placeholder = t("search.placeholder", {
+    language: lookupModeInputLanguageLabel(currentLookupMode, labels),
+  });
 }
 
 queryLoggingToggleBtn.addEventListener("click", () => {
@@ -3699,3 +3793,8 @@ async function initializeAppState() {
 }
 
 void initializeAppState();
+
+/** E2E-only: same-session active-bundle resync. Absent unless VITE_E2E_TEST_HOOKS=true. */
+if (import.meta.env.VITE_E2E_TEST_HOOKS === "true") {
+  installE2ERefreshDbStatusHook(() => refreshDbStatus());
+}

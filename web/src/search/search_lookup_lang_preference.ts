@@ -1,11 +1,9 @@
 /**
- * ML1D1 — Search lookup-language preference key (localStorage).
+ * ML1D1/ML1D2 — Search lookup-language preference key (localStorage).
  *
  * ML1B approved key: siralex.search_lookup_lang = "fr" | "en"
  *
- * ML1D1 defines safe parse/write helpers only. Consumer startup must NOT restore
- * English from this preference until ML1D2 completes English UI/presentation.
- * Default remains FR.
+ * ML1D2 restores EN at consumer startup only after active-bundle capability is known.
  */
 
 export const SEARCH_LOOKUP_LANG_STORAGE_KEY = "siralex.search_lookup_lang" as const;

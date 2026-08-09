@@ -3882,6 +3882,43 @@ button.target-link .target-text {
   overflow-wrap: anywhere;
 }
 
+.ux2-search-language-text {
+  display: inline-block;
+}
+
+.ux2-search-partner-select {
+  appearance: none;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 1.25rem 0 0;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(45deg, transparent 50%, currentColor 50%) calc(100% - 0.55rem) 50% / 0.35rem 0.35rem
+      no-repeat,
+    linear-gradient(135deg, currentColor 50%, transparent 50%) calc(100% - 0.3rem) 50% / 0.35rem 0.35rem
+      no-repeat,
+    transparent;
+  font: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ux2-search-partner-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ux2-search-partner-select:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
 .ux2-search-direction .ux2-search-language:first-child {
   text-align: left;
 }

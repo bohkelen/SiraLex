@@ -1,0 +1,40 @@
+{"key": "alpha_fr", "key_type": "src_casefold", "ir_ids": ["diag_idx_alpha"]}
+{"key": "beta_fr", "key_type": "src_casefold", "ir_ids": ["diag_idx_beta"]}
+{"key": "bon travail", "key_type": "src_casefold", "ir_ids": ["diag_idx_bon_travail"]}
+{"key": "ouverture", "key_type": "src_casefold", "ir_ids": ["diag_idx_ouverture"]}
+{"key": "alpha_fr", "key_type": "src_diacritics_insensitive", "ir_ids": ["diag_idx_alpha"]}
+{"key": "beta_fr", "key_type": "src_diacritics_insensitive", "ir_ids": ["diag_idx_beta"]}
+{"key": "bon travail", "key_type": "src_diacritics_insensitive", "ir_ids": ["diag_idx_bon_travail"]}
+{"key": "ouverture", "key_type": "src_diacritics_insensitive", "ir_ids": ["diag_idx_ouverture"]}
+{"key": "alpha_fr", "key_type": "src_nospace", "ir_ids": ["diag_idx_alpha"]}
+{"key": "beta_fr", "key_type": "src_nospace", "ir_ids": ["diag_idx_beta"]}
+{"key": "bontravail", "key_type": "src_nospace", "ir_ids": ["diag_idx_bon_travail"]}
+{"key": "ouverture", "key_type": "src_nospace", "ir_ids": ["diag_idx_ouverture"]}
+{"key": "alphafr", "key_type": "src_punct_stripped", "ir_ids": ["diag_idx_alpha"]}
+{"key": "betafr", "key_type": "src_punct_stripped", "ir_ids": ["diag_idx_beta"]}
+{"key": "bon travail", "key_type": "src_punct_stripped", "ir_ids": ["diag_idx_bon_travail"]}
+{"key": "ouverture", "key_type": "src_punct_stripped", "ir_ids": ["diag_idx_ouverture"]}
+{"key": "alpha_mnk", "key_type": "tgt_casefold", "ir_ids": ["diag_lex_alpha"]}
+{"key": "beta_mnk", "key_type": "tgt_casefold", "ir_ids": ["diag_lex_beta"]}
+{"key": "bon_mnk", "key_type": "tgt_casefold", "ir_ids": ["diag_lex_bon_mnk"]}
+{"key": "dàa dá", "key_type": "tgt_casefold", "ir_ids": ["diag_lex_daa_da"]}
+{"key": "alpha_mnk", "key_type": "tgt_diacritics_insensitive", "ir_ids": ["diag_lex_alpha"]}
+{"key": "beta_mnk", "key_type": "tgt_diacritics_insensitive", "ir_ids": ["diag_lex_beta"]}
+{"key": "bon_mnk", "key_type": "tgt_diacritics_insensitive", "ir_ids": ["diag_lex_bon_mnk"]}
+{"key": "daa da", "key_type": "tgt_diacritics_insensitive", "ir_ids": ["diag_lex_daa_da"]}
+{"key": "alpha_mnk", "key_type": "tgt_nospace", "ir_ids": ["diag_lex_alpha"]}
+{"key": "beta_mnk", "key_type": "tgt_nospace", "ir_ids": ["diag_lex_beta"]}
+{"key": "bon_mnk", "key_type": "tgt_nospace", "ir_ids": ["diag_lex_bon_mnk"]}
+{"key": "daada", "key_type": "tgt_nospace", "ir_ids": ["diag_lex_daa_da"]}
+{"key": "alphamnk", "key_type": "tgt_punct_stripped", "ir_ids": ["diag_lex_alpha"]}
+{"key": "betamnk", "key_type": "tgt_punct_stripped", "ir_ids": ["diag_lex_beta"]}
+{"key": "bonmnk", "key_type": "tgt_punct_stripped", "ir_ids": ["diag_lex_bon_mnk"]}
+{"key": "daa da", "key_type": "tgt_punct_stripped", "ir_ids": ["diag_lex_daa_da"]}
+{"key":"house","key_type":"en_casefold","ir_ids":["diag_idx_house"]}
+{"key":"house_mnk","key_type":"tgt_casefold","ir_ids":["diag_lex_house"]}
+{"key":"house","key_type":"en_diacritics_insensitive","ir_ids":["diag_idx_house"]}
+{"key":"house_mnk","key_type":"tgt_diacritics_insensitive","ir_ids":["diag_lex_house"]}
+{"key":"house","key_type":"en_punct_stripped","ir_ids":["diag_idx_house"]}
+{"key":"housemnk","key_type":"tgt_punct_stripped","ir_ids":["diag_lex_house"]}
+{"key":"house","key_type":"en_nospace","ir_ids":["diag_idx_house"]}
+{"key":"house_mnk","key_type":"tgt_nospace","ir_ids":["diag_lex_house"]}

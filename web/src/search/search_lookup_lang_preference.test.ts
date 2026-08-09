@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   parseSearchLookupLangPreference,
@@ -54,9 +54,7 @@ describe("search_lookup_lang_preference", () => {
     expect(() => writeSearchLookupLangPreference("en", broken)).not.toThrow();
   });
 
-  it("documents that ML1D1 does not restore EN at consumer startup", () => {
-    // Preference helpers exist for ML1D2; main.ts must not call read on boot for mode.
+  it("documents the ML1D2 preference key contract", () => {
     expect(SEARCH_LOOKUP_LANG_STORAGE_KEY).toBe("siralex.search_lookup_lang");
-    expect(vi.isFakeTimers()).toBe(false);
   });
 });
