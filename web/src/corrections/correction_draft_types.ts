@@ -70,13 +70,12 @@ export function isCorrectionMode(value: unknown): value is CorrectionMode {
  * Indices are used because SenseRaw/ExampleRaw have no durable sub-IDs.
  * Do not treat sense_num as identity.
  *
- * Russian boundary:
- * - `"ru"` may validate only as preservation of an existing record target
- *   (live content may contain Russian gloss material).
- * - CF1 does not add Russian labels, workflows, source-language selection,
- *   or product-language support.
- * - Entry form UI should later expose `"ru"` only when selected live content
- *   is actually Russian; arbitrary Russian-target creation is not implied.
+ * Russian boundary (RL1):
+ * - `"ru"` remains schema-valid for historical drafts and export provenance.
+ * - Ordinary consumer Suggest Correction must not offer new RU translation
+ *   targets (see `buildCorrectionTargetOptions` / `isConsumerCreatableCorrectionTarget`).
+ * - CF1 does not add Russian UI locale, Search language, or product-language support.
+ * - Live lexicon may still contain Russian source gloss material.
  */
 export type CorrectionTarget =
   | { type: "entry" }

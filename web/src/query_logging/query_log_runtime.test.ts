@@ -5,11 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { deleteSiralexDb, openSiralexDb, setCachedBundleCatalog } from "../idb/siralex_db";
 import type { SearchResult } from "../search/search_query";
 import { recordQueryLoggingConsent } from "./query_log_consent";
-import { isQueryLogEventV2 } from "./query_log_derive";
+import { isQueryLogEventV3 } from "./query_log_derive";
 import { countQueryLogs, listQueryLogs } from "./query_log_store";
 import {
   QUERY_LOG_CONSENT_VERSION,
-  QUERY_LOG_EVENT_V2,
+  QUERY_LOG_EVENT_V3,
   QUERY_LOG_TOP_IR_IDS_LIMIT,
 } from "./query_log_types";
 import {
@@ -17,6 +17,10 @@ import {
   getQueryLoggingEnabled,
   setQueryLoggingEnabled,
 } from "./query_log_runtime";
+
+function recentIso(offsetMs = 0): string {
+  return new Date(Date.now() - offsetMs).toISOString();
+}
 
 type MemoryStorage = {
   getItem(key: string): string | null;
@@ -128,7 +132,7 @@ describe("query log runtime integration", () => {
 
     await appendSearchQueryLogIfEnabled({
       queryRaw: "bonjour",
-      direction: "source_to_target",
+      lookupMode: { from: "fr", to: "mnk" },
       result: makeSearchResult(),
       activeBundleMeta: {
         bundle_id: "bundle-a",
@@ -156,7 +160,7 @@ describe("query log runtime integration", () => {
 
     await appendSearchQueryLogIfEnabled({
       queryRaw: "bonjour",
-      direction: "source_to_target",
+      lookupMode: { from: "fr", to: "mnk" },
       result: makeSearchResult(),
       activeBundleMeta: {
         bundle_id: "bundle-a",
@@ -182,7 +186,7 @@ describe("query log runtime integration", () => {
 
     await appendSearchQueryLogIfEnabled({
       queryRaw: "   ",
-      direction: "source_to_target",
+      lookupMode: { from: "fr", to: "mnk" },
       result: makeSearchResult({ ir_ids: [] }),
       activeBundleMeta: {
         bundle_id: "bundle-a",
@@ -202,13 +206,13 @@ describe("query log runtime integration", () => {
     }
   });
 
-  it("writes a v2 row when logging is enabled with valid consent", async () => {
+  it("writes a v3 row when logging is enabled with valid consent", async () => {
     const storage = createMemoryStorage();
     enableLoggingWithConsent(storage);
 
     await appendSearchQueryLogIfEnabled({
       queryRaw: "Bon re\u0301veil",
-      direction: "source_to_target",
+      lookupMode: { from: "fr", to: "mnk" },
       result: makeSearchResult({
         matched_key: "bon réveil",
         query_normalized_keys: {
@@ -234,11 +238,13 @@ describe("query log runtime integration", () => {
     try {
       const rows = await listQueryLogs(db);
       expect(rows).toHaveLength(1);
-      expect(isQueryLogEventV2(rows[0])).toBe(true);
+      expect(isQueryLogEventV3(rows[0])).toBe(true);
       expect(rows[0]).toMatchObject({
-        schema_version: QUERY_LOG_EVENT_V2,
+        schema_version: QUERY_LOG_EVENT_V3,
         query_raw: "Bon re\u0301veil",
         direction: "source_to_target",
+        input_lang: "fr",
+        output_lang: "mnk",
         matched_key_type: "casefold",
         matched_key: "bon réveil",
         query_normalized_primary: "bon réveil",
@@ -255,7 +261,7 @@ describe("query log runtime integration", () => {
         logging_enabled: true,
         matched_deep_ladder: false,
       });
-      if (isQueryLogEventV2(rows[0])) {
+      if (isQueryLogEventV3(rows[0])) {
         expect(rows[0].query_normalized_keys.casefold).toEqual(["bon réveil"]);
         expect(rows[0].session_bucket_id.trim()).not.toBe("");
       }
@@ -270,7 +276,7 @@ describe("query log runtime integration", () => {
 
     await appendSearchQueryLogIfEnabled({
       queryRaw: "hello",
-      direction: "source_to_target",
+      lookupMode: { from: "fr", to: "mnk" },
       result: makeSearchResult({
         query_normalized_keys: {
           casefold: ["shadow-key"],
@@ -294,8 +300,8 @@ describe("query log runtime integration", () => {
     const db = await openSiralexDb();
     try {
       const row = (await listQueryLogs(db))[0];
-      expect(isQueryLogEventV2(row)).toBe(true);
-      if (isQueryLogEventV2(row)) {
+      expect(isQueryLogEventV3(row)).toBe(true);
+      if (isQueryLogEventV3(row)) {
         expect(row.query_normalized_keys.casefold).toEqual(["shadow-key"]);
       }
     } finally {
@@ -309,7 +315,7 @@ describe("query log runtime integration", () => {
 
     await appendSearchQueryLogIfEnabled({
       queryRaw: "multi",
-      direction: "source_to_target",
+      lookupMode: { from: "fr", to: "mnk" },
       result: makeSearchResult({
         ir_ids: ["ir-1", "ir-2", "ir-3", "ir-4", "ir-5", "ir-6"],
         matched_key_type: "casefold",
@@ -328,8 +334,8 @@ describe("query log runtime integration", () => {
     const db = await openSiralexDb();
     try {
       const row = (await listQueryLogs(db))[0];
-      expect(isQueryLogEventV2(row)).toBe(true);
-      if (isQueryLogEventV2(row)) {
+      expect(isQueryLogEventV3(row)).toBe(true);
+      if (isQueryLogEventV3(row)) {
         expect(row.top_ir_ids).toEqual(["ir-1", "ir-2", "ir-3", "ir-4", "ir-5"]);
         expect(row.top_ir_ids.length).toBe(QUERY_LOG_TOP_IR_IDS_LIMIT);
         expect(row.result_status).toBe("hit_multi");
@@ -346,7 +352,7 @@ describe("query log runtime integration", () => {
 
     await appendSearchQueryLogIfEnabled({
       queryRaw: "missing",
-      direction: "target_to_source",
+      lookupMode: { from: "mnk", to: "fr" },
       result: makeSearchResult({
         ir_ids: [],
         matched_key_type: null,
@@ -367,8 +373,8 @@ describe("query log runtime integration", () => {
     const db = await openSiralexDb();
     try {
       const row = (await listQueryLogs(db))[0];
-      expect(isQueryLogEventV2(row)).toBe(true);
-      if (isQueryLogEventV2(row)) {
+      expect(isQueryLogEventV3(row)).toBe(true);
+      if (isQueryLogEventV3(row)) {
         expect(row.matched_key_type).toBe("none");
         expect(row.result_status).toBe("miss");
         expect(row.result_count).toBe(0);
@@ -410,7 +416,7 @@ describe("query log runtime integration", () => {
 
     await appendSearchQueryLogIfEnabled({
       queryRaw: "bonjour",
-      direction: "source_to_target",
+      lookupMode: { from: "fr", to: "mnk" },
       result: makeSearchResult(),
       activeBundleMeta: {
         bundle_id: "bundle-a",
@@ -425,8 +431,8 @@ describe("query log runtime integration", () => {
     const readDb = await openSiralexDb();
     try {
       const row = (await listQueryLogs(readDb))[0];
-      expect(isQueryLogEventV2(row)).toBe(true);
-      if (isQueryLogEventV2(row)) {
+      expect(isQueryLogEventV3(row)).toBe(true);
+      if (isQueryLogEventV3(row)) {
         expect(row.catalog_version).toBe("norm-v3-featured");
       }
     } finally {
@@ -440,7 +446,7 @@ describe("query log runtime integration", () => {
 
     await appendSearchQueryLogIfEnabled({
       queryRaw: "bonjour",
-      direction: "source_to_target",
+      lookupMode: { from: "fr", to: "mnk" },
       result: makeSearchResult(),
       activeBundleMeta: {
         bundle_id: "bundle-a",
@@ -455,8 +461,8 @@ describe("query log runtime integration", () => {
     const db = await openSiralexDb();
     try {
       const row = (await listQueryLogs(db))[0];
-      expect(isQueryLogEventV2(row)).toBe(true);
-      if (isQueryLogEventV2(row)) {
+      expect(isQueryLogEventV3(row)).toBe(true);
+      if (isQueryLogEventV3(row)) {
         expect(row.catalog_version).toBeUndefined();
       }
     } finally {
@@ -472,7 +478,7 @@ describe("query log runtime integration", () => {
     await expect(
       appendSearchQueryLogIfEnabled({
         queryRaw: "bonjour",
-        direction: "source_to_target",
+        lookupMode: { from: "fr", to: "mnk" },
         result: makeSearchResult(),
         activeBundleMeta: {
           bundle_id: "",
@@ -495,5 +501,52 @@ describe("query log runtime integration", () => {
 
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+
+  it("logs unambiguous LookupMode provenance for all four pairs", async () => {
+    const storage = createMemoryStorage();
+    enableLoggingWithConsent(storage);
+
+    const cases = [
+      { lookupMode: { from: "fr", to: "mnk" } as const, query: "maison", direction: "source_to_target" },
+      { lookupMode: { from: "en", to: "mnk" } as const, query: "house", direction: "source_to_target" },
+      { lookupMode: { from: "mnk", to: "fr" } as const, query: "bón", direction: "target_to_source" },
+      { lookupMode: { from: "mnk", to: "en" } as const, query: "bón", direction: "target_to_source" },
+    ];
+
+    for (const [i, c] of cases.entries()) {
+      await appendSearchQueryLogIfEnabled({
+        queryRaw: c.query,
+        lookupMode: c.lookupMode,
+        result: makeSearchResult({ matched_key: c.query, ir_ids: [`ir-${i}`] }),
+        activeBundleMeta: {
+          bundle_id: "bundle-ml",
+          version: "1.0.0",
+          normalization_ruleset: "norm_v3",
+        },
+        storageScopeId: "bundle-ml::sha256:1",
+        uiLanguage: "fr",
+        latencyMs: 1,
+        timestampIso: `2026-07-01T00:00:0${i}.000Z`,
+      });
+    }
+
+    const db = await openSiralexDb();
+    try {
+      const rows = await listQueryLogs(db);
+      expect(rows).toHaveLength(4);
+      for (const [i, c] of cases.entries()) {
+        const row = rows[i];
+        expect(isQueryLogEventV3(row)).toBe(true);
+        if (isQueryLogEventV3(row)) {
+          expect(row.input_lang).toBe(c.lookupMode.from);
+          expect(row.output_lang).toBe(c.lookupMode.to);
+          expect(row.direction).toBe(c.direction);
+          expect(row.query_raw).toBe(c.query);
+        }
+      }
+    } finally {
+      db.close();
+    }
   });
 });

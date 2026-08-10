@@ -36,10 +36,10 @@
     {
       "bundle_id": "bundle_full_20260710_337619ff",
       "name": "French ↔ Maninka",
-      "version": "norm-v3-featured-7n2b4g11-7l13-7n2a8-7n2b9-runtime-smoke-pass",
-      "size_bytes": 26169580,
-      "url_base": "./bundle_full_20260710_337619ff/",
-      "content_sha256": "sha256:337619ff43131acde1390d7892d687372785729dac5d85abe82b61cc92285c3c",
+      "version": "norm-v3-featured-ml1e-multilingual-en-index",
+      "size_bytes": 29793679,
+      "url_base": "./bundle_full_20260710_337619ff__d076558b/",
+      "content_sha256": "sha256:d076558b2f668a06a5a30a143026433e9e0de3523e0397183cfd897b2641d90a",
       "languages": {
         "source_lang": "fr",
         "target_lang": "mnk"

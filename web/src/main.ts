@@ -1,4 +1,5 @@
 import "./style.css";
+import { installE2ERefreshDbStatusHook } from "./e2e_test_hooks";
 import { registerSW } from "virtual:pwa-register";
 import appPackage from "../package.json";
 
@@ -6,7 +7,6 @@ import { probeJsonlFile } from "./bundle_probe";
 import {
   buildLanguageMetaFromManifest,
   getBundleDisplayName,
-  getSearchPlaceholder,
   getSourceLabel,
   getTargetLabel,
   getTargetEntriesLabel,
@@ -107,14 +107,30 @@ import {
   setQueryLoggingEnabled,
 } from "./query_logging/query_log_runtime";
 import type { QueryLogEvent } from "./query_logging/query_log_types";
-import { searchQuery } from "./search/search_query";
+import { searchQueryForLookupMode } from "./search/search_query";
+import {
+  bundleSupportsEnglishLookup,
+  DEFAULT_LOOKUP_MODE,
+  resolveSupportedLookupMode,
+  restoreForwardLookupModeFromPreference,
+  swapLookupMode,
+  toLegacySearchDirection,
+  withPartnerLookupLanguage,
+  type LookupMode,
+} from "./search/lookup_mode";
+import { decideLookupModeActiveBundleSync } from "./search/lookup_mode_active_bundle_sync";
+import {
+  readSearchLookupLangPreference,
+  writeSearchLookupLangPreference,
+} from "./search/search_lookup_lang_preference";
+import { resolveSavedPresentationPreferredGlossLanguage } from "./search/saved_presentation_gloss_preference";
 import { resolveRecords } from "./search/resolve_records";
 import {
   getNoResultMessage,
   renderResultsList,
   type ResultDisplayContext,
 } from "./render/render_results";
-import { applySearchDirectionPresentation } from "./render/render_search_chrome";
+import { applyLookupModePresentation, lookupModeInputLanguageLabel } from "./render/render_lookup_mode_chrome";
 import { renderEntryDetail, showTargetEntryUnavailable } from "./render/render_entry";
 import { renderCorrectionForm } from "./render/render_correction_form";
 import {
@@ -171,6 +187,7 @@ import {
 import { countCorrectionDrafts } from "./corrections/correction_draft_store";
 import { renderCorrectionManagement } from "./render/render_correction_management";
 import { openTargetLexiconEntry } from "./navigation/open_target_lexicon_entry";
+import { bindTargetNavToSearchOrigin } from "./navigation/target_nav_lookup_mode";
 import type { EnrichedRecord, TargetEntry } from "./types/records";
 import { isLexiconDisplay } from "./types/records";
 
@@ -1173,22 +1190,25 @@ async function refreshDbStatus() {
           : undefined;
       installedBundles = bundles;
       currentActiveBundle = active;
+      const nextBundleId = active?.bundle_id;
+      const nextContentSha = active?.expected_content_sha256;
+      const previousBundleIdForSync = lastKnownActiveBundleId;
+      syncLookupModeForActiveBundle(active ?? undefined, previousBundleIdForSync);
+      updateLangToggle();
       if (loadedCatalogBundles.length > 0) {
         await backfillInstalledLanguageMetaFromCatalog(loadedCatalogBundles);
       }
-      const nextBundleId = active?.bundle_id;
-      const nextContentSha = active?.expected_content_sha256;
       if (
         lastKnownActiveBundleId !== nextBundleId ||
         lastKnownActiveContentSha !== nextContentSha
       ) {
-        const bundleIdentityChanged = lastKnownActiveBundleId !== nextBundleId;
+        const identityChanged = lastKnownActiveBundleId !== nextBundleId;
         lastKnownActiveBundleId = nextBundleId;
         lastKnownActiveContentSha = nextContentSha;
         learningBackupSurface?.invalidatePreviewForBundleChange();
         activeCorrectionForm?.notifyBundleLifecycleChanged();
         activeSearchFeedbackForm?.notifyBundleLifecycleChanged();
-        if (bundleIdentityChanged) {
+        if (identityChanged) {
           if (
             resultsHostContext === "review" ||
             resultsHostContext === "saved_vocabulary" ||
@@ -1264,6 +1284,8 @@ async function refreshDbStatus() {
     hasActiveBundle = false;
     installedBundles = [];
     currentActiveBundle = undefined;
+    syncLookupModeForActiveBundle(undefined, lastKnownActiveBundleId);
+    updateLangToggle();
     currentStorageEstimate = undefined;
     renderBundleSelectOptions(undefined);
     renderInstalledBundleManager();
@@ -1887,6 +1909,9 @@ clearDbBtn.addEventListener("click", () => {
       resultsHostContext = "search";
       searchResults.innerHTML = "";
       lastKnownActiveBundleId = undefined;
+      lastKnownActiveContentSha = undefined;
+      lookupPreferenceHydrated = false;
+      lastKnownEnglishAvailable = undefined;
       importProgress.textContent = t("db.deleted");
     } catch (e) {
       importProgress.textContent += t("db.deleteFailed", { error: String(e) });
@@ -1963,7 +1988,119 @@ probeAllBtn.addEventListener("click", () => {
 
 // --- Language toggle ---
 
-let searchDirection: SearchDirection = "source_to_target";
+/** Runtime Search source of truth (ML1D1). Legacy SearchDirection is derived. */
+let currentLookupMode: LookupMode = { ...DEFAULT_LOOKUP_MODE };
+/** Skip preference-forward restore until first active-bundle sync completes. */
+let lookupPreferenceHydrated = false;
+/**
+ * Last applied English capability for the active bundle (ML1D2A).
+ * Detects EN unavailable→available recovery independently of bundle_id.
+ */
+let lastKnownEnglishAvailable: boolean | undefined;
+
+function activeLookupCapabilityMeta(
+  meta: ActiveBundleMeta | undefined = currentActiveBundle,
+): { lookup_languages?: string[]; search_key_families?: string[] } {
+  return {
+    lookup_languages: meta?.lookup_languages,
+    search_key_families: meta?.search_key_families,
+  };
+}
+
+function lookupLanguageLabels() {
+  return {
+    fr: t("lookup.lang.fr"),
+    en: t("lookup.lang.en"),
+    mnk: t("lookup.lang.mnk"),
+  };
+}
+
+/**
+ * Capability-only revalidation: preserves orientation when still supported.
+ * Does not read or write the FR/EN preference.
+ */
+function revalidateLookupModeForActiveBundle(meta: ActiveBundleMeta | undefined): void {
+  if (!meta) {
+    currentLookupMode = { ...DEFAULT_LOOKUP_MODE };
+    return;
+  }
+  currentLookupMode = resolveSupportedLookupMode(
+    activeLookupCapabilityMeta(meta),
+    currentLookupMode,
+  );
+}
+
+/**
+ * Restore preferred FR/EN in forward orientation (…→MNK).
+ * Does not erase stored EN when the bundle lacks English.
+ */
+function restoreLookupModeFromPreferenceForBundle(meta: ActiveBundleMeta | undefined): void {
+  if (!meta) {
+    currentLookupMode = { ...DEFAULT_LOOKUP_MODE };
+    return;
+  }
+  currentLookupMode = restoreForwardLookupModeFromPreference(
+    readSearchLookupLangPreference(),
+    activeLookupCapabilityMeta(meta),
+  );
+}
+
+/**
+ * Apply LookupMode sync policy for the current active installed meta.
+ * Tracks English capability transitions without becoming a second state machine.
+ */
+function syncLookupModeForActiveBundle(
+  meta: ActiveBundleMeta | undefined,
+  previousBundleId: string | undefined,
+): void {
+  const nextBundleId = meta?.bundle_id;
+  const nextEnglishAvailable = meta
+    ? bundleSupportsEnglishLookup(activeLookupCapabilityMeta(meta))
+    : false;
+  const action = decideLookupModeActiveBundleSync({
+    hydrated: lookupPreferenceHydrated,
+    previousBundleId,
+    nextBundleId,
+    previousEnglishAvailable: lastKnownEnglishAvailable,
+    nextEnglishAvailable,
+  });
+
+  if (action === "default_fr_mnk") {
+    currentLookupMode = { ...DEFAULT_LOOKUP_MODE };
+  } else if (action === "restore_preference_forward") {
+    restoreLookupModeFromPreferenceForBundle(meta);
+  } else {
+    revalidateLookupModeForActiveBundle(meta);
+  }
+
+  lookupPreferenceHydrated = true;
+  lastKnownEnglishAvailable = meta ? nextEnglishAvailable : undefined;
+}
+
+function setPartnerLookupLanguage(partner: "fr" | "en", options?: { persist?: boolean }): void {
+  const next = withPartnerLookupLanguage(currentLookupMode, partner);
+  const resolved = currentActiveBundle
+    ? resolveSupportedLookupMode(activeLookupCapabilityMeta(), next)
+    : { ...DEFAULT_LOOKUP_MODE };
+  currentLookupMode = resolved;
+  if (options?.persist) {
+    // Persist the user's explicit FR/EN choice, not the capability-clamped result.
+    writeSearchLookupLangPreference(partner);
+  }
+  updateLangToggle();
+  clearExecutedSearchSnapshot();
+  activeSearchFeedbackForm?.notifySearchChanged();
+  if (
+    resultsHostContext === "search" &&
+    !activeSearchFeedbackForm &&
+    lastSearchResults.length > 0
+  ) {
+    showResultsList();
+  } else if (resultsHostContext === "search" && !activeSearchFeedbackForm) {
+    const entry = searchResults.querySelector("[data-testid^='search-feedback-entry']");
+    entry?.remove();
+  }
+}
 
 const RECENT_QUERY_LOGS_LIMIT = 50;
 
@@ -2110,34 +2247,24 @@ async function renderQueryLoggingToggle() {
 }
 
 function updateLangToggle() {
-  const locale = getCurrentLocale();
-  const sourceLanguageLabel = getSourceLabel(
-    currentActiveBundle?.language_meta,
-    t("language.source"),
-    locale,
-  );
-  const targetLanguageLabel = getTargetLabel(
-    currentActiveBundle?.language_meta,
-    t("language.target"),
-    locale,
-  );
-  applySearchDirectionPresentation({
-    sourceLabelEl: searchSourceLanguage,
-    targetLabelEl: searchTargetLanguage,
+  const labels = lookupLanguageLabels();
+  const englishAvailable = bundleSupportsEnglishLookup(activeLookupCapabilityMeta());
+  applyLookupModePresentation({
+    fromHost: searchSourceLanguage,
+    toHost: searchTargetLanguage,
     swapButton: langToggle,
     searchLabelEl: searchLabel,
-    direction: searchDirection,
-    sourceLanguageLabel,
-    targetLanguageLabel,
+    mode: currentLookupMode,
+    labels,
+    englishAvailable,
+    disabled: !hasActiveBundle || busy,
+    onPartnerChange: (partner) => {
+      setPartnerLookupLanguage(partner, { persist: true });
+    },
   });
-  searchInput.placeholder = getSearchPlaceholder(
-    searchDirection,
-    currentActiveBundle?.language_meta,
-    t("language.source"),
-    t("language.target"),
-    (label) => t("search.placeholder", { language: label }),
-    locale,
-  );
+  searchInput.placeholder = t("search.placeholder", {
+    language: lookupModeInputLanguageLabel(currentLookupMode, labels),
+  });
 }
 
 queryLoggingToggleBtn.addEventListener("click", () => {
@@ -2209,7 +2336,7 @@ recentQueryLogsRefreshBtn.addEventListener("click", () => {
 });
 
 langToggle.addEventListener("click", () => {
-  searchDirection = searchDirection === "source_to_target" ? "target_to_source" : "source_to_target";
+  currentLookupMode = swapLookupMode(currentLookupMode);
   updateLangToggle();
   // Direction change invalidates any prior executed-search capture context.
   clearExecutedSearchSnapshot();
@@ -2233,8 +2360,8 @@ const QUERY_LOGGING_SETTLE_DELAY_MS = 800;
 type SettledQueryLogPayload = {
   seq: number;
   query: string;
-  direction: SearchDirection;
-  result: Awaited<ReturnType<typeof searchQuery>>;
+  lookupMode: LookupMode;
+  result: Awaited<ReturnType<typeof searchQueryForLookupMode>>;
   activeBundleMeta: ActiveBundleMeta;
   storageScopeId: string;
   latencyMs: number;
@@ -2946,7 +3073,12 @@ function scheduleSettledQueryLog(payload: SettledQueryLogPayload) {
     if (pending.seq !== searchSeq) return;
     if (pending.query.trim() === "") return;
     if (searchInput.value !== pending.query) return;
-    if (searchDirection !== pending.direction) return;
+    if (
+      currentLookupMode.from !== pending.lookupMode.from ||
+      currentLookupMode.to !== pending.lookupMode.to
+    ) {
+      return;
+    }
     if (!currentActiveBundle) return;
     if (currentActiveBundle.bundle_id !== pending.activeBundleMeta.bundle_id) return;
     if (getBundleStorageScopeId(currentActiveBundle) !== pending.storageScopeId) return;
@@ -2954,7 +3086,7 @@ function scheduleSettledQueryLog(payload: SettledQueryLogPayload) {
 
     void appendSearchQueryLogIfEnabled({
       queryRaw: pending.query,
-      direction: pending.direction,
+      lookupMode: pending.lookupMode,
       result: pending.result,
       activeBundleMeta: pending.activeBundleMeta,
       storageScopeId: pending.storageScopeId,
@@ -2990,7 +3122,14 @@ searchInput.addEventListener("input", () => {
 
 /** Origin for entry-detail Back navigation (no router). */
 type EntryNavOrigin =
-  | { kind: "search"; restoreDirection: SearchDirection }
+  | {
+      kind: "search";
+      /**
+       * Immutable LookupMode snapshot for the Search event that opened this
+       * entry. Used for both presentation and Back restore (ML1D3).
+       */
+      restoreLookupMode: LookupMode;
+    }
   | { kind: "saved_vocabulary" };
 
 function showNoResultSearchSurface(query: string): void {
@@ -3042,10 +3181,10 @@ function restoreSearchSurfaceAfterFeedback(): void {
     disposeActiveCorrectionManagement();
     invalidateCollectionAndReviewContexts();
     searchResults.innerHTML = "";
-    const list = renderResultsList(lastSearchResults, (record) => {
+    const list = renderResultsList(lastSearchResults, (record, context) => {
       showEntryDetail(record, {
         kind: "search",
-        restoreDirection: searchDirection,
+        restoreLookupMode: { ...context.lookupMode },
       });
     });
     if (list) searchResults.appendChild(list);
@@ -3137,10 +3276,10 @@ function showResultsList() {
   searchResults.innerHTML = "";
   if (lastSearchResults.length === 0) return;
 
-  const list = renderResultsList(lastSearchResults, (record) => {
+  const list = renderResultsList(lastSearchResults, (record, context) => {
     showEntryDetail(record, {
       kind: "search",
-      restoreDirection: searchDirection,
+      restoreLookupMode: { ...context.lookupMode },
     });
   });
   if (list) searchResults.appendChild(list);
@@ -3284,21 +3423,37 @@ ux2Wordmark.addEventListener("click", () => {
   navigatePrimary("search");
 });
 
-function setSearchDirection(direction: SearchDirection) {
-  if (searchDirection === direction) {
+function setSearchLookupMode(mode: LookupMode) {
+  const next = currentActiveBundle
+    ? resolveSupportedLookupMode(
+        {
+          lookup_languages: currentActiveBundle.lookup_languages,
+          search_key_families: currentActiveBundle.search_key_families,
+        },
+        mode,
+      )
+    : { ...DEFAULT_LOOKUP_MODE };
+  if (currentLookupMode.from === next.from && currentLookupMode.to === next.to) {
     updateLangToggle();
     return;
   }
-  searchDirection = direction;
+  currentLookupMode = next;
   updateLangToggle();
 }
 
-function handleOpenTargetLexiconEntry(target: TargetEntry, mappingRoot: HTMLElement) {
+function handleOpenTargetLexiconEntry(
+  target: TargetEntry,
+  mappingRoot: HTMLElement,
+  /** Immutable Search-result LookupMode — never live picker state (ML1D3A). */
+  originLookupMode: LookupMode,
+) {
   const pendingEntryGen = entryDetailGeneration;
   const pendingSearchSeq = searchSeq;
   const pendingHost = resultsHostContext;
   const pendingBundleId = currentActiveBundle?.bundle_id;
-  const restoreDirection = searchDirection;
+  const { restoreLookupMode, chromeLookupMode } =
+    bindTargetNavToSearchOrigin(originLookupMode);
+  const restoreDirection = toLegacySearchDirection(restoreLookupMode);
   const preservedQuery = searchInput.value;
 
   void openTargetLexiconEntry({
@@ -3313,10 +3468,10 @@ function handleOpenTargetLexiconEntry(target: TargetEntry, mappingRoot: HTMLElem
       currentActiveBundle?.bundle_id === pendingBundleId &&
       searchInput.value === preservedQuery,
     setDirectionTargetToSource: () => {
-      setSearchDirection("target_to_source");
+      setSearchLookupMode(chromeLookupMode);
     },
-    openEntryDetail: (record, backDirection) => {
-      showEntryDetail(record, { kind: "search", restoreDirection: backDirection });
+    openEntryDetail: (record) => {
+      showEntryDetail(record, { kind: "search", restoreLookupMode });
       const headword = searchResults.querySelector<HTMLElement>(".entry-headword");
       headword?.focus();
     },
@@ -3437,20 +3592,34 @@ function showEntryDetail(record: EnrichedRecord, origin: EntryNavOrigin) {
     : undefined;
 
   let entryRoot: HTMLElement | null = null;
+  const presentationLookupMode: LookupMode =
+    origin.kind === "search"
+      ? { ...origin.restoreLookupMode }
+      : (() => {
+          const preferred = resolveSavedPresentationPreferredGlossLanguage(
+            activeLookupCapabilityMeta(),
+          );
+          return preferred === "en"
+            ? ({ from: "en", to: "mnk" } as const)
+            : ({ ...DEFAULT_LOOKUP_MODE } as const);
+        })();
   const view = renderEntryDetail(record, {
     backLabel:
       origin.kind === "saved_vocabulary" ? t("entry.backToSaved") : t("entry.back"),
+    presentationLookupMode,
     onBack: () => {
       if (origin.kind === "saved_vocabulary") {
         setSearchView("search");
         showSavedVocabulary();
         return;
       }
-      setSearchDirection(origin.restoreDirection);
+      setSearchLookupMode(origin.restoreLookupMode);
       showResultsList();
     },
     onOpenTargetEntry: (target) => {
-      if (entryRoot) handleOpenTargetLexiconEntry(target, entryRoot);
+      // Index mappings are Search-origin only; Learning saves lexicon_entry only.
+      if (!entryRoot || origin.kind !== "search") return;
+      handleOpenTargetLexiconEntry(target, entryRoot, origin.restoreLookupMode);
     },
     targetEntriesLabel: getTargetEntriesLabel(
       currentActiveBundle?.language_meta,
@@ -3507,7 +3676,8 @@ async function runSearch(query: string) {
   // New execution invalidates any prior capture context immediately.
   clearExecutedSearchSnapshot();
   activeSearchFeedbackForm?.notifySearchChanged();
-  const executedDirection = searchDirection;
+  // Bind LookupMode to this generation — do not re-read after await.
+  const executedLookupMode: LookupMode = { ...currentLookupMode };
   const t0 = performance.now();
   let db: IDBDatabase | undefined;
   try {
@@ -3520,13 +3690,24 @@ async function runSearch(query: string) {
       return;
     }
     const activeStorageScopeId = getBundleStorageScopeId(activeBundleMeta);
+    const capabilityMeta = {
+      lookup_languages: activeBundleMeta.lookup_languages,
+      search_key_families: activeBundleMeta.search_key_families,
+    };
+    // Revalidate against the exact active bundle before probing.
+    const effectiveMode = resolveSupportedLookupMode(capabilityMeta, executedLookupMode);
+    if (effectiveMode.from !== executedLookupMode.from || effectiveMode.to !== executedLookupMode.to) {
+      currentLookupMode = effectiveMode;
+      updateLangToggle();
+    }
 
-    const result = await searchQuery(
+    const result = await searchQueryForLookupMode(
       db,
       activeStorageScopeId,
-      executedDirection,
+      effectiveMode,
       query,
       activeBundleMeta.search_index_directional === true,
+      capabilityMeta,
     );
     if (seq !== searchSeq) return;
 
@@ -3540,7 +3721,9 @@ async function runSearch(query: string) {
         lastExecutedSearch = {
           generation: seq,
           query_raw: query,
-          search_direction: executedDirection,
+          search_direction: toLegacySearchDirection(effectiveMode),
+          input_lang: effectiveMode.from,
+          output_lang: effectiveMode.to,
           result_state: "no_result",
           result_count: 0,
           bundle_id: activeBundleMeta.bundle_id,
@@ -3552,7 +3735,7 @@ async function runSearch(query: string) {
       scheduleSettledQueryLog({
         seq,
         query,
-        direction: executedDirection,
+        lookupMode: effectiveMode,
         result,
         activeBundleMeta,
         storageScopeId: activeStorageScopeId,
@@ -3571,7 +3754,8 @@ async function runSearch(query: string) {
 
     lastSearchResults = records.map((record) => ({
       rawQuery: query,
-      searchDirection: executedDirection,
+      lookupMode: { ...effectiveMode },
+      searchDirection: toLegacySearchDirection(effectiveMode),
       matched_key_type: result.matched_key_type,
       matched_key: result.matched_key,
       sourceLabel: getLocalizedSourceLabel(activeBundleMeta.language_meta),
@@ -3584,7 +3768,9 @@ async function runSearch(query: string) {
       lastExecutedSearch = {
         generation: seq,
         query_raw: query,
-        search_direction: executedDirection,
+        search_direction: toLegacySearchDirection(effectiveMode),
+        input_lang: effectiveMode.from,
+        output_lang: effectiveMode.to,
         result_state: "results_not_useful",
         result_count: records.length,
         ...(matchedIrIds !== undefined ? { matched_ir_ids: matchedIrIds } : {}),
@@ -3597,7 +3783,7 @@ async function runSearch(query: string) {
     scheduleSettledQueryLog({
       seq,
       query,
-      direction: executedDirection,
+      lookupMode: effectiveMode,
       result,
       activeBundleMeta,
       storageScopeId: activeStorageScopeId,
@@ -3635,3 +3821,8 @@ async function initializeAppState() {
 }
 
 void initializeAppState();
+
+/** E2E-only: same-session active-bundle resync. Absent unless VITE_E2E_TEST_HOOKS=true. */
+if (import.meta.env.VITE_E2E_TEST_HOOKS === "true") {
+  installE2ERefreshDbStatusHook(() => refreshDbStatus());
+}

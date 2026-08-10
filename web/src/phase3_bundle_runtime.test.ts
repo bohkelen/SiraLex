@@ -14,6 +14,7 @@ import {
   setBundleInstallSession,
   setActiveBundleId,
   setActiveBundleMeta,
+  SIRALEX_DB_VERSION,
 } from "./idb/siralex_db";
 import { importRecordsJsonl } from "./import/import_records";
 import { importSearchIndexJsonl } from "./import/import_search_index";
@@ -27,6 +28,114 @@ function makeJsonlFile(name: string, rows: unknown[]): File {
 }
 
 describe("Phase 3 manifest parsing", () => {
+  it("accepts additive multilingual capability metadata", () => {
+    const result = parseAndValidateManifestJson(
+      JSON.stringify({
+        manifest_schema_version: "bundle_manifest_v1",
+        bundle_id: "bundle_full_20260710_337619ff",
+        bundle_type: "full",
+        bundle_format: "directory",
+        compression: "none",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        rule_versions: { normalization: "norm_v3", en_gloss_key: "en_gloss_key_v1" },
+        sources: { included: ["src_malipense"], excluded: [] },
+        reconciliation_action: "REPLACE_ALL",
+        update_mode: "REPLACE_ALL",
+        search_index_directional: true,
+        search_key_families: ["en", "src", "tgt"],
+        languages: {
+          source_lang: "fr",
+          target_lang: "mnk",
+          lexical_language: "mnk",
+          lookup_languages: ["fr", "en", "mnk"],
+        },
+        files: [
+          { path: "records.jsonl", byte_length: 1, sha256: "sha256:aa" },
+          { path: "search_index.jsonl", byte_length: 1, sha256: "sha256:bb" },
+        ],
+        content_sha256: "sha256:" + "a".repeat(64),
+      }),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.manifest?.search_key_families).toEqual(["en", "src", "tgt"]);
+    expect(result.manifest?.languages).toEqual({
+      source_lang: "fr",
+      target_lang: "mnk",
+      lexical_language: "mnk",
+      lookup_languages: ["fr", "en", "mnk"],
+    });
+    expect(result.manifest?.rule_versions.en_gloss_key).toBe("en_gloss_key_v1");
+  });
+
+  it("persists multilingual capability fields on install without IDB version bump", async () => {
+    const contentSha = "sha256:" + "c".repeat(64);
+    const parsed = parseAndValidateManifestJson(
+      JSON.stringify({
+        manifest_schema_version: "bundle_manifest_v1",
+        bundle_id: "bundle_full_ml1c2_capability",
+        bundle_type: "full",
+        bundle_format: "directory",
+        compression: "none",
+        record_schema_id: "normalized_v1",
+        record_schema_version: "1",
+        rule_versions: { normalization: "norm_v3", en_gloss_key: "en_gloss_key_v1" },
+        sources: { included: ["src_malipense"], excluded: [] },
+        reconciliation_action: "REPLACE_ALL",
+        update_mode: "REPLACE_ALL",
+        search_index_directional: true,
+        search_key_families: ["en", "src", "tgt"],
+        languages: {
+          source_lang: "fr",
+          target_lang: "mnk",
+          lexical_language: "mnk",
+          lookup_languages: ["fr", "en", "mnk"],
+        },
+        files: [
+          { path: "records.jsonl", byte_length: 10, sha256: "sha256:aaa" },
+          { path: "search_index.jsonl", byte_length: 20, sha256: "sha256:bbb" },
+        ],
+        content_sha256: contentSha,
+      }),
+    );
+    expect(parsed.ok).toBe(true);
+
+    const db = await openSiralexDb();
+    try {
+      await installBundleIntoDb(
+        db,
+        parsed.manifest!,
+        {
+          recordsSource: makeJsonlFile("records.jsonl", [
+            {
+              ir_id: "rec-house",
+              ir_kind: "lexicon_entry",
+              source_id: "src_malipense",
+              norm_version: "norm_v3",
+              preferred_form: "bón",
+              variant_forms: ["bón"],
+              search_keys: { casefold: ["bón"] },
+              display: { headword: "bón" },
+            },
+          ]),
+          searchIndexSource: makeJsonlFile("search_index.jsonl", [
+            { key_type: "en_casefold", key: "house", ir_ids: ["rec-house"] },
+          ]),
+        },
+        () => undefined,
+      );
+
+      const active = await getActiveBundleMeta(db);
+      expect(active?.lexical_language).toBe("mnk");
+      expect(active?.lookup_languages).toEqual(["fr", "en", "mnk"]);
+      expect(active?.search_key_families).toEqual(["en", "src", "tgt"]);
+      // Document-field addition only; schema store version stays 6.
+      expect(SIRALEX_DB_VERSION).toBe(6);
+    } finally {
+      db.close();
+    }
+  });
+
   it("accepts legacy manifests without language metadata", () => {
     const result = parseAndValidateManifestJson(
       JSON.stringify({

@@ -54,6 +54,8 @@ function input(
     storage_scope_id: `bundle_a::${HASH}`,
     query_raw: "kùn",
     search_direction: "source_to_target",
+    input_lang: "fr",
+    output_lang: "mnk",
     result_state: "no_result",
     result_count: 0,
     ...overrides,

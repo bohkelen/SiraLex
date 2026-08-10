@@ -105,7 +105,8 @@ describe("correction form model — targets", () => {
     expect(keys).toContain("sense:1");
     expect(keys).toContain("translation:0:fr");
     expect(keys).toContain("translation:0:en");
-    expect(keys).toContain("translation:0:ru");
+    // RL1: live gloss_ru remains on the record but is not a new-capture target.
+    expect(keys).not.toContain("translation:0:ru");
     expect(keys).toContain("example:0:0");
     expect(keys).toContain("usage_note:0");
     expect(keys).toContain("other_field");
@@ -113,7 +114,20 @@ describe("correction form model — targets", () => {
     expect(keys).not.toContain("usage_note:1");
   });
 
-  it("omits POS/N’Ko/Russian when absent", () => {
+  it("RL1 never offers Russian meaning as a new consumer target", () => {
+    const options = buildCorrectionTargetOptions(lexicon());
+    expect(options.some((o) => o.key === "translation:0:ru")).toBe(false);
+    expect(
+      options.every(
+        (o) => o.target.type !== "translation" || o.target.gloss_lang !== "ru",
+      ),
+    ).toBe(true);
+    // Underlying record still carries Russian source data.
+    const sense0 = (lexicon().display as { senses: { gloss_ru?: string }[] }).senses[0];
+    expect(sense0?.gloss_ru).toBe("голова");
+  });
+
+  it("omits POS/N’Ko/EN when absent", () => {
     const entry = lexicon({
       display: {
         headword_latin: "x",

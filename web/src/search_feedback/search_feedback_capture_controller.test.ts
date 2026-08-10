@@ -139,6 +139,8 @@ describe("search feedback capture controller", () => {
       storage_scope_id: `bundle_a::${HASH}`,
       query_raw: "  kùn  ",
       search_direction: "source_to_target",
+      input_lang: "fr",
+      output_lang: "mnk",
       result_state: "no_result",
       result_count: 0,
     });
@@ -203,6 +205,8 @@ describe("search feedback capture controller", () => {
           storage_scope_id: context.storage_scope_id,
           query_raw: context.query_raw,
           search_direction: context.search_direction,
+          input_lang: context.input_lang,
+          output_lang: context.output_lang,
           result_state: context.result_state,
           result_count: context.result_count,
         });

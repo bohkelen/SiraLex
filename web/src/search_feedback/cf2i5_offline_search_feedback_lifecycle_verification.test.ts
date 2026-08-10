@@ -78,6 +78,8 @@ function input(overrides: Partial<CreateSearchFeedbackDraftInput> = {}): CreateS
     storage_scope_id: SCOPE_H1,
     query_raw: "zzzz_cf2i5",
     search_direction: "source_to_target",
+    input_lang: "fr",
+    output_lang: "mnk",
     result_state: "no_result",
     result_count: 0,
     requested_meaning: "Need greeting\nline2 ߞߎ߲",

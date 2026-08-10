@@ -58,12 +58,32 @@ In the current SiraLex runtime, the schema field name is `catalog_schema_version
 
 Field meanings:
 
-- `bundle_id`: stable bundle identifier used by the app for install/update state.
+- `bundle_id`: stable **logical dictionary / product-line** identity used by the app for install/update state and for personal-data continuity (Learning, CF1, CF2). Compatible releases of the same product line reuse this id; a new `bundle_id` is a distinct dictionary lineage.
 - `name`: human-readable dictionary name shown in the UI.
-- `version`: publisher-facing release label.
-- `url_base`: directory prefix for the bundle assets.
-- `content_sha256`: authoritative bundle identity for update detection.
+- `version`: publisher-facing release label (not the integrity identity).
+- `url_base`: directory prefix for the bundle assets of this published content version.
+- `content_sha256`: immutable **content / artifact version** identity. Authoritative for update detection: same `bundle_id` + new `content_sha256` means a compatible in-line update; identical pair means already current.
 - `size_bytes`: bundle payload size in bytes for display and planning.
+
+Local install scope (not a catalog field; computed by the installer):
+
+- `storage_scope_id` = `` `${bundle_id}::${content_sha256}` ``
+
+Stable `bundle_id` does **not** mean mutable artifact bytes. Each published payload remains immutable and addressable by `content_sha256`. A replacement install creates a new `storage_scope_id` and retires the previous dictionary payload scope while retaining personal records according to existing Learning/CF lifecycle rules.
+
+### Physical artifact directories (publisher tooling)
+
+On disk, publishers SHOULD keep one directory per immutable content version. When building with an explicit logical `--bundle-id`, the bundle builder defaults to a **versioned artifact directory name**:
+
+```text
+{bundle_id}__{content_sha256_prefix8}
+```
+
+Example: logical `bundle_full_20260710_337619ff` with content hash starting `d076558b…` → directory `bundle_full_20260710_337619ff__d076558b`.
+
+The directory name is a physical packaging convenience. It is **not** Learning identity and does **not** replace `manifest.bundle_id`. Catalog `url_base` points at the chosen published directory for that content version.
+
+See `shared/specs/offline-bundle-versioning.md` (Bundle identifiers) for the normative reuse / mint rules.
 
 ## URL Rules
 

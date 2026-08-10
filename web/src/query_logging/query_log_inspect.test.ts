@@ -19,6 +19,10 @@ import {
   type QueryLogEventV2,
 } from "./query_log_types";
 
+function recentIso(offsetMs = 0): string {
+  return new Date(Date.now() - offsetMs).toISOString();
+}
+
 function makeV1Row(overrides: Partial<QueryLogEventV1> = {}): QueryLogEventV1 {
   return {
     schema_version: "query_log_event_v1",
@@ -36,7 +40,7 @@ function makeV1Row(overrides: Partial<QueryLogEventV1> = {}): QueryLogEventV1 {
     storage_scope_id: "bundle-a::sha256:1",
     norm_version: "norm_v2",
     app_version: "0.0.0",
-    timestamp_iso: "2026-06-18T00:00:00.000Z",
+    timestamp_iso: recentIso(),
     logging_enabled: true,
     ...overrides,
   };
@@ -46,7 +50,7 @@ function makeV2Row(overrides: Partial<QueryLogEventV2> = {}): QueryLogEventV2 {
   return {
     schema_version: QUERY_LOG_EVENT_V2,
     event_id: "evt-1",
-    timestamp_iso: "2026-06-18T00:00:00.000Z",
+    timestamp_iso: recentIso(),
     app_version: "0.0.0",
     bundle_id: "bundle-a",
     storage_scope_id: "bundle-a::sha256:1",

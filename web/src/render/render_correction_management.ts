@@ -134,7 +134,8 @@ function setCounter(node: HTMLElement, count: number, max: number): void {
   node.textContent = t("correctionFeedback.form.counter", { count, max });
 }
 
-function simplifyTargetLabel(target: CorrectionTarget): string {
+/** Management/list target label (includes historical RU identification). */
+export function formatCorrectionManagementTargetLabel(target: CorrectionTarget): string {
   switch (target.type) {
     case "entry":
       return t("correctionFeedback.form.target.entry");
@@ -173,6 +174,10 @@ function simplifyTargetLabel(target: CorrectionTarget): string {
         label: target.field_label,
       });
   }
+}
+
+function simplifyTargetLabel(target: CorrectionTarget): string {
+  return formatCorrectionManagementTargetLabel(target);
 }
 
 export type CorrectionManagementView = {

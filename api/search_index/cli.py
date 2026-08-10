@@ -35,6 +35,26 @@ def main():
         action="store_true",
         help="Verbose output",
     )
+    parser.add_argument(
+        "--no-english-keys",
+        action="store_true",
+        help="Disable additive en_* emission from sense gloss_en (default: emit when present)",
+    )
+    parser.add_argument(
+        "--english-provenance",
+        type=Path,
+        default=None,
+        help="Optional path for English key provenance JSONL (outside consumer bundle)",
+    )
+    parser.add_argument(
+        "--base-search-index",
+        type=Path,
+        default=None,
+        help=(
+            "Optional existing search_index.jsonl to preserve (src_*/tgt_*/legacy). "
+            "When set, only additive en_* rows are derived from --input records."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -45,12 +65,17 @@ def main():
 
     print(f"Input: {args.input}")
     print(f"Output: {args.output}")
+    if args.base_search_index:
+        print(f"Base search index: {args.base_search_index}")
     print()
 
     stats = process_normalized_file(
         args.input,
         args.output,
         verbose=args.verbose,
+        emit_english_keys=not args.no_english_keys,
+        english_provenance_path=args.english_provenance,
+        base_search_index_path=args.base_search_index,
     )
 
     print()
@@ -64,6 +89,17 @@ def main():
     print("Unique keys per type:")
     for key_type, count in sorted(stats.get("unique_keys_by_type", {}).items()):
         print(f"  {key_type:30s} {count}")
+    en_summary = stats.get("english_provenance")
+    if en_summary:
+        print()
+        print("English provenance:")
+        print(f"  extraction_rule:            {en_summary.get('extraction_rule')}")
+        print(f"  source_senses:              {en_summary.get('source_senses')}")
+        print(f"  extracted_candidates:       {en_summary.get('extracted_candidates')}")
+        print(f"  unique_english_keys:        {en_summary.get('unique_english_keys')}")
+        print(f"  en_index_rows:              {en_summary.get('en_index_rows')}")
+        if en_summary.get("provenance_path"):
+            print(f"  provenance_path:            {en_summary.get('provenance_path')}")
     print("=" * 50)
 
 

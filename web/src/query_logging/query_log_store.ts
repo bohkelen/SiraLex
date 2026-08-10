@@ -4,10 +4,20 @@ import {
   QUERY_LOG_INDEX_BY_TIMESTAMP_ISO,
   STORE_QUERY_LOGS,
 } from "../idb/siralex_db";
-import { deriveMatchedDeepLadder, deriveResultStatus, isQueryLogEventV2 } from "./query_log_derive";
+import {
+  isValidLookupMode,
+  toLegacySearchDirection,
+  type LookupMode,
+} from "../search/lookup_mode";
+import {
+  deriveMatchedDeepLadder,
+  deriveResultStatus,
+  isModernQueryLogEvent,
+} from "./query_log_derive";
 import type {
   AppendQueryLogInput,
   AppendQueryLogV2Input,
+  AppendQueryLogV3Input,
   ExportQueryLogsOptions,
   ListQueryLogsOptions,
   ListRecentQueryLogsOptions,
@@ -15,7 +25,9 @@ import type {
   QueryLogEvent,
   QueryLogEventV1,
   QueryLogEventV2,
+  QueryLogEventV3,
   QueryLogLadderLevel,
+  QueryLogLookupLanguage,
   QueryLogNormalizedKeys,
   QueryLogResultStatus,
   QueryLogScopeFilter,
@@ -23,6 +35,7 @@ import type {
 } from "./query_log_types";
 import {
   QUERY_LOG_EVENT_V2,
+  QUERY_LOG_EVENT_V3,
   QUERY_LOG_MAX_AGE_MS,
   QUERY_LOG_MAX_ROWS,
   QUERY_LOG_TOP_IR_IDS_LIMIT,
@@ -234,8 +247,30 @@ function validateAppendV2Input(input: AppendQueryLogV2Input): void {
   }
 }
 
+function isValidLookupLanguage(value: unknown): value is QueryLogLookupLanguage {
+  return value === "fr" || value === "en" || value === "mnk";
+}
+
+function validateAppendV3Input(input: AppendQueryLogV3Input): void {
+  validateAppendV2Input(input);
+  const label = "appendQueryLogV3";
+  if (!isValidLookupLanguage(input.input_lang)) {
+    throw new Error(`${label}: input_lang must be fr, en, or mnk`);
+  }
+  if (!isValidLookupLanguage(input.output_lang)) {
+    throw new Error(`${label}: output_lang must be fr, en, or mnk`);
+  }
+  const mode: LookupMode = { from: input.input_lang, to: input.output_lang };
+  if (!isValidLookupMode(mode)) {
+    throw new Error(`${label}: input_lang/output_lang must form a valid LookupMode pair`);
+  }
+  if (toLegacySearchDirection(mode) !== input.direction) {
+    throw new Error(`${label}: direction must mirror the LookupMode pair`);
+  }
+}
+
 function cloneEvent(row: QueryLogEvent): QueryLogEvent {
-  if (isQueryLogEventV2(row)) {
+  if (isModernQueryLogEvent(row)) {
     return {
       ...row,
       query_normalized_keys: cloneNormalizedKeys(row.query_normalized_keys),
@@ -384,6 +419,25 @@ export async function appendQueryLogV2(db: IDBDatabase, input: AppendQueryLogV2I
   const store = tx.objectStore(STORE_QUERY_LOGS);
   const row: QueryLogEventV2 = {
     schema_version: QUERY_LOG_EVENT_V2,
+    ...input,
+    query_normalized_keys: cloneNormalizedKeys(input.query_normalized_keys),
+    top_ir_ids: [...input.top_ir_ids],
+  };
+
+  const key = await reqToPromise(store.add(row));
+  await txDone(tx);
+
+  await pruneQueryLogsAfterAppend(db);
+  return Number(key);
+}
+
+export async function appendQueryLogV3(db: IDBDatabase, input: AppendQueryLogV3Input): Promise<number> {
+  validateAppendV3Input(input);
+
+  const tx = db.transaction(STORE_QUERY_LOGS, "readwrite");
+  const store = tx.objectStore(STORE_QUERY_LOGS);
+  const row: QueryLogEventV3 = {
+    schema_version: QUERY_LOG_EVENT_V3,
     ...input,
     query_normalized_keys: cloneNormalizedKeys(input.query_normalized_keys),
     top_ir_ids: [...input.top_ir_ids],

@@ -3,18 +3,27 @@ import { describe, expect, it } from "vitest";
 import {
   deriveMatchedDeepLadder,
   deriveResultStatus,
+  formatLookupModeDisplay,
   getQueryLogMatchedKey,
   getQueryLogMatchedKeyType,
   getQueryLogResultCount,
   getQueryLogStatusLabel,
   isQueryLogEventV2,
+  isQueryLogEventV3,
+  resolveLookupModeFromQueryLog,
 } from "./query_log_derive";
 import {
   QUERY_LOG_CONSENT_VERSION,
   QUERY_LOG_EVENT_V2,
+  QUERY_LOG_EVENT_V3,
   type QueryLogEventV1,
   type QueryLogEventV2,
+  type QueryLogEventV3,
 } from "./query_log_types";
+
+function recentIso(offsetMs = 0): string {
+  return new Date(Date.now() - offsetMs).toISOString();
+}
 
 function makeV1Row(overrides: Partial<QueryLogEventV1> = {}): QueryLogEventV1 {
   return {
@@ -33,7 +42,7 @@ function makeV1Row(overrides: Partial<QueryLogEventV1> = {}): QueryLogEventV1 {
     storage_scope_id: "bundle-a::sha256:1",
     norm_version: "norm_v3",
     app_version: "0.0.0",
-    timestamp_iso: "2026-06-18T00:00:00.000Z",
+    timestamp_iso: recentIso(),
     logging_enabled: true,
     ...overrides,
   };
@@ -43,7 +52,7 @@ function makeV2Row(overrides: Partial<QueryLogEventV2> = {}): QueryLogEventV2 {
   return {
     schema_version: QUERY_LOG_EVENT_V2,
     event_id: "evt-1",
-    timestamp_iso: "2026-06-18T00:00:00.000Z",
+    timestamp_iso: recentIso(),
     app_version: "0.0.0",
     bundle_id: "bundle-a",
     storage_scope_id: "bundle-a::sha256:1",
@@ -156,5 +165,62 @@ describe("v1 and v2 inspect fallbacks", () => {
     expect(getQueryLogStatusLabel(row)).toBe("hit_multi");
     expect(getQueryLogMatchedKeyType(row)).toBe("punct_stripped");
     expect(getQueryLogMatchedKey(row)).toBe("a-b");
+  });
+});
+
+function makeV3Row(overrides: Partial<QueryLogEventV3> = {}): QueryLogEventV3 {
+  return {
+    ...makeV2Row(),
+    schema_version: QUERY_LOG_EVENT_V3,
+    input_lang: "fr",
+    output_lang: "mnk",
+    ...overrides,
+  };
+}
+
+describe("query-log LookupMode provenance", () => {
+  it("resolves historical v1/v2 direction to FR↔MNK only", () => {
+    expect(resolveLookupModeFromQueryLog(makeV1Row({ direction: "source_to_target" }))).toEqual({
+      from: "fr",
+      to: "mnk",
+    });
+    expect(resolveLookupModeFromQueryLog(makeV2Row({ direction: "target_to_source" }))).toEqual({
+      from: "mnk",
+      to: "fr",
+    });
+  });
+
+  it("resolves explicit V3 EN pairs without ambiguity", () => {
+    expect(
+      resolveLookupModeFromQueryLog(
+        makeV3Row({
+          input_lang: "en",
+          output_lang: "mnk",
+          direction: "source_to_target",
+        }),
+      ),
+    ).toEqual({ from: "en", to: "mnk" });
+    expect(
+      resolveLookupModeFromQueryLog(
+        makeV3Row({
+          input_lang: "mnk",
+          output_lang: "en",
+          direction: "target_to_source",
+        }),
+      ),
+    ).toEqual({ from: "mnk", to: "en" });
+  });
+
+  it("formats lookup pair labels for diagnostics", () => {
+    expect(formatLookupModeDisplay({ from: "fr", to: "mnk" })).toBe("FR → MNK");
+    expect(formatLookupModeDisplay({ from: "en", to: "mnk" })).toBe("EN → MNK");
+    expect(formatLookupModeDisplay({ from: "mnk", to: "fr" })).toBe("MNK → FR");
+    expect(formatLookupModeDisplay({ from: "mnk", to: "en" })).toBe("MNK → EN");
+  });
+
+  it("detects V3 and rejects V2 as V3", () => {
+    expect(isQueryLogEventV3(makeV3Row())).toBe(true);
+    expect(isQueryLogEventV3(makeV2Row())).toBe(false);
+    expect(isQueryLogEventV2(makeV3Row())).toBe(false);
   });
 });

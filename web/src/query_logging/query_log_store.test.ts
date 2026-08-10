@@ -20,6 +20,7 @@ import {
 import {
   appendQueryLog,
   appendQueryLogV2,
+  appendQueryLogV3,
   clearAllQueryLogs,
   clearQueryLogsForStorageScope,
   countQueryLogs,
@@ -32,10 +33,15 @@ import type { AppendQueryLogInput, AppendQueryLogV2Input } from "./query_log_typ
 import {
   QUERY_LOG_CONSENT_VERSION,
   QUERY_LOG_EVENT_V2,
+  QUERY_LOG_EVENT_V3,
   QUERY_LOG_MAX_AGE_MS,
   QUERY_LOG_MAX_ROWS,
   QUERY_LOG_TOP_IR_IDS_LIMIT,
 } from "./query_log_types";
+
+function recentIso(offsetMs = 0): string {
+  return new Date(Date.now() - offsetMs).toISOString();
+}
 
 function makeAppendInput(overrides: Partial<AppendQueryLogInput> = {}): AppendQueryLogInput {
   return {
@@ -54,7 +60,7 @@ function makeAppendInput(overrides: Partial<AppendQueryLogInput> = {}): AppendQu
     storage_scope_id: "bundle_full_test_aaaaaaaa::sha256:111",
     norm_version: "norm_v2",
     app_version: "dev-test",
-    timestamp_iso: "2026-05-06T00:00:00.000Z",
+    timestamp_iso: recentIso(3000),
     logging_enabled: true,
     ...overrides,
   };
@@ -66,7 +72,7 @@ function makeAppendV2Input(overrides: Partial<AppendQueryLogV2Input> = {}): Appe
 
   return {
     event_id: "evt-test-1",
-    timestamp_iso: "2026-06-18T00:00:00.000Z",
+    timestamp_iso: recentIso(),
     app_version: "dev-test",
     bundle_id: "bundle_full_test_aaaaaaaa",
     storage_scope_id: "bundle_full_test_aaaaaaaa::sha256:111",
@@ -215,9 +221,9 @@ describe("query log store", () => {
   it("preserves append order across multiple writes", async () => {
     const db = await openSiralexDb();
     try {
-      await appendQueryLog(db, makeAppendInput({ query_raw: "first", timestamp_iso: "2026-05-06T00:00:00.000Z" }));
-      await appendQueryLog(db, makeAppendInput({ query_raw: "second", timestamp_iso: "2026-05-06T00:00:01.000Z" }));
-      await appendQueryLog(db, makeAppendInput({ query_raw: "third", timestamp_iso: "2026-05-06T00:00:02.000Z" }));
+      await appendQueryLog(db, makeAppendInput({ query_raw: "first", timestamp_iso: recentIso(3000) }));
+      await appendQueryLog(db, makeAppendInput({ query_raw: "second", timestamp_iso: recentIso(2000) }));
+      await appendQueryLog(db, makeAppendInput({ query_raw: "third", timestamp_iso: recentIso(1000) }));
 
       const oldestFirst = await listQueryLogs(db);
       expect(oldestFirst.map((row) => row.query_raw)).toEqual(["first", "second", "third"]);
@@ -281,7 +287,7 @@ describe("query log store", () => {
     const db = await openSiralexDb();
     try {
       await appendQueryLog(db, makeAppendInput({ query_raw: "one" }));
-      await appendQueryLog(db, makeAppendInput({ query_raw: "two", timestamp_iso: "2026-05-06T00:00:01.000Z" }));
+      await appendQueryLog(db, makeAppendInput({ query_raw: "two", timestamp_iso: recentIso(2000) }));
 
       const blob = await exportQueryLogsJsonl(db);
       const text = await blob.text();
@@ -299,8 +305,8 @@ describe("query log store", () => {
   it("exports rows in log_id ascending order", async () => {
     const db = await openSiralexDb();
     try {
-      await appendQueryLog(db, makeAppendInput({ query_raw: "a", timestamp_iso: "2026-05-06T00:00:02.000Z" }));
-      await appendQueryLog(db, makeAppendInput({ query_raw: "b", timestamp_iso: "2026-05-06T00:00:01.000Z" }));
+      await appendQueryLog(db, makeAppendInput({ query_raw: "a", timestamp_iso: recentIso(1000) }));
+      await appendQueryLog(db, makeAppendInput({ query_raw: "b", timestamp_iso: recentIso(2000) }));
 
       const blob = await exportQueryLogsJsonl(db);
       const lines = (await blob.text()).trimEnd().split("\n").map((line) => JSON.parse(line));
@@ -670,7 +676,7 @@ describe("query log store v2", () => {
   it("listRecentQueryLogs returns mixed v1 and v2 rows as QueryLogEvent[]", async () => {
     const db = await openSiralexDb();
     try {
-      await appendQueryLog(db, makeAppendInput({ query_raw: "legacy", timestamp_iso: "2026-06-01T00:00:00.000Z" }));
+      await appendQueryLog(db, makeAppendInput({ query_raw: "legacy", timestamp_iso: recentIso(4000) }));
       await appendQueryLogV2(
         db,
         makeAppendV2Input({ query_raw: "modern", event_id: "evt-modern", timestamp_iso: "2026-06-18T00:00:00.000Z" }),
@@ -749,12 +755,14 @@ describe("query log store v2", () => {
         oldest_timestamp_iso: null,
       });
 
+      const olderIso = recentIso(4000);
+      const newerIso = recentIso(1000);
       await appendQueryLogV2(
         db,
         makeAppendV2Input({
           query_raw: "older",
           event_id: "evt-older",
-          timestamp_iso: "2026-06-01T00:00:00.000Z",
+          timestamp_iso: olderIso,
         }),
       );
       await appendQueryLogV2(
@@ -762,14 +770,53 @@ describe("query log store v2", () => {
         makeAppendV2Input({
           query_raw: "newer",
           event_id: "evt-newer",
-          timestamp_iso: "2026-06-18T00:00:00.000Z",
+          timestamp_iso: newerIso,
         }),
       );
 
       expect(await getQueryLogStats(db)).toEqual({
         count: 2,
-        oldest_timestamp_iso: "2026-06-01T00:00:00.000Z",
+        oldest_timestamp_iso: olderIso,
       });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("appends a v3 row with required input_lang/output_lang", async () => {
+    const db = await openSiralexDb();
+    try {
+      const logId = await appendQueryLogV3(db, {
+        ...makeAppendV2Input({ event_id: "evt-v3", query_raw: "house" }),
+        input_lang: "en",
+        output_lang: "mnk",
+        direction: "source_to_target",
+      });
+      expect(typeof logId).toBe("number");
+      const rows = await listQueryLogs(db);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.schema_version).toBe(QUERY_LOG_EVENT_V3);
+      if (rows[0]?.schema_version === QUERY_LOG_EVENT_V3) {
+        expect(rows[0].input_lang).toBe("en");
+        expect(rows[0].output_lang).toBe("mnk");
+        expect(rows[0].direction).toBe("source_to_target");
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rejects v3 rows whose direction does not mirror the language pair", async () => {
+    const db = await openSiralexDb();
+    try {
+      await expect(
+        appendQueryLogV3(db, {
+          ...makeAppendV2Input({ event_id: "evt-bad" }),
+          input_lang: "en",
+          output_lang: "mnk",
+          direction: "target_to_source",
+        }),
+      ).rejects.toThrow(/direction must mirror/);
     } finally {
       db.close();
     }

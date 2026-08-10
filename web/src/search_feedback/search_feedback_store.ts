@@ -1,23 +1,28 @@
 /**
  * CF2I2 — Local search-failure feedback IndexedDB store.
  *
- * Persists validated search_failure_feedback_draft_v1 rows only.
+ * Persists validated search-failure feedback drafts (V1 historical rows and
+ * V2 creates). New creates always write schema V2 with required language pair.
  * Does not mutate dictionary, Learning, query-log, CF1, or bundle registry stores.
  * Does not perform export, UI, Phase 1.5 conversion, or corpus mutation.
  *
  * Invariant: the saved search event is immutable historical evidence.
  * Only the user's explanation of what they wanted may change.
+ * V1 rows are never upgraded in place.
  */
 
 import { STORE_SEARCH_FAILURE_FEEDBACK } from "../idb/siralex_db";
 import {
-  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION,
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
   SEARCH_FEEDBACK_ID_MAX_CHARS,
   cloneSearchFeedbackDraft,
   countUnicodeCharacters,
+  isSearchFeedbackDraftV2,
   isValidSearchFeedbackIsoTimestamp,
   type SearchFeedbackDirection,
-  type SearchFeedbackDraftV1,
+  type SearchFeedbackDraft,
+  type SearchFeedbackDraftV2,
+  type SearchFeedbackLookupLanguage,
   type SearchFeedbackResultState,
 } from "./search_feedback_types";
 import {
@@ -31,6 +36,9 @@ export type CreateSearchFeedbackDraftInput = {
   storage_scope_id: string;
   query_raw: string;
   search_direction: SearchFeedbackDirection;
+  /** Required LookupMode provenance for all new creates (V2). */
+  input_lang: SearchFeedbackLookupLanguage;
+  output_lang: SearchFeedbackLookupLanguage;
   result_state: SearchFeedbackResultState;
   result_count: number;
   matched_ir_ids?: string[];
@@ -102,7 +110,7 @@ export class SearchFeedbackStoreError extends Error {
 export type CreateSearchFeedbackDraftResult =
   | {
       ok: true;
-      draft: SearchFeedbackDraftV1;
+      draft: SearchFeedbackDraft;
     }
   | {
       ok: false;
@@ -117,7 +125,7 @@ export type CreateSearchFeedbackDraftResult =
 export type UpdateSearchFeedbackDraftResult =
   | {
       ok: true;
-      draft: SearchFeedbackDraftV1;
+      draft: SearchFeedbackDraft;
     }
   | {
       ok: false;
@@ -221,8 +229,8 @@ function compareCodePoints(a: string, b: string): number {
  * Distinct from CF2I1 export ordering (bundle_id → created_at → feedback_id).
  */
 export function compareSearchFeedbackDraftsForManagement(
-  a: SearchFeedbackDraftV1,
-  b: SearchFeedbackDraftV1,
+  a: SearchFeedbackDraft,
+  b: SearchFeedbackDraft,
 ): number {
   const byUpdated = compareCodePoints(b.updated_at, a.updated_at);
   if (byUpdated !== 0) return byUpdated;
@@ -235,15 +243,17 @@ function buildDraftFromCreateInput(
   input: CreateSearchFeedbackDraftInput,
   feedbackId: string,
   timestamp: string,
-): SearchFeedbackDraftV1 {
+): SearchFeedbackDraftV2 {
   return {
-    schema_version: SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION,
+    schema_version: SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
     feedback_id: feedbackId,
     bundle_id: input.bundle_id,
     content_sha256: input.content_sha256,
     storage_scope_id: input.storage_scope_id,
     query_raw: input.query_raw,
     search_direction: input.search_direction,
+    input_lang: input.input_lang,
+    output_lang: input.output_lang,
     result_state: input.result_state,
     result_count: input.result_count,
     ...(input.matched_ir_ids !== undefined
@@ -264,7 +274,7 @@ function buildDraftFromCreateInput(
 function parseStoredFeedbackOrThrow(
   value: unknown,
   label: string,
-): SearchFeedbackDraftV1 {
+): SearchFeedbackDraft {
   const parsed = validateSearchFeedbackDraft(value);
   if (!parsed.ok) {
     throw new SearchFeedbackStoreError("invalid_stored_feedback", label);
@@ -272,11 +282,56 @@ function parseStoredFeedbackOrThrow(
   return parsed.value;
 }
 
+function buildUpdatedDraft(
+  current: SearchFeedbackDraft,
+  input: UpdateSearchFeedbackDraftInput,
+  timestamp: string,
+): SearchFeedbackDraft {
+  const base = {
+    schema_version: current.schema_version,
+    feedback_id: current.feedback_id,
+    bundle_id: current.bundle_id,
+    content_sha256: current.content_sha256,
+    storage_scope_id: current.storage_scope_id,
+    query_raw: current.query_raw,
+    search_direction: current.search_direction,
+    result_state: current.result_state,
+    result_count: current.result_count,
+    ...(current.matched_ir_ids !== undefined
+      ? { matched_ir_ids: [...current.matched_ir_ids] }
+      : {}),
+    ...(input.requested_meaning !== undefined
+      ? { requested_meaning: input.requested_meaning }
+      : {}),
+    ...(input.user_description !== undefined
+      ? { user_description: input.user_description }
+      : {}),
+    created_at: current.created_at,
+    updated_at: timestamp,
+    status: "draft" as const,
+  };
+
+  if (isSearchFeedbackDraftV2(current)) {
+    return {
+      ...base,
+      schema_version: current.schema_version,
+      input_lang: current.input_lang,
+      output_lang: current.output_lang,
+    };
+  }
+
+  return {
+    ...base,
+    schema_version: current.schema_version,
+  };
+}
+
 /**
  * Create a search-feedback draft.
  *
  * Store-level guarantee: same feedback_id cannot overwrite via add().
  * Duplicate UI activation is a later capture-surface responsibility.
+ * Always persists schema V2 with required language pair.
  */
 export async function createSearchFeedbackDraft(
   db: IDBDatabase,
@@ -304,7 +359,7 @@ export async function createSearchFeedbackDraft(
     return { ok: false, code: "invalid_input" };
   }
 
-  let draft: SearchFeedbackDraftV1;
+  let draft: SearchFeedbackDraftV2;
   try {
     draft = buildDraftFromCreateInput(input, feedbackId, timestamp);
     validateSearchFeedbackDraftForWrite(draft, "createSearchFeedbackDraft");
@@ -339,7 +394,7 @@ export async function createSearchFeedbackDraft(
 export async function getSearchFeedbackDraft(
   db: IDBDatabase,
   feedbackId: string,
-): Promise<SearchFeedbackDraftV1 | undefined> {
+): Promise<SearchFeedbackDraft | undefined> {
   if (!isValidFeedbackIdInput(feedbackId)) {
     throw new SearchFeedbackStoreError("invalid_feedback_id");
   }
@@ -362,7 +417,7 @@ export async function getSearchFeedbackDraft(
 
 export async function listSearchFeedbackDrafts(
   db: IDBDatabase,
-): Promise<SearchFeedbackDraftV1[]> {
+): Promise<SearchFeedbackDraft[]> {
   try {
     const tx = db.transaction(STORE_SEARCH_FAILURE_FEEDBACK, "readonly");
     const rows = await reqToPromise(
@@ -370,7 +425,7 @@ export async function listSearchFeedbackDrafts(
     );
     await txDone(tx);
 
-    const drafts: SearchFeedbackDraftV1[] = [];
+    const drafts: SearchFeedbackDraft[] = [];
     for (let i = 0; i < rows.length; i += 1) {
       drafts.push(
         cloneSearchFeedbackDraft(
@@ -403,6 +458,7 @@ export async function countSearchFeedbackDrafts(db: IDBDatabase): Promise<number
  * Update mutable user-evidence fields only.
  * Immutable search-event provenance / identity / created_at / status come from
  * the stored row and cannot be changed through this API.
+ * Preserves schema_version and (for V2) language pair; never upgrades V1.
  *
  * Timestamp policy: injected `now()` must be strictly greater than the previous
  * `updated_at`. Same-timestamp clocks are rejected (`invalid_timestamp`).
@@ -440,7 +496,7 @@ export async function updateSearchFeedbackDraft(
       return await abortAnd({ ok: false, code: "not_found" });
     }
 
-    let current: SearchFeedbackDraftV1;
+    let current: SearchFeedbackDraft;
     try {
       current = parseStoredFeedbackOrThrow(
         existingRaw,
@@ -462,29 +518,7 @@ export async function updateSearchFeedbackDraft(
       return await abortAnd({ ok: false, code: "invalid_timestamp" });
     }
 
-    const updated: SearchFeedbackDraftV1 = {
-      schema_version: current.schema_version,
-      feedback_id: current.feedback_id,
-      bundle_id: current.bundle_id,
-      content_sha256: current.content_sha256,
-      storage_scope_id: current.storage_scope_id,
-      query_raw: current.query_raw,
-      search_direction: current.search_direction,
-      result_state: current.result_state,
-      result_count: current.result_count,
-      ...(current.matched_ir_ids !== undefined
-        ? { matched_ir_ids: [...current.matched_ir_ids] }
-        : {}),
-      ...(input.requested_meaning !== undefined
-        ? { requested_meaning: input.requested_meaning }
-        : {}),
-      ...(input.user_description !== undefined
-        ? { user_description: input.user_description }
-        : {}),
-      created_at: current.created_at,
-      updated_at: timestamp,
-      status: "draft",
-    };
+    const updated = buildUpdatedDraft(current, input, timestamp);
 
     try {
       validateSearchFeedbackDraftForWrite(updated, "updateSearchFeedbackDraft");
@@ -542,7 +576,7 @@ export async function deleteSearchFeedbackDraft(
       return await abortAnd({ ok: false, code: "not_found" });
     }
 
-    let current: SearchFeedbackDraftV1;
+    let current: SearchFeedbackDraft;
     try {
       current = parseStoredFeedbackOrThrow(existingRaw, "deleteSearchFeedbackDraft");
     } catch {

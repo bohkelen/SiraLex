@@ -1,0 +1,65 @@
+{
+  "manifest_schema_version": "bundle_manifest_v1",
+  "bundle_id": "bundle_full_20260710_337619ff",
+  "bundle_type": "full",
+  "bundle_format": "directory",
+  "compression": "none",
+  "record_schema_id": "normalized_v1",
+  "record_schema_version": "1",
+  "rule_versions": {
+    "normalization": "norm_v3",
+    "en_gloss_key": "en_gloss_key_v1"
+  },
+  "search_index_directional": true,
+  "sources": {
+    "included": [
+      "src_malipense"
+    ],
+    "excluded": []
+  },
+  "reconciliation_action": "REPLACE_ALL",
+  "update_mode": "REPLACE_ALL",
+  "build": {
+    "ir_parser_versions": [
+      "malipense_index_v1",
+      "malipense_lexicon_v3"
+    ],
+    "git_commit": "53807716f154167a1df0c75f3f6648a51983f625",
+    "record_counts": {
+      "lexicon_entries": 8826,
+      "index_mappings": 10509
+    }
+  },
+  "files": [
+    {
+      "path": "records.jsonl",
+      "byte_length": 15959637,
+      "sha256": "sha256:d99242ed0c049759ec265f3583683c99a3146854b4481b6d3de86cbd33f50a90"
+    },
+    {
+      "path": "search_index.jsonl",
+      "byte_length": 13834042,
+      "sha256": "sha256:1b436fd77dc5404631ac6e91e5d02a38f419a58984f0ccf27bfba4ca7cb0d892"
+    }
+  ],
+  "content_sha256": "sha256:d076558b2f668a06a5a30a143026433e9e0de3523e0397183cfd897b2641d90a",
+  "search_key_families": [
+    "en",
+    "src",
+    "tgt"
+  ],
+  "languages": {
+    "source_lang": "fr",
+    "target_lang": "mnk",
+    "lexical_language": "mnk",
+    "lookup_languages": [
+      "fr",
+      "en",
+      "mnk"
+    ]
+  },
+  "language_labels": {
+    "source": "French",
+    "target": "Maninka"
+  }
+}

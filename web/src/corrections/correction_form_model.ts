@@ -47,7 +47,8 @@ export type CorrectionTargetOptionLabel =
   | {
       kind: "translation";
       senseNumber: number;
-      gloss_lang: "fr" | "en" | "ru";
+      /** New-capture options are FR/EN only; `"ru"` is not generated (RL1). */
+      gloss_lang: "fr" | "en";
       gloss: string;
     }
   | {
@@ -111,6 +112,29 @@ export type CorrectionFormViewModel = {
 };
 
 const TARGET_LABEL_PREVIEW_MAX = 80;
+
+/**
+ * RL1 — gloss languages offered for ordinary consumer correction capture.
+ * Historical drafts may still store `"ru"`; schema validation retains `"ru"`.
+ * New Suggest Correction target generation must not invent RU options.
+ */
+export const CONSUMER_CREATABLE_GLOSS_LANGS = ["fr", "en"] as const;
+export type ConsumerCreatableGlossLang = (typeof CONSUMER_CREATABLE_GLOSS_LANGS)[number];
+
+export function isConsumerCreatableGlossLang(
+  value: unknown,
+): value is ConsumerCreatableGlossLang {
+  return value === "fr" || value === "en";
+}
+
+/**
+ * True when a correction target may be offered by ordinary consumer capture.
+ * Historical RU translation targets remain schema-valid but are not creatable here.
+ */
+export function isConsumerCreatableCorrectionTarget(target: CorrectionTarget): boolean {
+  if (target.type !== "translation") return true;
+  return isConsumerCreatableGlossLang(target.gloss_lang);
+}
 
 function cloneLexiconEntry(entry: EnrichedRecord): EnrichedRecord {
   return structuredClone(entry);
@@ -272,19 +296,8 @@ export function buildCorrectionTargetOptions(entry: EnrichedRecord): CorrectionT
         previewText: boundPreview(sense.gloss_en),
       });
     }
-    if (typeof sense.gloss_ru === "string" && sense.gloss_ru.trim() !== "") {
-      options.push({
-        key: `translation:${senseIndex}:ru`,
-        target: { type: "translation", sense_index: senseIndex, gloss_lang: "ru" },
-        label: {
-          kind: "translation",
-          senseNumber,
-          gloss_lang: "ru",
-          gloss: boundPreview(sense.gloss_ru),
-        },
-        previewText: boundPreview(sense.gloss_ru),
-      });
-    }
+    // RL1: Russian remains source data on the live entry but is never offered
+    // as a new consumer correction target (historical RU drafts stay valid).
 
     const examples = sense.examples ?? [];
     examples.forEach((example, exampleIndex) => {
@@ -386,7 +399,8 @@ export function buildCorrectionDisplaySnapshot(
       break;
     case "sense": {
       const sense = senseAt(entry, target.sense_index);
-      const gloss = sense?.gloss_fr ?? sense?.gloss_en ?? sense?.gloss_ru;
+      // Consumer snapshot context is FR/EN only (never Russian fallback).
+      const gloss = sense?.gloss_fr ?? sense?.gloss_en;
       if (typeof gloss === "string" && gloss.trim() !== "") {
         snapshot.selected_gloss = boundCorrectionSnapshotText(
           gloss,
@@ -397,6 +411,7 @@ export function buildCorrectionDisplaySnapshot(
     }
     case "translation": {
       const sense = senseAt(entry, target.sense_index);
+      // Resolve selected gloss by target language, including historical `"ru"`.
       const gloss =
         target.gloss_lang === "fr"
           ? sense?.gloss_fr
@@ -425,7 +440,8 @@ export function buildCorrectionDisplaySnapshot(
           exampleText(example),
           CORRECTION_SNAPSHOT_FIELD_MAX_CHARS,
         );
-        const gloss = example.trans_fr ?? example.trans_en ?? example.trans_ru;
+        // Example targets remain generic text; FR/EN gloss context only (no RU).
+        const gloss = example.trans_fr ?? example.trans_en;
         if (typeof gloss === "string" && gloss.trim() !== "") {
           snapshot.selected_gloss = boundCorrectionSnapshotText(
             gloss,

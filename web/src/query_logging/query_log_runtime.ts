@@ -1,9 +1,13 @@
 import appPackage from "../../package.json";
 
-import type { SearchDirection } from "../bundle_labels";
 import type { ActiveBundleMeta } from "../idb/siralex_db";
 import { openSiralexDb } from "../idb/siralex_db";
 import type { SearchKeys } from "../norm/norm_v1";
+import {
+  lookupModeToLanguagePair,
+  toLegacySearchDirection,
+  type LookupMode,
+} from "../search/lookup_mode";
 import type { SearchResult } from "../search/search_query";
 import { resolveCatalogVersionForBundle } from "./query_log_catalog";
 import {
@@ -11,8 +15,8 @@ import {
   hasValidQueryLoggingConsent,
 } from "./query_log_consent";
 import { deriveMatchedDeepLadder, deriveResultStatus } from "./query_log_derive";
-import { appendQueryLogV2 } from "./query_log_store";
-import type { AppendQueryLogV2Input, QueryLogNormalizedKeys } from "./query_log_types";
+import { appendQueryLogV3 } from "./query_log_store";
+import type { AppendQueryLogV3Input, QueryLogNormalizedKeys } from "./query_log_types";
 import {
   QUERY_LOG_CONSENT_VERSION,
   QUERY_LOG_TOP_IR_IDS_LIMIT,
@@ -23,7 +27,8 @@ const APP_VERSION = typeof appPackage.version === "string" ? appPackage.version 
 
 type AppendSearchQueryLogParams = {
   queryRaw: string;
-  direction: SearchDirection;
+  /** Exact LookupMode used for the settled search generation. */
+  lookupMode: LookupMode;
   result: SearchResult;
   activeBundleMeta: Pick<ActiveBundleMeta, "bundle_id" | "version" | "normalization_ruleset">;
   storageScopeId: string;
@@ -122,8 +127,10 @@ export async function appendSearchQueryLogIfEnabled(params: AppendSearchQueryLog
     const catalogVersion = await resolveCatalogVersionForBundle(db, params.activeBundleMeta.bundle_id);
     const matchedKeyType = params.result.matched_key_type ?? "none";
     const resultCount = params.result.ir_ids.length;
+    const pair = lookupModeToLanguagePair(params.lookupMode);
+    const direction = toLegacySearchDirection(params.lookupMode);
 
-    const input: AppendQueryLogV2Input = {
+    const input: AppendQueryLogV3Input = {
       event_id: createEventId(),
       timestamp_iso: params.timestampIso ?? new Date().toISOString(),
       app_version: APP_VERSION,
@@ -134,7 +141,9 @@ export async function appendSearchQueryLogIfEnabled(params: AppendSearchQueryLog
       query_raw: params.queryRaw,
       query_normalized_primary: resolveQueryNormalizedPrimary(params.result),
       query_normalized_keys: mapSearchKeysToQueryLogKeys(params.result.query_normalized_keys),
-      direction: params.direction,
+      direction,
+      input_lang: pair.input_lang,
+      output_lang: pair.output_lang,
       ui_language: params.uiLanguage,
       result_status: deriveResultStatus(resultCount),
       result_count: resultCount,
@@ -153,7 +162,7 @@ export async function appendSearchQueryLogIfEnabled(params: AppendSearchQueryLog
       input.catalog_version = catalogVersion;
     }
 
-    await appendQueryLogV2(db, input);
+    await appendQueryLogV3(db, input);
   } catch (error) {
     console.warn("Query logging failed:", error);
   } finally {

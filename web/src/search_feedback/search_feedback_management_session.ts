@@ -33,14 +33,19 @@ import {
   cloneSearchFeedbackDraft,
   countUnicodeCharacters,
   hasDisallowedControlCharacters,
+  isSearchFeedbackDraftV2,
   type SearchFeedbackDirection,
-  type SearchFeedbackDraftV1,
+  type SearchFeedbackDraft,
   type SearchFeedbackResultState,
 } from "./search_feedback_types";
 import type {
   FeedbackHandoffResult,
   FeedbackHandoffSuccessMethod,
 } from "../feedback/feedback_handoff";
+import {
+  lookupModeFromLegacySearchDirection,
+  type LookupMode,
+} from "../search/lookup_mode";
 
 export type SearchFeedbackAvailabilityState =
   | "dictionary_current"
@@ -106,7 +111,7 @@ export type SearchFeedbackManagementVm = {
   phase: SearchFeedbackManagementPhase;
   feedbackCount: number;
   items: SearchFeedbackManagementListItem[];
-  selected?: SearchFeedbackDraftV1;
+  selected?: SearchFeedbackDraft;
   availability?: SearchFeedbackAvailabilityState;
   editFields?: SearchFeedbackEditFields;
   editErrors?: SearchFeedbackEditFieldErrors;
@@ -170,7 +175,7 @@ function closeIfOwned(
  * Uses logical bundle_id + content hash only (storage_scope_id is historical).
  */
 export function deriveSearchFeedbackAvailability(
-  draft: SearchFeedbackDraftV1,
+  draft: SearchFeedbackDraft,
   installed: ActiveBundleMeta | undefined,
 ): SearchFeedbackAvailabilityState {
   if (!installed) return "dictionary_unavailable";
@@ -185,8 +190,21 @@ export function deriveSearchFeedbackAvailability(
   return "dictionary_current";
 }
 
+/**
+ * Resolve LookupMode for management display/provenance without mutating storage.
+ * V2 uses stored language pair; V1 maps legacy search_direction → FR↔MNK.
+ */
+export function resolveLookupModeForManagement(
+  draft: SearchFeedbackDraft,
+): LookupMode {
+  if (isSearchFeedbackDraftV2(draft)) {
+    return { from: draft.input_lang, to: draft.output_lang };
+  }
+  return lookupModeFromLegacySearchDirection(draft.search_direction);
+}
+
 function listItemFromDraft(
-  draft: SearchFeedbackDraftV1,
+  draft: SearchFeedbackDraft,
   availability: SearchFeedbackAvailabilityState,
 ): SearchFeedbackManagementListItem {
   const preview = draft.requested_meaning?.trim();
@@ -201,7 +219,7 @@ function listItemFromDraft(
   };
 }
 
-function fieldsFromDraft(draft: SearchFeedbackDraftV1): SearchFeedbackEditFields {
+function fieldsFromDraft(draft: SearchFeedbackDraft): SearchFeedbackEditFields {
   return {
     requested_meaning: draft.requested_meaning ?? "",
     user_description: draft.user_description ?? "",
@@ -282,7 +300,7 @@ export function createSearchFeedbackManagementSession(
   let phase: SearchFeedbackManagementPhase = "loading";
   let feedbackCount = 0;
   let items: SearchFeedbackManagementListItem[] = [];
-  let selected: SearchFeedbackDraftV1 | undefined;
+  let selected: SearchFeedbackDraft | undefined;
   let availability: SearchFeedbackAvailabilityState | undefined;
   let editFields: SearchFeedbackEditFields | undefined;
   let editErrors: SearchFeedbackEditFieldErrors | undefined;
@@ -336,7 +354,7 @@ export function createSearchFeedbackManagementSession(
 
   async function availabilityFor(
     db: IDBDatabase,
-    draft: SearchFeedbackDraftV1,
+    draft: SearchFeedbackDraft,
   ): Promise<SearchFeedbackAvailabilityState> {
     const installed = await getInstalled(db, draft.bundle_id);
     return deriveSearchFeedbackAvailability(draft, installed);

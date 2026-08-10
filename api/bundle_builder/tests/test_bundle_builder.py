@@ -13,16 +13,20 @@ Tests cover:
 
 import hashlib
 import json
+import shutil
 import tempfile
 from pathlib import Path
 
 import pytest
 
 from bundle_builder.build_bundle import (
+    ArtifactDirectoryConflictError,
+    artifact_dir_name,
     build_bundle,
     compute_content_sha256,
     generate_bundle_id,
     sha256_file,
+    validate_bundle_id,
     verify_bundle,
 )
 
@@ -135,6 +139,20 @@ SAMPLE_INDEX_ENTRIES_DIRECTIONAL = [
         "key": "bon travail",
         "key_type": "src_casefold",
         "ir_ids": ["ffff1111eeee2222"],
+    },
+    {
+        "key": "dɔbɛn",
+        "key_type": "tgt_casefold",
+        "ir_ids": ["aaaa1111bbbb2222"],
+    },
+]
+
+SAMPLE_INDEX_ENTRIES_DIRECTIONAL_WITH_EN = [
+    *SAMPLE_INDEX_ENTRIES_DIRECTIONAL,
+    {
+        "key": "house",
+        "key_type": "en_casefold",
+        "ir_ids": ["aaaa1111bbbb2222"],
     },
 ]
 
@@ -265,6 +283,25 @@ class TestGenerateBundleId:
         bid = generate_bundle_id("full", "20260207", "sha256:abcdef1234567890fedcba")
         parts = bid.split("_")
         assert len(parts[-1]) == 8
+
+
+class TestValidateBundleId:
+    def test_accepts_historical_shapes(self):
+        assert validate_bundle_id("bundle_full_20260710_337619ff") == "bundle_full_20260710_337619ff"
+        assert (
+            validate_bundle_id("bundle_full_20260616_phase7j_alias_round2_candidate")
+            == "bundle_full_20260616_phase7j_alias_round2_candidate"
+        )
+
+    def test_rejects_empty_and_whitespace(self):
+        with pytest.raises(ValueError, match="nonempty"):
+            validate_bundle_id("")
+        with pytest.raises(ValueError, match="whitespace"):
+            validate_bundle_id(" bundle_x ")
+
+    def test_rejects_path_separators(self):
+        with pytest.raises(ValueError, match="path separators"):
+            validate_bundle_id("bundle/full")
 
 
 # ===========================================================================
@@ -468,7 +505,7 @@ class TestBuildBundle:
         search_index = tmp_path / "search_index_legacy_for_v2.jsonl"
         write_jsonl(search_index, SAMPLE_INDEX_ENTRIES)
 
-        with pytest.raises(ValueError, match="Directional bundle mode requires src_\\*/tgt_\\*"):
+        with pytest.raises(ValueError, match="Directional bundle mode requires directional key families"):
             build_bundle(normalized, search_index, tmp_path / "bundles")
 
     def test_legacy_mode_rejects_directional_key_families(self, bundle_inputs, tmp_path):
@@ -492,6 +529,354 @@ class TestBuildBundle:
 
         with pytest.raises(ValueError, match="mixes directional and legacy key families"):
             build_bundle(normalized, search_index, tmp_path / "bundles")
+
+    def test_explicit_bundle_id_honored(self, bundle_inputs, tmp_path):
+        normalized, search_index = bundle_inputs
+        output_dir = tmp_path / "bundles"
+        result = build_bundle(
+            normalized,
+            search_index,
+            output_dir,
+            bundle_id="bundle_full_logical_line_pin",
+        )
+        assert result["bundle_id"] == "bundle_full_logical_line_pin"
+        expected_dir = artifact_dir_name(
+            "bundle_full_logical_line_pin",
+            result["content_sha256"],
+        )
+        assert result["artifact_dir_name"] == expected_dir
+        assert Path(result["bundle_dir"]).name == expected_dir
+        assert result["versioned_output"] is True
+        assert result["manifest"]["bundle_id"] == "bundle_full_logical_line_pin"
+
+    def test_invalid_explicit_bundle_id_rejected(self, bundle_inputs, tmp_path):
+        normalized, search_index = bundle_inputs
+        with pytest.raises(ValueError, match="bundle_id"):
+            build_bundle(
+                normalized,
+                search_index,
+                tmp_path / "bundles",
+                bundle_id="bad id with spaces",
+            )
+
+    def test_content_hash_independent_of_bundle_id(self, bundle_inputs, tmp_path):
+        normalized, search_index = bundle_inputs
+        generated = build_bundle(normalized, search_index, tmp_path / "gen")
+        pinned = build_bundle(
+            normalized,
+            search_index,
+            tmp_path / "pin",
+            bundle_id="bundle_full_logical_line_pin",
+        )
+        assert generated["content_sha256"] == pinned["content_sha256"]
+        assert generated["bundle_id"] != pinned["bundle_id"]
+
+    def test_versioned_outputs_coexist_for_same_logical_id(self, bundle_inputs, tmp_path):
+        normalized, search_index = bundle_inputs
+        output_dir = tmp_path / "bundles"
+        logical_id = "bundle_full_logical_line_pin"
+
+        first = build_bundle(
+            normalized,
+            search_index,
+            output_dir,
+            bundle_id=logical_id,
+        )
+
+        # Mutate search index payload to force a new content_sha256.
+        alt_index = tmp_path / "search_index_alt.jsonl"
+        alt_index.write_text(
+            search_index.read_text(encoding="utf-8")
+            + json.dumps(
+                {
+                    "key": "extra",
+                    "key_type": "casefold",
+                    "ir_ids": ["zzzz9999yyyy8888"],
+                },
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        second = build_bundle(
+            normalized,
+            alt_index,
+            output_dir,
+            bundle_id=logical_id,
+        )
+
+        assert first["bundle_id"] == second["bundle_id"] == logical_id
+        assert first["content_sha256"] != second["content_sha256"]
+        assert first["artifact_dir_name"] != second["artifact_dir_name"]
+        assert Path(first["bundle_dir"]).is_dir()
+        assert Path(second["bundle_dir"]).is_dir()
+        assert Path(first["bundle_dir"]).exists()
+        assert Path(second["bundle_dir"]).exists()
+        assert verify_bundle(Path(first["bundle_dir"]))["valid"] is True
+        assert verify_bundle(Path(second["bundle_dir"]))["valid"] is True
+        assert (
+            json.load(open(Path(first["bundle_dir"]) / "bundle.manifest.json"))["bundle_id"]
+            == logical_id
+        )
+        assert (
+            json.load(open(Path(second["bundle_dir"]) / "bundle.manifest.json"))["bundle_id"]
+            == logical_id
+        )
+
+    def test_versioned_identical_rebuild_is_idempotent(self, bundle_inputs, tmp_path):
+        normalized, search_index = bundle_inputs
+        output_dir = tmp_path / "bundles"
+        first = build_bundle(
+            normalized,
+            search_index,
+            output_dir,
+            bundle_id="bundle_full_logical_line_pin",
+        )
+        marker = Path(first["bundle_dir"]) / "marker.txt"
+        marker.write_text("keep-me", encoding="utf-8")
+        assert verify_bundle(Path(first["bundle_dir"]))["valid"] is True
+
+        second = build_bundle(
+            normalized,
+            search_index,
+            output_dir,
+            bundle_id="bundle_full_logical_line_pin",
+        )
+        assert second["skipped_because_identical"] is True
+        assert second["bundle_dir"] == first["bundle_dir"]
+        assert second["content_sha256"] == first["content_sha256"]
+        assert marker.read_text(encoding="utf-8") == "keep-me"
+        assert verify_bundle(Path(second["bundle_dir"]))["valid"] is True
+
+    def _assert_tampered_versioned_artifact_fails_closed(
+        self,
+        *,
+        bundle_inputs,
+        tmp_path,
+        mutate,
+    ):
+        normalized, search_index = bundle_inputs
+        output_dir = tmp_path / "bundles"
+        first = build_bundle(
+            normalized,
+            search_index,
+            output_dir,
+            bundle_id="bundle_full_logical_line_pin",
+        )
+        artifact = Path(first["bundle_dir"])
+        mutate(artifact)
+        after_mutate_listing = {
+            p.name: (p.read_bytes() if p.is_file() else None) for p in artifact.iterdir()
+        }
+
+        with pytest.raises(ArtifactDirectoryConflictError, match="verification failed"):
+            build_bundle(
+                normalized,
+                search_index,
+                output_dir,
+                bundle_id="bundle_full_logical_line_pin",
+            )
+
+        assert artifact.is_dir()
+        after_fail_listing = {
+            p.name: (p.read_bytes() if p.is_file() else None) for p in artifact.iterdir()
+        }
+        assert after_fail_listing == after_mutate_listing
+        # Temp build dir must not remain.
+        assert not (output_dir / "_bundle_full_building").exists()
+        # Corrupted artifact was not repaired in place.
+        assert verify_bundle(artifact)["valid"] is False
+
+    def test_versioned_tampered_records_fails_closed(self, bundle_inputs, tmp_path):
+        def mutate(artifact: Path) -> None:
+            records = artifact / "records.jsonl"
+            records.write_bytes(records.read_bytes() + b"\nTAMPER\n")
+
+        self._assert_tampered_versioned_artifact_fails_closed(
+            bundle_inputs=bundle_inputs,
+            tmp_path=tmp_path,
+            mutate=mutate,
+        )
+
+    def test_versioned_tampered_search_index_fails_closed(self, bundle_inputs, tmp_path):
+        def mutate(artifact: Path) -> None:
+            index = artifact / "search_index.jsonl"
+            index.write_bytes(index.read_bytes() + b"\nTAMPER\n")
+
+        self._assert_tampered_versioned_artifact_fails_closed(
+            bundle_inputs=bundle_inputs,
+            tmp_path=tmp_path,
+            mutate=mutate,
+        )
+
+    def test_versioned_missing_payload_fails_closed(self, bundle_inputs, tmp_path):
+        def mutate(artifact: Path) -> None:
+            (artifact / "records.jsonl").unlink()
+
+        self._assert_tampered_versioned_artifact_fails_closed(
+            bundle_inputs=bundle_inputs,
+            tmp_path=tmp_path,
+            mutate=mutate,
+        )
+
+    def test_versioned_manifest_hash_match_but_payload_differs_fails_closed(
+        self,
+        bundle_inputs,
+        tmp_path,
+    ):
+        """Exact ML1C1A1 regression: matching declared content_sha256 alone is insufficient."""
+        normalized, search_index = bundle_inputs
+        output_dir = tmp_path / "bundles"
+        first = build_bundle(
+            normalized,
+            search_index,
+            output_dir,
+            bundle_id="bundle_full_logical_line_pin",
+        )
+        artifact = Path(first["bundle_dir"])
+        declared_hash = first["content_sha256"]
+
+        # Corrupt payload bytes while leaving the manifest content_sha256 text alone.
+        records = artifact / "records.jsonl"
+        records.write_bytes(records.read_bytes() + b"CORRUPT")
+        manifest = json.loads((artifact / "bundle.manifest.json").read_text(encoding="utf-8"))
+        assert manifest["content_sha256"] == declared_hash
+
+        with pytest.raises(ArtifactDirectoryConflictError, match="verification failed"):
+            build_bundle(
+                normalized,
+                search_index,
+                output_dir,
+                bundle_id="bundle_full_logical_line_pin",
+            )
+
+        assert artifact.is_dir()
+        assert json.loads((artifact / "bundle.manifest.json").read_text(encoding="utf-8"))[
+            "content_sha256"
+        ] == declared_hash
+        assert records.read_bytes().endswith(b"CORRUPT")
+        assert not (output_dir / "_bundle_full_building").exists()
+
+    def test_versioned_conflict_fails_closed(self, bundle_inputs, tmp_path):
+        normalized, search_index = bundle_inputs
+        output_dir = tmp_path / "bundles"
+        logical_id = "bundle_full_logical_line_pin"
+        first = build_bundle(
+            normalized,
+            search_index,
+            output_dir,
+            bundle_id=logical_id,
+        )
+        alt_index = tmp_path / "search_index_alt.jsonl"
+        alt_index.write_text(
+            search_index.read_text(encoding="utf-8")
+            + '{"key":"extra","key_type":"casefold","ir_ids":["zzzz"]}\n',
+            encoding="utf-8",
+        )
+        # Precompute next content hash by building into an isolated dir first.
+        preview = build_bundle(
+            normalized,
+            alt_index,
+            tmp_path / "preview",
+            bundle_id=logical_id,
+        )
+        conflict_dir = output_dir / preview["artifact_dir_name"]
+        conflict_dir.mkdir(parents=True)
+        (conflict_dir / "bundle.manifest.json").write_text(
+            json.dumps(
+                {
+                    "bundle_id": logical_id,
+                    "content_sha256": "sha256:" + ("0" * 64),
+                }
+            ),
+            encoding="utf-8",
+        )
+        # Incomplete planted artifact fails verification before any overwrite.
+        with pytest.raises(ArtifactDirectoryConflictError, match="verification failed"):
+            build_bundle(
+                normalized,
+                alt_index,
+                output_dir,
+                bundle_id=logical_id,
+            )
+        # Prior first artifact retained.
+        assert Path(first["bundle_dir"]).is_dir()
+        assert conflict_dir.is_dir()
+
+    def test_versioned_valid_existing_with_conflicting_hash_fails_closed(
+        self,
+        bundle_inputs,
+        tmp_path,
+    ):
+        """Existing dir verifies, but verified content_sha256 differs from new build."""
+        normalized, search_index = bundle_inputs
+        output_dir = tmp_path / "bundles"
+        logical_id = "bundle_full_logical_line_pin"
+        first = build_bundle(
+            normalized,
+            search_index,
+            output_dir,
+            bundle_id=logical_id,
+        )
+        alt_index = tmp_path / "search_index_alt.jsonl"
+        alt_index.write_text(
+            search_index.read_text(encoding="utf-8")
+            + '{"key":"extra","key_type":"casefold","ir_ids":["zzzz"]}\n',
+            encoding="utf-8",
+        )
+        preview = build_bundle(
+            normalized,
+            alt_index,
+            tmp_path / "preview",
+            bundle_id=logical_id,
+        )
+        # Place a *valid* different-content artifact under the path the new build needs.
+        conflict_dir = output_dir / preview["artifact_dir_name"]
+        shutil.copytree(first["bundle_dir"], conflict_dir)
+        assert verify_bundle(conflict_dir)["valid"] is True
+        assert verify_bundle(conflict_dir)["content_sha256"] == first["content_sha256"]
+        assert first["content_sha256"] != preview["content_sha256"]
+
+        planted_listing = {
+            p.name: (p.read_bytes() if p.is_file() else None) for p in conflict_dir.iterdir()
+        }
+        with pytest.raises(ArtifactDirectoryConflictError, match="Refusing to overwrite"):
+            build_bundle(
+                normalized,
+                alt_index,
+                output_dir,
+                bundle_id=logical_id,
+            )
+        assert Path(first["bundle_dir"]).is_dir()
+        assert {
+            p.name: (p.read_bytes() if p.is_file() else None) for p in conflict_dir.iterdir()
+        } == planted_listing
+        assert not (output_dir / "_bundle_full_building").exists()
+
+    def test_default_convenience_dir_name_equals_bundle_id(self, bundle_inputs, tmp_path):
+        normalized, search_index = bundle_inputs
+        result = build_bundle(normalized, search_index, tmp_path / "bundles")
+        assert result["versioned_output"] is False
+        assert result["artifact_dir_name"] == result["bundle_id"]
+        assert Path(result["bundle_dir"]).name == result["bundle_id"]
+
+    def test_accepts_additive_en_key_family(self, bundle_inputs_v3, tmp_path):
+        normalized, _ = bundle_inputs_v3
+        search_index = tmp_path / "search_index_en.jsonl"
+        write_jsonl(search_index, SAMPLE_INDEX_ENTRIES_DIRECTIONAL_WITH_EN)
+        result = build_bundle(
+            normalized,
+            search_index,
+            tmp_path / "bundles",
+            source_lang="fr",
+            target_lang="mnk",
+            bundle_id="bundle_full_logical_line_pin",
+        )
+        assert result["manifest"]["search_key_families"] == ["en", "src", "tgt"]
+        assert result["manifest"]["rule_versions"]["en_gloss_key"] == "en_gloss_key_v1"
+        assert result["manifest"]["languages"]["lookup_languages"] == ["en", "fr", "mnk"]
+        assert result["manifest"]["languages"]["lexical_language"] == "mnk"
+        assert result["artifact_dir_name"].startswith("bundle_full_logical_line_pin__")
 
     def test_optional_language_metadata(self, bundle_inputs, tmp_path):
         normalized, search_index = bundle_inputs
@@ -540,6 +925,7 @@ class TestVerifyBundle:
         assert verification["valid"] is True
         assert len(verification["errors"]) == 0
         assert verification["bundle_id"] == result["bundle_id"]
+        assert verification["content_sha256"] == result["content_sha256"]
 
     def test_missing_manifest_fails(self, tmp_path):
         bundle_dir = tmp_path / "fake_bundle"

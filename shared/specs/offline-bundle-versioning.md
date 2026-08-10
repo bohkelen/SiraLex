@@ -37,20 +37,89 @@ Bundles MUST be typed:
 
 Both bundle types MUST use the same record schema and the same manifest contract.
 
-## Bundle identifiers
+## Bundle identifiers (canonical identity model)
 
-Each bundle MUST have a unique identifier:
+SiraLex distinguishes **logical dictionary identity** from **immutable content identity**. These MUST NOT be conflated.
 
-- **`bundle_id`**: stable string identifier, unique across all time.
+| Identifier | Role | Mutability |
+|------------|------|------------|
+| **`bundle_id`** | Stable **logical dictionary / product-line** identity. Personal overlays (Learning, CF1, CF2) key continuity against this id. | Stable across compatible releases of the same product line |
+| **`content_sha256`** | Immutable **content / artifact version** identity for a published payload | Changes whenever payload bytes change |
+| **`storage_scope_id`** (consumer-local) | Exact installed version scope: `` `${bundle_id}::${content_sha256}` `` | New scope per installed content version |
 
-Recommended format (illustrative, not required):
+### Meanings (normative)
+
+- **`bundle_id`**: identifies the logical dictionary product line (for example the featured French/English↔Maninka line). Reusing the same `bundle_id` with a new `content_sha256` is a **compatible update** in that line, not mutation of a prior artifact.
+- **`content_sha256`**: identifies one immutable published content version. Every distinct payload MUST have a distinct `content_sha256`. Installed dictionary bytes are never silently rewritten in place.
+- **`storage_scope_id`**: local install key for dictionary records/index for one exact `(bundle_id, content_sha256)` pair. A replacement install creates a new scope and retires the previous dictionary payload scope while retaining personal records according to Learning/CF lifecycle rules.
+
+### Recommended generated format (convenience default only)
+
+Builders MAY generate a fresh id shaped like:
 
 - `bundle_{type}_{yyyymmdd}_{short_hash}`
+
+That format is a **convenience default for new product lines / one-off builds**. It is **not** a requirement that every content change mint a new `bundle_id`. Compatible releases of an existing product line SHOULD reuse the logical `bundle_id` and emit a new `content_sha256`.
+
+Builders that publish compatible updates into an existing product line SHOULD accept an explicit logical `bundle_id` input (for example CLI `--bundle-id`). Until that input exists, publishers MUST pin/reuse the logical id by an equivalent reviewed packaging step rather than treating the generated default as normative.
 
 Additionally, bundles SHOULD include:
 
 - **`bundle_semver`**: optional semantic version for human communication (not authoritative)
 - **`created_at`**: ISO-8601 timestamp (informational; see determinism rules below)
+
+### When `bundle_id` MAY be reused
+
+A release MAY reuse an existing `bundle_id` only when **all** of the following hold:
+
+- same lexical dictionary / product line
+- same `ir_id` identity domain (entries that keep the same `ir_id` remain the same lexical objects)
+- compatible record / search semantics for REPLACE_ALL consumer update
+- Learning / CF1 / CF2 continuity against `(bundle_id, …)` is intended
+- consumer `update_mode` / `reconciliation_action` remain `REPLACE_ALL` (v1)
+- no intentional fork that requires a separate personal-data namespace
+
+Under that rule:
+
+```text
+same bundle_id + new content_sha256
+= compatible update/release in the same logical dictionary line
+```
+
+### When a new `bundle_id` MUST be minted
+
+A release MUST mint a new `bundle_id` when any of the following hold:
+
+- unrelated dictionary / different product
+- changed lexical identity domain (systematic `ir_id` reassignment or incompatible entry identity)
+- intentionally separate edition or product line that must not share Learning/CF personal-data namespace
+- publisher explicitly chooses a fork rather than a compatible in-line update
+
+Under that rule:
+
+```text
+new bundle_id
+= distinct dictionary lineage / intentionally separate Learning namespace
+```
+
+### Physical artifact directory name (publisher tooling)
+
+Logical `bundle_id` and immutable `content_sha256` MAY map to a filesystem directory whose name differs from `bundle_id` so multiple content versions of one product line can coexist under one output root.
+
+Recommended deterministic shape when publishing compatible updates with an explicit logical id:
+
+```text
+{bundle_id}__{first_8_hex_of_content_sha256}
+```
+
+Example: `bundle_full_20260710_337619ff__d076558b`.
+
+Normative constraints:
+
+- Manifest `bundle_id` remains the logical product-line id (unchanged by directory naming).
+- Directory naming MUST NOT be used as Learning / CF primary identity.
+- A versioned/publish-safe builder MUST NOT destructively replace an existing immutable artifact directory when the recorded `content_sha256` differs (fail closed). Identical rebuilds MAY be idempotent.
+- Convenience builds that mint a fresh generated `bundle_id` MAY continue to use directory name == `bundle_id`.
 
 ## Manifest (required)
 
@@ -137,23 +206,32 @@ It MAY include:
   - `created_at` SHOULD be omitted; if included, it MUST be informational only and MUST NOT be included in any hash computations.
 - Bundle consumers MUST verify integrity using the manifest hashes before using the data.
 
-## “No silent mutation” across bundles (normative)
+## “No silent mutation” across content versions (normative)
 
-If any of these change, you MUST publish a new bundle (new `bundle_id`):
+Published payload bytes are immutable. If any of the following change, you MUST publish a **new immutable content artifact** (new `content_sha256` and new payload files). You MUST NOT rewrite a previously published artifact in place:
 
 - record schema version
 - any `rule_versions.*` value
 - included/excluded sources set
 - correction dataset (approved RFC 6902 correction records) that affect outputs
+- search index / records payload bytes for any other reason
 
-This preserves reproducibility and makes trustable diffs possible.
+**Immutability is about `content_sha256` / artifact bytes, not about minting a new `bundle_id`.**
+
+Whether that new artifact reuses the prior `bundle_id` is governed by the reuse / mint rules in **Bundle identifiers** above:
+
+- compatible in-line product release → **reuse** `bundle_id`, new `content_sha256`
+- incompatible identity domain or intentional fork → **new** `bundle_id` and new `content_sha256`
+
+This preserves reproducibility and makes trustable diffs possible without fragmenting Learning identity on routine compatible updates.
 
 ## Disablement / removal handling (required)
 
 If a source is disabled or a rights holder requests removal:
 
-- A new bundle MUST be produced with that `source_id` excluded.
+- A new **immutable content artifact** MUST be produced with that `source_id` excluded (new `content_sha256`).
 - The manifest MUST list that source under `sources.excluded[]` with a reason and timestamp.
+- If the result remains the same product line with compatible `ir_id` continuity, the release MAY reuse the existing logical `bundle_id`; otherwise it MUST mint a new `bundle_id` per the identity rules above.
 - Bundle consumers MUST treat this as a reconciliation event requiring `reconciliation_action = "REPLACE_ALL"` (v1).
 - The system SHOULD support “tombstoning”:
   - keep internal auditability of what changed
@@ -175,10 +253,11 @@ Any selection heuristic MUST be:
 
 Bundle consumers SHOULD:
 
-- keep track of current `bundle_id`
-- download a new bundle when `bundle_id` changes
-- verify hashes
-- import into local storage (e.g., IndexedDB) idempotently
+- keep track of current logical `bundle_id` **and** installed `content_sha256` / `storage_scope_id`
+- when the catalog/manifest shows the **same** `bundle_id` with a **new** `content_sha256`, treat that as a **compatible in-line update**: import the new payload into a new `storage_scope_id`, REPLACE_ALL dictionary records/index for that logical id, retire the previous dictionary payload scope, and retain personal overlays keyed by `bundle_id` per Learning/CF lifecycle rules
+- when the catalog/manifest shows a **new** `bundle_id`, treat that as a **distinct dictionary lineage** (separate Learning/CF namespace), not as an in-place continuation of the prior line
+- verify hashes before trusting payload bytes
+- import into local storage (e.g., IndexedDB) idempotently (same `storage_scope_id` ⇒ already current)
 
 This spec does not mandate delta updates. It reserves `update_mode = "DELTA"` fields for future use; **v1 consumers MUST treat `update_mode = "DELTA"` as unsupported**. If deltas are introduced later, they must also be versioned and hash-verified.
 

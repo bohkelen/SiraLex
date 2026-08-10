@@ -19,9 +19,12 @@ import {
 
 import {
   SEARCH_FEEDBACK_AUTHORITY_LABEL,
-  SEARCH_FEEDBACK_PACKAGE_SCHEMA,
+  SEARCH_FEEDBACK_PACKAGE_SCHEMA_V2,
   parseSearchFeedbackJson,
 } from "../src/search_feedback/search_feedback_package";
+import {
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
+} from "../src/search_feedback/search_feedback_types";
 import {
   createRunId,
   writeCf2EvidenceArtifacts,
@@ -193,15 +196,18 @@ test.describe("CF2I5 search feedback lifecycle", () => {
     const parsed = parseSearchFeedbackJson(exportedPackageText);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) throw new Error("export parse failed");
-    expect(parsed.package.package_schema).toBe(SEARCH_FEEDBACK_PACKAGE_SCHEMA);
+    expect(parsed.package.package_schema).toBe(SEARCH_FEEDBACK_PACKAGE_SCHEMA_V2);
     expect(parsed.package.authority_label).toBe(SEARCH_FEEDBACK_AUTHORITY_LABEL);
     expect(parsed.package.feedback_count).toBe(1);
     const fb = parsed.package.feedbacks[0]!;
+    expect(fb.schema_version).toBe(SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2);
     expect(fb.bundle_id).toBe(DEBUG_BUNDLE_ID);
     expect(fb.content_sha256).toBe(DEBUG_CONTENT_SHA);
     expect(fb.query_raw).toBe(NO_RESULT_QUERY);
     expect(fb.result_state).toBe("no_result");
     expect(fb.result_count).toBe(0);
+    expect(fb.input_lang).toBe("fr");
+    expect(fb.output_lang).toBe("mnk");
     expect("matched_ir_ids" in fb).toBe(false);
     expect(fb.requested_meaning).toBe(NOTE_V1);
     expect(fb.requested_meaning).toContain("ߞߎ߲");

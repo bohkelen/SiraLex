@@ -1,6 +1,8 @@
 export type QueryLogSchemaVersion = "query_log_event_v1";
 
 export const QUERY_LOG_EVENT_V2 = "query_log_event_v2" as const;
+/** Multilingual provenance: required input_lang + output_lang (LookupMode pair). */
+export const QUERY_LOG_EVENT_V3 = "query_log_event_v3" as const;
 export const QUERY_LOG_CONSENT_VERSION = "phase7k_tester_consent_v1" as const;
 export const QUERY_LOG_TOP_IR_IDS_LIMIT = 5 as const;
 export const QUERY_LOG_MAX_ROWS = 2000 as const;
@@ -14,6 +16,9 @@ export type QueryLogLadderLevel =
   | "none";
 
 export type QueryLogDirection = "source_to_target" | "target_to_source";
+
+/** LookupMode language endpoints persisted on V3 query-log rows. */
+export type QueryLogLookupLanguage = "fr" | "en" | "mnk";
 
 export type QueryLogNormalizedKeys = {
   casefold: string[];
@@ -70,11 +75,23 @@ export type QueryLogEventV2 = {
   consent_version: string;
 };
 
-export type QueryLogEvent = QueryLogEventV1 | QueryLogEventV2;
+/**
+ * V3 freezes V2 shape and adds required LookupMode provenance.
+ * `direction` remains as the legacy mirror of the pair.
+ */
+export type QueryLogEventV3 = Omit<QueryLogEventV2, "schema_version"> & {
+  schema_version: typeof QUERY_LOG_EVENT_V3;
+  input_lang: QueryLogLookupLanguage;
+  output_lang: QueryLogLookupLanguage;
+};
+
+export type QueryLogEvent = QueryLogEventV1 | QueryLogEventV2 | QueryLogEventV3;
 
 export type AppendQueryLogInput = Omit<QueryLogEventV1, "log_id" | "schema_version">;
 
 export type AppendQueryLogV2Input = Omit<QueryLogEventV2, "log_id" | "schema_version">;
+
+export type AppendQueryLogV3Input = Omit<QueryLogEventV3, "log_id" | "schema_version">;
 
 export type QueryLogScopeFilter = {
   bundle_id?: string;

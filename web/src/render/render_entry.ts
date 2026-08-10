@@ -20,6 +20,16 @@ import type {
 import { isLexiconDisplay, isIndexMappingDisplay } from "../types/records";
 import { t } from "../i18n";
 import type { LearningSaveControlState } from "../learning/entry_learning_session";
+import {
+  DEFAULT_LOOKUP_MODE,
+  preferredGlossLanguage,
+  type LookupMode,
+  type PreferredGlossLanguage,
+} from "../search/lookup_mode";
+import {
+  resolvePreferredGloss,
+  type ResolvedPreferredGloss,
+} from "../search/resolve_preferred_gloss";
 
 function el(tag: string, cls?: string, text?: string): HTMLElement {
   const e = document.createElement(tag);
@@ -44,20 +54,59 @@ function renderLabeledSection(titleKey: "entry.section.variants" | "entry.sectio
   return section;
 }
 
-function renderExample(ex: ExampleRaw): HTMLElement {
+function translationLabelKey(
+  language: PreferredGlossLanguage,
+): "entry.translationLabel.fr" | "entry.translationLabel.en" {
+  return language === "en" ? "entry.translationLabel.en" : "entry.translationLabel.fr";
+}
+
+function appendResolvedGloss(
+  parent: HTMLElement,
+  resolved: ResolvedPreferredGloss,
+  className: string,
+  testId: string,
+): void {
+  const node = el("div", className);
+  node.setAttribute("data-testid", testId);
+  if (resolved.text && resolved.language) {
+    node.setAttribute("data-gloss-lang", resolved.language);
+    node.setAttribute("data-gloss-fallback", resolved.usedFallback ? "true" : "false");
+    if (resolved.usedFallback) {
+      const label = el("span", "ux2-entry-gloss-lang", t(translationLabelKey(resolved.language)));
+      const text = el("span", "ux2-entry-gloss-text", resolved.text);
+      node.append(label, document.createTextNode(": "), text);
+    } else {
+      node.textContent = resolved.text;
+    }
+  } else {
+    node.setAttribute("data-gloss-unavailable", "true");
+    node.textContent = t("render.noTranslation");
+  }
+  parent.appendChild(node);
+}
+
+function renderExample(ex: ExampleRaw, preferred: PreferredGlossLanguage): HTMLElement {
   const wrap = el("div", "entry-example ux2-entry-example");
   wrap.appendChild(el("div", "example-text ux2-entry-example-latin", ex.text_latin));
   if (ex.text_nko_provided) {
     wrap.appendChild(nkoText(ex.text_nko_provided, "example-nko ux2-entry-example-nko"));
   }
-  if (ex.trans_fr) {
-    wrap.appendChild(el("div", "example-trans ux2-entry-example-trans", ex.trans_fr));
-  }
-  if (ex.trans_en) {
-    wrap.appendChild(el("div", "example-trans ux2-entry-example-trans", ex.trans_en));
-  }
-  if (ex.trans_ru) {
-    wrap.appendChild(el("div", "example-trans ux2-entry-example-trans", ex.trans_ru));
+  // Only apply FR/EN preference when the renderer already exposes translations.
+  // Never surface Russian (RL1 owns broader RU removal).
+  const hasFrOrEn =
+    (typeof ex.trans_fr === "string" && ex.trans_fr.trim() !== "") ||
+    (typeof ex.trans_en === "string" && ex.trans_en.trim() !== "");
+  if (hasFrOrEn) {
+    appendResolvedGloss(
+      wrap,
+      resolvePreferredGloss({
+        glossFr: ex.trans_fr,
+        glossEn: ex.trans_en,
+        preferred,
+      }),
+      "example-trans ux2-entry-example-trans",
+      "entry-example-trans",
+    );
   }
   if (ex.source_attribution) {
     wrap.appendChild(el("div", "example-attr ux2-entry-example-attr", ex.source_attribution));
@@ -65,25 +114,35 @@ function renderExample(ex: ExampleRaw): HTMLElement {
   return wrap;
 }
 
-function renderSubEntry(sub: SubEntry): HTMLElement {
+function renderSubEntry(sub: SubEntry, preferred: PreferredGlossLanguage): HTMLElement {
   const wrap = el("div", "entry-subentry ux2-entry-subentry");
   wrap.appendChild(el("div", "subentry-text ux2-entry-subentry-text", sub.text));
   if (sub.nko) {
     wrap.appendChild(nkoText(sub.nko, "subentry-nko ux2-entry-subentry-nko"));
   }
-  if (sub.gloss_fr) {
-    wrap.appendChild(el("div", "subentry-gloss ux2-entry-subentry-gloss", sub.gloss_fr));
-  }
-  if (sub.gloss_en) {
-    wrap.appendChild(el("div", "subentry-gloss ux2-entry-subentry-gloss", sub.gloss_en));
-  }
-  if (sub.gloss_ru) {
-    wrap.appendChild(el("div", "subentry-gloss ux2-entry-subentry-gloss", sub.gloss_ru));
+  const hasFrOrEn =
+    (typeof sub.gloss_fr === "string" && sub.gloss_fr.trim() !== "") ||
+    (typeof sub.gloss_en === "string" && sub.gloss_en.trim() !== "");
+  if (hasFrOrEn) {
+    appendResolvedGloss(
+      wrap,
+      resolvePreferredGloss({
+        glossFr: sub.gloss_fr,
+        glossEn: sub.gloss_en,
+        preferred,
+      }),
+      "subentry-gloss ux2-entry-subentry-gloss",
+      "entry-subentry-gloss",
+    );
   }
   return wrap;
 }
 
-function renderSense(sense: SenseRaw, index: number): HTMLElement {
+function renderSense(
+  sense: SenseRaw,
+  index: number,
+  preferred: PreferredGlossLanguage,
+): HTMLElement {
   const wrap = el("div", "entry-sense ux2-entry-sense");
   const num = sense.sense_num ?? index + 1;
 
@@ -91,15 +150,16 @@ function renderSense(sense: SenseRaw, index: number): HTMLElement {
   header.appendChild(el("span", "sense-num ux2-entry-sense-num", `${num}`));
   wrap.appendChild(header);
 
-  if (sense.gloss_fr) {
-    wrap.appendChild(el("div", "sense-gloss ux2-entry-gloss", sense.gloss_fr));
-  }
-  if (sense.gloss_en) {
-    wrap.appendChild(el("div", "sense-gloss ux2-entry-gloss", sense.gloss_en));
-  }
-  if (sense.gloss_ru) {
-    wrap.appendChild(el("div", "sense-gloss ux2-entry-gloss", sense.gloss_ru));
-  }
+  appendResolvedGloss(
+    wrap,
+    resolvePreferredGloss({
+      glossFr: sense.gloss_fr,
+      glossEn: sense.gloss_en,
+      preferred,
+    }),
+    "sense-gloss ux2-entry-gloss",
+    "entry-gloss",
+  );
 
   if (sense.usage_note) {
     const usageBody = el("div");
@@ -113,12 +173,12 @@ function renderSense(sense: SenseRaw, index: number): HTMLElement {
   }
   if (sense.examples && sense.examples.length > 0) {
     const exWrap = el("div", "sense-examples");
-    for (const ex of sense.examples) exWrap.appendChild(renderExample(ex));
+    for (const ex of sense.examples) exWrap.appendChild(renderExample(ex, preferred));
     wrap.appendChild(renderLabeledSection("entry.section.examples", exWrap));
   }
   if (sense.sub_entries && sense.sub_entries.length > 0) {
     const subWrap = el("div", "sense-subentries");
-    for (const sub of sense.sub_entries) subWrap.appendChild(renderSubEntry(sub));
+    for (const sub of sense.sub_entries) subWrap.appendChild(renderSubEntry(sub, preferred));
     wrap.appendChild(renderLabeledSection("entry.section.subentries", subWrap));
   }
   return wrap;
@@ -304,6 +364,7 @@ function renderEntryActions(
 
 function renderLexiconEntry(
   d: LexiconDisplayFields,
+  preferred: PreferredGlossLanguage,
   learning?: EntryLearningCallbacks,
   onSuggestCorrection?: () => void,
 ): { wrap: HTMLElement; setLearningSaveState?: (state: LearningSaveControlState) => void } {
@@ -354,7 +415,7 @@ function renderLexiconEntry(
 
   if (d.senses && d.senses.length > 0) {
     const sensesWrap = el("div", "entry-senses ux2-entry-senses");
-    d.senses.forEach((sense, i) => sensesWrap.appendChild(renderSense(sense, i)));
+    d.senses.forEach((sense, i) => sensesWrap.appendChild(renderSense(sense, i, preferred)));
     wrap.appendChild(sensesWrap);
   }
 
@@ -417,6 +478,11 @@ export type EntryDetailCallbacks = {
   /** Presentation-only Back label; navigation remains owned by the application. */
   backLabel?: string;
   /**
+   * Immutable LookupMode snapshot for Search-origin presentation (ML1D3).
+   * When omitted, defaults to FR→MNK preference (legacy default).
+   */
+  presentationLookupMode?: LookupMode;
+  /**
    * Open a target lexicon entry from an index mapping by identity (anchor/ir_id).
    * Must not perform a text search.
    */
@@ -456,10 +522,13 @@ export function renderEntryDetail(
   container.appendChild(backBtn);
 
   let setLearningSaveState: ((state: LearningSaveControlState) => void) | undefined;
+  const presentationMode = callbacks.presentationLookupMode ?? DEFAULT_LOOKUP_MODE;
+  const preferred = preferredGlossLanguage(presentationMode);
 
   if (isLexiconDisplay(record)) {
     const lexicon = renderLexiconEntry(
       record.display,
+      preferred,
       callbacks.learning,
       callbacks.onSuggestCorrection,
     );

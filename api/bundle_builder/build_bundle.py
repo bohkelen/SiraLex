@@ -18,6 +18,7 @@ This module never modifies source artifacts. It only copies and hashes.
 
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 from datetime import datetime, timezone
@@ -31,11 +32,42 @@ LEGACY_KEY_TYPES = {
     "nospace",
 }
 
+DIRECTIONAL_KEY_FAMILIES = ("src", "tgt", "en")
+
 DIRECTIONAL_KEY_TYPES = {
     f"{family}_{key_type}"
-    for family in ("src", "tgt")
+    for family in DIRECTIONAL_KEY_FAMILIES
     for key_type in LEGACY_KEY_TYPES
 }
+
+# Core FR/MNK families required for directional bundles; en_* is optional/additive.
+CORE_DIRECTIONAL_FAMILIES = ("src", "tgt")
+
+# Logical bundle_id shape: nonempty, path-safe, matches historical id conventions.
+BUNDLE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,198}$")
+
+
+def validate_bundle_id(bundle_id: str) -> str:
+    """
+    Validate an explicit logical bundle_id.
+
+    Returns the id unchanged when valid; raises ValueError otherwise.
+    Does not hardcode any featured id.
+    """
+    if not isinstance(bundle_id, str):
+        raise ValueError("bundle_id must be a string")
+    if bundle_id.strip() != bundle_id:
+        raise ValueError("bundle_id must not have leading or trailing whitespace")
+    if not bundle_id:
+        raise ValueError("bundle_id must be nonempty")
+    if "/" in bundle_id or "\\" in bundle_id:
+        raise ValueError("bundle_id must not contain path separators")
+    if not BUNDLE_ID_PATTERN.fullmatch(bundle_id):
+        raise ValueError(
+            "bundle_id must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,198}$ "
+            f"(got {bundle_id!r})"
+        )
+    return bundle_id
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +164,82 @@ def generate_bundle_id(
     hex_part = content_sha256.split(":")[-1]
     short_hash = hex_part[:8]
     return f"bundle_{bundle_type}_{date_str}_{short_hash}"
+
+
+def content_sha256_prefix(content_sha256: str, *, length: int = 8) -> str:
+    """Return the leading hex prefix of a canonical content_sha256 value."""
+    if not isinstance(content_sha256, str) or not content_sha256.startswith("sha256:"):
+        raise ValueError(
+            "content_sha256 must be shaped as sha256:<hex> "
+            f"(got {content_sha256!r})"
+        )
+    hex_part = content_sha256.split(":", 1)[1]
+    if length < 1 or length > len(hex_part):
+        raise ValueError(f"invalid content hash prefix length: {length}")
+    return hex_part[:length]
+
+
+def artifact_dir_name(bundle_id: str, content_sha256: str) -> str:
+    """
+    Physical artifact directory name for a logical bundle + content version.
+
+    Shape: `{bundle_id}__{content_sha256_prefix8}`
+
+    This is NOT Learning identity and MUST NOT replace manifest.bundle_id.
+    """
+    validated = validate_bundle_id(bundle_id)
+    prefix = content_sha256_prefix(content_sha256)
+    return f"{validated}__{prefix}"
+
+
+class ArtifactDirectoryConflictError(FileExistsError):
+    """Raised when a versioned artifact directory already exists unsafely."""
+
+
+def _commit_artifact_directory(
+    *,
+    temp_bundle_dir: Path,
+    final_bundle_dir: Path,
+    content_hash: str,
+    versioned_output: bool,
+) -> tuple[Path, bool]:
+    """
+    Move temp build into the final artifact directory.
+
+    Returns (final_dir, skipped_because_identical).
+
+    Versioned/publish-safe path:
+      - existing artifact must fully verify via verify_bundle()
+      - only then may matching content_sha256 be treated as idempotent
+      - verification failure or hash mismatch → fail closed (no overwrite)
+    Convenience path:
+      - may replace an existing same-named convenience directory.
+    """
+    if final_bundle_dir.exists():
+        if versioned_output:
+            # Forward reference is safe: verify_bundle exists at call time.
+            verification = verify_bundle(final_bundle_dir)
+            if not verification["valid"]:
+                raise ArtifactDirectoryConflictError(
+                    "Refusing to reuse existing immutable artifact directory "
+                    f"{final_bundle_dir}: verification failed: "
+                    + "; ".join(verification.get("errors") or ["unknown error"])
+                )
+            existing_hash = verification.get("content_sha256")
+            if existing_hash == content_hash:
+                # Idempotent rebuild of the exact same verified immutable artifact.
+                shutil.rmtree(temp_bundle_dir)
+                return final_bundle_dir, True
+            raise ArtifactDirectoryConflictError(
+                "Refusing to overwrite existing immutable artifact directory "
+                f"{final_bundle_dir}: existing content_sha256={existing_hash!r}, "
+                f"new content_sha256={content_hash!r}"
+            )
+        # Convenience/non-versioned path only: replace same-named output.
+        shutil.rmtree(final_bundle_dir)
+
+    temp_bundle_dir.rename(final_bundle_dir)
+    return final_bundle_dir, False
 
 
 # ---------------------------------------------------------------------------
@@ -233,10 +341,20 @@ def _collect_search_index_key_types(search_index_path: Path) -> set[str]:
     return key_types
 
 
+def _family_prefix(key_type: str) -> str:
+    return key_type.split("_", 1)[0]
+
+
 def _validate_search_index_key_families(
     search_index_path: Path,
     search_index_directional: bool,
-) -> None:
+) -> set[str]:
+    """
+    Validate search index key families.
+
+    Returns the set of directional family prefixes present (src/tgt/en) when
+    directional, else an empty set. Legacy undirected indexes return empty.
+    """
     key_types = _collect_search_index_key_types(search_index_path)
     if not key_types:
         raise ValueError(f"No search index entries found in {search_index_path}")
@@ -257,15 +375,25 @@ def _validate_search_index_key_families(
             f"legacy={sorted(seen_legacy)}, directional={sorted(seen_directional)}"
         )
 
-    if search_index_directional and not seen_directional:
-        raise ValueError(
-            "Directional bundle mode requires src_*/tgt_* key families in search_index.jsonl"
-        )
+    if search_index_directional:
+        if not seen_directional:
+            raise ValueError(
+                "Directional bundle mode requires directional key families in search_index.jsonl"
+            )
+        families = {_family_prefix(k) for k in seen_directional}
+        missing_core = [f for f in CORE_DIRECTIONAL_FAMILIES if f not in families]
+        if missing_core:
+            raise ValueError(
+                "Directional bundle mode requires src_* and tgt_* key families; "
+                f"missing={missing_core}, present={sorted(families)}"
+            )
+        return families
 
-    if not search_index_directional and seen_directional:
+    if seen_directional:
         raise ValueError(
             "Legacy bundle mode requires undirected key families only in search_index.jsonl"
         )
+    return set()
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +413,10 @@ def build_bundle(
     source_label: str | None = None,
     target_label: str | None = None,
     target_scripts: list[str] | None = None,
+    bundle_id: str | None = None,
+    lexical_language: str | None = None,
+    lookup_languages: list[str] | None = None,
+    versioned_output: bool | None = None,
 ) -> dict[str, Any]:
     """
     Build an offline bundle directory from normalized records and search index.
@@ -301,9 +433,17 @@ def build_bundle(
         source_label: optional human-readable source language label
         target_label: optional human-readable target language label
         target_scripts: optional list of supported target scripts
+        bundle_id: optional explicit logical bundle_id; when omitted, a convenience
+            id is generated from type/date/content hash
+        lexical_language: optional lexical language code (e.g. mnk)
+        lookup_languages: optional lookup language list (e.g. fr, en, mnk)
+        versioned_output: when True, physical directory is
+            `{bundle_id}__{content_prefix}` and never destructively overwritten.
+            Default: True when explicit bundle_id is supplied; False for
+            convenience-generated ids (directory name == bundle_id).
 
     Returns:
-        dict with bundle metadata including bundle_id and bundle_dir path
+        dict with bundle_id, content_sha256, artifact_dir_name, bundle_dir, …
     """
     if sources_included is None:
         sources_included = ["src_malipense"]
@@ -311,6 +451,11 @@ def build_bundle(
         ir_parser_versions = ["malipense_lexicon_v3", "malipense_index_v1"]
     if target_scripts is None:
         target_scripts = []
+
+    explicit_bundle_id = validate_bundle_id(bundle_id) if bundle_id is not None else None
+    if versioned_output is None:
+        # Publication-safe default: pin path when logical id is explicitly supplied.
+        versioned_output = explicit_bundle_id is not None
 
     # Validate inputs exist
     if not normalized_path.exists():
@@ -322,9 +467,12 @@ def build_bundle(
     record_counts = _count_records_by_kind(normalized_path)
     normalization_ruleset = _detect_normalization_ruleset(normalized_path)
     search_index_directional = _is_directional_ruleset(normalization_ruleset)
-    _validate_search_index_key_families(search_index_path, search_index_directional)
+    search_key_families = _validate_search_index_key_families(
+        search_index_path,
+        search_index_directional,
+    )
 
-    # Date string for bundle ID
+    # Date string for convenience bundle ID
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
 
     # Create a temporary name first; we'll rename after computing the ID
@@ -353,27 +501,40 @@ def build_bundle(
             "sha256": sha256_file(dest_path),
         })
 
-    # Compute content_sha256
+    # Compute content_sha256 (payload files only — independent of bundle_id /
+    # physical artifact directory name)
     content_hash = compute_content_sha256(files_list)
 
-    # Generate bundle_id
-    bundle_id = generate_bundle_id(bundle_type, date_str, content_hash)
+    # Logical bundle_id: explicit pin or convenience default
+    if explicit_bundle_id is not None:
+        resolved_bundle_id = explicit_bundle_id
+    else:
+        resolved_bundle_id = generate_bundle_id(bundle_type, date_str, content_hash)
+
+    if versioned_output:
+        resolved_artifact_dir_name = artifact_dir_name(resolved_bundle_id, content_hash)
+    else:
+        resolved_artifact_dir_name = resolved_bundle_id
 
     # Get git commit
     git_commit = get_git_commit()
 
+    rule_versions: dict[str, Any] = {
+        "normalization": normalization_ruleset,
+    }
+    if "en" in search_key_families:
+        rule_versions["en_gloss_key"] = "en_gloss_key_v1"
+
     # Build manifest
     manifest = {
         "manifest_schema_version": "bundle_manifest_v1",
-        "bundle_id": bundle_id,
+        "bundle_id": resolved_bundle_id,
         "bundle_type": bundle_type,
         "bundle_format": "directory",
         "compression": "none",
         "record_schema_id": "normalized_v1",
         "record_schema_version": "1",
-        "rule_versions": {
-            "normalization": normalization_ruleset,
-        },
+        "rule_versions": rule_versions,
         "search_index_directional": search_index_directional,
         "sources": {
             "included": sorted(sources_included),
@@ -390,12 +551,25 @@ def build_bundle(
         "content_sha256": content_hash,
     }
 
-    if source_lang or target_lang:
-        manifest["languages"] = {}
-        if source_lang:
-            manifest["languages"]["source_lang"] = source_lang
-        if target_lang:
-            manifest["languages"]["target_lang"] = target_lang
+    if search_key_families:
+        manifest["search_key_families"] = sorted(search_key_families)
+
+    languages: dict[str, Any] = {}
+    if source_lang:
+        languages["source_lang"] = source_lang
+    if target_lang:
+        languages["target_lang"] = target_lang
+    if lexical_language:
+        languages["lexical_language"] = lexical_language
+    if lookup_languages:
+        languages["lookup_languages"] = list(lookup_languages)
+    elif "en" in search_key_families and source_lang and target_lang:
+        # Advertise FR+EN lookup when English keys are present and pair is known.
+        languages["lookup_languages"] = sorted({source_lang, "en", target_lang})
+        if not lexical_language:
+            languages["lexical_language"] = target_lang
+    if languages:
+        manifest["languages"] = languages
 
     if source_label or target_label:
         manifest["language_labels"] = {}
@@ -423,16 +597,26 @@ def build_bundle(
             hex_hash = file_entry["sha256"].split(":")[-1]
             f.write(f"{hex_hash}  {file_entry['path']}\n")
 
-    # Rename temp dir to final name
-    final_bundle_dir = output_dir / bundle_id
-    if final_bundle_dir.exists():
-        shutil.rmtree(final_bundle_dir)
-    temp_bundle_dir.rename(final_bundle_dir)
+    final_bundle_dir = output_dir / resolved_artifact_dir_name
+    try:
+        final_bundle_dir, skipped_identical = _commit_artifact_directory(
+            temp_bundle_dir=temp_bundle_dir,
+            final_bundle_dir=final_bundle_dir,
+            content_hash=content_hash,
+            versioned_output=versioned_output,
+        )
+    except Exception:
+        if temp_bundle_dir.exists():
+            shutil.rmtree(temp_bundle_dir)
+        raise
 
     return {
-        "bundle_id": bundle_id,
+        "bundle_id": resolved_bundle_id,
+        "artifact_dir_name": resolved_artifact_dir_name,
         "bundle_dir": str(final_bundle_dir),
         "content_sha256": content_hash,
+        "versioned_output": versioned_output,
+        "skipped_because_identical": skipped_identical,
         "manifest": manifest,
         "files_count": len(files_list),
     }
@@ -449,12 +633,13 @@ def verify_bundle(bundle_dir: Path) -> dict[str, Any]:
     4. content_sha256 matches recomputed value.
 
     Returns:
-        dict with verification results
+        dict with verification results. On success includes content_sha256.
     """
     result: dict[str, Any] = {
         "valid": True,
         "errors": [],
         "bundle_id": None,
+        "content_sha256": None,
     }
 
     manifest_path = bundle_dir / "bundle.manifest.json"
@@ -472,6 +657,9 @@ def verify_bundle(bundle_dir: Path) -> dict[str, Any]:
         return result
 
     result["bundle_id"] = manifest.get("bundle_id")
+    declared_content_hash = manifest.get("content_sha256")
+    if isinstance(declared_content_hash, str):
+        result["content_sha256"] = declared_content_hash
 
     # Check required manifest fields
     required_fields = [
@@ -523,5 +711,9 @@ def verify_bundle(bundle_dir: Path) -> dict[str, Any]:
             f"content_sha256 mismatch: expected {expected_content_hash}, "
             f"got {actual_content_hash}"
         )
+
+    if not result["valid"]:
+        # Do not advertise a declared hash as verified when integrity failed.
+        result["content_sha256"] = None
 
     return result

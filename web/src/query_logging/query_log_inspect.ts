@@ -3,6 +3,7 @@ import {
   getQueryLogMatchedKeyType,
   getQueryLogResultCount,
   getQueryLogStatusLabel,
+  recentLogLookupPairDisplay,
 } from "./query_log_derive";
 import type { QueryLogEvent, QueryLogEventV1 } from "./query_log_types";
 
@@ -26,4 +27,9 @@ export function recentLogMatchedKeyDisplay(row: QueryLogEvent): string | null {
 
 export function recentLogMatchedKeyTypeDisplay(row: QueryLogEvent): string {
   return getQueryLogMatchedKeyType(row);
+}
+
+/** Advanced/diagnostics: FR → MNK | EN → MNK | MNK → FR | MNK → EN */
+export function recentLogLookupPairLabel(row: QueryLogEvent): string {
+  return recentLogLookupPairDisplay(row);
 }

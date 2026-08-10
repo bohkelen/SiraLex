@@ -37,6 +37,7 @@ const FULL_LEXICON: EnrichedRecord = {
             text_nko_provided: "ߊ ߞߎ߲",
             trans_fr: "sa tête",
             trans_en: "his head",
+            trans_ru: "его голова",
             source_attribution: "corpus note",
           },
         ],
@@ -133,11 +134,18 @@ describe("UX2I4 entry presentation", () => {
 
     const senses = root.querySelectorAll(".ux2-entry-sense");
     expect(senses.length).toBe(2);
-    expect(root.textContent).toContain("main");
-    expect(root.textContent).toContain("hand");
-    expect(root.textContent).toContain("рука");
-    expect(root.textContent).toContain("bras");
-    expect(root.textContent).toContain("arm");
+    const glosses = root.querySelectorAll('[data-testid="entry-gloss"]');
+    expect(glosses[0]?.textContent).toBe("main");
+    expect(glosses[0]?.getAttribute("data-gloss-lang")).toBe("fr");
+    expect(glosses[1]?.textContent).toBe("bras");
+    expect(root.textContent).not.toContain("рука");
+    expect(root.textContent).not.toContain("его голова");
+    expect(root.querySelector('[data-testid="entry-example-trans"]')?.textContent).toBe(
+      "sa tête",
+    );
+    expect(root.querySelector('[data-testid="entry-subentry-gloss"]')?.textContent).toBe(
+      "près de la main",
+    );
 
     const exampleNko = root.querySelector(".example-nko");
     expect(exampleNko?.getAttribute("lang")).toBe("nqo");
@@ -163,6 +171,32 @@ describe("UX2I4 entry presentation", () => {
     expect(
       actions!.compareDocumentPosition(sensesWrap!) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("ML1D3 prefers English glosses for EN LookupMode and never Russian", () => {
+    const { root } = renderEntryDetail(FULL_LEXICON, {
+      onBack: () => undefined,
+      presentationLookupMode: { from: "en", to: "mnk" },
+    });
+    const glosses = root.querySelectorAll('[data-testid="entry-gloss"]');
+    expect(glosses[0]?.textContent).toBe("hand");
+    expect(glosses[0]?.getAttribute("data-gloss-lang")).toBe("en");
+    expect(glosses[1]?.textContent).toBe("arm");
+    expect(root.querySelectorAll('[data-testid="entry-gloss"]')[0]?.textContent).not.toBe("main");
+    expect(root.textContent).not.toContain("рука");
+    expect(root.querySelector('[data-testid="entry-example-trans"]')?.textContent).toBe(
+      "his head",
+    );
+  });
+
+  it("ML1D3 French UI labels do not change EN gloss selection", () => {
+    setCurrentLocale("fr");
+    const { root } = renderEntryDetail(FULL_LEXICON, {
+      onBack: () => undefined,
+      presentationLookupMode: { from: "mnk", to: "en" },
+    });
+    expect(root.querySelector('[data-testid="entry-gloss"]')?.textContent).toBe("hand");
+    expect(root.textContent).toContain("Exemples");
   });
 
   it("omits empty optional shells for a minimal Latin-only entry", () => {

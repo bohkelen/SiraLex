@@ -1,7 +1,7 @@
 /**
  * CF2I1 — Search feedback package model, parser, builder, and serialization.
  *
- * SearchFeedbackPackageV1 is unreviewed search-failure evidence for later
+ * SearchFeedbackPackage is unreviewed search-failure evidence for later
  * human triage. It is not:
  * - missing-entry truth
  * - correction_record_v1 / correctionset input
@@ -9,23 +9,41 @@
  * - Phase 1.5 patch data
  * - query-log export
  *
+ * Package schemas (ML1C2A):
+ * - V1 packages carry only V1 drafts (no language fields).
+ * - V2 packages carry only V2 drafts (required language fields).
+ * - Default export builder produces V2, upgrading V1 drafts to export copies.
+ *
  * Pure module: no IndexedDB, clock, DOM, download, network, i18n, or corpus mutation.
  */
 
 import {
-  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION,
-  cloneSearchFeedbackDraft,
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1,
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
+  cloneSearchFeedbackDraftV1,
+  cloneSearchFeedbackDraftV2,
   compareSearchFeedbackDraftsForExport,
   countUnicodeCharacters,
+  isSearchFeedbackDraftV1,
+  isSearchFeedbackDraftV2,
   isValidSearchFeedbackIsoTimestamp,
+  type SearchFeedbackDraft,
   type SearchFeedbackDraftV1,
+  type SearchFeedbackDraftV2,
 } from "./search_feedback_types";
 import {
   validateSearchFeedbackDraft,
   validateSearchFeedbackDraftForWrite,
 } from "./search_feedback_validation";
 
-export const SEARCH_FEEDBACK_PACKAGE_SCHEMA = "siralex_search_feedback_v1" as const;
+export const SEARCH_FEEDBACK_PACKAGE_SCHEMA_V1 = "siralex_search_feedback_v1" as const;
+export const SEARCH_FEEDBACK_PACKAGE_SCHEMA_V2 = "siralex_search_feedback_v2" as const;
+
+/**
+ * Historical alias for V1 package identity (locks-schema tests / older call sites).
+ * Prefer SEARCH_FEEDBACK_PACKAGE_SCHEMA_V1 or _V2 explicitly for new code.
+ */
+export const SEARCH_FEEDBACK_PACKAGE_SCHEMA = SEARCH_FEEDBACK_PACKAGE_SCHEMA_V1;
 
 /** Exact CF2D0 authority label — search failure evidence ≠ missing-entry truth. */
 export const SEARCH_FEEDBACK_AUTHORITY_LABEL =
@@ -39,13 +57,26 @@ export const SEARCH_FEEDBACK_PACKAGE_MAX_VALIDATION_ERRORS = 100;
 export const SEARCH_FEEDBACK_APP_VERSION_MAX_CHARS = 200;
 
 export type SearchFeedbackPackageV1 = {
-  package_schema: typeof SEARCH_FEEDBACK_PACKAGE_SCHEMA;
+  package_schema: typeof SEARCH_FEEDBACK_PACKAGE_SCHEMA_V1;
   exported_at: string;
   app_version?: string;
   authority_label: typeof SEARCH_FEEDBACK_AUTHORITY_LABEL;
   feedback_count: number;
   feedbacks: SearchFeedbackDraftV1[];
 };
+
+export type SearchFeedbackPackageV2 = {
+  package_schema: typeof SEARCH_FEEDBACK_PACKAGE_SCHEMA_V2;
+  exported_at: string;
+  app_version?: string;
+  authority_label: typeof SEARCH_FEEDBACK_AUTHORITY_LABEL;
+  feedback_count: number;
+  feedbacks: SearchFeedbackDraftV2[];
+};
+
+export type SearchFeedbackPackage =
+  | SearchFeedbackPackageV1
+  | SearchFeedbackPackageV2;
 
 export type SearchFeedbackPackageValidationErrorCode =
   | "file_too_large"
@@ -70,7 +101,7 @@ export type SearchFeedbackPackageValidationError = {
 export type ParseSearchFeedbackPackageResult =
   | {
       ok: true;
-      package: SearchFeedbackPackageV1;
+      package: SearchFeedbackPackage;
     }
   | {
       ok: false;
@@ -86,7 +117,7 @@ export type SearchFeedbackBuildErrorCode =
   | "invalid_app_version";
 
 /**
- * Typed failure from {@link buildSearchFeedbackPackage}.
+ * Typed failure from package builders.
  * Messages are structural; they must not include user-authored content.
  */
 export class SearchFeedbackBuildError extends Error {
@@ -168,6 +199,45 @@ function fail(collector: ErrorCollector): ParseSearchFeedbackPackageResult {
 }
 
 /**
+ * Deterministic V1→V2 export upgrade copy.
+ * Does not mutate the input draft. Local V1 rows remain V1 in IndexedDB.
+ */
+export function upgradeSearchFeedbackDraftV1ToV2ForExport(
+  draft: SearchFeedbackDraftV1,
+): SearchFeedbackDraftV2 {
+  const langs =
+    draft.search_direction === "source_to_target"
+      ? ({ input_lang: "fr", output_lang: "mnk" } as const)
+      : ({ input_lang: "mnk", output_lang: "fr" } as const);
+
+  return {
+    schema_version: SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
+    feedback_id: draft.feedback_id,
+    bundle_id: draft.bundle_id,
+    content_sha256: draft.content_sha256,
+    storage_scope_id: draft.storage_scope_id,
+    query_raw: draft.query_raw,
+    search_direction: draft.search_direction,
+    input_lang: langs.input_lang,
+    output_lang: langs.output_lang,
+    result_state: draft.result_state,
+    result_count: draft.result_count,
+    ...(draft.matched_ir_ids !== undefined
+      ? { matched_ir_ids: [...draft.matched_ir_ids] }
+      : {}),
+    ...(draft.requested_meaning !== undefined
+      ? { requested_meaning: draft.requested_meaning }
+      : {}),
+    ...(draft.user_description !== undefined
+      ? { user_description: draft.user_description }
+      : {}),
+    created_at: draft.created_at,
+    updated_at: draft.updated_at,
+    status: "draft",
+  };
+}
+
+/**
  * Parse and strictly validate a search-feedback JSON string.
  * Preserves validated input feedback order. Does not mutate inputs.
  * Does not diagnose linguistic cause or convert to Phase 1.5 artifacts.
@@ -214,10 +284,14 @@ export function parseSearchFeedbackJson(
   }
   if (collector.errors.length > 0) return fail(collector);
 
-  if (parsed.package_schema !== SEARCH_FEEDBACK_PACKAGE_SCHEMA) {
+  const packageSchema = parsed.package_schema;
+  if (
+    packageSchema !== SEARCH_FEEDBACK_PACKAGE_SCHEMA_V1 &&
+    packageSchema !== SEARCH_FEEDBACK_PACKAGE_SCHEMA_V2
+  ) {
     pushError(collector, {
       code:
-        typeof parsed.package_schema === "string"
+        typeof packageSchema === "string"
           ? "unsupported_package_schema"
           : "invalid_package_field",
       path: "package_schema",
@@ -289,7 +363,8 @@ export function parseSearchFeedbackJson(
     return fail(collector);
   }
 
-  const feedbacks: SearchFeedbackDraftV1[] = [];
+  const feedbacksV1: SearchFeedbackDraftV1[] = [];
+  const feedbacksV2: SearchFeedbackDraftV2[] = [];
   const seenIds = new Set<string>();
   for (let i = 0; i < parsed.feedbacks.length; i += 1) {
     const path = `feedbacks[${i}]`;
@@ -303,6 +378,27 @@ export function parseSearchFeedbackJson(
       if (collector.truncated) return fail(collector);
       continue;
     }
+
+    if (packageSchema === SEARCH_FEEDBACK_PACKAGE_SCHEMA_V1) {
+      if (!isSearchFeedbackDraftV1(draftResult.value)) {
+        pushError(collector, {
+          code: "invalid_feedback",
+          path,
+          feedback_index: i,
+        });
+        if (collector.truncated) return fail(collector);
+        continue;
+      }
+    } else if (!isSearchFeedbackDraftV2(draftResult.value)) {
+      pushError(collector, {
+        code: "invalid_feedback",
+        path,
+        feedback_index: i,
+      });
+      if (collector.truncated) return fail(collector);
+      continue;
+    }
+
     if (seenIds.has(draftResult.value.feedback_id)) {
       pushError(collector, {
         code: "duplicate_feedback_id",
@@ -313,41 +409,56 @@ export function parseSearchFeedbackJson(
       continue;
     }
     seenIds.add(draftResult.value.feedback_id);
-    feedbacks.push(draftResult.value);
+    if (isSearchFeedbackDraftV1(draftResult.value)) {
+      feedbacksV1.push(draftResult.value);
+    } else {
+      feedbacksV2.push(draftResult.value);
+    }
   }
 
   if (collector.errors.length > 0) return fail(collector);
 
+  if (packageSchema === SEARCH_FEEDBACK_PACKAGE_SCHEMA_V1) {
+    return {
+      ok: true,
+      package: {
+        package_schema: SEARCH_FEEDBACK_PACKAGE_SCHEMA_V1,
+        exported_at: parsed.exported_at,
+        ...(appVersion !== undefined ? { app_version: appVersion } : {}),
+        authority_label: SEARCH_FEEDBACK_AUTHORITY_LABEL,
+        feedback_count: feedbacksV1.length,
+        feedbacks: feedbacksV1,
+      },
+    };
+  }
+
   return {
     ok: true,
     package: {
-      package_schema: SEARCH_FEEDBACK_PACKAGE_SCHEMA,
+      package_schema: SEARCH_FEEDBACK_PACKAGE_SCHEMA_V2,
       exported_at: parsed.exported_at,
       ...(appVersion !== undefined ? { app_version: appVersion } : {}),
       authority_label: SEARCH_FEEDBACK_AUTHORITY_LABEL,
-      feedback_count: feedbacks.length,
-      feedbacks,
+      feedback_count: feedbacksV2.length,
+      feedbacks: feedbacksV2,
     },
   };
 }
 
-/**
- * Build a validated, canonically ordered search-feedback package.
- * Caller supplies `exportedAt`. Does not access the clock or IndexedDB.
- */
-export function buildSearchFeedbackPackage(
-  feedbacks: readonly SearchFeedbackDraftV1[],
-  options: {
-    exportedAt: string;
-    appVersion?: string;
+/** Alias of {@link parseSearchFeedbackJson} for clarity at call sites. */
+export function parseSearchFeedbackPackageJson(
+  text: string,
+  options?: {
+    byteLength?: number;
   },
-): SearchFeedbackPackageV1 {
-  if (!Array.isArray(feedbacks) || feedbacks.length === 0) {
-    throw new SearchFeedbackBuildError(
-      "empty_feedbacks",
-      "buildSearchFeedbackPackage: feedbacks must be a non-empty array",
-    );
-  }
+): ParseSearchFeedbackPackageResult {
+  return parseSearchFeedbackJson(text, options);
+}
+
+function assertBuildOptions(options: {
+  exportedAt: string;
+  appVersion?: string;
+}): void {
   if (!isValidSearchFeedbackIsoTimestamp(options.exportedAt)) {
     throw new SearchFeedbackBuildError(
       "invalid_exported_at",
@@ -367,11 +478,94 @@ export function buildSearchFeedbackPackage(
       );
     }
   }
+}
+
+/**
+ * Historical V1 package builder for tests and V1-only archives.
+ * Accepts V1 drafts only.
+ */
+export function buildSearchFeedbackPackageV1(
+  feedbacks: readonly SearchFeedbackDraftV1[],
+  options: {
+    exportedAt: string;
+    appVersion?: string;
+  },
+): SearchFeedbackPackageV1 {
+  if (!Array.isArray(feedbacks) || feedbacks.length === 0) {
+    throw new SearchFeedbackBuildError(
+      "empty_feedbacks",
+      "buildSearchFeedbackPackageV1: feedbacks must be a non-empty array",
+    );
+  }
+  assertBuildOptions(options);
 
   const cloned: SearchFeedbackDraftV1[] = [];
   const seen = new Set<string>();
   for (let i = 0; i < feedbacks.length; i += 1) {
-    const input = feedbacks[i];
+    const input = feedbacks[i]!;
+    try {
+      validateSearchFeedbackDraftForWrite(input, `feedbacks[${i}]`);
+    } catch {
+      throw new SearchFeedbackBuildError(
+        "invalid_feedback",
+        `feedbacks[${i}]: invalid search feedback draft`,
+        i,
+      );
+    }
+    if (!isSearchFeedbackDraftV1(input)) {
+      throw new SearchFeedbackBuildError(
+        "invalid_feedback",
+        `feedbacks[${i}]: V1 package requires V1 drafts`,
+        i,
+      );
+    }
+    if (seen.has(input.feedback_id)) {
+      throw new SearchFeedbackBuildError(
+        "duplicate_feedback_id",
+        `feedbacks[${i}]: duplicate feedback_id`,
+        i,
+      );
+    }
+    seen.add(input.feedback_id);
+    cloned.push(cloneSearchFeedbackDraftV1(input));
+  }
+
+  cloned.sort(compareSearchFeedbackDraftsForExport);
+
+  return {
+    package_schema: SEARCH_FEEDBACK_PACKAGE_SCHEMA_V1,
+    exported_at: options.exportedAt,
+    ...(options.appVersion !== undefined ? { app_version: options.appVersion } : {}),
+    authority_label: SEARCH_FEEDBACK_AUTHORITY_LABEL,
+    feedback_count: cloned.length,
+    feedbacks: cloned,
+  };
+}
+
+/**
+ * Default export builder: produces PackageV2.
+ * Mixed local V1/V2 drafts are accepted; V1 drafts are upgraded to V2 export
+ * copies without mutating the input objects.
+ */
+export function buildSearchFeedbackPackage(
+  feedbacks: readonly SearchFeedbackDraft[],
+  options: {
+    exportedAt: string;
+    appVersion?: string;
+  },
+): SearchFeedbackPackageV2 {
+  if (!Array.isArray(feedbacks) || feedbacks.length === 0) {
+    throw new SearchFeedbackBuildError(
+      "empty_feedbacks",
+      "buildSearchFeedbackPackage: feedbacks must be a non-empty array",
+    );
+  }
+  assertBuildOptions(options);
+
+  const cloned: SearchFeedbackDraftV2[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < feedbacks.length; i += 1) {
+    const input = feedbacks[i]!;
     try {
       validateSearchFeedbackDraftForWrite(input, `feedbacks[${i}]`);
     } catch {
@@ -389,13 +583,17 @@ export function buildSearchFeedbackPackage(
       );
     }
     seen.add(input.feedback_id);
-    cloned.push(cloneSearchFeedbackDraft(input));
+    if (isSearchFeedbackDraftV1(input)) {
+      cloned.push(upgradeSearchFeedbackDraftV1ToV2ForExport(input));
+    } else {
+      cloned.push(cloneSearchFeedbackDraftV2(input));
+    }
   }
 
   cloned.sort(compareSearchFeedbackDraftsForExport);
 
   return {
-    package_schema: SEARCH_FEEDBACK_PACKAGE_SCHEMA,
+    package_schema: SEARCH_FEEDBACK_PACKAGE_SCHEMA_V2,
     exported_at: options.exportedAt,
     ...(options.appVersion !== undefined ? { app_version: options.appVersion } : {}),
     authority_label: SEARCH_FEEDBACK_AUTHORITY_LABEL,
@@ -404,7 +602,7 @@ export function buildSearchFeedbackPackage(
   };
 }
 
-function serializeDraft(draft: SearchFeedbackDraftV1, indent: string, level: number): string {
+function serializeDraft(draft: SearchFeedbackDraft, indent: string, level: number): string {
   const pad = indent.repeat(level);
   const pad1 = indent.repeat(level + 1);
   const fields = [
@@ -415,9 +613,15 @@ function serializeDraft(draft: SearchFeedbackDraftV1, indent: string, level: num
     `${pad1}"storage_scope_id": ${JSON.stringify(draft.storage_scope_id)}`,
     `${pad1}"query_raw": ${JSON.stringify(draft.query_raw)}`,
     `${pad1}"search_direction": ${JSON.stringify(draft.search_direction)}`,
+  ];
+  if (isSearchFeedbackDraftV2(draft)) {
+    fields.push(`${pad1}"input_lang": ${JSON.stringify(draft.input_lang)}`);
+    fields.push(`${pad1}"output_lang": ${JSON.stringify(draft.output_lang)}`);
+  }
+  fields.push(
     `${pad1}"result_state": ${JSON.stringify(draft.result_state)}`,
     `${pad1}"result_count": ${draft.result_count}`,
-  ];
+  );
   if (draft.matched_ir_ids !== undefined) {
     const ids =
       draft.matched_ir_ids.length === 0
@@ -446,9 +650,10 @@ function serializeDraft(draft: SearchFeedbackDraftV1, indent: string, level: num
 /**
  * Deterministic package serialization:
  * stable field order, two-space indent, EOF newline, exact Unicode.
+ * V1 drafts omit language fields; V2 drafts always include them.
  */
 export function serializeSearchFeedbackPackage(
-  pkg: SearchFeedbackPackageV1,
+  pkg: SearchFeedbackPackage,
 ): string {
   const indent = "  ";
 
@@ -501,5 +706,9 @@ export function buildSearchFeedbackFilename(exportedAt: string): string {
   return `siralex-search-feedback-${yyyy}-${mm}-${dd}T${hh}-${mi}-${ss}Z.json`;
 }
 
-// Re-export schema constant used by tests/docs for draft identity cross-checks.
-export { SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION };
+// Re-export draft schema constants used by tests/docs for identity cross-checks.
+export {
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1,
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
+};
+export { SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1 as SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION };

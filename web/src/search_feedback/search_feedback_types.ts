@@ -5,12 +5,25 @@
  * search against a specific dictionary version. It is not evidence that the
  * requested lexical object should exist.
  *
+ * Schema versioning (ML1C2A):
+ * - V1 is frozen: no input_lang/output_lang.
+ * - V2 requires input_lang + output_lang (LookupMode pair).
+ *
  * Pure module: no IndexedDB, clock, DOM, network, i18n, search, or corpus mutation.
  * Does not import CF1 correction record types.
  */
 
-export const SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION =
+export const SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1 =
   "search_failure_feedback_draft_v1" as const;
+export const SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2 =
+  "search_failure_feedback_draft_v2" as const;
+
+/**
+ * @deprecated Historical alias for V1 identity at call sites that predate V2.
+ * Prefer SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1 or _V2 explicitly.
+ */
+export const SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION =
+  SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1;
 
 export const SEARCH_FEEDBACK_QUERY_RAW_MAX_CHARS = 1_000;
 export const SEARCH_FEEDBACK_REQUESTED_MEANING_MAX_CHARS = 2_000;
@@ -45,9 +58,18 @@ export function isSearchFeedbackResultState(
 
 export type SearchFeedbackDirection = "source_to_target" | "target_to_source";
 
+/** Lookup language codes for CF2 provenance (ML1C2). */
+export type SearchFeedbackLookupLanguage = "fr" | "en" | "mnk";
+
 const SEARCH_FEEDBACK_DIRECTIONS = new Set<SearchFeedbackDirection>([
   "source_to_target",
   "target_to_source",
+]);
+
+const SEARCH_FEEDBACK_LOOKUP_LANGUAGES = new Set<SearchFeedbackLookupLanguage>([
+  "fr",
+  "en",
+  "mnk",
 ]);
 
 export function isSearchFeedbackDirection(
@@ -56,15 +78,21 @@ export function isSearchFeedbackDirection(
   return typeof value === "string" && SEARCH_FEEDBACK_DIRECTIONS.has(value as SearchFeedbackDirection);
 }
 
+export function isSearchFeedbackLookupLanguage(
+  value: unknown,
+): value is SearchFeedbackLookupLanguage {
+  return (
+    typeof value === "string" &&
+    SEARCH_FEEDBACK_LOOKUP_LANGUAGES.has(value as SearchFeedbackLookupLanguage)
+  );
+}
+
 /**
- * Local search-failure feedback draft (CF2).
- *
- * Identity is `feedback_id` only. `matched_ir_ids` are optional evidence of
- * results shown for `results_not_useful` — never CF1 correction targets,
- * never required foreign keys, never mutable anchors.
+ * Frozen V1 local search-failure feedback draft (CF2).
+ * No language provenance fields — historical FR↔MNK-only shape.
  */
 export type SearchFeedbackDraftV1 = {
-  schema_version: typeof SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION;
+  schema_version: typeof SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1;
   feedback_id: string;
   bundle_id: string;
   content_sha256: string;
@@ -80,6 +108,44 @@ export type SearchFeedbackDraftV1 = {
   updated_at: string;
   status: "draft";
 };
+
+/**
+ * V2 local search-failure feedback draft (CF2).
+ * Requires explicit LookupMode pair as input_lang + output_lang.
+ */
+export type SearchFeedbackDraftV2 = {
+  schema_version: typeof SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2;
+  feedback_id: string;
+  bundle_id: string;
+  content_sha256: string;
+  storage_scope_id: string;
+  query_raw: string;
+  search_direction: SearchFeedbackDirection;
+  input_lang: SearchFeedbackLookupLanguage;
+  output_lang: SearchFeedbackLookupLanguage;
+  result_state: SearchFeedbackResultState;
+  result_count: number;
+  matched_ir_ids?: string[];
+  requested_meaning?: string;
+  user_description?: string;
+  created_at: string;
+  updated_at: string;
+  status: "draft";
+};
+
+export type SearchFeedbackDraft = SearchFeedbackDraftV1 | SearchFeedbackDraftV2;
+
+export function isSearchFeedbackDraftV1(
+  value: SearchFeedbackDraft,
+): value is SearchFeedbackDraftV1 {
+  return value.schema_version === SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1;
+}
+
+export function isSearchFeedbackDraftV2(
+  value: SearchFeedbackDraft,
+): value is SearchFeedbackDraftV2 {
+  return value.schema_version === SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2;
+}
 
 /**
  * Count Unicode code points (not UTF-16 code units, not grapheme clusters).
@@ -136,11 +202,11 @@ export function isValidCanonicalContentSha256(value: unknown): value is string {
   return /^sha256:[0-9a-f]{64}$/.test(value);
 }
 
-export function cloneSearchFeedbackDraft(
+export function cloneSearchFeedbackDraftV1(
   draft: SearchFeedbackDraftV1,
 ): SearchFeedbackDraftV1 {
   const out: SearchFeedbackDraftV1 = {
-    schema_version: draft.schema_version,
+    schema_version: SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V1,
     feedback_id: draft.feedback_id,
     bundle_id: draft.bundle_id,
     content_sha256: draft.content_sha256,
@@ -165,6 +231,46 @@ export function cloneSearchFeedbackDraft(
   return out;
 }
 
+export function cloneSearchFeedbackDraftV2(
+  draft: SearchFeedbackDraftV2,
+): SearchFeedbackDraftV2 {
+  const out: SearchFeedbackDraftV2 = {
+    schema_version: SEARCH_FEEDBACK_DRAFT_SCHEMA_VERSION_V2,
+    feedback_id: draft.feedback_id,
+    bundle_id: draft.bundle_id,
+    content_sha256: draft.content_sha256,
+    storage_scope_id: draft.storage_scope_id,
+    query_raw: draft.query_raw,
+    search_direction: draft.search_direction,
+    input_lang: draft.input_lang,
+    output_lang: draft.output_lang,
+    result_state: draft.result_state,
+    result_count: draft.result_count,
+    created_at: draft.created_at,
+    updated_at: draft.updated_at,
+    status: "draft",
+  };
+  if (draft.matched_ir_ids !== undefined) {
+    out.matched_ir_ids = [...draft.matched_ir_ids];
+  }
+  if (draft.requested_meaning !== undefined) {
+    out.requested_meaning = draft.requested_meaning;
+  }
+  if (draft.user_description !== undefined) {
+    out.user_description = draft.user_description;
+  }
+  return out;
+}
+
+export function cloneSearchFeedbackDraft(
+  draft: SearchFeedbackDraft,
+): SearchFeedbackDraft {
+  if (isSearchFeedbackDraftV2(draft)) {
+    return cloneSearchFeedbackDraftV2(draft);
+  }
+  return cloneSearchFeedbackDraftV1(draft);
+}
+
 function compareCodePoints(a: string, b: string): number {
   if (a < b) return -1;
   if (a > b) return 1;
@@ -176,8 +282,8 @@ function compareCodePoints(a: string, b: string): number {
  * Code-point comparison only — never localeCompare.
  */
 export function compareSearchFeedbackDraftsForExport(
-  a: SearchFeedbackDraftV1,
-  b: SearchFeedbackDraftV1,
+  a: SearchFeedbackDraft,
+  b: SearchFeedbackDraft,
 ): number {
   const byBundle = compareCodePoints(a.bundle_id, b.bundle_id);
   if (byBundle !== 0) return byBundle;

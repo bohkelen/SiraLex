@@ -112,19 +112,14 @@ export function formatCorrectionTargetOptionLabel(label: CorrectionTargetOptionL
     case "sense":
       return t("correctionFeedback.form.target.sense", { n: label.senseNumber });
     case "translation":
-      if (label.gloss_lang === "fr") {
-        return t("correctionFeedback.form.target.translationFr", {
-          n: label.senseNumber,
-          gloss: label.gloss,
-        });
-      }
+      // RL1: new-capture options are FR/EN only.
       if (label.gloss_lang === "en") {
         return t("correctionFeedback.form.target.translationEn", {
           n: label.senseNumber,
           gloss: label.gloss,
         });
       }
-      return t("correctionFeedback.form.target.translationRu", {
+      return t("correctionFeedback.form.target.translationFr", {
         n: label.senseNumber,
         gloss: label.gloss,
       });
