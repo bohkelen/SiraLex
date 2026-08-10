@@ -293,6 +293,25 @@ describe("ML1D3 LookupMode-aware result glosses", () => {
     expect(gloss?.textContent).toBe("maison");
     expect(gloss?.getAttribute("data-gloss-lang")).toBe("fr");
     expect(gloss?.textContent).not.toContain("house");
+    expect(list?.textContent).not.toContain("дом");
+  });
+
+  it("RL1: RU-only record shows unavailable and never Russian", () => {
+    const ruOnly: EnrichedRecord = {
+      ...BILINGUAL,
+      ir_id: "record-ru-only",
+      display: {
+        headword_latin: "house_mnk",
+        senses: [{ gloss_ru: "дом" }],
+      },
+    };
+    const list = renderResultsList(
+      [makeContext(ruOnly, { lookupMode: { from: "en", to: "mnk" }, rawQuery: "x" })],
+      () => undefined,
+    );
+    const gloss = list?.querySelector('[data-testid="result-gloss"]');
+    expect(gloss?.getAttribute("data-gloss-unavailable")).toBe("true");
+    expect(list?.textContent).not.toContain("дом");
   });
 
   it("keeps immutable result LookupMode when a different mode is current elsewhere", () => {

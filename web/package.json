@@ -23,6 +23,7 @@
     "test:e2e:ml1d2-picker": "playwright test -c playwright.ml1d2.config.ts",
     "test:e2e:ml1d3-presentation": "playwright test -c playwright.ml1d2.config.ts e2e/ml1d3_lookup_presentation.spec.ts",
     "test:e2e:ml1d3": "npm run test:e2e:ml1d3-presentation",
+    "test:e2e:rl1": "playwright test -c playwright.ml1d2.config.ts e2e/rl1_russian_consumer_surfaces.spec.ts",
     "test:e2e:ux2-entry": "npm run build && playwright test -c playwright.config.ts e2e/ux2_entry_detail.spec.ts",
     "test:e2e:ux2-saved": "npm run build && playwright test -c playwright.config.ts e2e/ux2_saved_vocabulary.spec.ts",
     "test:e2e:ux2-review": "npm run build && playwright test -c playwright.config.ts e2e/ux2_review.spec.ts",

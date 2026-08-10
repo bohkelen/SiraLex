@@ -7,6 +7,7 @@ import {
   DEFAULT_LOOKUP_MODE,
   glossFallbackChain,
   indexFamilyForLookupInput,
+  isLookupLanguage,
   isValidLookupMode,
   LookupCapabilityError,
   lookupModeFromLegacySearchDirection,
@@ -172,6 +173,13 @@ describe("preferred gloss language", () => {
   it("never includes Russian in the fallback chain", () => {
     expect(glossFallbackChain("en")).toEqual(["en", "fr"]);
     expect(glossFallbackChain("fr")).toEqual(["fr", "en"]);
+  });
+
+  it("RL1: Russian cannot be a LookupLanguage or LookupMode endpoint", () => {
+    expect(isLookupLanguage("ru")).toBe(false);
+    expect(isValidLookupMode({ from: "ru", to: "mnk" })).toBe(false);
+    expect(isValidLookupMode({ from: "mnk", to: "ru" })).toBe(false);
+    expect(isValidLookupMode({ from: "fr", to: "ru" })).toBe(false);
   });
 });
 

@@ -37,6 +37,7 @@ const FULL_LEXICON: EnrichedRecord = {
             text_nko_provided: "ߊ ߞߎ߲",
             trans_fr: "sa tête",
             trans_en: "his head",
+            trans_ru: "его голова",
             source_attribution: "corpus note",
           },
         ],
@@ -138,6 +139,7 @@ describe("UX2I4 entry presentation", () => {
     expect(glosses[0]?.getAttribute("data-gloss-lang")).toBe("fr");
     expect(glosses[1]?.textContent).toBe("bras");
     expect(root.textContent).not.toContain("рука");
+    expect(root.textContent).not.toContain("его голова");
     expect(root.querySelector('[data-testid="entry-example-trans"]')?.textContent).toBe(
       "sa tête",
     );
