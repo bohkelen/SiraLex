@@ -177,16 +177,29 @@ def derive_deep_ladder(matched_key_type: str) -> bool:
     return matched_key_type in DEEP_LADDER_KEY_TYPES
 
 
+def is_acceptable_bundle_artifact_dir_name(
+    dir_name: str, bundle_id: str, content_sha256: str | None = None
+) -> bool:
+    """Accept logical id dirname or ML1C1A `{bundle_id}__{content_sha256_prefix8}`."""
+    if dir_name == bundle_id:
+        return True
+    prefix = f"{bundle_id}__"
+    if not dir_name.startswith(prefix):
+        return False
+    hash_prefix = dir_name[len(prefix) :]
+    if len(hash_prefix) != 8 or any(c not in "0123456789abcdefABCDEF" for c in hash_prefix):
+        return False
+    if isinstance(content_sha256, str) and content_sha256.strip():
+        hex_part = content_sha256.split(":", 1)[-1].lower()
+        if not hex_part.startswith(hash_prefix.lower()):
+            return False
+    return True
+
+
 def validate_bundle_metadata(bundle_path: Path, manifest: MatrixManifest) -> None:
     bundle_dir = bundle_path.resolve()
     if not bundle_dir.is_dir():
         raise BundleMetadataError(f"bundle path is not a directory: {bundle_dir}")
-
-    if bundle_dir.name != manifest.bundle_id:
-        raise BundleMetadataError(
-            "bundle directory basename must match manifest.bundle_id: "
-            f"expected {manifest.bundle_id!r}, got {bundle_dir.name!r}"
-        )
 
     bundle_manifest_path = bundle_dir / "bundle.manifest.json"
     if not bundle_manifest_path.exists():
@@ -201,6 +214,24 @@ def validate_bundle_metadata(bundle_path: Path, manifest: MatrixManifest) -> Non
 
     if not isinstance(bundle_manifest, dict):
         raise BundleMetadataError("bundle.manifest.json must be a JSON object")
+
+    manifest_bundle_id = bundle_manifest.get("bundle_id")
+    if manifest_bundle_id != manifest.bundle_id:
+        raise BundleMetadataError(
+            "bundle.manifest.json bundle_id must match matrix manifest bundle_id: "
+            f"expected {manifest.bundle_id!r}, got {manifest_bundle_id!r}"
+        )
+
+    content_sha = bundle_manifest.get("content_sha256")
+    content_sha_str = content_sha if isinstance(content_sha, str) else None
+    if not is_acceptable_bundle_artifact_dir_name(
+        bundle_dir.name, manifest.bundle_id, content_sha_str
+    ):
+        raise BundleMetadataError(
+            "bundle directory basename must match manifest.bundle_id "
+            "or versioned artifact `{bundle_id}__{content_sha256_prefix8}`: "
+            f"expected {manifest.bundle_id!r}, got {bundle_dir.name!r}"
+        )
 
     rule_versions = bundle_manifest.get("rule_versions") or {}
     bundle_norm = rule_versions.get("normalization")

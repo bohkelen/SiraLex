@@ -193,18 +193,32 @@ export function sha256File(path: string): string {
   return `sha256:${digest}`;
 }
 
+/**
+ * Accept either legacy dir name == logical bundle_id, or ML1C1A versioned
+ * physical artifact directory `{bundle_id}__{content_sha256_prefix8}`.
+ */
+export function isAcceptableBundleArtifactDirName(
+  dirBasename: string,
+  bundleId: string,
+  contentSha256?: string,
+): boolean {
+  if (dirBasename === bundleId) return true;
+  const prefix = `${bundleId}__`;
+  if (!dirBasename.startsWith(prefix)) return false;
+  const hashPrefix = dirBasename.slice(prefix.length);
+  if (!/^[0-9a-f]{8}$/i.test(hashPrefix)) return false;
+  if (typeof contentSha256 === "string" && contentSha256.trim() !== "") {
+    const hex = contentSha256.replace(/^sha256:/i, "").toLowerCase();
+    if (!hex.startsWith(hashPrefix.toLowerCase())) return false;
+  }
+  return true;
+}
+
 export function verifyRuntimeFixtureIdentity(
   bundleDir: string,
   manifest: MatrixManifest,
 ): string {
   const bundleBasename = basename(bundleDir);
-  if (bundleBasename !== manifest.bundle_id) {
-    throw new RuntimeBundleMetadataError(
-      "bundle directory basename must match manifest.bundle_id: " +
-        `expected ${JSON.stringify(manifest.bundle_id)}, got ${JSON.stringify(bundleBasename)}`,
-    );
-  }
-
   const bundleManifestPath = join(bundleDir, "bundle.manifest.json");
   if (!existsSync(bundleManifestPath)) {
     throw new RuntimeBundleMetadataError("bundle.manifest.json is missing");
@@ -221,6 +235,27 @@ export function verifyRuntimeFixtureIdentity(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new RuntimeBundleMetadataError(`bundle.manifest.json is invalid: ${message}`);
+  }
+
+  const manifestBundleId =
+    typeof bundleManifest.bundle_id === "string" ? bundleManifest.bundle_id : undefined;
+  if (manifestBundleId !== manifest.bundle_id) {
+    throw new RuntimeBundleMetadataError(
+      "bundle.manifest.json bundle_id must match matrix manifest bundle_id: " +
+        `expected ${JSON.stringify(manifest.bundle_id)}, got ${JSON.stringify(manifestBundleId)}`,
+    );
+  }
+
+  const contentSha =
+    typeof bundleManifest.content_sha256 === "string"
+      ? bundleManifest.content_sha256
+      : undefined;
+  if (!isAcceptableBundleArtifactDirName(bundleBasename, manifest.bundle_id, contentSha)) {
+    throw new RuntimeBundleMetadataError(
+      "bundle directory basename must match manifest.bundle_id " +
+        "or versioned artifact `{bundle_id}__{content_sha256_prefix8}`: " +
+        `expected ${JSON.stringify(manifest.bundle_id)}, got ${JSON.stringify(bundleBasename)}`,
+    );
   }
 
   const ruleVersions = bundleManifest.rule_versions;

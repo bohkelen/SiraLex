@@ -23,6 +23,7 @@ import {
   populateSearchIndexFromBundle,
   RuntimeBundleMetadataError,
   RuntimeSearchIndexChecksumError,
+  isAcceptableBundleArtifactDirName,
   verifyRuntimeFixtureIdentity,
   type CaseReplayResult,
 } from "./run_matrix";
@@ -155,6 +156,23 @@ describe("Phase 7L runtime search regression", () => {
     } finally {
       rmSync(tempRoot, { recursive: true, force: true });
     }
+  });
+
+  it("versioned artifact directory name `{bundle_id}__{hashprefix8}` is accepted", () => {
+    expect(
+      isAcceptableBundleArtifactDirName(
+        "bundle_full_20260710_337619ff__d076558b",
+        "bundle_full_20260710_337619ff",
+        "sha256:d076558b2f668a06a5a30a143026433e9e0de3523e0397183cfd897b2641d90a",
+      ),
+    ).toBe(true);
+    expect(
+      isAcceptableBundleArtifactDirName(
+        "bundle_full_20260710_337619ff__deadbeef",
+        "bundle_full_20260710_337619ff",
+        "sha256:d076558b2f668a06a5a30a143026433e9e0de3523e0397183cfd897b2641d90a",
+      ),
+    ).toBe(false);
   });
 
   it("modified copied search_index.jsonl fails checksum verification before database mutation", async () => {

@@ -38,15 +38,15 @@ const FEATURED_BUNDLE_ID = "bundle_full_20260710_337619ff";
 const PRIOR_FEATURED_BUNDLE_ID = "bundle_full_20260708_27643bb0";
 const FALLBACK_BUNDLE_ID = "bundle_full_20260616_phase7j_alias_round2_candidate";
 
-const FEATURED_DIR = join(REPO_ROOT, "web/public", FEATURED_BUNDLE_ID);
+const FEATURED_DIR = join(REPO_ROOT, "web/public", `${FEATURED_BUNDLE_ID}__d076558b`);
 const PRIOR_DIR = join(REPO_ROOT, "web/public", PRIOR_FEATURED_BUNDLE_ID);
 const MATRIX_PATH = join(REPO_ROOT, "shared/search_regression/search_regression_matrix_v1.jsonl");
 
 const EXPECTED_FEATURED = {
-  version: "norm-v3-featured-7n2b4g11-7l13-7n2a8-7n2b9-runtime-smoke-pass",
-  content_sha256: "sha256:337619ff43131acde1390d7892d687372785729dac5d85abe82b61cc92285c3c",
+  version: "norm-v3-featured-ml1e-multilingual-en-index",
+  content_sha256: "sha256:d076558b2f668a06a5a30a143026433e9e0de3523e0397183cfd897b2641d90a",
   records_sha256: "sha256:d99242ed0c049759ec265f3583683c99a3146854b4481b6d3de86cbd33f50a90",
-  search_index_sha256: "sha256:55bf98fc99a592f7003aa338fc7b4790bc9cd642b676c99a725d83a5f9ca79e3",
+  search_index_sha256: "sha256:1b436fd77dc5404631ac6e91e5d02a38f419a58984f0ccf27bfba4ca7cb0d892",
   prix_direct_id: "ffbf014bd96ffabf",
   prix_owner_ir_id: "3b8c3b7a0c5e897d",
 } as const;
@@ -181,7 +181,7 @@ describe("Phase 7N2B4G11 featured promotion", () => {
     expect(featured.bundle_id).toBe(FEATURED_BUNDLE_ID);
     expect(featured.version).toBe(EXPECTED_FEATURED.version);
     expect(featured.content_sha256).toBe(EXPECTED_FEATURED.content_sha256);
-    expect(featured.url_base).toBe(`./${FEATURED_BUNDLE_ID}/`);
+    expect(featured.url_base).toBe(`./${FEATURED_BUNDLE_ID}__d076558b/`);
 
     expect(sortFirst.bundle_id).toBe(FALLBACK_BUNDLE_ID);
 

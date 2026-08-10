@@ -317,13 +317,24 @@ async function deleteStoreRowsByBundleId(
   storeName: typeof STORE_RECORDS | typeof STORE_SEARCH_INDEX,
   bundleId: string,
 ): Promise<void> {
+  // Cursor delete avoids getAllKeys() materializing 100k+ primary keys in memory
+  // (pathological on same-ID featured updates in fake-indexeddb / large scopes).
   const tx = db.transaction(storeName, "readwrite");
   const store = tx.objectStore(storeName);
   const index = store.index(INDEX_BY_BUNDLE_ID);
-  const primaryKeys = await reqToPromise(index.getAllKeys(IDBKeyRange.only(bundleId)));
-  for (const key of primaryKeys) {
-    store.delete(key);
-  }
+  await new Promise<void>((resolve, reject) => {
+    const cursorReq = index.openCursor(IDBKeyRange.only(bundleId));
+    cursorReq.addEventListener("error", () => reject(cursorReq.error));
+    cursorReq.addEventListener("success", () => {
+      const cursor = cursorReq.result;
+      if (!cursor) {
+        resolve();
+        return;
+      }
+      cursor.delete();
+      cursor.continue();
+    });
+  });
   await txDone(tx);
 }
 

@@ -6,8 +6,8 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /ml1d[23]_.*\.spec\.ts|rl1_.*\.spec\.ts/,
-  timeout: 900_000,
+  testMatch: /ml1d[23]_.*\.spec\.ts|rl1_.*\.spec\.ts|ml1e_.*\.spec\.ts/,
+  timeout: 2_400_000,
   expect: {
     timeout: 30_000,
   },
