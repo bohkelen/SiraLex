@@ -56,8 +56,28 @@ import {
 import {
   installBundleIntoDb,
   installRemoteCatalogBundle,
+  type InstallProgressCopy,
   type InstallProgressMode,
 } from "./install/bundle_install";
+import { isActiveFeaturedUpdateAvailable } from "./dictionary_update/dictionary_update_availability";
+import {
+  applyNoticeDismissed,
+  beginConfirm,
+  beginProgress,
+  closeUpdateUi,
+  createDictionaryUpdateConsumerState,
+  markUpdateFailure,
+  markUpdateSuccess,
+  setProgressMessage,
+  shouldShowSearchUpdateNotice,
+  type DictionaryUpdateConsumerState,
+} from "./dictionary_update/dictionary_update_consumer_state";
+import {
+  closeDictionaryUpdateDialog,
+  openDictionaryUpdateDialog,
+  renderDictionaryUpdateDialog,
+  renderSearchUpdateNotice,
+} from "./render/render_dictionary_update";
 import {
   buildQueryLogDiagnosticsContext,
   clearQueryLogsFromUi,
@@ -311,6 +331,7 @@ app.innerHTML = `
         </div>
 
         <div id="searchMeta" class="ux2-search-meta" aria-live="polite"></div>
+        <div id="dictionaryUpdateNoticeHost" class="ux2-dict-update-notice-host" hidden></div>
       </div>
 
       <div id="searchResults" class="ux2-surface-host ux2-search-results"></div>
@@ -533,6 +554,7 @@ const searchFeedbackDeleteReminder = mustGetEl<HTMLParagraphElement>(
   "#searchFeedbackDeleteReminder",
 );
 const searchChrome = mustGetEl<HTMLDivElement>("#searchChrome");
+const dictionaryUpdateNoticeHost = mustGetEl<HTMLDivElement>("#dictionaryUpdateNoticeHost");
 const searchInput = mustGetEl<HTMLInputElement>("#searchInput");
 const searchLabel = mustGetEl<HTMLLabelElement>("#searchLabel");
 const searchSourceLanguage = mustGetEl<HTMLSpanElement>("#searchSourceLanguage");
@@ -582,6 +604,10 @@ let remoteInstallBundleId: string | undefined;
 let currentStorageEstimate: { usage?: number; quota?: number } | undefined;
 let featuredInstallInProgress = false;
 let packageImportInProgress = false;
+/** DU1 — session-scoped consumer dictionary update UX. */
+let dictionaryUpdateState: DictionaryUpdateConsumerState = createDictionaryUpdateConsumerState();
+let dictionaryUpdateDialogEl: HTMLDialogElement | null = null;
+let dictionaryUpdatePendingEntry: BundleCatalogEntryV1 | undefined;
 
 function formatErrorDetails(e: unknown): string {
   const details = [`String(e): ${String(e)}`];
@@ -704,6 +730,200 @@ function getCatalogEntryRuntimeState(entry: BundleCatalogEntryV1): {
   };
 }
 
+function getActiveFeaturedUpdateCatalogEntry(): BundleCatalogEntryV1 | undefined {
+  if (!currentActiveBundle || loadedCatalogBundles.length === 0) return undefined;
+  const featured = getFeaturedCatalogEntry();
+  const entry =
+    featured && featured.bundle_id === currentActiveBundle.bundle_id
+      ? featured
+      : getLoadedCatalogEntry(currentActiveBundle.bundle_id);
+  if (
+    !isActiveFeaturedUpdateAvailable({
+      active: currentActiveBundle,
+      featuredEntry: entry,
+    })
+  ) {
+    return undefined;
+  }
+  return entry;
+}
+
+function buildConsumerUpdateProgressCopy(): Partial<InstallProgressCopy> {
+  return {
+    installingPrefix: t("progress.installingPrefix"),
+    stageLabel: t("progress.stageLabel"),
+    stageFetchingManifest: t("progress.stage.fetchManifest"),
+    stageFetchingRecords: t("progress.stage.fetchRecords"),
+    stageFetchingSearchIndex: t("progress.stage.fetchSearchIndex"),
+    stageStagingPayloads: t("progress.stage.stagingPayloads"),
+    bytesReadLabel: t("progress.bytesReadLabel"),
+    linesSeenLabel: t("progress.linesSeenLabel"),
+    recordsWrittenLabel: t("progress.recordsWrittenLabel"),
+    entriesWrittenLabel: t("progress.entriesWrittenLabel"),
+    batchesCommittedLabel: t("progress.batchesCommittedLabel"),
+    consumerPreparing: t("dictionaryUpdate.progress.preparing"),
+    consumerDownloading: t("dictionaryUpdate.progress.downloading"),
+    consumerVerifying: t("dictionaryUpdate.progress.verifying"),
+    consumerInstalling: t("dictionaryUpdate.progress.installing"),
+    consumerInstallingPercent: t("dictionaryUpdate.progress.installingPercent"),
+    consumerAddingPercent: t("dictionaryUpdate.progress.installingPercent"),
+    consumerCleanup: t("dictionaryUpdate.progress.cleanup"),
+  };
+}
+
+function mountDictionaryUpdateDialog(): void {
+  closeDictionaryUpdateDialog(dictionaryUpdateDialogEl);
+  dictionaryUpdateDialogEl = null;
+  if (dictionaryUpdateState.phase === "idle") return;
+
+  const dialog = renderDictionaryUpdateDialog(
+    {
+      phase: dictionaryUpdateState.phase,
+      progressMessage: dictionaryUpdateState.progressMessage,
+      failureMessage: dictionaryUpdateState.failureMessage,
+      cleanupWarning: dictionaryUpdateState.cleanupWarning,
+    },
+    {
+      onConfirmUpdate: () => {
+        void runConfirmedDictionaryUpdate();
+      },
+      onCancel: () => {
+        dictionaryUpdatePendingEntry = undefined;
+        dictionaryUpdateState = closeUpdateUi(dictionaryUpdateState);
+        mountDictionaryUpdateDialog();
+        refreshSearchUpdateNotice();
+      },
+      onRetry: () => {
+        dictionaryUpdateState = beginConfirm(dictionaryUpdateState);
+        mountDictionaryUpdateDialog();
+      },
+      onContinue: () => {
+        dictionaryUpdatePendingEntry = undefined;
+        dictionaryUpdateState = closeUpdateUi(dictionaryUpdateState);
+        mountDictionaryUpdateDialog();
+        refreshSearchUpdateNotice();
+      },
+      onCloseFailure: () => {
+        dictionaryUpdatePendingEntry = undefined;
+        dictionaryUpdateState = closeUpdateUi(dictionaryUpdateState);
+        mountDictionaryUpdateDialog();
+        refreshSearchUpdateNotice();
+      },
+    },
+  );
+  dictionaryUpdateDialogEl = dialog;
+  openDictionaryUpdateDialog(dialog);
+}
+
+function refreshSearchUpdateNotice(): void {
+  const updateEntry = getActiveFeaturedUpdateCatalogEntry();
+  const updateAvailable = Boolean(updateEntry);
+  const show = shouldShowSearchUpdateNotice({
+    updateAvailable,
+    noticeDismissedThisSession: dictionaryUpdateState.noticeDismissedThisSession,
+    phase: dictionaryUpdateState.phase,
+  });
+
+  dictionaryUpdateNoticeHost.replaceChildren();
+  if (!show || !updateEntry) {
+    dictionaryUpdateNoticeHost.hidden = true;
+    return;
+  }
+
+  dictionaryUpdateNoticeHost.hidden = false;
+  dictionaryUpdateNoticeHost.appendChild(
+    renderSearchUpdateNotice({
+      onUpdate: () => {
+        openDictionaryUpdateConfirm(updateEntry);
+      },
+      onNotNow: () => {
+        dictionaryUpdateState = applyNoticeDismissed(dictionaryUpdateState);
+        refreshSearchUpdateNotice();
+      },
+    }),
+  );
+}
+
+function openDictionaryUpdateConfirm(entry: BundleCatalogEntryV1): void {
+  dictionaryUpdatePendingEntry = entry;
+  dictionaryUpdateState = beginConfirm(dictionaryUpdateState);
+  mountDictionaryUpdateDialog();
+}
+
+async function runConfirmedDictionaryUpdate(): Promise<void> {
+  const entry = dictionaryUpdatePendingEntry;
+  if (!entry || busy) return;
+
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    dictionaryUpdateState = markUpdateFailure(
+      dictionaryUpdateState,
+      t("dictionaryUpdate.offlineRequired"),
+    );
+    mountDictionaryUpdateDialog();
+    return;
+  }
+
+  const activateOnCommit =
+    !installedBundles.find((b) => b.bundle_id === entry.bundle_id) ||
+    currentActiveBundle?.bundle_id === entry.bundle_id;
+
+  dictionaryUpdateState = beginProgress(
+    dictionaryUpdateState,
+    t("dictionaryUpdate.progress.preparing"),
+  );
+  mountDictionaryUpdateDialog();
+
+  await withSingleWriterLock(`consumer update ${entry.bundle_id}`, async () => {
+    const result = await installCatalogEntry(
+      entry,
+      activateOnCommit,
+      importProgress,
+      "consumer",
+      {
+        progressCopyOverride: buildConsumerUpdateProgressCopy(),
+        onConsumerProgress: (message) => {
+          dictionaryUpdateState = setProgressMessage(dictionaryUpdateState, message);
+          if (dictionaryUpdateDialogEl) {
+            const progressEl = dictionaryUpdateDialogEl.querySelector(
+              "[data-testid='dictionary-update-progress']",
+            );
+            if (progressEl) progressEl.textContent = message;
+          }
+        },
+      },
+    );
+
+    if (result.ok) {
+      dictionaryUpdateState = markUpdateSuccess(
+        dictionaryUpdateState,
+        result.cleanupWarning,
+      );
+    } else {
+      dictionaryUpdateState = markUpdateFailure(
+        dictionaryUpdateState,
+        result.message || t("dictionaryUpdate.failureBody"),
+      );
+    }
+    mountDictionaryUpdateDialog();
+  });
+}
+
+async function maybeRefreshFeaturedCatalogForUpdateCheck(): Promise<void> {
+  if (!currentActiveBundle) return;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    refreshSearchUpdateNotice();
+    return;
+  }
+  try {
+    await loadCatalogFromUrl(FEATURED_CATALOG_URL, catalogStatus, {
+      updateCatalogInput: false,
+    });
+  } catch {
+    // Keep cached catalog if any; do not claim an update without catalog data.
+  }
+  refreshSearchUpdateNotice();
+}
+
 function renderInstalledBundleManager() {
   const knownPayloadBytes = getKnownBundlePayloadBytes(installedBundles);
   const unknownSizeCount = installedBundles.filter((bundle) => bundle.storage_bytes === undefined).length;
@@ -754,9 +974,11 @@ function renderInstalledBundleManager() {
       });
     },
     onRemove: (bundleId) => {
+      const bundle = installedBundles.find((b) => b.bundle_id === bundleId);
+      const name = bundle ? getInstalledBundleName(bundle) : bundleId;
       const confirmed =
         typeof window === "undefined" ||
-        window.confirm(t("bundle.removeConfirm", { bundleId }));
+        window.confirm(t("dictionaries.removeConfirm", { name }));
       if (!confirmed) return;
       void withSingleWriterLock(`remove bundle ${bundleId}`, async () => {
         const db = await openSiralexDb();
@@ -778,13 +1000,7 @@ function renderInstalledBundleManager() {
       const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
       const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
       if (!catalogEntry || catalogState?.comparison.state !== "update_available") return;
-      void withSingleWriterLock(`update bundle ${bundle.bundle_id}`, async () => {
-        await installCatalogEntry(
-          catalogEntry,
-          catalogState?.activateOnCommit ??
-            currentActiveBundle?.bundle_id === bundle.bundle_id,
-        );
-      });
+      openDictionaryUpdateConfirm(catalogEntry);
     },
   });
   installedBundleList.replaceChildren(list);
@@ -1306,6 +1522,7 @@ async function refreshDbStatus() {
     searchResults.innerHTML = "";
   }
   updateLangToggle();
+  refreshSearchUpdateNotice();
   if (
     appShell.dataset.primary === "more" &&
     appShell.dataset.moreView === "landing" &&
@@ -1571,6 +1788,7 @@ async function loadCatalogFromUrl(
     catalogLoading = false;
     updateCatalogControls();
     renderCatalogList();
+    refreshSearchUpdateNotice();
   }
 }
 
@@ -1643,7 +1861,11 @@ async function installCatalogEntry(
   activateOnCommit = true,
   progressTarget: HTMLDivElement = importProgress,
   progressMode: InstallProgressMode = "detailed",
-): Promise<{ ok: boolean; message: string }> {
+  opts: {
+    progressCopyOverride?: Partial<InstallProgressCopy>;
+    onConsumerProgress?: (message: string) => void;
+  } = {},
+): Promise<{ ok: boolean; message: string; cleanupWarning?: string }> {
   if (!loadedCatalogUrl) {
     progressTarget.style.display = "";
     progressTarget.textContent = t("catalog.missingSourceUrl");
@@ -1672,31 +1894,40 @@ async function installCatalogEntry(
   progressTarget.style.display = "";
   progressTarget.textContent =
     progressMode === "consumer"
-      ? t("progress.consumer.preparing")
+      ? (opts.progressCopyOverride?.consumerPreparing ?? t("progress.consumer.preparing"))
       : t("catalog.prepareRemoteInstall", { bundleId: entry.bundle_id });
 
   const db = await openSiralexDb();
   try {
+    const defaultConsumerCopy: Partial<InstallProgressCopy> = {
+      installingPrefix: t("progress.installingPrefix"),
+      stageLabel: t("progress.stageLabel"),
+      stageFetchingManifest: t("progress.stage.fetchManifest"),
+      stageFetchingRecords: t("progress.stage.fetchRecords"),
+      stageFetchingSearchIndex: t("progress.stage.fetchSearchIndex"),
+      stageStagingPayloads: t("progress.stage.stagingPayloads"),
+      bytesReadLabel: t("progress.bytesReadLabel"),
+      linesSeenLabel: t("progress.linesSeenLabel"),
+      recordsWrittenLabel: t("progress.recordsWrittenLabel"),
+      entriesWrittenLabel: t("progress.entriesWrittenLabel"),
+      batchesCommittedLabel: t("progress.batchesCommittedLabel"),
+      consumerAddingPercent: t("progress.consumer.addingPercent"),
+      consumerPreparing: t("progress.consumer.preparing"),
+      consumerDownloading: t("progress.consumer.downloading"),
+      consumerVerifying: t("progress.consumer.verifying"),
+      consumerInstalling: t("progress.consumer.installing"),
+      consumerCleanup: t("progress.consumer.cleanup"),
+    };
     const { manifest, result } = await installRemoteCatalogBundle(db, entry, loadedCatalogUrl, {
       activateOnCommit,
       signal: controller.signal,
       onUpdate: (message) => {
         progressTarget.textContent = message;
+        opts.onConsumerProgress?.(message);
       },
       progressCopy: {
-        installingPrefix: t("progress.installingPrefix"),
-        stageLabel: t("progress.stageLabel"),
-        stageFetchingManifest: t("progress.stage.fetchManifest"),
-        stageFetchingRecords: t("progress.stage.fetchRecords"),
-        stageFetchingSearchIndex: t("progress.stage.fetchSearchIndex"),
-        stageStagingPayloads: t("progress.stage.stagingPayloads"),
-        bytesReadLabel: t("progress.bytesReadLabel"),
-        linesSeenLabel: t("progress.linesSeenLabel"),
-        recordsWrittenLabel: t("progress.recordsWrittenLabel"),
-        entriesWrittenLabel: t("progress.entriesWrittenLabel"),
-        batchesCommittedLabel: t("progress.batchesCommittedLabel"),
-        consumerAddingPercent: t("progress.consumer.addingPercent"),
-        consumerPreparing: t("progress.consumer.preparing"),
+        ...defaultConsumerCopy,
+        ...opts.progressCopyOverride,
       },
       progressMode,
       storageEstimate:
@@ -1722,7 +1953,11 @@ async function installCatalogEntry(
       if (result.cleanupWarning) {
         progressTarget.textContent += `\n${result.cleanupWarning}\n`;
       }
-      return { ok: true, message: "installed" };
+      return {
+        ok: true,
+        message: "installed",
+        cleanupWarning: result.cleanupWarning,
+      };
     }
   } catch (e) {
     console.error("REMOTE INSTALL FAILED", e);
@@ -3818,6 +4053,7 @@ async function initializeAppState() {
   }
   await refreshDbStatus();
   updatePackageImportControls();
+  void maybeRefreshFeaturedCatalogForUpdateCheck();
 }
 
 void initializeAppState();

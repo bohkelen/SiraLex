@@ -86,9 +86,14 @@ test.describe("ML1E featured multilingual same-ID update", () => {
     await expect(page.locator("body")).toContainText(/Update available|Mise à jour disponible|Update/i);
 
     // Prefer the installed-row Update control (same logical bundle_id).
-    const updateBtn = page.locator(".ux2-dict-action-update").first();
+    const updateBtn = page.locator(".ux2-dict-row .ux2-dict-action-update").first();
     await expect(updateBtn).toBeVisible({ timeout: 30_000 });
     await updateBtn.click();
+    // DU1 — consumer confirmation before same-ID update starts.
+    const confirmDialog = page.locator('[data-testid="dictionary-update-dialog"]');
+    await expect(confirmDialog).toBeVisible({ timeout: 15_000 });
+    await expect(confirmDialog).toContainText(/saved|enregistr|progress|correction|feedback|retours/i);
+    await confirmDialog.getByRole("button", { name: /Update dictionary|Mettre à jour le dictionnaire/i }).click();
     await expect
       .poll(async () => (await readActiveMeta(page)).expected_content_sha256, {
         timeout: installTimeoutMs,
@@ -96,6 +101,10 @@ test.describe("ML1E featured multilingual same-ID update", () => {
       })
       .toBe(NEW_HASH);
     await expect.poll(async () => getActiveBundleId(page), { timeout: 30_000 }).toBe(BUNDLE_ID);
+    // Success UI appears only after post-commit old-payload cleanup finishes.
+    const successDialog = page.locator('[data-testid="dictionary-update-dialog"][data-phase="success"]');
+    await expect(successDialog).toBeVisible({ timeout: installTimeoutMs });
+    await successDialog.getByRole("button", { name: /Continue|Continuer/i }).click();
 
     await navigateUx2Primary(page, "search");
     await expect(page.locator("#searchInput")).toBeEnabled({ timeout: installTimeoutMs });
