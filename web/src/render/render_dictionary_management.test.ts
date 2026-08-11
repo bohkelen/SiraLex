@@ -45,6 +45,7 @@ describe("UX2I6B1 dictionary management presentation", () => {
     );
     expect(root.querySelector(".ux2-dict-row-active")?.textContent).toBe("Active");
     expect(root.textContent).toContain("Available offline on this device");
+    expect(root.textContent).toContain("Installed");
     expect(root.textContent).toContain("Saved learning data and local feedback are kept");
     expect(root.textContent).not.toMatch(/storage scope|sha256|bundle_full_/i);
     const remove = root.querySelector<HTMLButtonElement>(".ux2-dict-action-remove")!;

@@ -3533,12 +3533,19 @@ button.target-link .target-text {
 
 .ux2-dict-row-meta,
 .ux2-dict-row-offline,
+.ux2-dict-row-installed,
 .ux2-dict-row-update,
+.ux2-dict-row-update-help,
 .ux2-dict-row-retain {
   margin: 0;
   font-family: var(--font-sans);
   font-size: var(--type-helper-size);
   color: var(--color-text-muted);
+}
+
+.ux2-dict-row-update {
+  font-weight: 600;
+  color: var(--color-action-text);
 }
 
 .ux2-dict-row-actions {
@@ -3573,6 +3580,11 @@ button.target-link .target-text {
   color: var(--color-text-primary);
 }
 
+.ux2-dict-action-secondary {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
 .ux2-dict-action:disabled,
 .ux2-dict-package-btn:disabled {
   opacity: 0.55;
@@ -3584,6 +3596,85 @@ button.target-link .target-text {
 .ux2-dict-package-btn:focus-visible {
   outline: var(--focus-ring-width) solid var(--color-focus);
   outline-offset: var(--focus-ring-offset);
+}
+
+.ux2-dict-update-notice-host {
+  margin: var(--space-3) 0 0;
+}
+
+.ux2-dict-update-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ux2-dict-update-notice-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.ux2-dict-update-notice-body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
+}
+
+.ux2-dict-update-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ux2-dict-update-dialog {
+  max-width: min(28rem, calc(100vw - 2rem));
+  width: 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.ux2-dict-update-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.ux2-dict-update-dialog-title {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--type-section-size, 1.125rem);
+  font-weight: 600;
+}
+
+.ux2-dict-update-dialog-body,
+.ux2-dict-update-dialog-help,
+.ux2-dict-update-dialog-progress,
+.ux2-dict-update-dialog-warning,
+.ux2-dict-update-dialog-detail {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  white-space: pre-line;
+}
+
+.ux2-dict-update-dialog-help,
+.ux2-dict-update-dialog-warning,
+.ux2-dict-update-dialog-detail {
+  font-size: var(--type-helper-size);
+  color: var(--color-text-muted);
+}
+
+.ux2-dict-update-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .ux2-dict-empty {

@@ -84,6 +84,12 @@ export type InstallProgressCopy = {
   batchesCommittedLabel: string;
   consumerAddingPercent: string;
   consumerPreparing: string;
+  /** Optional consumer stages (DU1 update / refined first-run). */
+  consumerDownloading?: string;
+  consumerVerifying?: string;
+  consumerInstalling?: string;
+  consumerInstallingPercent?: string;
+  consumerCleanup?: string;
 };
 
 const DEFAULT_INSTALL_PROGRESS_COPY: InstallProgressCopy = {
@@ -110,9 +116,34 @@ function installHeader(copy: InstallProgressCopy, bundleId: string): string {
   return `${copy.installingPrefix} ${bundleId}`;
 }
 
-function formatConsumerAddingPercent(copy: InstallProgressCopy, percent: number): string {
+function formatConsumerPercent(template: string, percent: number): string {
   const clamped = Math.max(0, Math.min(99, percent));
-  return copy.consumerAddingPercent.replace("{percent}", String(clamped));
+  return template.replace("{percent}", String(clamped));
+}
+
+function formatConsumerAddingPercent(copy: InstallProgressCopy, percent: number): string {
+  const template = copy.consumerInstallingPercent ?? copy.consumerAddingPercent;
+  return formatConsumerPercent(template, percent);
+}
+
+function emitConsumerPreparing(copy: InstallProgressCopy, onUpdate: (message: string) => void): void {
+  onUpdate(copy.consumerPreparing);
+}
+
+function emitConsumerDownloading(copy: InstallProgressCopy, onUpdate: (message: string) => void): void {
+  onUpdate(copy.consumerDownloading ?? copy.consumerPreparing);
+}
+
+function emitConsumerVerifying(copy: InstallProgressCopy, onUpdate: (message: string) => void): void {
+  onUpdate(copy.consumerVerifying ?? copy.consumerPreparing);
+}
+
+function emitConsumerInstalling(copy: InstallProgressCopy, onUpdate: (message: string) => void): void {
+  onUpdate(copy.consumerInstalling ?? copy.consumerPreparing);
+}
+
+function emitConsumerCleanup(copy: InstallProgressCopy, onUpdate: (message: string) => void): void {
+  onUpdate(copy.consumerCleanup ?? copy.consumerPreparing);
 }
 
 function createLinkedAbortSignal(timeoutMs: number, externalSignal?: AbortSignal): {
@@ -386,7 +417,7 @@ export async function installBundleIntoDb(
 
     stage = "committing bundle metadata";
     if (progressMode === "consumer") {
-      onUpdate(progressCopy.consumerPreparing);
+      emitConsumerInstalling(progressCopy, onUpdate);
     }
     const installedMeta = buildInstalledBundleMeta(manifest, nextStorageScopeId, recordsCount, indexCount, metadata);
     if (activateOnCommit) {
@@ -404,6 +435,9 @@ export async function installBundleIntoDb(
 
     if (previousStorageScopeId && previousStorageScopeId !== nextStorageScopeId) {
       stage = "cleanup: previous bundle scope removal";
+      if (progressMode === "consumer") {
+        emitConsumerCleanup(progressCopy, onUpdate);
+      }
       try {
         await deleteBundleScopeData(db, previousStorageScopeId);
         await clearBundleInstallSession(db);
@@ -445,13 +479,16 @@ export async function installRemoteCatalogBundle(
 
   const urls = deriveBundleAssetUrls(catalogUrl, entry);
   if (progressMode === "consumer") {
-    onUpdate(progressCopy.consumerPreparing);
+    emitConsumerPreparing(progressCopy, onUpdate);
   } else {
     onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingManifest}\n`);
   }
   const manifestTimeout = createLinkedAbortSignal(responseStartTimeoutMs, signal);
   let manifestResponse: Response;
   try {
+    if (progressMode === "consumer") {
+      emitConsumerDownloading(progressCopy, onUpdate);
+    }
     manifestResponse = await fetchImpl(urls.manifest_url, {
       headers: { Accept: "application/json" },
       signal: manifestTimeout.signal,
@@ -463,6 +500,9 @@ export async function installRemoteCatalogBundle(
     throw new Error(`Bundle request failed: ${manifestResponse.status} ${manifestResponse.statusText} (${urls.manifest_url})`);
   }
   validateRemoteUrlPolicy(manifestResponse.url || urls.manifest_url, catalogUrl);
+  if (progressMode === "consumer") {
+    emitConsumerVerifying(progressCopy, onUpdate);
+  }
   const manifestText = await manifestResponse.text();
   const parsed = parseAndValidateManifestJson(manifestText);
   if (!parsed.ok || !parsed.manifest) {
@@ -520,6 +560,8 @@ export async function installRemoteCatalogBundle(
 
   if (progressMode === "detailed") {
     onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingRecords}\n`);
+  } else if (progressMode === "consumer") {
+    emitConsumerDownloading(progressCopy, onUpdate);
   }
   const recordsStream = await fetchBodyStream(
     urls.records_url,
@@ -531,6 +573,8 @@ export async function installRemoteCatalogBundle(
   );
   if (progressMode === "detailed") {
     onUpdate(`${installHeader(progressCopy, entry.bundle_id)}\n${progressCopy.stageLabel}: ${progressCopy.stageFetchingSearchIndex}\n`);
+  } else if (progressMode === "consumer") {
+    emitConsumerDownloading(progressCopy, onUpdate);
   }
   const indexStream = await fetchBodyStream(
     urls.search_index_url,

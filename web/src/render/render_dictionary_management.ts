@@ -76,8 +76,12 @@ export function renderInstalledDictionaryRow(
     main.appendChild(el("div", "ux2-dict-row-meta", metaParts.join(" · ")));
   }
   main.appendChild(el("div", "ux2-dict-row-offline", t("dictionaries.availableOffline")));
+  main.appendChild(el("div", "ux2-dict-row-installed", t("dictionaries.installedState")));
   if (row.updateAvailable) {
-    main.appendChild(el("div", "ux2-dict-row-update", t("catalog.badge.updateAvailable")));
+    const updateState = el("div", "ux2-dict-row-update", t("dictionaryUpdate.newVersionAvailable"));
+    updateState.setAttribute("role", "status");
+    main.appendChild(updateState);
+    main.appendChild(el("p", "ux2-dict-row-update-help", t("dictionaryUpdate.whatsUpdated")));
   }
   main.appendChild(el("p", "ux2-dict-row-retain", t("dictionaries.savedDataRetained")));
 
@@ -86,7 +90,7 @@ export function renderInstalledDictionaryRow(
     const updateBtn = document.createElement("button");
     updateBtn.type = "button";
     updateBtn.className = "ux2-dict-action ux2-dict-action-update";
-    updateBtn.textContent = t("catalog.action.update");
+    updateBtn.textContent = t("dictionaryUpdate.action");
     updateBtn.disabled = callbacks.isBusy();
     updateBtn.addEventListener("click", () => callbacks.onUpdate?.(row.bundleId));
     actions.appendChild(updateBtn);
