@@ -292,7 +292,10 @@ async function performConfiguredFeedbackHandoff(
 app.innerHTML = `
   <div class="ux2-app-shell" id="ux2AppShell" data-primary="search" data-search-view="search">
     <header class="ux2-app-header">
-      <button type="button" class="ux2-wordmark ux2-type-wordmark ux2-focus-ring" id="ux2Wordmark" aria-label="${t("nav.home")}">SiraLex</button>
+      <button type="button" class="ux2-wordmark ux2-type-wordmark ux2-focus-ring" id="ux2Wordmark" aria-label="${t("nav.home")}">
+        <img class="ux2-wordmark-mark" src="./logo/siralex-logo-mark-only.svg" alt="" />
+        <span class="ux2-wordmark-text">SiraLex</span>
+      </button>
       <div id="ux2PrimaryNavHost" class="ux2-primary-nav-host"></div>
     </header>
 
