@@ -503,3 +503,139 @@ describe("searchQueryForLookupMode hyphen/space expansion", () => {
     }
   });
 });
+
+describe("searchQueryForLookupMode French ligature expansion", () => {
+  const CAPABLE = ENGLISH_CAPABLE;
+
+  beforeEach(async () => {
+    try {
+      await deleteSiralexDb();
+    } catch {
+      // fine
+    }
+  });
+
+  it("keeps an original exact hit and does not retry œ→oe", async () => {
+    const db = await openSiralexDb();
+    try {
+      await putSearchIndexEntry(db, "src_casefold", "sœur", ["fr-ligature"]);
+      await putSearchIndexEntry(db, "src_casefold", "soeur", ["fr-ascii"]);
+      const result = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "sœur",
+        true,
+        CAPABLE,
+      );
+      expect(result.ir_ids).toEqual(["fr-ligature"]);
+      expect(result.separator_variant_query ?? null).toBeNull();
+    } finally {
+      db.close();
+    }
+  });
+
+  it("retries FR œ→oe after an exact miss", async () => {
+    const db = await openSiralexDb();
+    try {
+      await putSearchIndexEntry(db, "src_casefold", "soeur", ["fr-soeur"]);
+      await putSearchIndexEntry(db, "src_casefold", "coeur", ["fr-coeur"]);
+      await putSearchIndexEntry(db, "src_casefold", "oeuf", ["fr-oeuf"]);
+      await putSearchIndexEntry(db, "ru_casefold", "soeur", ["ru-should-never"]);
+
+      const sister = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "sœur",
+        true,
+        CAPABLE,
+      );
+      expect(sister.ir_ids).toEqual(["fr-soeur"]);
+      expect(sister.separator_variant_query).toBe("soeur");
+      expect(sister.ir_ids).not.toContain("ru-should-never");
+      expect(JSON.stringify(sister)).not.toContain("ru-should-never");
+      expect(JSON.stringify(sister)).not.toMatch(/\u07c0|\u07cf|\u07d3/);
+
+      const heart = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "cœur",
+        true,
+        CAPABLE,
+      );
+      expect(heart.ir_ids).toEqual(["fr-coeur"]);
+      expect(heart.separator_variant_query).toBe("coeur");
+
+      const egg = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "ŒUF",
+        true,
+        CAPABLE,
+      );
+      expect(egg.ir_ids).toEqual(["fr-oeuf"]);
+      expect(egg.matched_key).toBe("oeuf");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("does not run ligature expansion for EN or MNK source modes", async () => {
+    const db = await openSiralexDb();
+    try {
+      await putSearchIndexEntry(db, "en_casefold", "soeur", ["en-soeur"]);
+      await putSearchIndexEntry(db, "tgt_casefold", "soeur", ["mnk-soeur"]);
+      await putSearchIndexEntry(db, "src_casefold", "soeur", ["fr-soeur"]);
+
+      const en = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "en", to: "mnk" },
+        "sœur",
+        true,
+        CAPABLE,
+      );
+      expect(en.ir_ids).toEqual([]);
+
+      for (const mode of [
+        { from: "mnk" as const, to: "fr" as const },
+        { from: "mnk" as const, to: "en" as const },
+      ]) {
+        const mnk = await searchQueryForLookupMode(
+          db,
+          BUNDLE_SCOPE,
+          mode,
+          "sœur",
+          true,
+          CAPABLE,
+        );
+        expect(mnk.ir_ids).toEqual([]);
+        expect(mnk.separator_variant_query ?? null).toBeNull();
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  it("falls through to hyphen/space when the ligature variant misses", async () => {
+    const db = await openSiralexDb();
+    try {
+      await putSearchIndexEntry(db, "src_casefold", "sœur-extra", ["fr-hyphen"]);
+      const result = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "sœur extra",
+        true,
+        CAPABLE,
+      );
+      expect(result.ir_ids).toEqual(["fr-hyphen"]);
+      expect(result.separator_variant_query).toBe("sœur-extra");
+    } finally {
+      db.close();
+    }
+  });
+});
