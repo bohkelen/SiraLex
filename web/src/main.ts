@@ -4027,9 +4027,11 @@ async function runSearch(query: string) {
     const records = await resolveRecords(db, activeStorageScopeId, result.ir_ids);
     if (seq !== searchSeq) return;
 
-    searchMeta.textContent = t("search.resultMeta", {
-      count: records.length,
-    });
+    searchMeta.textContent = result.separator_variant_query
+      ? t("search.separatorVariantMeta", { query: result.separator_variant_query })
+      : t("search.resultMeta", {
+          count: records.length,
+        });
 
     lastSearchResults = records.map((record) => ({
       rawQuery: query,

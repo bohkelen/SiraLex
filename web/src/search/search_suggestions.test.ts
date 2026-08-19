@@ -309,4 +309,60 @@ describe("lookupPrefixSuggestionsForLookupMode", () => {
       db.close();
     }
   });
+
+  it("SQ1C1 variant hit has ir_ids so prefix suggestions stay unused", async () => {
+    const db = await openSiralexDb();
+    try {
+      await putSearchIndexEntry(db, "src_casefold", "grand-pere", ["fr-grand"]);
+      await putSearchIndexEntry(db, "src_casefold", "grandeur", ["fr-grandeur"]);
+      const expanded = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "grand pere",
+        true,
+        ENGLISH_CAPABLE,
+      );
+      expect(expanded.ir_ids).toEqual(["fr-grand"]);
+      expect(expanded.separator_variant_query).toBe("grand-pere");
+      // Host only calls prefix lookup when ir_ids is empty.
+      expect(expanded.ir_ids.length).toBeGreaterThan(0);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("SQ1C1 variant miss still allows SQ1B prefix suggestions on the original query", async () => {
+    const db = await openSiralexDb();
+    try {
+      await seedSq1bIndex(db);
+      await putSearchIndexEntry(db, "src_casefold", "grand-pere", ["fr-grand"]);
+      const miss = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "enf-xyz",
+        true,
+        ENGLISH_CAPABLE,
+      );
+      expect(miss.ir_ids).toEqual([]);
+      expect(miss.separator_variant_query ?? null).toBeNull();
+
+      const prefix = await lookupPrefixSuggestionsForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "enf",
+        true,
+        ENGLISH_CAPABLE,
+      );
+      expect(prefix.suggestions.map((row) => row.key)).toEqual([
+        "enfant",
+        "enfance",
+        "enfant beni",
+      ]);
+    } finally {
+      db.close();
+    }
+  });
 });
