@@ -146,6 +146,7 @@ import {
 } from "./search/search_lookup_lang_preference";
 import { resolveSavedPresentationPreferredGlossLanguage } from "./search/saved_presentation_gloss_preference";
 import { resolveRecords } from "./search/resolve_records";
+import { partitionFrExactSourceTermHits } from "./search/search_result_ranking";
 import {
   getNoResultMessage,
   renderResultsList,
@@ -4024,8 +4025,12 @@ async function runSearch(query: string) {
       return;
     }
 
-    const records = await resolveRecords(db, activeStorageScopeId, result.ir_ids);
+    const resolved = await resolveRecords(db, activeStorageScopeId, result.ir_ids);
     if (seq !== searchSeq) return;
+    const records = partitionFrExactSourceTermHits(resolved, effectiveMode, {
+      matchedKey: result.matched_key,
+      matchedKeyType: result.matched_key_type,
+    });
 
     searchMeta.textContent = result.separator_variant_query
       ? t("search.separatorVariantMeta", { query: result.separator_variant_query })
