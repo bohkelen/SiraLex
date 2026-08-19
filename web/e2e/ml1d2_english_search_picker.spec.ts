@@ -126,6 +126,41 @@ test.describe("ML1D2A English search picker", () => {
     await expect(page.locator("#searchResults")).toContainText(/house/i, { timeout: 10_000 });
   });
 
+  test("SQ1B EN prefix suggestions do not leak French keys and recompute on LookupMode change", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    page.on("dialog", (dialog) => dialog.accept());
+    await clearDbAndInstall(page, enBundleDir, EN_BUNDLE_ID);
+    await setUiLocale(page, "en");
+    await navigateUx2Primary(page, "search");
+
+    const partner = page.locator('[data-testid="search-partner-language"]');
+    await partner.selectOption("en");
+    await page.locator("#searchInput").fill("hou");
+    await expect(page.locator("#searchMeta")).toHaveText(/No exact match/i, { timeout: 15_000 });
+    await expect(page.locator("[data-testid='search-suggestion']")).toContainText(/house/i);
+    await expect(page.locator("[data-testid='search-suggestion']")).not.toContainText(/alpha_fr|ouverture/i);
+
+    await partner.selectOption("fr");
+    await expect(page.locator("[data-testid='search-suggestion']")).toHaveCount(0, {
+      timeout: 15_000,
+    });
+    await expect(page.locator("#searchResults")).not.toContainText(/^house$/i);
+
+    await partner.selectOption("en");
+    await page.locator("#searchInput").fill("hou");
+    await expect(page.locator("[data-testid='search-suggestion']").first()).toContainText(/house/i, {
+      timeout: 15_000,
+    });
+    await page.locator("[data-testid='search-suggestion']").first().click();
+    await expect(page.locator("#searchInput")).toHaveValue("house");
+    await expect(page.locator("#searchResults")).toContainText(/house_mnk|house/i, {
+      timeout: 10_000,
+    });
+    await expect(page.locator("[data-testid='search-suggestions']")).toHaveCount(0);
+  });
+
   test("FR-only fixture: partner select absent", async ({ page }) => {
     page.on("dialog", (dialog) => dialog.accept());
     await clearDbAndInstall(page, frOnlyBundleDir, FR_ONLY_BUNDLE_ID);

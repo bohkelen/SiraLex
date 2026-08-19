@@ -172,6 +172,42 @@ test.describe("UX2I3 Search Home and Results", () => {
       fullPage: true,
     });
   });
+
+  test("SQ1B prefix suggestions on exact miss, not on exact hit", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    page.on("dialog", (dialog) => dialog.accept());
+    await installDebugBundle(page);
+    await setUiLocale(page, "en");
+
+    await page.locator("#searchInput").fill("a");
+    await expect(page.locator("#searchMeta")).toContainText(/No results/i, { timeout: 15_000 });
+    await expect(page.locator("[data-testid='search-suggestions']")).toHaveCount(0);
+
+    await page.locator("#searchInput").fill("al");
+    await expect(page.locator("#searchMeta")).toContainText(/No results/i, { timeout: 15_000 });
+    await expect(page.locator("[data-testid='search-suggestions']")).toHaveCount(0);
+
+    await page.locator("#searchInput").fill("alp");
+    await expect(page.locator("#searchMeta")).toHaveText(/No exact match/i, { timeout: 15_000 });
+    await expect(page.locator("[data-testid='search-suggestions']")).toBeVisible();
+    await expect(page.locator("[data-testid='search-suggestion']").first()).toContainText("alpha_fr");
+    await expect(
+      page.locator("[data-testid='search-feedback-entry-no-result']"),
+    ).toBeVisible();
+
+    await page.locator("[data-testid='search-suggestion']").first().click();
+    await expect(page.locator("#searchInput")).toHaveValue("alpha_fr");
+    await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.locator("[data-testid='search-suggestions']")).toHaveCount(0);
+
+    await page.locator("#searchInput").fill("alpha_fr");
+    await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.locator("[data-testid='search-suggestions']")).toHaveCount(0);
+  });
 });
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {

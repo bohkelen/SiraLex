@@ -128,6 +128,7 @@ import {
 } from "./query_logging/query_log_runtime";
 import type { QueryLogEvent } from "./query_logging/query_log_types";
 import { searchQueryForLookupMode } from "./search/search_query";
+import { lookupPrefixSuggestionsForLookupMode } from "./search/search_suggestions";
 import {
   bundleSupportsEnglishLookup,
   DEFAULT_LOOKUP_MODE,
@@ -150,6 +151,7 @@ import {
   renderResultsList,
   type ResultDisplayContext,
 } from "./render/render_results";
+import { renderSearchSuggestions } from "./render/render_search_suggestions";
 import { applyLookupModePresentation, lookupModeInputLanguageLabel } from "./render/render_lookup_mode_chrome";
 import { renderEntryDetail, showTargetEntryUnavailable } from "./render/render_entry";
 import { renderCorrectionForm } from "./render/render_correction_form";
@@ -2328,16 +2330,7 @@ function setPartnerLookupLanguage(partner: "fr" | "en", options?: { persist?: bo
   updateLangToggle();
   clearExecutedSearchSnapshot();
   activeSearchFeedbackForm?.notifySearchChanged();
-  if (
-    resultsHostContext === "search" &&
-    !activeSearchFeedbackForm &&
-    lastSearchResults.length > 0
-  ) {
-    showResultsList();
-  } else if (resultsHostContext === "search" && !activeSearchFeedbackForm) {
-    const entry = searchResults.querySelector("[data-testid^='search-feedback-entry']");
-    entry?.remove();
-  }
+  afterLookupModeSurfaceUpdate();
 }
 
 const RECENT_QUERY_LOGS_LIMIT = 50;
@@ -2579,16 +2572,7 @@ langToggle.addEventListener("click", () => {
   // Direction change invalidates any prior executed-search capture context.
   clearExecutedSearchSnapshot();
   activeSearchFeedbackForm?.notifySearchChanged();
-  if (
-    resultsHostContext === "search" &&
-    !activeSearchFeedbackForm &&
-    lastSearchResults.length > 0
-  ) {
-    showResultsList();
-  } else if (resultsHostContext === "search" && !activeSearchFeedbackForm) {
-    const entry = searchResults.querySelector("[data-testid^='search-feedback-entry']");
-    entry?.remove();
-  }
+  afterLookupModeSurfaceUpdate();
 });
 
 // --- Search + results ---
@@ -2621,6 +2605,8 @@ let activeReviewHost: ReturnType<typeof createReviewSurfaceHost> | undefined;
  */
 let focusReviewActionOnce = false;
 let lastSearchResults: ResultDisplayContext[] = [];
+/** Prefix completions for the last exact miss (empty when exact hits). */
+let lastPrefixSuggestions: string[] = [];
 /** Track active bundle id so switches invalidate collection/Review contexts. */
 let lastKnownActiveBundleId: string | undefined;
 /** Track content hash so dictionary updates invalidate live correction forms. */
@@ -3351,11 +3337,20 @@ searchInput.addEventListener("input", () => {
     searchMeta.textContent = "";
     searchResults.innerHTML = "";
     lastSearchResults = [];
+    lastPrefixSuggestions = [];
     return;
   }
   searchDebounceTimer = setTimeout(() => {
     void runSearch(query);
   }, 150);
+});
+
+searchInput.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  const suggestionRoot = searchResults.querySelector("[data-testid='search-suggestions']");
+  if (!suggestionRoot) return;
+  event.preventDefault();
+  suggestionRoot.remove();
 });
 
 /** Origin for entry-detail Back navigation (no router). */
@@ -3370,6 +3365,45 @@ type EntryNavOrigin =
     }
   | { kind: "saved_vocabulary" };
 
+function afterLookupModeSurfaceUpdate(): void {
+  if (resultsHostContext !== "search" || activeSearchFeedbackForm) return;
+  if (lastSearchResults.length > 0) {
+    showResultsList();
+    return;
+  }
+  lastPrefixSuggestions = [];
+  const query = searchInput.value;
+  if (query.trim() === "") {
+    const entry = searchResults.querySelector("[data-testid^='search-feedback-entry']");
+    entry?.remove();
+    searchResults.querySelector("[data-testid='search-suggestions']")?.remove();
+    return;
+  }
+  void runSearch(query);
+}
+
+function applySearchSuggestion(suggestionKey: string): void {
+  searchInput.value = suggestionKey;
+  clearTimeout(searchDebounceTimer);
+  cancelPendingSettledQueryLog();
+  void runSearch(suggestionKey);
+}
+
+function mountNoResultSearchContents(query: string): void {
+  searchResults.innerHTML = "";
+  if (lastPrefixSuggestions.length > 0) {
+    const suggestions = renderSearchSuggestions(lastPrefixSuggestions, applySearchSuggestion);
+    if (suggestions) searchResults.appendChild(suggestions);
+  }
+  if (canOfferSearchFeedbackCapture(lastExecutedSearch)) {
+    searchResults.appendChild(
+      renderNoResultSearchFeedbackEntry(query, () => {
+        showSearchFeedbackCapture();
+      }),
+    );
+  }
+}
+
 function showNoResultSearchSurface(query: string): void {
   resultsHostContext = "search";
   setSearchView("search");
@@ -3377,13 +3411,7 @@ function showNoResultSearchSurface(query: string): void {
   disposeActiveCorrectionManagement();
   disposeActiveSearchFeedbackForm();
   disposeActiveSearchFeedbackManagement();
-  searchResults.innerHTML = "";
-  if (!canOfferSearchFeedbackCapture(lastExecutedSearch)) return;
-  searchResults.appendChild(
-    renderNoResultSearchFeedbackEntry(query, () => {
-      showSearchFeedbackCapture();
-    }),
-  );
+  mountNoResultSearchContents(query);
 }
 
 function restoreSearchSurfaceAfterFeedback(): void {
@@ -3396,20 +3424,16 @@ function restoreSearchSurfaceAfterFeedback(): void {
     return;
   }
   if (lastExecutedSearch.result_state === "no_result") {
-    searchMeta.textContent = getNoResultMessage(lastExecutedSearch.query_raw);
+    searchMeta.textContent =
+      lastPrefixSuggestions.length > 0
+        ? t("search.noExactMatch")
+        : getNoResultMessage(lastExecutedSearch.query_raw);
     // Avoid disposeActiveSearchFeedbackForm again inside showNoResultSearchSurface —
     // generation already advanced above; rebuild surface directly.
     resultsHostContext = "search";
     disposeActiveCorrectionForm();
     disposeActiveCorrectionManagement();
-    searchResults.innerHTML = "";
-    if (canOfferSearchFeedbackCapture(lastExecutedSearch)) {
-      searchResults.appendChild(
-        renderNoResultSearchFeedbackEntry(lastExecutedSearch.query_raw, () => {
-          showSearchFeedbackCapture();
-        }),
-      );
-    }
+    mountNoResultSearchContents(lastExecutedSearch.query_raw);
     return;
   }
   if (lastSearchResults.length > 0) {
@@ -3925,6 +3949,7 @@ async function runSearch(query: string) {
       searchMeta.textContent = t("search.disabledNoActiveBundle");
       searchResults.innerHTML = "";
       lastSearchResults = [];
+      lastPrefixSuggestions = [];
       return;
     }
     const activeStorageScopeId = getBundleStorageScopeId(activeBundleMeta);
@@ -3950,10 +3975,26 @@ async function runSearch(query: string) {
     if (seq !== searchSeq) return;
 
     if (result.ir_ids.length === 0) {
-      searchMeta.textContent = getNoResultMessage(query);
+      lastSearchResults = [];
+      lastPrefixSuggestions = [];
+      let prefixKeys: string[] = [];
+      if (query.trim() !== "") {
+        const prefixResult = await lookupPrefixSuggestionsForLookupMode(
+          db,
+          activeStorageScopeId,
+          effectiveMode,
+          query,
+          activeBundleMeta.search_index_directional === true,
+          capabilityMeta,
+        );
+        if (seq !== searchSeq) return;
+        prefixKeys = prefixResult.suggestions.map((row) => row.key);
+        lastPrefixSuggestions = prefixKeys;
+      }
+      searchMeta.textContent =
+        prefixKeys.length > 0 ? t("search.noExactMatch") : getNoResultMessage(query);
       invalidateCollectionAndReviewContexts();
       resultsHostContext = "search";
-      lastSearchResults = [];
       const contentSha = activeBundleMeta.expected_content_sha256;
       if (contentSha) {
         lastExecutedSearch = {
@@ -4000,6 +4041,7 @@ async function runSearch(query: string) {
       targetLabel: getLocalizedTargetLabel(activeBundleMeta.language_meta),
       record,
     }));
+    lastPrefixSuggestions = [];
     const matchedIrIds = deriveMatchedIrIdsFromRecords(records);
     const contentSha = activeBundleMeta.expected_content_sha256;
     if (contentSha) {
@@ -4033,6 +4075,7 @@ async function runSearch(query: string) {
     searchMeta.textContent = t("search.error", { error: String(e) });
     searchResults.innerHTML = "";
     lastSearchResults = [];
+    lastPrefixSuggestions = [];
     clearExecutedSearchSnapshot();
   } finally {
     db?.close();

@@ -12,8 +12,9 @@
  * punct_stripped → nospace), stopping at the first level that yields a
  * non-empty ir_ids[] from the search_index store.
  *
- * No prefix search, no suggestions, no fuzzy matching, no merging across
- * levels, no client-side re-ranking.
+ * Exact retrieval does not prefix-match, fuzzy-match, merge ladder rungs, or
+ * re-rank postings. Prefix *suggestions* after an exact miss live in
+ * search_suggestions.ts and never merge into ir_ids[].
  */
 
 import { STORE_SEARCH_INDEX } from "../idb/siralex_db";
@@ -29,7 +30,7 @@ import {
   type LookupMode,
 } from "./lookup_mode";
 
-const KEY_TYPE_ORDER: (keyof SearchKeys)[] = [
+export const SEARCH_LADDER_KEY_TYPES: readonly (keyof SearchKeys)[] = [
   "casefold",
   "diacritics_insensitive",
   "punct_stripped",
@@ -91,7 +92,7 @@ async function runExactnessLadder(args: {
 
   let lastTriedNormalizedKey: string | null = null;
 
-  for (const keyType of KEY_TYPE_ORDER) {
+  for (const keyType of SEARCH_LADDER_KEY_TYPES) {
     const normalizedKeys = keys[keyType];
     if (normalizedKeys.length === 0) continue;
     const storageKeyType = args.resolveStorageKeyType(keyType);
