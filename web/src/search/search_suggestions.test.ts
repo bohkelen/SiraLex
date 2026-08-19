@@ -332,6 +332,27 @@ describe("lookupPrefixSuggestionsForLookupMode", () => {
     }
   });
 
+  it("SQ1C2 ligature variant hit has ir_ids so prefix suggestions stay unused", async () => {
+    const db = await openSiralexDb();
+    try {
+      await putSearchIndexEntry(db, "src_casefold", "soeur", ["fr-soeur"]);
+      await putSearchIndexEntry(db, "src_casefold", "soierie", ["fr-soierie"]);
+      const expanded = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "sœur",
+        true,
+        ENGLISH_CAPABLE,
+      );
+      expect(expanded.ir_ids).toEqual(["fr-soeur"]);
+      expect(expanded.separator_variant_query).toBe("soeur");
+      expect(expanded.ir_ids.length).toBeGreaterThan(0);
+    } finally {
+      db.close();
+    }
+  });
+
   it("SQ1C1 variant miss still allows SQ1B prefix suggestions on the original query", async () => {
     const db = await openSiralexDb();
     try {

@@ -13,10 +13,10 @@
  * non-empty ir_ids[] from the search_index store.
  *
  * Exact retrieval does not prefix-match, fuzzy-match, merge ladder rungs, or
- * re-rank postings. After an exact miss, FR/EN LookupMode may retry at most
- * two ASCII hyphen↔space surface variants (search_query_variants.ts). Prefix
- * *suggestions* after that miss live in search_suggestions.ts and never merge
- * into ir_ids[].
+ * re-rank postings. After an exact miss, LookupMode may retry bounded
+ * orthographic surfaces (French œ→oe, then FR/EN hyphen↔space) from
+ * search_query_variants.ts. Prefix *suggestions* after that miss live in
+ * search_suggestions.ts and never merge into ir_ids[].
  */
 
 import { STORE_SEARCH_INDEX } from "../idb/siralex_db";
@@ -31,10 +31,7 @@ import {
   type LookupCapabilityMeta,
   type LookupMode,
 } from "./lookup_mode";
-import {
-  hyphenSpaceExpansionAllowed,
-  hyphenSpaceExpansionQueries,
-} from "./search_query_variants";
+import { safeQueryVariants } from "./search_query_variants";
 
 export const SEARCH_LADDER_KEY_TYPES: readonly (keyof SearchKeys)[] = [
   "casefold",
@@ -64,7 +61,7 @@ export type SearchResult = {
   matched_key: string | null;
   query_normalized_keys: SearchKeys;
   last_tried_normalized_key: string | null;
-  /** Hyphen/space surface that produced a hit. Absent/null when the original query was used. */
+  /** Orthographic variant surface that produced a hit (hyphen/space or œ→oe). */
   separator_variant_query?: string | null;
 };
 
@@ -178,11 +175,11 @@ export async function searchQueryForLookupMode(
     resolveStorageKeyType,
   });
 
-  if (original.ir_ids.length > 0 || !hyphenSpaceExpansionAllowed(lookupMode)) {
+  if (original.ir_ids.length > 0) {
     return original;
   }
 
-  for (const variantQuery of hyphenSpaceExpansionQueries(query)) {
+  for (const variantQuery of safeQueryVariants(query, lookupMode)) {
     const expanded = await runExactnessLadder({
       db,
       activeBundleId: storageScopeId,
