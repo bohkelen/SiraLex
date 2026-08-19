@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SiraLex · Mark Only · Full Color
+  V2 Refined Baseline — N'Ko-inspired path mark
+  Color: Terracotta #B85C38 on transparent background
+  SiraLex logo assets v1
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 80 108"
+  fill="none"
+  role="img"
+  aria-label="SiraLex mark"
+>
+  <title>SiraLex mark</title>
+  <path
+    d="M 36 16 L 54 16 C 70 16 78 28 70 46 C 62 62 42 64 36 78 C 30 92 40 102 58 100"
+    stroke="#B85C38"
+    stroke-width="7.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

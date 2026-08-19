@@ -78,6 +78,11 @@ test.describe("UX2I2 shell navigation", () => {
       "aria-label",
       /SiraLex home|Accueil SiraLex/i,
     );
+    const wordmarkMark = page.locator("#ux2Wordmark .ux2-wordmark-mark");
+    await expect(wordmarkMark).toBeVisible();
+    await expect(wordmarkMark).toHaveAttribute("src", "./logo/siralex-logo-mark-only.svg");
+    await expect(wordmarkMark).toHaveAttribute("alt", "");
+    await expect(page.locator("#ux2Wordmark .ux2-wordmark-text")).toHaveText("SiraLex");
 
     await navigateUx2Primary(page, "more");
     await expect(page.locator("#ux2AppShell")).toHaveAttribute("data-primary", "more");
