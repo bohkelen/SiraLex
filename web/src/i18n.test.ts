@@ -173,6 +173,9 @@ describe("i18n translations", () => {
       "Switch search direction: French to Maninka",
     );
     expect(t("search.resultMeta", { count: 4 })).toBe("4 results");
+    expect(t("search.separatorVariantMeta", { query: "bon travail" })).toBe(
+      'Showing results for "bon travail"',
+    );
     expect(t("searchFeedback.capture.resultsNotUsefulAction")).toContain(
       "Tell us what you were looking for",
     );
@@ -182,6 +185,9 @@ describe("i18n translations", () => {
       "Changer le sens de recherche : Français vers Maninka",
     );
     expect(t("search.resultMeta", { count: 4 })).toBe("4 résultats");
+    expect(t("search.separatorVariantMeta", { query: "bon travail" })).toBe(
+      "Résultats pour « bon travail »",
+    );
     expect(t("searchFeedback.capture.resultsNotUsefulAction")).toContain(
       "Dites-nous ce que vous cherchiez",
     );

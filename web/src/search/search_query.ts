@@ -13,8 +13,10 @@
  * non-empty ir_ids[] from the search_index store.
  *
  * Exact retrieval does not prefix-match, fuzzy-match, merge ladder rungs, or
- * re-rank postings. Prefix *suggestions* after an exact miss live in
- * search_suggestions.ts and never merge into ir_ids[].
+ * re-rank postings. After an exact miss, FR/EN LookupMode may retry at most
+ * two ASCII hyphen↔space surface variants (search_query_variants.ts). Prefix
+ * *suggestions* after that miss live in search_suggestions.ts and never merge
+ * into ir_ids[].
  */
 
 import { STORE_SEARCH_INDEX } from "../idb/siralex_db";
@@ -29,6 +31,10 @@ import {
   type LookupCapabilityMeta,
   type LookupMode,
 } from "./lookup_mode";
+import {
+  hyphenSpaceExpansionAllowed,
+  hyphenSpaceExpansionQueries,
+} from "./search_query_variants";
 
 export const SEARCH_LADDER_KEY_TYPES: readonly (keyof SearchKeys)[] = [
   "casefold",
@@ -58,6 +64,8 @@ export type SearchResult = {
   matched_key: string | null;
   query_normalized_keys: SearchKeys;
   last_tried_normalized_key: string | null;
+  /** Hyphen/space surface that produced a hit. Absent/null when the original query was used. */
+  separator_variant_query?: string | null;
 };
 
 function idbGet<T>(store: IDBObjectStore, key: IDBValidKey): Promise<T | undefined> {
@@ -82,6 +90,7 @@ async function runExactnessLadder(args: {
       matched_key: null,
       query_normalized_keys: EMPTY_SEARCH_KEYS,
       last_tried_normalized_key: null,
+      separator_variant_query: null,
     };
   }
 
@@ -111,6 +120,7 @@ async function runExactnessLadder(args: {
           matched_key: normalizedKey,
           query_normalized_keys: keys,
           last_tried_normalized_key: normalizedKey,
+          separator_variant_query: null,
         };
       }
     }
@@ -122,6 +132,7 @@ async function runExactnessLadder(args: {
     matched_key: null,
     query_normalized_keys: keys,
     last_tried_normalized_key: lastTriedNormalizedKey,
+    separator_variant_query: null,
   };
 }
 
@@ -152,18 +163,41 @@ export async function searchQueryForLookupMode(
     );
   }
 
-  return runExactnessLadder({
+  const resolveStorageKeyType = (keyType: keyof SearchKeys) => {
+    if (!searchIndexDirectional) {
+      // Legacy undirected indexes: FR↔MNK only (EN already rejected above).
+      return keyType;
+    }
+    return toLookupKeyType(lookupMode, keyType);
+  };
+
+  const original = await runExactnessLadder({
     db,
     activeBundleId: storageScopeId,
     query,
-    resolveStorageKeyType: (keyType) => {
-      if (!searchIndexDirectional) {
-        // Legacy undirected indexes: FR↔MNK only (EN already rejected above).
-        return keyType;
-      }
-      return toLookupKeyType(lookupMode, keyType);
-    },
+    resolveStorageKeyType,
   });
+
+  if (original.ir_ids.length > 0 || !hyphenSpaceExpansionAllowed(lookupMode)) {
+    return original;
+  }
+
+  for (const variantQuery of hyphenSpaceExpansionQueries(query)) {
+    const expanded = await runExactnessLadder({
+      db,
+      activeBundleId: storageScopeId,
+      query: variantQuery,
+      resolveStorageKeyType,
+    });
+    if (expanded.ir_ids.length > 0) {
+      return {
+        ...expanded,
+        separator_variant_query: variantQuery,
+      };
+    }
+  }
+
+  return original;
 }
 
 /**

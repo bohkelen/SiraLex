@@ -208,6 +208,23 @@ test.describe("UX2I3 Search Home and Results", () => {
     });
     await expect(page.locator("[data-testid='search-suggestions']")).toHaveCount(0);
   });
+
+  test("SQ1C1 hyphen/space variant hit shows results without suggestions", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    page.on("dialog", (dialog) => dialog.accept());
+    await installDebugBundle(page);
+    await setUiLocale(page, "en");
+
+    await page.locator("#searchInput").fill("bon-travail");
+    await expect(page.locator("#searchResults .result-open").first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.locator("#searchMeta")).toHaveText(/Showing results for "bon travail"/i);
+    await expect(page.locator("[data-testid='search-suggestions']")).toHaveCount(0);
+    await expect(
+      page.locator("[data-testid='search-feedback-entry-results-not-useful']"),
+    ).toHaveCount(1);
+  });
 });
 
 async function setUiLocale(page: Page, locale: "en" | "fr"): Promise<void> {

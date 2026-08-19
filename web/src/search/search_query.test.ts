@@ -349,3 +349,157 @@ describe("searchQueryForLookupMode multilingual ladder", () => {
     }
   });
 });
+
+describe("searchQueryForLookupMode hyphen/space expansion", () => {
+  const CAPABLE = ENGLISH_CAPABLE;
+
+  beforeEach(async () => {
+    try {
+      await deleteSiralexDb();
+    } catch {
+      // fine
+    }
+  });
+
+  async function seedExpansionIndex(db: IDBDatabase): Promise<void> {
+    await putSearchIndexEntry(db, "src_casefold", "grand-pere", ["fr-grand"]);
+    await putSearchIndexEntry(db, "src_casefold", "grand pere", ["fr-grand-spaced"]);
+    await putSearchIndexEntry(db, "src_casefold", "enfant", ["fr-enfant"]);
+    await putSearchIndexEntry(db, "src_casefold", "enfance", ["fr-enfance"]);
+    await putSearchIndexEntry(db, "en_casefold", "pick up", ["en-pickup"]);
+    await putSearchIndexEntry(db, "en_casefold", "right hand", ["en-right"]);
+    await putSearchIndexEntry(db, "en_casefold", "house", ["en-house"]);
+    await putSearchIndexEntry(db, "tgt_casefold", "duba-duba", ["mnk-duba"]);
+    await putSearchIndexEntry(db, "tgt_casefold", "bolo", ["mnk-bolo"]);
+    await putSearchIndexEntry(db, "ru_casefold", "grand-pere", ["ru-should-never"]);
+    await putSearchIndexEntry(db, "tgt_casefold", "ߓߟߏ", ["nko-only"]);
+  }
+
+  it("keeps an original exact hit and does not retry variants", async () => {
+    const db = await openSiralexDb();
+    try {
+      await seedExpansionIndex(db);
+      const result = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "grand pere",
+        true,
+        CAPABLE,
+      );
+      expect(result.ir_ids).toEqual(["fr-grand-spaced"]);
+      expect(result.separator_variant_query ?? null).toBeNull();
+      expect(result.matched_key).toBe("grand pere");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("retries FR hyphen/space variants after an exact miss", async () => {
+    const db = await openSiralexDb();
+    try {
+      await putSearchIndexEntry(db, "src_casefold", "grand-pere", ["fr-grand"]);
+      const result = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "grand pere",
+        true,
+        CAPABLE,
+      );
+      expect(result.ir_ids).toEqual(["fr-grand"]);
+      expect(result.separator_variant_query).toBe("grand-pere");
+      expect(result.matched_key).toBe("grand-pere");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("retries EN hyphen/space variants after an exact miss", async () => {
+    const db = await openSiralexDb();
+    try {
+      await seedExpansionIndex(db);
+      const pick = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "en", to: "mnk" },
+        "pick-up",
+        true,
+        CAPABLE,
+      );
+      expect(pick.ir_ids).toEqual(["en-pickup"]);
+      expect(pick.separator_variant_query).toBe("pick up");
+
+      const right = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "en", to: "mnk" },
+        "right-hand",
+        true,
+        CAPABLE,
+      );
+      expect(right.ir_ids).toEqual(["en-right"]);
+      expect(right.separator_variant_query).toBe("right hand");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("does not expand MNK source queries", async () => {
+    const db = await openSiralexDb();
+    try {
+      await seedExpansionIndex(db);
+      for (const mode of [
+        { from: "mnk" as const, to: "fr" as const },
+        { from: "mnk" as const, to: "en" as const },
+      ]) {
+        const result = await searchQueryForLookupMode(
+          db,
+          BUNDLE_SCOPE,
+          mode,
+          "duba duba",
+          true,
+          CAPABLE,
+        );
+        expect(result.ir_ids).toEqual([]);
+        expect(result.separator_variant_query ?? null).toBeNull();
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  it("does not return Russian keys or synthesize N’Ko from Latin", async () => {
+    const db = await openSiralexDb();
+    try {
+      await putSearchIndexEntry(db, "src_casefold", "grand-pere", ["fr-grand"]);
+      await putSearchIndexEntry(db, "ru_casefold", "grand-pere", ["ru-should-never"]);
+      const result = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "grand pere",
+        true,
+        CAPABLE,
+      );
+      expect(result.ir_ids).toEqual(["fr-grand"]);
+      expect(result.ir_ids).not.toContain("ru-should-never");
+      expect(JSON.stringify(result)).not.toContain("ru-should-never");
+      expect(JSON.stringify(result)).not.toMatch(/\u07c0|\u07cf|\u07d3/);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("does not expand via the legacy searchQuery adapter", async () => {
+    const db = await openSiralexDb();
+    try {
+      await putSearchIndexEntry(db, "src_casefold", "grand-pere", ["fr-grand"]);
+      const result = await searchQuery(db, BUNDLE_SCOPE, "source_to_target", "grand pere", true);
+      expect(result.ir_ids).toEqual([]);
+      expect(result.separator_variant_query ?? null).toBeNull();
+    } finally {
+      db.close();
+    }
+  });
+});
