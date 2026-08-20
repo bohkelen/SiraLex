@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
+    "alias:append-dry-run": "node tools/governed_alias_append_dry_run_cli.mjs",
     "test:e2e:usage": "npm run build && playwright test -c playwright.config.ts",
     "test:e2e:usage:featured": "SIRALEX_USAGE_BUNDLE_DIR=public/bundle_full_20260710_337619ff__d076558b SIRALEX_USAGE_INSTALL_TIMEOUT_MS=900000 npm run test:e2e:usage",
     "test:e2e:usage:headed": "npm run build && playwright test -c playwright.config.ts --headed",
