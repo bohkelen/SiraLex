@@ -31,6 +31,7 @@ siralex-validate-source-index-supplements = "source_index_supplements.validate_s
 siralex-generate-source-index-supplements = "source_index_supplements.generate_supplement_records:main"
 siralex-merge-source-index-supplements = "source_index_supplements.merge_supplements_into_search_index:main"
 siralex-mine-source-index-gaps = "source_index_gap_discovery.mine_candidates:main"
+siralex-validate-corpus-sources = "corpus_sources.validate_corpus_sources:main"
 
 [tool.ruff]
 line-length = 100
@@ -50,6 +51,7 @@ packages = [
     "source_aliases",
     "source_index_supplements",
     "source_index_gap_discovery",
+    "corpus_sources",
 ]
 
 [build-system]
