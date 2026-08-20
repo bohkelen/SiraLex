@@ -7,10 +7,14 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from corpus_annotations.event_timestamps import (
+    parse_event_timestamp,
+    validate_event_timestamp_field,
+)
 from corpus_segments.validate_corpus_segments import (
     SEGMENT_ID_RE,
     CorpusSegmentValidationError,
@@ -20,10 +24,6 @@ from corpus_segments.validate_corpus_segments import (
 SCHEMA_VERSION = "corpus_annotations_v1"
 
 ANNOTATION_ID_RE = re.compile(r"^cann_[a-z0-9]+(?:_[a-z0-9]+)*$")
-ISO_TIMESTAMP_SHAPE_RE = re.compile(
-    r"^\d{4}-\d{2}-\d{2}"
-    r"(?:[Tt]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$"
-)
 
 ALLOWED_ANNOTATION_TYPES = {
     "transcript_raw",
@@ -148,31 +148,8 @@ def _require_non_empty_string(row: dict[str, Any], field_name: str, path: Path, 
     return value
 
 
-def _validate_timestamp(field_name: str, value: str, path: Path, line: int) -> None:
-    if not ISO_TIMESTAMP_SHAPE_RE.match(value):
-        raise _err(path, line, f"{field_name} must be an ISO-8601 date or timestamp")
-    try:
-        if len(value) == 10:
-            date.fromisoformat(value)
-            return
-        normalized = value.replace("Z", "+00:00") if value.endswith("Z") else value
-        datetime.fromisoformat(normalized)
-    except ValueError as exc:
-        raise _err(
-            path,
-            line,
-            f"{field_name} is not a valid calendar date/time: {value!r}",
-        ) from exc
-
-
 def _parse_timestamp_for_compare(value: str) -> datetime:
-    if len(value) == 10:
-        return datetime.fromisoformat(value + "T00:00:00")
-    normalized = value.replace("Z", "+00:00") if value.endswith("Z") else value
-    parsed = datetime.fromisoformat(normalized)
-    if parsed.tzinfo is not None:
-        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
-    return parsed
+    return parse_event_timestamp(value, field_name="timestamp")
 
 
 def _validate_uncertain_spans(
@@ -291,7 +268,9 @@ def validate_corpus_annotation_row(row: dict[str, Any], path: Path, line_number:
         raise _err(path, line_number, "content must be a non-empty string")
 
     created_at = _require_non_empty_string(row, "created_at", path, line_number)
-    _validate_timestamp("created_at", created_at, path, line_number)
+    validate_event_timestamp_field(
+        "created_at", created_at, path, line_number, error_factory=_err
+    )
 
     creation_method = _require_non_empty_string(row, "creation_method", path, line_number)
     if creation_method not in ALLOWED_CREATION_METHODS:

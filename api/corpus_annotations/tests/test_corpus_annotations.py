@@ -378,3 +378,84 @@ def test_cli_passes():
 
 def test_cli_fails():
     assert main([str(FIXTURES / "invalid_empty_content.jsonl")]) == 1
+
+
+def test_annotation_date_only_created_at_rejected(tmp_path: Path):
+    path = tmp_path / "date_only.jsonl"
+    write_jsonl(path, [minimal_raw(created_at="2026-08-20")])
+    with pytest.raises(CorpusAnnotationValidationError) as exc_info:
+        validate_corpus_annotations(path)
+    assert "explicit timezone" in str(exc_info.value)
+
+
+def test_annotation_naive_created_at_rejected(tmp_path: Path):
+    path = tmp_path / "naive.jsonl"
+    write_jsonl(path, [minimal_raw(created_at="2026-08-20T19:00:00")])
+    with pytest.raises(CorpusAnnotationValidationError) as exc_info:
+        validate_corpus_annotations(path)
+    assert "explicit timezone" in str(exc_info.value)
+
+
+def test_annotation_offset_timestamps_accepted(tmp_path: Path):
+    path = tmp_path / "offsets.jsonl"
+    write_jsonl(
+        path,
+        [
+            minimal_raw(
+                annotation_id="cann_parent",
+                created_at="2026-08-20T15:00:00-04:00",
+            ),
+            minimal_raw(
+                annotation_id="cann_child",
+                annotation_type="transcript_normalized",
+                creation_method="normalization",
+                created_at="2026-08-20T19:10:00Z",
+                derived_from_annotation_ids=["cann_parent"],
+            ),
+        ],
+    )
+    result = validate_corpus_annotations(path)
+    assert result.summary["row_count"] == 2
+
+
+def test_supersession_chronology_across_offsets(tmp_path: Path):
+    path = tmp_path / "super_offsets.jsonl"
+    write_jsonl(
+        path,
+        [
+            minimal_raw(
+                annotation_id="cann_old",
+                created_at="2026-08-20T19:00:00Z",
+            ),
+            minimal_raw(
+                annotation_id="cann_new",
+                created_at="2026-08-20T15:30:00-04:00",
+                supersedes_annotation_id="cann_old",
+            ),
+        ],
+    )
+    result = validate_corpus_annotations(path)
+    assert result.summary["row_count"] == 2
+
+
+def test_derivation_chronology_rejects_earlier_child_across_offsets(tmp_path: Path):
+    path = tmp_path / "derive_offsets.jsonl"
+    write_jsonl(
+        path,
+        [
+            minimal_raw(
+                annotation_id="cann_parent",
+                created_at="2026-08-20T19:00:00Z",
+            ),
+            minimal_raw(
+                annotation_id="cann_child",
+                annotation_type="transcript_normalized",
+                creation_method="normalization",
+                created_at="2026-08-20T14:00:00-04:00",
+                derived_from_annotation_ids=["cann_parent"],
+            ),
+        ],
+    )
+    with pytest.raises(CorpusAnnotationValidationError) as exc_info:
+        validate_corpus_annotations(path)
+    assert "derived annotation created_at must be >= parent" in str(exc_info.value)

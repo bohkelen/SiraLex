@@ -1,0 +1,2 @@
+{"schema_version":"corpus_annotation_reviews_v1","review_id":"crev_cross_ann_prior","annotation_id":"cann_fixture_manual_raw_001","reviewer_id":"reviewer_a","reviewed_at":"2026-08-20T20:00:00Z","review_method":"manual_review","decision":"accepted"}
+{"schema_version":"corpus_annotation_reviews_v1","review_id":"crev_cross_ann_later","annotation_id":"cann_fixture_translation_fr_001","reviewer_id":"reviewer_a","reviewed_at":"2026-08-20T21:00:00Z","review_method":"manual_review","decision":"accepted","supersedes_review_id":"crev_cross_ann_prior"}

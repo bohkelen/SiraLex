@@ -35,6 +35,9 @@ siralex-validate-corpus-sources = "corpus_sources.validate_corpus_sources:main"
 siralex-validate-corpus-artifacts = "corpus_artifacts.validate_corpus_artifacts:main"
 siralex-validate-corpus-segments = "corpus_segments.validate_corpus_segments:main"
 siralex-validate-corpus-annotations = "corpus_annotations.validate_corpus_annotations:main"
+siralex-validate-corpus-reviews = "corpus_reviews.validate_corpus_reviews:main"
+siralex-export-corpus-review-worksheet = "corpus_reviews.export_review_worksheet:main"
+siralex-corpus-review-dry-run = "corpus_reviews.dry_run_import_reviews:main"
 
 [tool.ruff]
 line-length = 100
@@ -58,6 +61,7 @@ packages = [
     "corpus_artifacts",
     "corpus_segments",
     "corpus_annotations",
+    "corpus_reviews",
 ]
 
 [build-system]

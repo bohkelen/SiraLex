@@ -69,7 +69,7 @@ MUST match:
 | `segment_id` | string | See syntax |
 | `annotation_type` | string enum | See types |
 | `content` | string | Non-empty annotation text |
-| `created_at` | string | ISO-8601 (calendar-validated) |
+| `created_at` | string | Full ISO-8601 **datetime with explicit timezone** (`Z` or `±HH:MM`). Date-only and timezone-naive values are rejected. |
 | `creation_method` | string enum | How it was produced |
 | `created_by` | string | Human/system id |
 
