@@ -141,6 +141,8 @@ Rules:
 - unique IDs; no self-reference
 - parents must resolve in the same annotations table
 - parents MUST share the same `segment_id`
+- derived annotation `created_at` MUST be `>=` each parent `created_at`
+  (equality allowed for coarse timestamps)
 - no cycles in the derivation graph
 
 `transcript_normalized` REQUIRES non-empty `derived_from_annotation_ids`.
@@ -175,6 +177,41 @@ supersede a gloss.
 Material content changes SHOULD create a new `annotation_id` related via
 derivation and/or supersession. Prefer treating annotation rows as immutable
 evidence records; do not silently rewrite `content` in place.
+
+## Combined provenance graph
+
+Derivation and supersession are separately meaningful, but they form one
+overall annotation-provenance system. Validators MUST treat the **union** of:
+
+```text
+derived_from_annotation_ids edges
++
+supersedes_annotation_id edges
+```
+
+as a single directed graph and require that union to be **acyclic**.
+
+A pattern such as “A derives from B” and “B supersedes A” is invalid even
+when each relation type alone looks acyclic. Parallel edges that point
+consistently in the same historical direction remain valid.
+
+## Current revision (leaf) semantics
+
+A **current annotation revision** is an annotation that is **not superseded**
+by any other annotation in the table (a supersession leaf).
+
+```text
+current revision count may be > 1
+```
+
+Competing same-type supersessions are legal. Example: `transcript_B` and
+`transcript_C` both supersede `transcript_A` ⇒ both B and C are current
+leaves.
+
+The system MUST NOT define `latest created_at` as the authoritative winner.
+Timestamp ordering is provenance chronology, not linguistic authority.
+Helpers such as `find_supersession_leaves` MUST return **all** leaves
+deterministically and MUST NOT select a winner.
 
 ## Uncertainty spans
 

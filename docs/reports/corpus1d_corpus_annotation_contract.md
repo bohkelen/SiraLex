@@ -101,7 +101,8 @@ Machine methods (`asr`, `machine_translation`, `llm_assisted`) require
 ## 10. Derivation model
 
 `derived_from_annotation_ids[]`: unique, no self-ref, same segment, resolve in
-table, cycle detection. `transcript_normalized` requires transcript parents.
+table, cycle detection, derived `created_at` ≥ each parent `created_at`.
+`transcript_normalized` requires transcript parents.
 
 ---
 
@@ -116,7 +117,19 @@ Optional `supersedes_annotation_id`:
 - multiple annotations may supersede the same parent (competing revisions)
 - history retained (no deletes)
 
-Hardened before commit after review feedback.
+**Current revision** = supersession leaf (not superseded by another row).
+Leaf count may be > 1. Chronology does **not** pick a winner.
+Helper: `find_supersession_leaves` returns all leaves deterministically.
+
+Hardened before / after initial CORPUS1D commit (provenance graph pass).
+
+---
+
+## 11b. Combined provenance graph
+
+Union of derivation + supersession edges MUST be acyclic (rejects
+“A derives from B” + “B supersedes A” and longer mixed cycles). Parallel
+historically consistent edges remain valid.
 
 ---
 
@@ -158,8 +171,9 @@ Optional `--segments` runs full segment validation. Optional
 
 ## 17. Annotation graph validation
 
-Duplicate IDs, missing/self/cyclic derivation, missing/self/cross-segment
-supersession, normalized parent-type checks.
+Duplicate IDs, missing/self/cyclic derivation, derivation chronology,
+missing/self/cross-segment/same-type/chronology supersession, combined
+derivation∪supersession acyclicity, normalized parent-type checks.
 
 ---
 
@@ -170,7 +184,8 @@ language, non-authoritative N’Ko, direct manual.
 
 Invalid: missing id, bad segment/type/content, ASR without machine provenance,
 normalized without parent, forbidden review field, bad uncertainty bounds;
-supersession cycle/chronology/cross-type; graph cases covered in unit tests.
+supersession cycle/chronology/cross-type; derivation before parent; combined
+derivation/supersession cycles; graph cases covered in unit tests.
 
 Valid supersession: `valid_supersession_same_type.jsonl`
 

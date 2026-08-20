@@ -477,6 +477,78 @@ def _detect_supersession_cycle(
         visit(annotation_id, [])
 
 
+def _provenance_neighbors(row: CorpusAnnotationRow) -> list[str]:
+    neighbors: list[str] = []
+    parents = row.row.get("derived_from_annotation_ids") or []
+    if isinstance(parents, list):
+        for parent_id in parents:
+            if isinstance(parent_id, str) and parent_id:
+                neighbors.append(parent_id)
+    superseded_id = row.row.get("supersedes_annotation_id")
+    if isinstance(superseded_id, str) and superseded_id:
+        neighbors.append(superseded_id)
+    return neighbors
+
+
+def _detect_combined_provenance_cycle(
+    rows_by_id: dict[str, CorpusAnnotationRow],
+    path: Path,
+) -> None:
+    """Reject cycles across the union of derivation + supersession edges."""
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(node_id: str, stack: list[str]) -> None:
+        if node_id in visited:
+            return
+        if node_id in visiting:
+            cycle = " -> ".join(stack[stack.index(node_id) :] + [node_id])
+            raise CorpusAnnotationValidationError(
+                f"{path}: combined derivation/supersession cycle detected: {cycle}"
+            )
+        visiting.add(node_id)
+        row = rows_by_id.get(node_id)
+        if row is not None:
+            for neighbor in _provenance_neighbors(row):
+                visit(neighbor, stack + [node_id])
+        visiting.remove(node_id)
+        visited.add(node_id)
+
+    for annotation_id in rows_by_id:
+        visit(annotation_id, [])
+
+
+def find_supersession_leaves(
+    rows: list[CorpusAnnotationRow] | list[dict[str, Any]],
+) -> list[str]:
+    """Return annotation_ids that are not superseded by any other annotation.
+
+    Deterministic sorted order. Multiple leaves may exist for competing
+    same-type revisions. Chronology does not select a winner.
+    """
+    normalized: list[CorpusAnnotationRow] = []
+    for item in rows:
+        if isinstance(item, CorpusAnnotationRow):
+            normalized.append(item)
+        elif isinstance(item, dict):
+            normalized.append(CorpusAnnotationRow(row=item, line_number=0))
+        else:
+            raise TypeError("rows must be CorpusAnnotationRow or dict objects")
+
+    superseded_targets: set[str] = set()
+    for item in normalized:
+        target = item.row.get("supersedes_annotation_id")
+        if isinstance(target, str) and target:
+            superseded_targets.add(target)
+
+    leaves = [
+        item.annotation_id
+        for item in normalized
+        if item.annotation_id and item.annotation_id not in superseded_targets
+    ]
+    return sorted(leaves)
+
+
 def validate_corpus_annotations(
     path: Path,
     *,
@@ -557,6 +629,15 @@ def validate_corpus_annotations(
                             f"or transcript_normalized (parent {parent_id!r} is "
                             f"{parent_type!r})",
                         )
+                item_created = _parse_timestamp_for_compare(str(item.row["created_at"]))
+                parent_created = _parse_timestamp_for_compare(str(parent.row["created_at"]))
+                if item_created < parent_created:
+                    raise _err(
+                        path,
+                        item.line_number,
+                        "derived annotation created_at must be >= parent "
+                        f"created_at ({parent_id!r})",
+                    )
 
         superseded_id = item.row.get("supersedes_annotation_id")
         if isinstance(superseded_id, str) and superseded_id:
@@ -597,6 +678,7 @@ def validate_corpus_annotations(
 
     _detect_derivation_cycle(rows_by_id, path)
     _detect_supersession_cycle(rows_by_id, path)
+    _detect_combined_provenance_cycle(rows_by_id, path)
 
     type_counts: dict[str, int] = {}
     for item in rows:

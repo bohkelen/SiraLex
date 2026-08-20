@@ -9,6 +9,7 @@ import pytest
 
 from corpus_annotations.validate_corpus_annotations import (
     CorpusAnnotationValidationError,
+    find_supersession_leaves,
     main,
     validate_corpus_annotations,
 )
@@ -186,12 +187,72 @@ def test_cross_segment_supersession_fails(tmp_path: Path):
             "invalid_supersession_cross_type.jsonl",
             "must preserve annotation_type",
         ),
+        (
+            "invalid_derivation_created_before_parent.jsonl",
+            "derived annotation created_at must be >= parent",
+        ),
+        (
+            "invalid_combined_derivation_supersession_cycle_2node.jsonl",
+            "combined derivation/supersession cycle detected",
+        ),
+        (
+            "invalid_combined_derivation_supersession_cycle_longer.jsonl",
+            "combined derivation/supersession cycle detected",
+        ),
     ],
 )
 def test_invalid_supersession_hardening_fixtures(fixture_name: str, needle: str):
     with pytest.raises(CorpusAnnotationValidationError) as exc_info:
         validate_corpus_annotations(FIXTURES / fixture_name)
     assert needle in str(exc_info.value)
+
+
+def test_find_supersession_leaves_returns_all_competing_leaves(tmp_path: Path):
+    path = tmp_path / "leaves.jsonl"
+    write_jsonl(
+        path,
+        [
+            minimal_raw(annotation_id="cann_base", created_at="2026-08-20T19:00:00Z"),
+            minimal_raw(
+                annotation_id="cann_rev_a",
+                created_at="2026-08-20T19:10:00Z",
+                supersedes_annotation_id="cann_base",
+            ),
+            minimal_raw(
+                annotation_id="cann_rev_b",
+                created_at="2026-08-20T19:11:00Z",
+                supersedes_annotation_id="cann_base",
+            ),
+        ],
+    )
+    result = validate_corpus_annotations(path)
+    leaves = find_supersession_leaves(result.rows)
+    assert leaves == ["cann_rev_a", "cann_rev_b"]
+
+
+def test_valid_parallel_derivation_and_supersession_same_direction(tmp_path: Path):
+    """Edges pointing consistently backward in history remain acyclic."""
+    path = tmp_path / "parallel.jsonl"
+    write_jsonl(
+        path,
+        [
+            minimal_raw(annotation_id="cann_root", created_at="2026-08-20T19:00:00Z"),
+            minimal_raw(
+                annotation_id="cann_mid",
+                created_at="2026-08-20T19:10:00Z",
+                supersedes_annotation_id="cann_root",
+            ),
+            minimal_raw(
+                annotation_id="cann_child",
+                annotation_type="transcript_normalized",
+                creation_method="normalization",
+                created_at="2026-08-20T19:20:00Z",
+                derived_from_annotation_ids=["cann_mid"],
+            ),
+        ],
+    )
+    result = validate_corpus_annotations(path)
+    assert result.summary["row_count"] == 3
 
 
 def test_valid_supersession_same_type_passes():
