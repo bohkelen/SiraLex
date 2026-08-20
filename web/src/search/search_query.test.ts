@@ -172,6 +172,41 @@ describe("searchQueryForLookupMode multilingual ladder", () => {
     }
   });
 
+  it("SQ1D1: keeps stored posting order and does not merge a later ladder rung", async () => {
+    const db = await openSiralexDb();
+    try {
+      await putSearchIndexEntry(db, "src_casefold", "mère", [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4",
+      ]);
+      await putSearchIndexEntry(db, "src_diacritics_insensitive", "mere", [
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4",
+        "lower-rung-only",
+      ]);
+
+      const result = await searchQueryForLookupMode(
+        db,
+        BUNDLE_SCOPE,
+        { from: "fr", to: "mnk" },
+        "mère",
+        true,
+        ENGLISH_CAPABLE,
+      );
+      expect(result.ir_ids).toEqual([
+        "0f517a71c373f51d",
+        "d540716db9321a83",
+        "e5164efcdf5e6ca4",
+      ]);
+      expect(result.matched_key_type).toBe("casefold");
+      expect(result.ir_ids).not.toContain("lower-rung-only");
+    } finally {
+      db.close();
+    }
+  });
+
   it("isolates directions so cross-family queries miss", async () => {
     const db = await openSiralexDb();
     try {

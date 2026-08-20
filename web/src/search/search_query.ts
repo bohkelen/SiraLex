@@ -17,6 +17,8 @@
  * orthographic surfaces (French œ→oe, then FR/EN hyphen↔space) from
  * search_query_variants.ts. Prefix *suggestions* after that miss live in
  * search_suggestions.ts and never merge into ir_ids[].
+ * FR→MNK source_term promotion (SQ1D1) runs after record resolve in
+ * search_result_ranking.ts; this module still returns stored ir_ids[] order.
  */
 
 import { STORE_SEARCH_INDEX } from "../idb/siralex_db";
