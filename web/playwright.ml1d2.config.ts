@@ -12,6 +12,8 @@ export default defineConfig({
     timeout: 30_000,
   },
   fullyParallel: false,
+  // Heavy featured install/update flows; one worker avoids concurrent IDB contention.
+  workers: 1,
   outputDir: "test-results/ml1d-picker",
   reporter: [["list"]],
   use: {
