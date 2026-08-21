@@ -193,18 +193,32 @@ Outputs stored under `data/corpus1f/outputs/` (untracked).
 
 ## 15. Worksheet export result
 
-`siralex-export-corpus-review-worksheet` against pilot annotations (leaves only):
+Initial CORPUS1F export was transcript-only (`corpus_annotation_review_worksheet_v1`):
+24 leaf rows with Maninka `content`, fingerprint, and blank review fields.
 
-- 24 rows
-- includes `worksheet_schema`, fingerprint, context columns, review fill columns,
-  `evidence_refs`
-- written locally to `data/corpus1f/outputs/review_worksheet.csv`
+**Pilot friction:** human review of audio ↔ Maninka form was possible, but
+semantic review was unnecessarily hard because dataset-supplied English/French
+glosses were not projected beside the transcript.
+
+**Accepted correction (same CORPUS1F track):** import separate `translation`
+annotations from SLR106 vocab CSVs and bump the worksheet to
+`corpus_annotation_review_worksheet_v2` with read-only related-translation
+context + `artifact_storage_ref`. Current human-facing file:
+
+```text
+data/corpus1f/outputs/review_worksheet.csv
+```
+
+(v1 blank export preserved locally as
+`review_worksheet_v1_pre_translation_context.csv`.)
+
+Details: `docs/reports/corpus1f_translation_context_from_pilot_friction.md`.
 
 ---
 
 ## 16. Unedited worksheet dry-run result
 
-`siralex-corpus-review-dry-run` on the unedited export:
+Initial v1 unedited dry-run:
 
 ```text
 ok=true
@@ -214,7 +228,38 @@ error_count=0
 preview_row_count=0
 ```
 
-Structural round-trip clean before human edit.
+After translation-context correction, unedited **v2** dry-run (transcript_raw
+subjects only) likewise:
+
+```text
+ok=true
+rows_read=24
+rows_skipped_unreviewed=24
+error_count=0
+```
+
+---
+
+## 16b. Translation-context review semantics
+
+A v2 worksheet row’s review decision applies to the referenced
+**`transcript_raw` annotation only**.
+
+Related English/French columns are **contextual evidence** projected from
+separate imported `translation` annotations.
+
+```text
+accepted transcript review
+≠ accepted English translation review
+≠ accepted French translation review
+```
+
+Do **not** automatically propagate transcript review decisions to translation
+annotations. If translation accuracy needs formal validation later, those
+translation annotations must become review subjects independently.
+
+Local counts after correction: 24 transcript_raw + 48 translation = **72**
+annotations; still 1 source / 24 artifacts / 24 segments.
 
 ---
 
@@ -229,8 +274,11 @@ Structural round-trip clean before human edit.
    subset selection still required downloading the complete archive.
 4. **Adult selection is possible** because ages are in metadata — good fit for
    the ethics gate.
-5. **No contract change required** for this pilot; friction is workflow /
-   interpretation, not ontology breakage.
+5. **Missing translation context in the worksheet** was real review friction;
+   resolved by separate imported translation annotations + read-only worksheet
+   projection (not by embedding `transcript.translation`).
+6. Initial ontology did not need weakening; the correction was workflow /
+   presentation based on observed pilot use.
 
 ---
 

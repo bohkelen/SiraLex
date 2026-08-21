@@ -22,6 +22,7 @@ from corpus_reviews.export_review_worksheet import (
     REVIEW_FILL_COLUMNS,
     WORKSHEET_COLUMNS,
     WORKSHEET_SCHEMA,
+    _artifact_storage_by_segment,
     build_worksheet_rows,
 )
 from corpus_reviews.validate_corpus_reviews import (
@@ -98,6 +99,7 @@ def dry_run_import_review_worksheet(
     artifacts_path: Path | None = None,
     sources_path: Path | None = None,
     include_superseded: bool = False,
+    annotation_type: str | None = None,
 ) -> CorpusReviewDryRunResult:
     try:
         annotation_result = validate_corpus_annotations(
@@ -112,11 +114,18 @@ def dry_run_import_review_worksheet(
         ) from exc
 
     annotations_by_id = {item.annotation_id: item for item in annotation_result.rows}
+    storage_by_segment = _artifact_storage_by_segment(
+        segments_path=segments_path,
+        artifacts_path=artifacts_path,
+        sources_path=sources_path,
+    )
     expected_by_id = {
         row["annotation_id"]: row
         for row in build_worksheet_rows(
             annotation_result.rows,
             include_superseded=include_superseded,
+            annotation_type=annotation_type,
+            artifact_storage_by_segment=storage_by_segment,
         )
     }
 
@@ -342,6 +351,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Expected worksheet was exported with --include-superseded",
     )
     parser.add_argument(
+        "--annotation-type",
+        default=None,
+        help="Expected worksheet was exported with --annotation-type filter",
+    )
+    parser.add_argument(
         "--preview-jsonl",
         type=Path,
         default=None,
@@ -356,6 +370,7 @@ def main(argv: list[str] | None = None) -> int:
             artifacts_path=args.artifacts,
             sources_path=args.sources,
             include_superseded=args.include_superseded,
+            annotation_type=args.annotation_type,
         )
     except CorpusReviewDryRunError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

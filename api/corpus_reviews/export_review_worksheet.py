@@ -16,18 +16,32 @@ from corpus_annotations.validate_corpus_annotations import (
     find_supersession_leaves,
     validate_corpus_annotations,
 )
+from corpus_artifacts.validate_corpus_artifacts import (
+    CorpusArtifactValidationError,
+    validate_corpus_artifacts,
+)
 from corpus_reviews.annotation_fingerprint import annotation_fingerprint_sha256
+from corpus_segments.validate_corpus_segments import (
+    CorpusSegmentValidationError,
+    validate_corpus_segments,
+)
 
-WORKSHEET_SCHEMA = "corpus_annotation_review_worksheet_v1"
+# v2 adds read-only related-translation + audio locator context discovered in CORPUS1F.
+WORKSHEET_SCHEMA = "corpus_annotation_review_worksheet_v2"
 
 CONTEXT_COLUMNS = [
     "worksheet_schema",
     "annotation_id",
     "annotation_type",
     "segment_id",
+    "artifact_storage_ref",
     "content",
     "content_language",
     "script",
+    "related_translation_english",
+    "related_translation_english_annotation_ids",
+    "related_translation_french",
+    "related_translation_french_annotation_ids",
     "creation_method",
     "created_by",
     "tool_name",
@@ -54,6 +68,9 @@ REVIEW_FILL_COLUMNS = [
 ]
 
 WORKSHEET_COLUMNS = CONTEXT_COLUMNS + REVIEW_FILL_COLUMNS
+
+_ENGLISH_LABELS = {"english", "en"}
+_FRENCH_LABELS = {"french", "fr", "français", "francais"}
 
 
 class CorpusReviewWorksheetError(ValueError):
@@ -98,14 +115,54 @@ def _competing_leaf_counts(
     return result
 
 
+def _normalize_language_label(value: str) -> str:
+    return value.strip().lower()
+
+
+def _related_translations_for_segment(
+    annotation_rows: list[CorpusAnnotationRow],
+    *,
+    segment_id: str,
+    leaf_ids: set[str],
+) -> dict[str, list[CorpusAnnotationRow]]:
+    """Collect current translation leaves on the same segment, grouped by language family."""
+    english: list[CorpusAnnotationRow] = []
+    french: list[CorpusAnnotationRow] = []
+    for item in annotation_rows:
+        if item.annotation_id not in leaf_ids:
+            continue
+        if item.segment_id != segment_id:
+            continue
+        if item.row.get("annotation_type") != "translation":
+            continue
+        label = _normalize_language_label(str(item.row.get("content_language", "")))
+        if label in _ENGLISH_LABELS:
+            english.append(item)
+        elif label in _FRENCH_LABELS:
+            french.append(item)
+    english.sort(key=lambda item: item.annotation_id)
+    french.sort(key=lambda item: item.annotation_id)
+    return {"english": english, "french": french}
+
+
+def _join_translation_contents(items: list[CorpusAnnotationRow]) -> str:
+    return " | ".join(str(item.row.get("content", "")) for item in items)
+
+
+def _join_annotation_ids(items: list[CorpusAnnotationRow]) -> str:
+    return ";".join(item.annotation_id for item in items)
+
+
 def build_worksheet_rows(
     annotation_rows: list[CorpusAnnotationRow],
     *,
     include_superseded: bool = False,
     annotation_type: str | None = None,
+    artifact_storage_by_segment: dict[str, str] | None = None,
 ) -> list[dict[str, str]]:
     leaf_ids = set(find_supersession_leaves(annotation_rows))
     competing = _competing_leaf_counts(annotation_rows, leaf_ids)
+    storage_by_segment = artifact_storage_by_segment or {}
 
     selected: list[CorpusAnnotationRow] = []
     for item in annotation_rows:
@@ -120,15 +177,34 @@ def build_worksheet_rows(
     worksheet_rows: list[dict[str, str]] = []
     for item in selected:
         row = item.row
+        related = _related_translations_for_segment(
+            annotation_rows,
+            segment_id=item.segment_id,
+            leaf_ids=leaf_ids,
+        )
+        # Do not echo a translation row's own content into related_* for that language
+        # when the reviewed subject is itself that translation — still useful to see
+        # the sibling language beside it.
+        english_items = related["english"]
+        french_items = related["french"]
         worksheet_rows.append(
             {
                 "worksheet_schema": WORKSHEET_SCHEMA,
                 "annotation_id": item.annotation_id,
                 "annotation_type": str(row.get("annotation_type", "")),
                 "segment_id": item.segment_id,
+                "artifact_storage_ref": storage_by_segment.get(item.segment_id, ""),
                 "content": str(row.get("content", "")),
                 "content_language": str(row.get("content_language", "")),
                 "script": str(row.get("script", "")),
+                "related_translation_english": _join_translation_contents(english_items),
+                "related_translation_english_annotation_ids": _join_annotation_ids(
+                    english_items
+                ),
+                "related_translation_french": _join_translation_contents(french_items),
+                "related_translation_french_annotation_ids": _join_annotation_ids(
+                    french_items
+                ),
                 "creation_method": str(row.get("creation_method", "")),
                 "created_by": str(row.get("created_by", "")),
                 "tool_name": str(row.get("tool_name", "")),
@@ -163,6 +239,39 @@ def worksheet_rows_to_csv(rows: list[dict[str, str]]) -> str:
     return buffer.getvalue()
 
 
+def _artifact_storage_by_segment(
+    *,
+    segments_path: Path | None,
+    artifacts_path: Path | None,
+    sources_path: Path | None,
+) -> dict[str, str]:
+    if segments_path is None or artifacts_path is None:
+        return {}
+    try:
+        segment_result = validate_corpus_segments(
+            segments_path,
+            artifacts_path=artifacts_path,
+            sources_path=sources_path,
+        )
+        artifact_result = validate_corpus_artifacts(
+            artifacts_path,
+            sources_path=sources_path,
+        )
+    except (CorpusSegmentValidationError, CorpusArtifactValidationError) as exc:
+        raise CorpusReviewWorksheetError(
+            f"segment/artifact tables required for artifact_storage_ref failed: {exc}"
+        ) from exc
+
+    artifacts_by_id = {
+        item.artifact_id: str(item.row.get("storage_ref", "") or "")
+        for item in artifact_result.rows
+    }
+    mapping: dict[str, str] = {}
+    for item in segment_result.rows:
+        mapping[item.segment_id] = artifacts_by_id.get(item.artifact_id, "")
+    return mapping
+
+
 def export_review_worksheet(
     annotations_path: Path,
     *,
@@ -184,10 +293,17 @@ def export_review_worksheet(
             f"annotations table validation failed ({annotations_path}): {exc}"
         ) from exc
 
+    storage_by_segment = _artifact_storage_by_segment(
+        segments_path=segments_path,
+        artifacts_path=artifacts_path,
+        sources_path=sources_path,
+    )
+
     rows = build_worksheet_rows(
         result.rows,
         include_superseded=include_superseded,
         annotation_type=annotation_type,
+        artifact_storage_by_segment=storage_by_segment,
     )
     csv_text = worksheet_rows_to_csv(rows)
     leaf_count = sum(1 for row in rows if row["is_current_leaf"] == "true")
@@ -196,6 +312,7 @@ def export_review_worksheet(
         "worksheet_row_count": len(rows),
         "current_leaf_rows": leaf_count,
         "include_superseded": 1 if include_superseded else 0,
+        "artifact_storage_context": 1 if storage_by_segment else 0,
     }
     return csv_text, summary
 
@@ -223,7 +340,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--annotation-type",
         default=None,
-        help="Optional filter to a single annotation_type",
+        help="Optional filter to a single annotation_type (e.g. transcript_raw)",
     )
     parser.add_argument("--segments", type=Path, default=None)
     parser.add_argument("--artifacts", type=Path, default=None)

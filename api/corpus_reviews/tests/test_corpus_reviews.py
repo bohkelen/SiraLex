@@ -322,6 +322,54 @@ def test_dry_run_rejects_missing_and_wrong_worksheet_schema(tmp_path: Path):
     assert any("unsupported worksheet_schema" in err for err in result_wrong.errors)
 
 
+def test_worksheet_includes_related_translation_context(tmp_path: Path):
+    path = tmp_path / "ann.jsonl"
+    write_jsonl(
+        path,
+        [
+            minimal_annotation(
+                annotation_id="cann_tr_src",
+                content="n'na",
+                content_language="Maninka",
+            ),
+            {
+                "schema_version": "corpus_annotations_v1",
+                "annotation_id": "cann_tr_en",
+                "segment_id": "cseg_fixture_time_001",
+                "annotation_type": "translation",
+                "content": "Mom",
+                "content_language": "English",
+                "created_at": "2026-08-20T19:01:00Z",
+                "creation_method": "import",
+                "created_by": "slr106_vocab_import",
+                "script": "Latn",
+                "derived_from_annotation_ids": ["cann_tr_src"],
+            },
+            {
+                "schema_version": "corpus_annotations_v1",
+                "annotation_id": "cann_tr_fr",
+                "segment_id": "cseg_fixture_time_001",
+                "annotation_type": "translation",
+                "content": "Maman",
+                "content_language": "French",
+                "created_at": "2026-08-20T19:01:00Z",
+                "creation_method": "import",
+                "created_by": "slr106_vocab_import",
+                "script": "Latn",
+                "derived_from_annotation_ids": ["cann_tr_src"],
+            },
+        ],
+    )
+    result = validate_corpus_annotations(path)
+    rows = build_worksheet_rows(result.rows, annotation_type="transcript_raw")
+    assert len(rows) == 1
+    assert rows[0]["worksheet_schema"] == WORKSHEET_SCHEMA
+    assert rows[0]["related_translation_english"] == "Mom"
+    assert rows[0]["related_translation_french"] == "Maman"
+    assert rows[0]["related_translation_english_annotation_ids"] == "cann_tr_en"
+    assert rows[0]["related_translation_french_annotation_ids"] == "cann_tr_fr"
+
+
 def test_dry_run_skips_unreviewed_rows(tmp_path: Path):
     annotations = FIXTURES / "valid_competing_transcript_leaves.jsonl"
     annotation_result = validate_corpus_annotations(annotations)

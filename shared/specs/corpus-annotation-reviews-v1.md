@@ -180,8 +180,23 @@ annotations
 Every exported row MUST include:
 
 ```text
-worksheet_schema = corpus_annotation_review_worksheet_v1
+worksheet_schema = corpus_annotation_review_worksheet_v2
 ```
+
+v2 adds **read-only review context** for related same-segment translation
+leaves and optional audio locator:
+
+| Column | Semantics |
+|--------|-----------|
+| `artifact_storage_ref` | Local/storage pointer when segments+artifacts are supplied |
+| `related_translation_english` | Joined content of current English translation leaves |
+| `related_translation_english_annotation_ids` | Matching `cann_…` ids (`;`-joined) |
+| `related_translation_french` | Joined content of current French translation leaves |
+| `related_translation_french_annotation_ids` | Matching `cann_…` ids (`;`-joined) |
+
+Storage model remains separate versioned annotations (`transcript_raw` vs
+`translation`). The worksheet **displays** related translations beside the
+reviewed subject; it does **not** store `transcript.translation=…`.
 
 Dry-run MUST reject missing/wrong/unsupported `worksheet_schema` and unknown
 unexpected CSV columns.
