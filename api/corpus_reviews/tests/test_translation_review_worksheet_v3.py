@@ -332,13 +332,14 @@ def test_translation_exporter_subject_is_translation_no_decision_inheritance(tmp
 
 @pytest.mark.skipif(not PILOT.exists(), reason="local CORPUS1F pilot data not present")
 def test_pilot_translation_export_dry_run_skips_all_and_preserves_reviews(tmp_path: Path):
+    """Blank translation export/dry-run must not mutate the existing local registry."""
     annotations, segments, artifacts, sources, reviews = _pilot_paths()
     assert reviews.exists()
     review_before = reviews.read_bytes()
     review_count_before = sum(
         1 for line in reviews.read_text(encoding="utf-8").splitlines() if line.strip()
     )
-    assert review_count_before == 24
+    assert review_count_before > 0
     annotations_before = annotations.read_bytes()
 
     csv_text, summary = export_review_worksheet(
@@ -358,7 +359,11 @@ def test_pilot_translation_export_dry_run_skips_all_and_preserves_reviews(tmp_pa
     assert all(row["source_transcript"] for row in rows)
     assert all(row["artifact_storage_ref"] for row in rows)
     en = [row for row in rows if row["content_language"].lower() in {"english", "en"}]
-    fr = [row for row in rows if row["content_language"].lower() in {"french", "fr", "français", "francais"}]
+    fr = [
+        row
+        for row in rows
+        if row["content_language"].lower() in {"french", "fr", "français", "francais"}
+    ]
     assert len(en) == 24
     assert len(fr) == 24
 
@@ -377,4 +382,8 @@ def test_pilot_translation_export_dry_run_skips_all_and_preserves_reviews(tmp_pa
     assert dry.summary["preview_row_count"] == 0
     assert dry.summary["error_count"] == 0
     assert reviews.read_bytes() == review_before
+    review_count_after = sum(
+        1 for line in reviews.read_text(encoding="utf-8").splitlines() if line.strip()
+    )
+    assert review_count_after == review_count_before
     assert annotations.read_bytes() == annotations_before
