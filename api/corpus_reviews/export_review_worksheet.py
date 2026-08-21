@@ -26,10 +26,14 @@ from corpus_segments.validate_corpus_segments import (
     validate_corpus_segments,
 )
 
-# v2 adds read-only related-translation + audio locator context discovered in CORPUS1F.
-WORKSHEET_SCHEMA = "corpus_annotation_review_worksheet_v2"
+WORKSHEET_SCHEMA_V2 = "corpus_annotation_review_worksheet_v2"
+WORKSHEET_SCHEMA_V3 = "corpus_annotation_review_worksheet_v3"
+# New exports use v3; dry-run continues to accept historical v2.
+WORKSHEET_SCHEMA = WORKSHEET_SCHEMA_V3
 
-CONTEXT_COLUMNS = [
+SUPPORTED_WORKSHEET_SCHEMAS = {WORKSHEET_SCHEMA_V2, WORKSHEET_SCHEMA_V3}
+
+CONTEXT_COLUMNS_V2 = [
     "worksheet_schema",
     "annotation_id",
     "annotation_type",
@@ -38,6 +42,34 @@ CONTEXT_COLUMNS = [
     "content",
     "content_language",
     "script",
+    "related_translation_english",
+    "related_translation_english_annotation_ids",
+    "related_translation_french",
+    "related_translation_french_annotation_ids",
+    "creation_method",
+    "created_by",
+    "tool_name",
+    "tool_version",
+    "model_name",
+    "model_version",
+    "uncertainty_summary",
+    "supersedes_annotation_id",
+    "is_current_leaf",
+    "competing_leaf_count",
+    "annotation_fingerprint_sha256",
+]
+
+CONTEXT_COLUMNS_V3 = [
+    "worksheet_schema",
+    "annotation_id",
+    "annotation_type",
+    "segment_id",
+    "artifact_storage_ref",
+    "content",
+    "content_language",
+    "script",
+    "source_transcript",
+    "source_transcript_annotation_ids",
     "related_translation_english",
     "related_translation_english_annotation_ids",
     "related_translation_french",
@@ -67,14 +99,30 @@ REVIEW_FILL_COLUMNS = [
     "review_method",
 ]
 
-WORKSHEET_COLUMNS = CONTEXT_COLUMNS + REVIEW_FILL_COLUMNS
+CONTEXT_COLUMNS = CONTEXT_COLUMNS_V3
+WORKSHEET_COLUMNS_V2 = CONTEXT_COLUMNS_V2 + REVIEW_FILL_COLUMNS
+WORKSHEET_COLUMNS_V3 = CONTEXT_COLUMNS_V3 + REVIEW_FILL_COLUMNS
+WORKSHEET_COLUMNS = WORKSHEET_COLUMNS_V3
 
 _ENGLISH_LABELS = {"english", "en"}
 _FRENCH_LABELS = {"french", "fr", "français", "francais"}
+_TRANSCRIPT_TYPES = {"transcript_raw", "transcript_normalized"}
 
 
 class CorpusReviewWorksheetError(ValueError):
     """Raised when worksheet export fails."""
+
+
+def context_columns_for_schema(schema: str) -> list[str]:
+    if schema == WORKSHEET_SCHEMA_V2:
+        return list(CONTEXT_COLUMNS_V2)
+    if schema == WORKSHEET_SCHEMA_V3:
+        return list(CONTEXT_COLUMNS_V3)
+    raise CorpusReviewWorksheetError(f"unsupported worksheet_schema {schema!r}")
+
+
+def worksheet_columns_for_schema(schema: str) -> list[str]:
+    return context_columns_for_schema(schema) + list(REVIEW_FILL_COLUMNS)
 
 
 def _uncertainty_summary(row: dict[str, Any]) -> str:
@@ -124,11 +172,14 @@ def _related_translations_for_segment(
     *,
     segment_id: str,
     leaf_ids: set[str],
+    exclude_annotation_id: str | None = None,
 ) -> dict[str, list[CorpusAnnotationRow]]:
     """Collect current translation leaves on the same segment, grouped by language family."""
     english: list[CorpusAnnotationRow] = []
     french: list[CorpusAnnotationRow] = []
     for item in annotation_rows:
+        if exclude_annotation_id and item.annotation_id == exclude_annotation_id:
+            continue
         if item.annotation_id not in leaf_ids:
             continue
         if item.segment_id != segment_id:
@@ -145,7 +196,27 @@ def _related_translations_for_segment(
     return {"english": english, "french": french}
 
 
-def _join_translation_contents(items: list[CorpusAnnotationRow]) -> str:
+def _source_transcripts_from_derivation(
+    item: CorpusAnnotationRow,
+    rows_by_id: dict[str, CorpusAnnotationRow],
+) -> list[CorpusAnnotationRow]:
+    parents = item.row.get("derived_from_annotation_ids") or []
+    if not isinstance(parents, list):
+        return []
+    found: list[CorpusAnnotationRow] = []
+    for parent_id in parents:
+        if not isinstance(parent_id, str) or not parent_id:
+            continue
+        parent = rows_by_id.get(parent_id)
+        if parent is None:
+            continue
+        if parent.row.get("annotation_type") in _TRANSCRIPT_TYPES:
+            found.append(parent)
+    found.sort(key=lambda row: row.annotation_id)
+    return found
+
+
+def _join_contents(items: list[CorpusAnnotationRow]) -> str:
     return " | ".join(str(item.row.get("content", "")) for item in items)
 
 
@@ -159,10 +230,17 @@ def build_worksheet_rows(
     include_superseded: bool = False,
     annotation_type: str | None = None,
     artifact_storage_by_segment: dict[str, str] | None = None,
+    worksheet_schema: str = WORKSHEET_SCHEMA_V3,
 ) -> list[dict[str, str]]:
+    if worksheet_schema not in SUPPORTED_WORKSHEET_SCHEMAS:
+        raise CorpusReviewWorksheetError(
+            f"unsupported worksheet_schema {worksheet_schema!r}"
+        )
+
     leaf_ids = set(find_supersession_leaves(annotation_rows))
     competing = _competing_leaf_counts(annotation_rows, leaf_ids)
     storage_by_segment = artifact_storage_by_segment or {}
+    rows_by_id = {item.annotation_id: item for item in annotation_rows}
 
     selected: list[CorpusAnnotationRow] = []
     for item in annotation_rows:
@@ -181,61 +259,70 @@ def build_worksheet_rows(
             annotation_rows,
             segment_id=item.segment_id,
             leaf_ids=leaf_ids,
+            exclude_annotation_id=item.annotation_id,
         )
-        # Do not echo a translation row's own content into related_* for that language
-        # when the reviewed subject is itself that translation — still useful to see
-        # the sibling language beside it.
-        english_items = related["english"]
-        french_items = related["french"]
-        worksheet_rows.append(
-            {
-                "worksheet_schema": WORKSHEET_SCHEMA,
-                "annotation_id": item.annotation_id,
-                "annotation_type": str(row.get("annotation_type", "")),
-                "segment_id": item.segment_id,
-                "artifact_storage_ref": storage_by_segment.get(item.segment_id, ""),
-                "content": str(row.get("content", "")),
-                "content_language": str(row.get("content_language", "")),
-                "script": str(row.get("script", "")),
-                "related_translation_english": _join_translation_contents(english_items),
-                "related_translation_english_annotation_ids": _join_annotation_ids(
-                    english_items
-                ),
-                "related_translation_french": _join_translation_contents(french_items),
-                "related_translation_french_annotation_ids": _join_annotation_ids(
-                    french_items
-                ),
-                "creation_method": str(row.get("creation_method", "")),
-                "created_by": str(row.get("created_by", "")),
-                "tool_name": str(row.get("tool_name", "")),
-                "tool_version": str(row.get("tool_version", "")),
-                "model_name": str(row.get("model_name", "")),
-                "model_version": str(row.get("model_version", "")),
-                "uncertainty_summary": _uncertainty_summary(row),
-                "supersedes_annotation_id": str(row.get("supersedes_annotation_id", "")),
-                "is_current_leaf": "true" if item.annotation_id in leaf_ids else "false",
-                "competing_leaf_count": str(competing.get(item.annotation_id, 0)),
-                "annotation_fingerprint_sha256": annotation_fingerprint_sha256(row),
-                "review_id": "",
-                "review_decision": "",
-                "evidence_strength": "",
-                "evidence_refs": "",
-                "issue_codes": "",
-                "review_notes": "",
-                "reviewer_id": "",
-                "reviewed_at": "",
-                "review_method": "",
-            }
-        )
+        source_transcripts: list[CorpusAnnotationRow] = []
+        if worksheet_schema == WORKSHEET_SCHEMA_V3 and row.get("annotation_type") == "translation":
+            source_transcripts = _source_transcripts_from_derivation(item, rows_by_id)
+
+        built: dict[str, str] = {
+            "worksheet_schema": worksheet_schema,
+            "annotation_id": item.annotation_id,
+            "annotation_type": str(row.get("annotation_type", "")),
+            "segment_id": item.segment_id,
+            "artifact_storage_ref": storage_by_segment.get(item.segment_id, ""),
+            "content": str(row.get("content", "")),
+            "content_language": str(row.get("content_language", "")),
+            "script": str(row.get("script", "")),
+            "related_translation_english": _join_contents(related["english"]),
+            "related_translation_english_annotation_ids": _join_annotation_ids(
+                related["english"]
+            ),
+            "related_translation_french": _join_contents(related["french"]),
+            "related_translation_french_annotation_ids": _join_annotation_ids(
+                related["french"]
+            ),
+            "creation_method": str(row.get("creation_method", "")),
+            "created_by": str(row.get("created_by", "")),
+            "tool_name": str(row.get("tool_name", "")),
+            "tool_version": str(row.get("tool_version", "")),
+            "model_name": str(row.get("model_name", "")),
+            "model_version": str(row.get("model_version", "")),
+            "uncertainty_summary": _uncertainty_summary(row),
+            "supersedes_annotation_id": str(row.get("supersedes_annotation_id", "")),
+            "is_current_leaf": "true" if item.annotation_id in leaf_ids else "false",
+            "competing_leaf_count": str(competing.get(item.annotation_id, 0)),
+            "annotation_fingerprint_sha256": annotation_fingerprint_sha256(row),
+            "review_id": "",
+            "review_decision": "",
+            "evidence_strength": "",
+            "evidence_refs": "",
+            "issue_codes": "",
+            "review_notes": "",
+            "reviewer_id": "",
+            "reviewed_at": "",
+            "review_method": "",
+        }
+        if worksheet_schema == WORKSHEET_SCHEMA_V3:
+            built["source_transcript"] = _join_contents(source_transcripts)
+            built["source_transcript_annotation_ids"] = _join_annotation_ids(
+                source_transcripts
+            )
+        worksheet_rows.append(built)
     return worksheet_rows
 
 
-def worksheet_rows_to_csv(rows: list[dict[str, str]]) -> str:
+def worksheet_rows_to_csv(
+    rows: list[dict[str, str]],
+    *,
+    worksheet_schema: str = WORKSHEET_SCHEMA_V3,
+) -> str:
+    columns = worksheet_columns_for_schema(worksheet_schema)
     buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=WORKSHEET_COLUMNS, lineterminator="\n")
+    writer = csv.DictWriter(buffer, fieldnames=columns, lineterminator="\n")
     writer.writeheader()
     for row in rows:
-        writer.writerow({column: row.get(column, "") for column in WORKSHEET_COLUMNS})
+        writer.writerow({column: row.get(column, "") for column in columns})
     return buffer.getvalue()
 
 
@@ -280,6 +367,7 @@ def export_review_worksheet(
     segments_path: Path | None = None,
     artifacts_path: Path | None = None,
     sources_path: Path | None = None,
+    worksheet_schema: str = WORKSHEET_SCHEMA_V3,
 ) -> tuple[str, dict[str, int]]:
     try:
         result = validate_corpus_annotations(
@@ -304,8 +392,9 @@ def export_review_worksheet(
         include_superseded=include_superseded,
         annotation_type=annotation_type,
         artifact_storage_by_segment=storage_by_segment,
+        worksheet_schema=worksheet_schema,
     )
-    csv_text = worksheet_rows_to_csv(rows)
+    csv_text = worksheet_rows_to_csv(rows, worksheet_schema=worksheet_schema)
     leaf_count = sum(1 for row in rows if row["is_current_leaf"] == "true")
     summary = {
         "annotation_row_count": len(result.rows),
@@ -313,6 +402,7 @@ def export_review_worksheet(
         "current_leaf_rows": leaf_count,
         "include_superseded": 1 if include_superseded else 0,
         "artifact_storage_context": 1 if storage_by_segment else 0,
+        "worksheet_schema_v3": 1 if worksheet_schema == WORKSHEET_SCHEMA_V3 else 0,
     }
     return csv_text, summary
 

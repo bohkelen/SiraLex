@@ -184,11 +184,27 @@ annotations
 → (later) governed production write — deferred
 ```
 
-Every exported row MUST include:
+Every **new** exported row MUST include:
+
+```text
+worksheet_schema = corpus_annotation_review_worksheet_v3
+```
+
+Dry-run / writer MUST continue accepting historical worksheets with:
 
 ```text
 worksheet_schema = corpus_annotation_review_worksheet_v2
 ```
+
+Schema dispatch is explicit and fail-closed:
+
+- `v2` → validate with v2 columns/context semantics
+- `v3` → validate with v3 columns/context semantics
+- unknown / mixed unsupported reinterpretation → reject
+
+Do **not** silently reinterpret a v2 worksheet as v3.
+
+### v2 context (historical)
 
 v2 adds **read-only review context** for related same-segment translation
 leaves and optional audio locator:
@@ -201,12 +217,64 @@ leaves and optional audio locator:
 | `related_translation_french` | Joined content of current French translation leaves |
 | `related_translation_french_annotation_ids` | Matching `cann_…` ids (`;`-joined) |
 
+### v3 context (current export)
+
+v3 preserves v2 columns and adds derivation-based source transcript context for
+**translation subjects**:
+
+| Column | Semantics |
+|--------|-----------|
+| `source_transcript` | Joined content of transcript parents from `derived_from_annotation_ids` |
+| `source_transcript_annotation_ids` | Matching parent `cann_…` ids (`;`-joined, deterministic) |
+
+For `transcript_*` subjects, source transcript columns are empty; related
+English/French translation leaves remain contextual evidence as in v2.
+
+For `translation` subjects:
+
+- source transcript comes from derivation parents (`transcript_raw` /
+  `transcript_normalized`), not “newest same-segment transcript wins”
+- related English/French columns project **all other** current same-segment
+  translation leaves as contextual evidence, grouped by content language
+  (subject annotation excluded)
+- same-language competing leaves remain visible; multiple leaves remain
+  visible and are ordered deterministically by `annotation_id` (no newest-wins)
+- sibling agreement is never an automatic acceptance rule; no sibling is
+  preferred or accepted automatically
+
+Pilot note (SLR106): the current dataset has exactly one English and one
+French translation leaf per segment, so each English subject row currently
+shows its French sibling (and vice versa). That is a property of this pilot,
+not a universal schema rule.
+Translation review questions (human):
+
+- EN subject: Does this English text accurately represent the meaning of the
+  referenced Maninka expression?
+- FR subject: Does this French text accurately represent the meaning of the
+  referenced Maninka expression?
+
+Authority boundaries remain:
+
+```text
+accepted transcript ≠ accepted translation
+accepted English translation ≠ accepted French translation
+translation review ≠ dictionary promotion
+translation review ≠ rights clearance
+translation review ≠ publication approval
+```
+
+Reuse existing issue codes (`translation_uncertain`, `meaning_uncertain`,
+`language_identity_uncertain`, `unknown_word`, `needs_second_reviewer`,
+`other`) unless a concrete gap appears.
+
 Storage model remains separate versioned annotations (`transcript_raw` vs
-`translation`). The worksheet **displays** related translations beside the
+`translation`). The worksheet **displays** related context beside the
 reviewed subject; it does **not** store `transcript.translation=…`.
 
 Dry-run MUST reject missing/wrong/unsupported `worksheet_schema` and unknown
-unexpected CSV columns.
+unexpected CSV columns. All read-only context columns (including v3 source /
+sibling fields) participate in deterministic reconstruction; edits fail with
+`FAIL STALE OR MODIFIED WORKSHEET CONTEXT`.
 
 Reviewer-editable columns include `evidence_refs` (semicolon-delimited),
 parsed into `evidence_refs[]` on preview rows.

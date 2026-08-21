@@ -18,12 +18,14 @@ from corpus_annotations.validate_corpus_annotations import (
     validate_corpus_annotations,
 )
 from corpus_reviews.export_review_worksheet import (
-    CONTEXT_COLUMNS,
     REVIEW_FILL_COLUMNS,
-    WORKSHEET_COLUMNS,
-    WORKSHEET_SCHEMA,
+    SUPPORTED_WORKSHEET_SCHEMAS,
+    WORKSHEET_SCHEMA_V2,
+    WORKSHEET_SCHEMA_V3,
     _artifact_storage_by_segment,
     build_worksheet_rows,
+    context_columns_for_schema,
+    worksheet_columns_for_schema,
 )
 from corpus_reviews.validate_corpus_reviews import (
     ALLOWED_DECISIONS,
@@ -91,6 +93,29 @@ def _row_has_review_input(row: dict[str, str]) -> bool:
     return any(str(row.get(column, "")).strip() for column in REVIEW_INPUT_COLUMNS)
 
 
+def _detect_worksheet_schema(header: list[str], sample_rows: list[dict[str, str]]) -> str:
+    """Resolve header/column layout schema; unsupported values fail per-row later."""
+    schemas = {
+        (row.get("worksheet_schema") or "").strip()
+        for row in sample_rows
+        if (row.get("worksheet_schema") or "").strip()
+    }
+    if len(schemas) > 1:
+        supported = schemas & SUPPORTED_WORKSHEET_SCHEMAS
+        if len(supported) == 1:
+            return next(iter(supported))
+        if len(supported) > 1:
+            raise CorpusReviewDryRunError(
+                f"mixed worksheet_schema values in one file: {sorted(schemas)}"
+            )
+    if schemas and schemas <= SUPPORTED_WORKSHEET_SCHEMAS and len(schemas) == 1:
+        return next(iter(schemas))
+    # Infer column layout from header when schema is missing/unsupported.
+    if "source_transcript" in header:
+        return WORKSHEET_SCHEMA_V3
+    return WORKSHEET_SCHEMA_V2
+
+
 def dry_run_import_review_worksheet(
     worksheet_path: Path,
     annotations_path: Path,
@@ -119,15 +144,6 @@ def dry_run_import_review_worksheet(
         artifacts_path=artifacts_path,
         sources_path=sources_path,
     )
-    expected_by_id = {
-        row["annotation_id"]: row
-        for row in build_worksheet_rows(
-            annotation_result.rows,
-            include_superseded=include_superseded,
-            annotation_type=annotation_type,
-            artifact_storage_by_segment=storage_by_segment,
-        )
-    }
 
     text = worksheet_path.read_text(encoding="utf-8")
     reader = csv.DictReader(io.StringIO(text))
@@ -135,16 +151,40 @@ def dry_run_import_review_worksheet(
         raise CorpusReviewDryRunError(f"{worksheet_path}: missing CSV header")
 
     header = list(reader.fieldnames)
-    missing_columns = [column for column in WORKSHEET_COLUMNS if column not in header]
+    raw_rows = list(reader)
+    normalized_preview = [
+        {key: (raw.get(key) or "").strip() for key in header} for raw in raw_rows
+    ]
+    try:
+        worksheet_schema = _detect_worksheet_schema(header, normalized_preview)
+    except CorpusReviewDryRunError:
+        raise
+
+    expected_columns = worksheet_columns_for_schema(worksheet_schema)
+    context_columns = context_columns_for_schema(worksheet_schema)
+
+    missing_columns = [column for column in expected_columns if column not in header]
     if missing_columns:
         raise CorpusReviewDryRunError(
-            f"{worksheet_path}: missing required columns: {', '.join(missing_columns)}"
+            f"{worksheet_path}: missing required columns for {worksheet_schema}: "
+            f"{', '.join(missing_columns)}"
         )
-    unexpected = [column for column in header if column not in WORKSHEET_COLUMNS]
+    unexpected = [column for column in header if column not in expected_columns]
     if unexpected:
         raise CorpusReviewDryRunError(
             f"{worksheet_path}: unknown unexpected columns: {', '.join(unexpected)}"
         )
+
+    expected_by_id = {
+        row["annotation_id"]: row
+        for row in build_worksheet_rows(
+            annotation_result.rows,
+            include_superseded=include_superseded,
+            annotation_type=annotation_type,
+            artifact_storage_by_segment=storage_by_segment,
+            worksheet_schema=worksheet_schema,
+        )
+    }
 
     result = CorpusReviewDryRunResult()
     rows_read = 0
@@ -157,30 +197,33 @@ def dry_run_import_review_worksheet(
     pending_previews: list[tuple[int, dict[str, Any]]] = []
     diagnostic_candidates: list[dict[str, Any]] = []
 
-    for line_number, raw in enumerate(reader, start=2):
+    for line_number, raw in enumerate(raw_rows, start=2):
         rows_read += 1
-        row = {key: (raw.get(key) or "").strip() for key in WORKSHEET_COLUMNS}
+        row = {key: (raw.get(key) or "").strip() for key in expected_columns}
 
-        worksheet_schema = row.get("worksheet_schema", "")
-        if not worksheet_schema:
+        row_schema = row.get("worksheet_schema", "")
+        if not row_schema:
             schema_errors += 1
             result.errors.append(
                 f"{worksheet_path}:{line_number}: missing worksheet_schema"
             )
             continue
-        if worksheet_schema != WORKSHEET_SCHEMA:
+        if row_schema not in SUPPORTED_WORKSHEET_SCHEMAS:
             schema_errors += 1
             result.errors.append(
                 f"{worksheet_path}:{line_number}: unsupported worksheet_schema "
-                f"{worksheet_schema!r} (expected {WORKSHEET_SCHEMA!r})"
+                f"{row_schema!r}"
+            )
+            continue
+        if row_schema != worksheet_schema:
+            schema_errors += 1
+            result.errors.append(
+                f"{worksheet_path}:{line_number}: worksheet_schema {row_schema!r} "
+                f"does not match file schema {worksheet_schema!r}"
             )
             continue
 
         if not _row_has_review_input(row):
-            # Still verify context integrity for unreviewed rows? Spec says dry-run
-            # against unedited worksheet expects all skipped with 0 errors. Context
-            # check for unreviewed rows ensures the worksheet wasn't tampered with
-            # before human fill — validate context whenever annotation_id present.
             annotation_id = row["annotation_id"]
             expected = expected_by_id.get(annotation_id)
             if expected is None:
@@ -192,7 +235,7 @@ def dry_run_import_review_worksheet(
                 continue
             mismatched = [
                 column
-                for column in CONTEXT_COLUMNS
+                for column in context_columns
                 if row.get(column, "") != expected.get(column, "")
             ]
             if mismatched:
@@ -220,7 +263,7 @@ def dry_run_import_review_worksheet(
 
         mismatched = [
             column
-            for column in CONTEXT_COLUMNS
+            for column in context_columns
             if row.get(column, "") != expected.get(column, "")
         ]
         if mismatched:
@@ -323,6 +366,8 @@ def dry_run_import_review_worksheet(
         "stale_context_errors": stale_context_errors,
         "unknown_annotation_errors": unknown_annotation_errors,
         "worksheet_schema_errors": schema_errors,
+        "worksheet_schema_v2": 1 if worksheet_schema == WORKSHEET_SCHEMA_V2 else 0,
+        "worksheet_schema_v3": 1 if worksheet_schema == WORKSHEET_SCHEMA_V3 else 0,
         **{f"decision.{key}": value for key, value in sorted(decision_counts.items())},
     }
     return result
