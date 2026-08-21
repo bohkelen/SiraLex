@@ -6,14 +6,21 @@ Reviews are separate immutable evidence records. They do **not** mutate
 annotations, create dictionary candidates, authorize publication, or resolve
 rights.
 
-Expected future production path (not created by CORPUS1E):
+Expected future production path (deferred; not created by CORPUS1E/CORPUS1F2):
 
 ```text
 shared/corpus/corpus_annotation_reviews_v1.jsonl
 ```
 
-CORPUS1E ships validators, worksheet export, and dry-run import only.
-Synthetic fixtures under `shared/corpus/fixtures/`.
+**History:**
+
+- CORPUS1E introduced the versioned review contract, validator, worksheet export,
+  and dry-run import (synthetic fixtures only).
+- CORPUS1F2 later added governed **pilot-local** persistence via
+  `siralex-write-corpus-reviews` for real completed human worksheets whose
+  annotations live under gitignored local pilot data.
+
+CORPUS1F2 does **not** create a tracked production review registry.
 
 ## Authority boundary
 
@@ -223,11 +230,62 @@ worksheet
 
 Edited CSV is never the canonical review registry.
 
+## Persistence lifecycle (pilot)
+
+```text
+completed worksheet
+→ canonical dry-run conversion + full review-table validation
+→ explicit --apply
+→ local immutable corpus_annotation_reviews_v1 registry
+```
+
+CLI: `siralex-write-corpus-reviews`
+
+Default invocation validates and reports intended changes and **does not write**.
+Persistence requires explicit `--apply`.
+
+### Local vs tracked registry
+
+For CORPUS1F pilot data that exists only under gitignored `data/corpus1f/`,
+persisted reviews MUST remain local (e.g.
+`data/corpus1f/tables/corpus_annotation_reviews_v1.jsonl`).
+
+A tracked production path such as
+`shared/corpus/corpus_annotation_reviews_v1.jsonl` remains **deferred** until
+reviews would reference tracked annotation authority rather than local-only
+pilot IDs.
+
+### Idempotence and conflicts
+
+- Candidate `review_id` **not present** in the existing registry → append
+- Candidate `review_id` present with identical canonical row → no-op / already present
+- Candidate `review_id` present with differing content → **FAIL CONFLICT** (no overwrite)
+
+`review_id` remains required on every canonical review record.
+
+Changed human judgments require a new review record (and later
+`supersedes_review_id` workflow). Worksheet review-supersession UX is not part
+of the initial writer.
+
+### Atomicity and post-write verification
+
+Writes use a temporary sibling file + fsync, then **validate that temporary
+file from disk** with the canonical review validator and annotation chain before
+`os.replace`. A best-effort parent-directory fsync may follow replace.
+Any failure yields non-zero exit and must not report success.
+
+### Write receipt
+
+Optional `--receipt` JSON records operational provenance (row counts, hashes,
+reviewer IDs). Receipts are not linguistic authority.
+
 ## Review supersession vs worksheet workflow
 
 ```text
 review supersession = contract/validator capability
-worksheet supersession workflow = deferred until governed review persistence exists
+worksheet supersession workflow = deferred
+governed persistence = local immutable append/idempotent apply
 ```
 
-Do not require worksheet fields for `supersedes_review_id` in CORPUS1E.
+Do not require worksheet fields for `supersedes_review_id` in the initial
+writer. Preview JSONL is diagnostic only and is never the write authority.

@@ -78,6 +78,23 @@ Maninka ↔ supplied dataset translation (EN/FR)
 Those translations are still **dataset-imported glosses**, not reviewed
 linguistic truth.
 
+### Review-target semantics (normative for this worksheet)
+
+A review decision on a v2 worksheet row applies to the referenced
+`transcript_raw` annotation **only**.
+
+Related English/French columns are read-only contextual evidence.
+
+```text
+accepted transcript review
+≠ accepted English translation review
+≠ accepted French translation review
+```
+
+Do not automatically propagate transcript decisions onto translation
+annotations. Formal translation validation requires reviewing those
+`translation` annotations as independent subjects later.
+
 ## Files
 
 Tracked (uncommitted unless requested):

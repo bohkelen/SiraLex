@@ -38,6 +38,7 @@ siralex-validate-corpus-annotations = "corpus_annotations.validate_corpus_annota
 siralex-validate-corpus-reviews = "corpus_reviews.validate_corpus_reviews:main"
 siralex-export-corpus-review-worksheet = "corpus_reviews.export_review_worksheet:main"
 siralex-corpus-review-dry-run = "corpus_reviews.dry_run_import_reviews:main"
+siralex-write-corpus-reviews = "corpus_reviews.write_corpus_reviews:main"
 
 [tool.ruff]
 line-length = 100
