@@ -39,6 +39,7 @@ siralex-validate-corpus-reviews = "corpus_reviews.validate_corpus_reviews:main"
 siralex-export-corpus-review-worksheet = "corpus_reviews.export_review_worksheet:main"
 siralex-corpus-review-dry-run = "corpus_reviews.dry_run_import_reviews:main"
 siralex-write-corpus-reviews = "corpus_reviews.write_corpus_reviews:main"
+siralex-malipense-version-delta = "malipense_version_delta.cli:main"
 
 [tool.ruff]
 line-length = 100
@@ -63,6 +64,7 @@ packages = [
     "corpus_segments",
     "corpus_annotations",
     "corpus_reviews",
+    "malipense_version_delta",
 ]
 
 [build-system]
