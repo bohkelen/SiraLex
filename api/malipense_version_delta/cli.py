@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         indent=2,
         sort_keys=True,
     ))
-    return 0 if summary["decision"].endswith("_COMPLETE") else 2
+    return 0 if summary["decision"].endswith("_RESTORED") else 2
 
 
 if __name__ == "__main__":

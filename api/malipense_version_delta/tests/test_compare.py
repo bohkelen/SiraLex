@@ -224,5 +224,71 @@ def test_provisional_match_when_ids_renumbered():
     assert delta[0]["match_method"] == "url_canonical+headword_latin_unique"
 
 
+def test_exact_content_supported_within_ambiguous_homonyms():
+    # Same headword twice on each side; one pair shares exact semantic projection
+    base = [
+        _entry(ir_id="b1", url=URL_A, source_record_id="e0", headword="bá", gloss_fr="mère"),
+        _entry(ir_id="b2", url=URL_A, source_record_id="e1", headword="bá", gloss_fr="fleuve"),
+    ]
+    cur = [
+        _entry(ir_id="c1", url=URL_A, source_record_id="e10", headword="bá", gloss_fr="mère"),
+        _entry(ir_id="c2", url=URL_A, source_record_id="e11", headword="bá", gloss_fr="changed"),
+    ]
+    delta, frag = compare_lexicon_records(base, cur, parser_compat_status="PASS")
+    assert frag["identity_confidence_counts"].get("EXACT_CONTENT_SUPPORTED", 0) == 1
+    assert frag["classification_counts"].get("UNCHANGED", 0) == 1
+    # Remaining same-headword leftovers stay AMBIGUOUS (not force-matched).
+    assert frag["identity_confidence_counts"].get("AMBIGUOUS", 0) == 2
+    assert frag["classification_counts"].get("IDENTITY_AMBIGUOUS", 0) == 2
+
+
 def test_canonical_dumps_sorted():
     assert canonical_dumps({"b": 1, "a": 2}) == '{"a":2,"b":1}'
+
+    base = [_entry(ir_id="1", url=URL_A, source_record_id="e0", headword="x", gloss_fr="abc")]
+    cur = [_entry(ir_id="2", url=URL_A, source_record_id="e9", headword="x", gloss_fr="abd")]
+    # unique headword → provisional match, then CHANGED (not fuzzy-collapsed to unchanged)
+    delta, frag = compare_lexicon_records(base, cur, parser_compat_status="PASS")
+    assert frag["classification_counts"]["CHANGED_EXISTING_RECORD"] == 1
+    assert delta[0]["identity_confidence"] == "PROVISIONAL"
+
+
+def test_semantic_compare_activates_after_compatibility():
+    base = [_entry(ir_id="1", url=URL_A, source_record_id="e0", headword="á", gloss_fr="old")]
+    cur = [_entry(ir_id="1", url=URL_A, source_record_id="e0", headword="á", gloss_fr="new")]
+    _, blocked = compare_lexicon_records(base, cur, parser_compat_status="FAIL")
+    assert blocked["classification_counts"].get("SEMANTIC_COMPARE_BLOCKED", 0) == 1
+    _, active = compare_lexicon_records(base, cur, parser_compat_status="PASS")
+    assert active["classification_counts"].get("CHANGED_EXISTING_RECORD", 0) == 1
+    assert active["semantic_compare_enabled"] is True
+
+
+def test_changed_example_and_nko_subtypes():
+    base = [
+        _entry(
+            ir_id="1",
+            url=URL_A,
+            source_record_id="e0",
+            headword="á",
+            gloss_fr="g",
+            nko="ߊ",
+            examples=[{"text_latin": "old", "trans_fr": "vieux"}],
+        )
+    ]
+    cur = [
+        _entry(
+            ir_id="1",
+            url=URL_A,
+            source_record_id="e0",
+            headword="á",
+            gloss_fr="g",
+            nko="ߋ",
+            examples=[{"text_latin": "new", "trans_fr": "neuf"}],
+        )
+    ]
+    delta, frag = compare_lexicon_records(base, cur, parser_compat_status="PASS")
+    classes = set(delta[0]["change_classes"])
+    assert "EXAMPLE_CHANGED" in classes
+    assert "NKO_CHANGED" in classes
+    assert frag["change_subtype_counts"]["EXAMPLE_CHANGED"] == 1
+    assert frag["change_subtype_counts"]["NKO_CHANGED"] == 1

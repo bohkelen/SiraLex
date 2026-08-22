@@ -6,8 +6,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
+from .canonical_json import canonical_dumps
+from .semantic import semantic_projection
 
-IDENTITY_RULE_ID = "malipense_identity_v1_partial"
+
+IDENTITY_RULE_ID = "malipense_identity_v2_partial"
 
 # Primary locator fields from existing IR / registry guidance.
 PRIMARY_IDENTITY_FIELDS = ("url_canonical", "source_record_id")
@@ -35,6 +38,10 @@ class RecordRef:
         if self.headword_latin is None or self.headword_latin == "":
             return None
         return (self.url_canonical, self.headword_latin)
+
+    @property
+    def semantic_signature(self) -> str:
+        return canonical_dumps(semantic_projection(self.record))
 
 
 def record_ref_from_ir(side: str, record: dict[str, Any]) -> RecordRef:
@@ -85,8 +92,69 @@ class MatchPair:
     baseline: RecordRef | None
     current: RecordRef | None
     match_method: str
-    # STRONG | PROVISIONAL | AMBIGUOUS | UNMATCHED_BASELINE | UNMATCHED_CURRENT
+    # STRONG | EXACT_CONTENT_SUPPORTED | PROVISIONAL | AMBIGUOUS |
+    # UNMATCHED_BASELINE | UNMATCHED_CURRENT
     identity_confidence: str
+
+
+def _emit_ambiguous_members(
+    pairs: list[MatchPair],
+    b_list: list[RecordRef],
+    c_list: list[RecordRef],
+    used_baseline: set[str],
+    used_current: set[str],
+    *,
+    match_method: str,
+) -> None:
+    for b in b_list:
+        if b.ir_id in used_baseline:
+            continue
+        pairs.append(
+            MatchPair(
+                baseline=b,
+                current=None,
+                match_method=match_method,
+                identity_confidence="AMBIGUOUS",
+            )
+        )
+        used_baseline.add(b.ir_id)
+    for c in c_list:
+        if c.ir_id in used_current:
+            continue
+        pairs.append(
+            MatchPair(
+                baseline=None,
+                current=c,
+                match_method=match_method,
+                identity_confidence="AMBIGUOUS",
+            )
+        )
+        used_current.add(c.ir_id)
+
+
+def _exact_content_pairs_within_group(
+    b_list: list[RecordRef],
+    c_list: list[RecordRef],
+) -> list[tuple[RecordRef, RecordRef]]:
+    """
+    Within an ambiguous same-page/same-headword group, pair records that share
+    an identical canonical semantic projection when that signature is unique
+    on both sides (1:1 only). No fuzzy / similarity matching.
+    """
+    by_sig_b: dict[str, list[RecordRef]] = defaultdict(list)
+    by_sig_c: dict[str, list[RecordRef]] = defaultdict(list)
+    for b in b_list:
+        by_sig_b[b.semantic_signature].append(b)
+    for c in c_list:
+        by_sig_c[c.semantic_signature].append(c)
+
+    paired: list[tuple[RecordRef, RecordRef]] = []
+    for sig in sorted(set(by_sig_b) & set(by_sig_c)):
+        bb = by_sig_b[sig]
+        cc = by_sig_c[sig]
+        if len(bb) == 1 and len(cc) == 1:
+            paired.append((bb[0], cc[0]))
+    return paired
 
 
 def match_records(
@@ -98,11 +166,12 @@ def match_records(
 
     1. Primary (url_canonical, source_record_id) when headword_latin also equal
        → STRONG
-    2. Else unique (url_canonical, headword_latin) 1:1 among unmatched
+    2. Unique (url_canonical, headword_latin) 1:1 among unmatched
        → PROVISIONAL
-    3. Else multi-homonym / multi-id collisions among unmatched
-       → AMBIGUOUS
-    4. Remainder → UNMATCHED_*
+    3. Within ambiguous same-page/same-headword groups, unique identical
+       semantic projection 1:1 → EXACT_CONTENT_SUPPORTED
+    4. Remaining multi-homonym collisions → AMBIGUOUS
+    5. Remainder → UNMATCHED_*
 
     Duplicate primary keys on a single side are rejected by caller before match.
     """
@@ -118,27 +187,14 @@ def match_records(
         b_list = base_by_primary[key]
         c_list = cur_by_primary[key]
         if len(b_list) != 1 or len(c_list) != 1:
-            # Ambiguous primary collision on a side — one row per involved record.
-            for b in b_list:
-                pairs.append(
-                    MatchPair(
-                        baseline=b,
-                        current=None,
-                        match_method="primary_key_collision",
-                        identity_confidence="AMBIGUOUS",
-                    )
-                )
-                used_baseline.add(b.ir_id)
-            for c in c_list:
-                pairs.append(
-                    MatchPair(
-                        baseline=None,
-                        current=c,
-                        match_method="primary_key_collision",
-                        identity_confidence="AMBIGUOUS",
-                    )
-                )
-                used_current.add(c.ir_id)
+            _emit_ambiguous_members(
+                pairs,
+                b_list,
+                c_list,
+                used_baseline,
+                used_current,
+                match_method="primary_key_collision",
+            )
             continue
         b = b_list[0]
         c = c_list[0]
@@ -155,11 +211,13 @@ def match_records(
             used_current.add(c.ir_id)
         # else: same id, different headword → renumbering; leave for later phases
 
-    # Phase 2/3: headword keys among remaining
+    # Phase 2: unique headword keys among remaining → PROVISIONAL
     rem_base = [r for r in baseline_refs if r.ir_id not in used_baseline]
     rem_cur = [r for r in current_refs if r.ir_id not in used_current]
     base_by_hw = index_by_headword(rem_base)
     cur_by_hw = index_by_headword(rem_cur)
+
+    ambiguous_groups: list[tuple[list[RecordRef], list[RecordRef]]] = []
 
     for key in sorted(set(base_by_hw) & set(cur_by_hw)):
         b_list = base_by_hw[key]
@@ -178,28 +236,36 @@ def match_records(
             used_baseline.add(b.ir_id)
             used_current.add(c.ir_id)
         else:
-            # Ambiguous homonym / multi-id collision: one evidence row per
-            # involved record (not a cartesian product).
-            for b in b_list:
-                pairs.append(
-                    MatchPair(
-                        baseline=b,
-                        current=None,
-                        match_method="url_canonical+headword_latin_ambiguous",
-                        identity_confidence="AMBIGUOUS",
-                    )
+            ambiguous_groups.append((b_list, c_list))
+
+    # Phase 3: exact-content-supported within ambiguous groups
+    for b_list, c_list in ambiguous_groups:
+        exact_pairs = _exact_content_pairs_within_group(b_list, c_list)
+        exact_b = {b.ir_id for b, _ in exact_pairs}
+        exact_c = {c.ir_id for _, c in exact_pairs}
+        for b, c in sorted(exact_pairs, key=lambda pc: (pc[0].ir_id, pc[1].ir_id)):
+            pairs.append(
+                MatchPair(
+                    baseline=b,
+                    current=c,
+                    match_method="url_canonical+headword+exact_semantic_projection",
+                    identity_confidence="EXACT_CONTENT_SUPPORTED",
                 )
-                used_baseline.add(b.ir_id)
-            for c in c_list:
-                pairs.append(
-                    MatchPair(
-                        baseline=None,
-                        current=c,
-                        match_method="url_canonical+headword_latin_ambiguous",
-                        identity_confidence="AMBIGUOUS",
-                    )
-                )
-                used_current.add(c.ir_id)
+            )
+            used_baseline.add(b.ir_id)
+            used_current.add(c.ir_id)
+
+        remain_b = [b for b in b_list if b.ir_id not in exact_b]
+        remain_c = [c for c in c_list if c.ir_id not in exact_c]
+        if remain_b or remain_c:
+            _emit_ambiguous_members(
+                pairs,
+                remain_b,
+                remain_c,
+                used_baseline,
+                used_current,
+                match_method="url_canonical+headword_latin_ambiguous",
+            )
 
     for b in baseline_refs:
         if b.ir_id not in used_baseline:

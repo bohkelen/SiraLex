@@ -327,9 +327,9 @@ def run_version_delta(
     )
 
     decision = (
-        "CORPUS1F10_MALIDABA_VERSION_DELTA_BLOCKED"
+        "CORPUS1F11_MALIDABA_DELTA_STILL_BLOCKED"
         if compat.status == "FAIL"
-        else "CORPUS1F10_MALIDABA_VERSION_DELTA_COMPLETE"
+        else "CORPUS1F11_MALIDABA_PARSER_COMPATIBILITY_RESTORED"
     )
 
     current_ir_path = output_dir / "malidaba_current_ir.jsonl"
@@ -348,19 +348,89 @@ def run_version_delta(
         rows = [r for r in delta_rows if r["classification"] == classification]
         return rows[:sample_n]
 
-    # N'Ko / example-idiom observations on matched provisional/strong when semantic on
+    # Headword-level descriptive sets (exact string equality; no fuzzy matching)
+    def _headwords(recs: list[dict[str, Any]]) -> set[str]:
+        out: set[str] = set()
+        for rec in recs:
+            hw = (rec.get("fields_raw") or {}).get("headword_latin")
+            if hw:
+                out.add(hw)
+        return out
+
+    base_hw = _headwords(baseline_records)
+    cur_hw = _headwords(current_records)
+    current_absent_from_baseline = sorted(cur_hw - base_hw)
+    baseline_absent_from_current = sorted(base_hw - cur_hw)
+
+    def _records_for_headwords(
+        recs: list[dict[str, Any]], headwords: set[str]
+    ) -> int:
+        n = 0
+        for rec in recs:
+            hw = (rec.get("fields_raw") or {}).get("headword_latin")
+            if hw in headwords:
+                n += 1
+        return n
+
+    headword_descriptors = {
+        "baseline_unique_headwords": len(base_hw),
+        "current_unique_headwords": len(cur_hw),
+        "current_headwords_absent_from_baseline": {
+            "unique_headword_count": len(current_absent_from_baseline),
+            "record_count": _records_for_headwords(
+                current_records, set(current_absent_from_baseline)
+            ),
+            "sample_first_n": current_absent_from_baseline[:25],
+        },
+        "baseline_headwords_absent_from_current": {
+            "unique_headword_count": len(baseline_absent_from_current),
+            "record_count": _records_for_headwords(
+                baseline_records, set(baseline_absent_from_current)
+            ),
+            "sample_first_n": baseline_absent_from_current[:25],
+        },
+    }
+
+    def _sense_field_totals(recs: list[dict[str, Any]]) -> dict[str, int]:
+        examples = 0
+        idioms = 0
+        nko = 0
+        for rec in recs:
+            fields = rec.get("fields_raw") or {}
+            if fields.get("headword_nko_provided"):
+                nko += 1
+            for sense in fields.get("senses") or []:
+                examples += len(sense.get("examples") or [])
+                idioms += len(sense.get("sub_entries") or [])
+        return {
+            "records_with_nko_headword": nko,
+            "example_count": examples,
+            "idiom_subentry_count": idioms,
+        }
+
+    matched_for_lex = [
+        r
+        for r in delta_rows
+        if r["identity_confidence"]
+        in {"STRONG", "EXACT_CONTENT_SUPPORTED", "PROVISIONAL"}
+        and r["classification"] in {CLASS_UNCHANGED, CLASS_CHANGED}
+    ]
+    nko_changed = sum(
+        1 for r in matched_for_lex if "NKO_CHANGED" in r.get("change_classes", [])
+    )
+    example_changed = sum(
+        1 for r in matched_for_lex if "EXAMPLE_CHANGED" in r.get("change_classes", [])
+    )
+    idiom_changed = sum(
+        1 for r in matched_for_lex if "IDIOM_CHANGED" in r.get("change_classes", [])
+    )
+
     nko_delta = {
-        "note": "observations limited when parser compatibility FAIL",
-        "current_records_with_nko": sum(
-            1
-            for r in current_records
-            if (r.get("fields_raw") or {}).get("headword_nko_provided")
-        ),
-        "baseline_records_with_nko": sum(
-            1
-            for r in baseline_records
-            if (r.get("fields_raw") or {}).get("headword_nko_provided")
-        ),
+        "baseline": _sense_field_totals(baseline_records),
+        "current": _sense_field_totals(current_records),
+        "matched_records_nko_changed": nko_changed,
+        "matched_records_example_changed": example_changed,
+        "matched_records_idiom_changed": idiom_changed,
     }
 
     summary = {
@@ -369,11 +439,7 @@ def run_version_delta(
         "source_id": "src_malipense",
         "parser_version": PARSER_VERSION,
         "identity_rule_id": IDENTITY_RULE_ID,
-        "identity_confidence_overall": "PARTIAL"
-        if compat.status == "FAIL"
-        or fragment["identity_confidence_counts"].get("PROVISIONAL", 0)
-        or fragment["identity_confidence_counts"].get("AMBIGUOUS", 0)
-        else "STRONG",
+        "identity_confidence_overall": "PARTIAL",
         "parser_compatibility": {
             "status": compat.status,
             "block_reason": compat.block_reason,
@@ -400,11 +466,13 @@ def run_version_delta(
         "match_method_counts": fragment["match_method_counts"],
         "identity_confidence_counts": fragment["identity_confidence_counts"],
         "new_analysis": fragment["new_analysis"],
+        "headword_descriptors": headword_descriptors,
         "nko_delta": nko_delta,
         "samples": {
             "NEW_IN_CURRENT_SOURCE": _samples(CLASS_NEW),
             "MISSING_FROM_CURRENT_SOURCE": _samples(CLASS_MISSING),
             "CHANGED_EXISTING_RECORD": _samples(CLASS_CHANGED),
+            "UNCHANGED": _samples(CLASS_UNCHANGED),
             "IDENTITY_AMBIGUOUS": _samples(CLASS_AMBIGUOUS),
             "SEMANTIC_COMPARE_BLOCKED": _samples(CLASS_BLOCKED_SEMANTIC),
         },
@@ -427,16 +495,31 @@ def run_version_delta(
         },
     }
 
-    # Overall identity confidence refinement when not blocked solely by parser
     strong = fragment["identity_confidence_counts"].get("STRONG", 0)
+    exact = fragment["identity_confidence_counts"].get("EXACT_CONTENT_SUPPORTED", 0)
     provisional = fragment["identity_confidence_counts"].get("PROVISIONAL", 0)
     ambiguous = fragment["identity_confidence_counts"].get("AMBIGUOUS", 0)
-    if strong and not provisional and not ambiguous and compat.status == "PASS":
+    if (
+        strong
+        and not provisional
+        and not exact
+        and not ambiguous
+        and compat.status == "PASS"
+    ):
         summary["identity_confidence_overall"] = "STRONG"
     elif compat.status == "FAIL":
-        summary["identity_confidence_overall"] = "PARTIAL"
+        summary["identity_confidence_overall"] = "BLOCKED"
     else:
         summary["identity_confidence_overall"] = "PARTIAL"
+
+    if (
+        compat.status == "PASS"
+        and fragment["semantic_compare_enabled"]
+        and fragment["classification_counts"].get(CLASS_BLOCKED_SEMANTIC, 0) == 0
+    ):
+        summary["human_review_readiness"] = "MALIDABA_DELTA_HUMAN_REVIEW_READY"
+    else:
+        summary["human_review_readiness"] = "NOT_READY"
 
     summary_path = output_dir / "malidaba_version_delta_summary.json"
     write_json(summary_path, summary)
