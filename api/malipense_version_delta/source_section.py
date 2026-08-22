@@ -100,6 +100,40 @@ def classify_ps_text(ps_text: str | None) -> tuple[str, str | None]:
     return CLASS_UNKNOWN, None
 
 
+def derive_classification_evidence(
+    *,
+    ps_text: str | None,
+    section_class: str,
+    ps_marker: str | None = None,
+) -> str:
+    """
+    Deterministic compact rule explanation for worksheet observability.
+
+    Not an LLM explanation — derived only from classifier inputs/outputs.
+    """
+    if section_class == CLASS_BASE_LEXICAL:
+        if not ps_text or not str(ps_text).strip():
+            return "unknown:missing_ps"
+        token = _first_ps_token(" ".join(str(ps_text).split()))
+        return f"ordinary_pos:{token}"
+
+    if section_class == CLASS_TOPONYM:
+        return "onomastic:n_prop_TOP"
+    if section_class == CLASS_PERSON_NAME:
+        slug = (ps_marker or "NOM").replace(" ", "_")
+        return f"onomastic:n_prop_{slug}"
+    if section_class == CLASS_OTHER_ADDON:
+        return "onomastic:n_prop_NOM_CL"
+
+    if ps_text is None or not str(ps_text).strip():
+        return "unknown:missing_ps"
+
+    normalized = " ".join(str(ps_text).split())
+    if _N_PROP_NAMESPACE_RE.match(normalized):
+        return "unknown:unrecognized_n_prop"
+    return "unknown:unrecognized_ps"
+
+
 def _entry_ps_from_header(header) -> str | None:
     """Read PS from nested or sibling lxP2 owned by one lxP header."""
     lxp2 = header.find("p", class_="lxP2")

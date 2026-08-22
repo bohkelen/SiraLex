@@ -16,14 +16,15 @@ from .compare import load_jsonl_records
 from .export_worksheet import (
     ALLOWED_DECISIONS,
     ALLOWED_ISSUE_CODES,
-    CONTEXT_COLUMNS,
     REVIEW_FILL_COLUMNS,
-    WORKSHEET_COLUMNS,
-    WORKSHEET_SCHEMA,
+    SUPPORTED_WORKSHEET_SCHEMAS,
+    WORKSHEET_SCHEMA_V1,
+    WORKSHEET_SCHEMA_V2,
     build_worksheet_row,
+    context_columns_for_schema,
+    worksheet_columns_for_schema,
 )
-from .frozen_inputs import verify_frozen_inputs
-from .review_triage import build_triage_in_memory
+from .review_triage import QUEUE_NEW_HEADWORD, build_triage_in_memory
 
 REVIEW_INPUT_COLUMNS = set(REVIEW_FILL_COLUMNS)
 
@@ -51,6 +52,41 @@ def _row_has_review_input(row: dict[str, str]) -> bool:
     return any(str(row.get(column, "")).strip() for column in REVIEW_INPUT_COLUMNS)
 
 
+def _detect_worksheet_schema(sample_rows: list[dict[str, str]]) -> str:
+    schemas = {
+        (row.get("worksheet_schema") or "").strip()
+        for row in sample_rows
+        if (row.get("worksheet_schema") or "").strip()
+    }
+    if len(schemas) > 1:
+        supported = schemas & SUPPORTED_WORKSHEET_SCHEMAS
+        if len(supported) == 1:
+            return next(iter(supported))
+        raise MalidabaReviewDryRunError(
+            f"mixed worksheet_schema values in one file: {sorted(schemas)}"
+        )
+    if schemas and schemas <= SUPPORTED_WORKSHEET_SCHEMAS:
+        return next(iter(schemas))
+    return WORKSHEET_SCHEMA_V2
+
+
+def _batch_rows_for_subjects(
+    triage,
+    batch_subject_ids: list[str] | None,
+) -> list[dict[str, Any]]:
+    if not batch_subject_ids:
+        return triage.batch_rows
+
+    by_id = {str(r.get("review_subject_id")): r for r in triage.queues[QUEUE_NEW_HEADWORD]}
+    fallback = {str(r.get("review_subject_id")): r for r in triage.batch_rows}
+    rows: list[dict[str, Any]] = []
+    for subject_id in batch_subject_ids:
+        row = by_id.get(subject_id) or fallback.get(subject_id)
+        if row is not None:
+            rows.append(row)
+    return rows
+
+
 def _expected_rows_from_frozen_inputs(
     *,
     baseline_ir_path: Path,
@@ -59,6 +95,7 @@ def _expected_rows_from_frozen_inputs(
     crawl_dir: Path,
     batch_subject_ids: list[str] | None = None,
     verify_hashes: bool = True,
+    worksheet_schema: str = WORKSHEET_SCHEMA_V2,
 ) -> dict[str, dict[str, str]]:
     triage = build_triage_in_memory(
         baseline_ir_path=baseline_ir_path,
@@ -67,10 +104,7 @@ def _expected_rows_from_frozen_inputs(
         crawl_dir=crawl_dir,
         verify_hashes=verify_hashes,
     )
-    batch_rows = triage.batch_rows
-    if batch_subject_ids is not None:
-        wanted = set(batch_subject_ids)
-        batch_rows = [r for r in batch_rows if r.get("review_subject_id") in wanted]
+    batch_rows = _batch_rows_for_subjects(triage, batch_subject_ids)
 
     current_records = load_jsonl_records(current_ir_path)
     by_id = {str(r.get("ir_id")): r for r in current_records if r.get("ir_id")}
@@ -81,6 +115,7 @@ def _expected_rows_from_frozen_inputs(
             by_id.get(str(row.get("review_subject_id") or "")),
             delta_sha256=triage.summary["frozen_inputs"]["delta_sha256"],
             current_ir_sha256=triage.summary["frozen_inputs"]["current_ir_sha256"],
+            worksheet_schema=worksheet_schema,
         )
         for row in batch_rows
     }
@@ -103,18 +138,26 @@ def dry_run_import_review_worksheet(
         raise MalidabaReviewDryRunError(f"{worksheet_path}: missing CSV header")
 
     header = list(reader.fieldnames)
-    missing = [c for c in WORKSHEET_COLUMNS if c not in header]
+    raw_rows = list(reader)
+    normalized_preview = [
+        {key: (raw.get(key) or "").strip() for key in header} for raw in raw_rows
+    ]
+    worksheet_schema = _detect_worksheet_schema(normalized_preview)
+    expected_columns = worksheet_columns_for_schema(worksheet_schema)
+    context_columns = context_columns_for_schema(worksheet_schema)
+
+    missing = [c for c in expected_columns if c not in header]
     if missing:
         raise MalidabaReviewDryRunError(
-            f"{worksheet_path}: missing required columns: {', '.join(missing)}"
+            f"{worksheet_path}: missing required columns for {worksheet_schema}: "
+            f"{', '.join(missing)}"
         )
-    unexpected = [c for c in header if c not in WORKSHEET_COLUMNS]
+    unexpected = [c for c in header if c not in expected_columns]
     if unexpected:
         raise MalidabaReviewDryRunError(
             f"{worksheet_path}: unknown columns: {', '.join(unexpected)}"
         )
 
-    raw_rows = list(reader)
     worksheet_subject_ids = [
         (raw.get("review_subject_id") or "").strip()
         for raw in raw_rows
@@ -128,6 +171,7 @@ def dry_run_import_review_worksheet(
             crawl_dir=crawl_dir,
             batch_subject_ids=worksheet_subject_ids,
             verify_hashes=verify_hashes,
+            worksheet_schema=worksheet_schema,
         )
 
     result = MalidabaReviewDryRunResult()
@@ -141,13 +185,14 @@ def dry_run_import_review_worksheet(
 
     for line_number, raw in enumerate(raw_rows, start=2):
         rows_read += 1
-        row = {key: (raw.get(key) or "").strip() for key in WORKSHEET_COLUMNS}
+        row = {key: (raw.get(key) or "").strip() for key in expected_columns}
 
-        if row.get("worksheet_schema") != WORKSHEET_SCHEMA:
+        row_schema = row.get("worksheet_schema", "")
+        if row_schema != worksheet_schema:
             error_count += 1
             result.errors.append(
-                f"{worksheet_path}:{line_number}: unsupported worksheet_schema "
-                f"{row.get('worksheet_schema')!r}"
+                f"{worksheet_path}:{line_number}: worksheet_schema {row_schema!r} "
+                f"does not match file schema {worksheet_schema!r}"
             )
             continue
 
@@ -163,7 +208,7 @@ def dry_run_import_review_worksheet(
 
         if not _row_has_review_input(row):
             mismatched = [
-                col for col in CONTEXT_COLUMNS if row.get(col, "") != expected.get(col, "")
+                col for col in context_columns if row.get(col, "") != expected.get(col, "")
             ]
             if mismatched:
                 stale_context_errors += 1
@@ -184,7 +229,7 @@ def dry_run_import_review_worksheet(
             continue
 
         mismatched = [
-            col for col in CONTEXT_COLUMNS if row.get(col, "") != expected.get(col, "")
+            col for col in context_columns if row.get(col, "") != expected.get(col, "")
         ]
         if mismatched:
             stale_context_errors += 1
@@ -247,6 +292,7 @@ def dry_run_import_review_worksheet(
         "stale_fingerprint_errors": stale_subject_errors,
         "stale_context_errors": stale_context_errors,
         "unknown_subject_errors": unknown_subject_errors,
+        "worksheet_schema": worksheet_schema,
     }
     return result
 

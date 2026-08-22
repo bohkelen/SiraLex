@@ -16,6 +16,7 @@ from malipense_version_delta.source_section import (
     classify_ps_text,
     build_entry_ps_index,
     classify_current_record,
+    derive_classification_evidence,
 )
 
 URL = "https://www.mali-pense.net/emk/lexicon/t.htm"
@@ -91,6 +92,13 @@ def test_classify_ps_text_unknown_non_empty_ps():
     section, marker = classify_ps_text("not-a-malidaba-pos-label")
     assert section == CLASS_UNKNOWN
     assert marker is None
+
+
+def test_derive_evidence_missing_ps():
+    assert (
+        derive_classification_evidence(ps_text=None, section_class=CLASS_UNKNOWN)
+        == "unknown:missing_ps"
+    )
 
 
 def test_classify_ps_text_does_not_guess_from_prophète_false_positive():

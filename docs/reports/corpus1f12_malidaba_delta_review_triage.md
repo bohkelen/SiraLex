@@ -163,10 +163,19 @@ No pure alphabetical front-loading.
 
 ## 14. Worksheet schema
 
-`malidaba_delta_review_worksheet_v1`
+`malidaba_delta_review_worksheet_v2` (CORPUS1F12A)
 
-Read-only context includes frozen hashes, review subject identity, PS-derived
-`source_section_class`, gloss summaries, fingerprint, and headword group fields.
+See also: [`corpus1f12a_malidaba_worksheet_observability.md`](corpus1f12a_malidaba_worksheet_observability.md)
+
+v2 adds read-only classification-evidence columns:
+
+- `source_ps_raw` — exact crawl `lxP2 span.PS` text
+- `source_classification_rule_id` — `malipense_source_section_ps_v2`
+- `source_classification_evidence` — deterministic rule token (e.g. `ordinary_pos:n`)
+
+The `pos` column remains normalized/parser entry-level POS (`pos_hint`). It is
+**not** populated from source PS because May 2026 nested HTML stores PS in lxP2
+sense blocks while the parser reads entry-level PS from the header strip only.
 
 Editable review columns (blank in Batch 001): `review_decision`, `reviewer_id`,
 `reviewed_at`, `review_method`, `issue_codes`, `review_notes`.

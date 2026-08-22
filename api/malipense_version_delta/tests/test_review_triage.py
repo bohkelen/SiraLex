@@ -18,7 +18,7 @@ from malipense_version_delta.canonical_json import sha256_file, write_jsonl
 from malipense_version_delta.compare import compare_lexicon_records
 from malipense_version_delta.dry_run_reviews import dry_run_import_review_worksheet
 from malipense_version_delta.export_worksheet import (
-    WORKSHEET_COLUMNS,
+    WORKSHEET_COLUMNS_V2,
     build_worksheet_row,
     export_batch_worksheet,
 )
@@ -371,7 +371,7 @@ def test_protected_context_edit_blocks_without_fingerprint_change(tmp_path: Path
     good = dict(expected)
     good["source_section_class"] = "TAMPERED"
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=WORKSHEET_COLUMNS, lineterminator="\n")
+    writer = csv.DictWriter(buf, fieldnames=WORKSHEET_COLUMNS_V2, lineterminator="\n")
     writer.writeheader()
     writer.writerow(good)
     tampered_path = tmp_path / "tampered_context.csv"
