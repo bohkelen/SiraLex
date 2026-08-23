@@ -140,6 +140,95 @@ def _cmd_dry_run(args: argparse.Namespace) -> int:
     return 0 if result.summary.get("error_count", 0) == 0 else 1
 
 
+def _cmd_encode_human_decision(args: argparse.Namespace) -> int:
+    """Mechanically encode an already-supplied human decision onto all blank rows."""
+    import csv
+    import io
+
+    from .export_worksheet import WORKSHEET_COLUMNS_V2, worksheet_columns_for_schema
+
+    text = args.worksheet.read_text(encoding="utf-8")
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None:
+        print("ERROR: missing CSV header", file=sys.stderr)
+        return 1
+    raw_rows = list(reader)
+    schema = (raw_rows[0].get("worksheet_schema") if raw_rows else "") or ""
+    columns = worksheet_columns_for_schema(schema) if schema else list(WORKSHEET_COLUMNS_V2)
+
+    updated = 0
+    already = 0
+    for raw in raw_rows:
+        decision = (raw.get("review_decision") or "").strip()
+        if decision:
+            already += 1
+            continue
+        raw["review_decision"] = args.review_decision
+        raw["reviewer_id"] = args.reviewer_id
+        raw["reviewed_at"] = args.reviewed_at
+        raw["review_method"] = args.review_method
+        updated += 1
+
+    with args.output.open("w", encoding="utf-8", newline="\n") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
+        writer.writeheader()
+        for raw in raw_rows:
+            writer.writerow({col: raw.get(col, "") for col in columns})
+
+    print(
+        json.dumps(
+            {
+                "rows": len(raw_rows),
+                "updated": updated,
+                "already_filled": already,
+                "review_decision": args.review_decision,
+                "reviewer_id": args.reviewer_id,
+                "reviewed_at": args.reviewed_at,
+                "review_method": args.review_method,
+                "output": str(args.output),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+def _cmd_write_reviews(args: argparse.Namespace) -> int:
+    from .write_reviews import MalidabaReviewWriteError, write_malidaba_reviews
+
+    try:
+        plan = write_malidaba_reviews(
+            args.worksheet,
+            baseline_ir_path=args.baseline_ir,
+            current_ir_path=args.current_ir,
+            delta_path=args.delta,
+            crawl_dir=args.crawl_dir,
+            output_path=args.output,
+            apply=args.apply,
+            verify_hashes=not args.skip_hash_verify,
+            receipt_path=args.receipt,
+        )
+    except MalidabaReviewWriteError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    print(
+        json.dumps(
+            {"ok": True, "applied": plan.applied, "receipt": plan.receipt},
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+    )
+    if not args.apply:
+        print(
+            "NOTE: validation-only mode; pass --apply to persist reviews.",
+            file=sys.stderr,
+        )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -194,6 +283,33 @@ def main(argv: list[str] | None = None) -> int:
     regen.add_argument("--batch-target", type=int, default=100)
     regen.add_argument("--skip-hash-verify", action="store_true")
     regen.set_defaults(func=_cmd_regenerate_worksheet)
+
+    encode = sub.add_parser(
+        "encode-human-decision",
+        help="Mechanically encode already-supplied human decisions onto blank rows",
+    )
+    encode.add_argument("--worksheet", type=Path, required=True)
+    encode.add_argument("--output", type=Path, required=True)
+    encode.add_argument("--review-decision", required=True)
+    encode.add_argument("--reviewer-id", required=True)
+    encode.add_argument("--reviewed-at", required=True)
+    encode.add_argument("--review-method", default="manual_review")
+    encode.set_defaults(func=_cmd_encode_human_decision)
+
+    write = sub.add_parser(
+        "write-reviews",
+        help="Governed persistence of Malidaba delta reviews (default: validate only)",
+    )
+    write.add_argument("--worksheet", type=Path, required=True)
+    write.add_argument("--baseline-ir", type=Path, required=True)
+    write.add_argument("--current-ir", type=Path, required=True)
+    write.add_argument("--delta", type=Path, required=True)
+    write.add_argument("--crawl-dir", type=Path, required=True)
+    write.add_argument("--output", type=Path, required=True)
+    write.add_argument("--apply", action="store_true")
+    write.add_argument("--skip-hash-verify", action="store_true")
+    write.add_argument("--receipt", type=Path, default=None)
+    write.set_defaults(func=_cmd_write_reviews)
 
     args = parser.parse_args(argv)
     return args.func(args)

@@ -41,6 +41,7 @@ siralex-corpus-review-dry-run = "corpus_reviews.dry_run_import_reviews:main"
 siralex-write-corpus-reviews = "corpus_reviews.write_corpus_reviews:main"
 siralex-malipense-version-delta = "malipense_version_delta.cli:main"
 siralex-malipense-delta-review = "malipense_version_delta.review_cli:main"
+siralex-write-malipense-delta-reviews = "malipense_version_delta.write_reviews:main"
 
 [tool.ruff]
 line-length = 100

@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from corpus_annotations.event_timestamps import parse_event_timestamp
+
 from .compare import load_jsonl_records
 from .export_worksheet import (
     ALLOWED_DECISIONS,
@@ -23,6 +25,11 @@ from .export_worksheet import (
     build_worksheet_row,
     context_columns_for_schema,
     worksheet_columns_for_schema,
+)
+from .review_identity import (
+    ALLOWED_REVIEW_METHODS,
+    SCHEMA_VERSION,
+    generate_malidaba_review_id,
 )
 from .review_triage import QUEUE_NEW_HEADWORD, build_triage_in_memory
 
@@ -255,34 +262,69 @@ def dry_run_import_review_worksheet(
             )
             continue
 
-        for required in ("reviewer_id", "reviewed_at", "review_method"):
-            if not row.get(required):
-                error_count += 1
-                result.errors.append(
-                    f"{worksheet_path}:{line_number}: missing {required} for reviewed row"
-                )
-                break
-        else:
-            issue_codes = _split_multi(row.get("issue_codes") or "")
-            invalid_codes = [c for c in issue_codes if c not in ALLOWED_ISSUE_CODES]
-            if invalid_codes:
-                error_count += 1
-                result.errors.append(
-                    f"{worksheet_path}:{line_number}: invalid issue_codes {invalid_codes!r}"
-                )
-                continue
+        incomplete = [
+            name
+            for name in ("reviewer_id", "reviewed_at", "review_method")
+            if not row.get(name)
+        ]
+        if incomplete:
+            error_count += 1
+            result.errors.append(
+                f"{worksheet_path}:{line_number}: missing "
+                f"{', '.join(incomplete)} for reviewed row"
+            )
+            continue
 
-            preview = {
-                "review_subject_id": subject_id,
-                "review_decision": decision,
-                "reviewer_id": row.get("reviewer_id"),
-                "reviewed_at": row.get("reviewed_at"),
-                "review_method": row.get("review_method"),
-                "issue_codes": issue_codes,
-                "review_notes": row.get("review_notes") or "",
-            }
-            result.preview_rows.append(preview)
-            preview_count += 1
+        method = row.get("review_method") or ""
+        if method not in ALLOWED_REVIEW_METHODS:
+            error_count += 1
+            result.errors.append(
+                f"{worksheet_path}:{line_number}: invalid review_method {method!r}"
+            )
+            continue
+
+        reviewed_at = row.get("reviewed_at") or ""
+        try:
+            parse_event_timestamp(reviewed_at, field_name="reviewed_at")
+        except ValueError as exc:
+            error_count += 1
+            result.errors.append(f"{worksheet_path}:{line_number}: {exc}")
+            continue
+
+        issue_codes = _split_multi(row.get("issue_codes") or "")
+        invalid_codes = [c for c in issue_codes if c not in ALLOWED_ISSUE_CODES]
+        if invalid_codes:
+            error_count += 1
+            result.errors.append(
+                f"{worksheet_path}:{line_number}: invalid issue_codes {invalid_codes!r}"
+            )
+            continue
+
+        preview = {
+            "schema_version": SCHEMA_VERSION,
+            "review_subject_id": subject_id,
+            "batch_id": row.get("batch_id") or "",
+            "delta_sha256": row.get("delta_sha256") or "",
+            "current_ir_sha256": row.get("current_ir_sha256") or "",
+            "current_record_fingerprint_sha256": row.get(
+                "current_record_fingerprint_sha256"
+            )
+            or "",
+            "review_decision": decision,
+            "reviewer_id": row.get("reviewer_id") or "",
+            "reviewed_at": reviewed_at,
+            "review_method": method,
+            "issue_codes": issue_codes,
+            "review_notes": row.get("review_notes") or "",
+        }
+        preview["review_id"] = generate_malidaba_review_id(preview)
+        result.preview_rows.append(preview)
+        preview_count += 1
+
+    decision_counts: dict[str, int] = {}
+    for preview in result.preview_rows:
+        decision = str(preview.get("review_decision") or "")
+        decision_counts[decision] = decision_counts.get(decision, 0) + 1
 
     result.summary = {
         "rows_read": rows_read,
@@ -293,6 +335,7 @@ def dry_run_import_review_worksheet(
         "stale_context_errors": stale_context_errors,
         "unknown_subject_errors": unknown_subject_errors,
         "worksheet_schema": worksheet_schema,
+        "decision_counts": decision_counts,
     }
     return result
 
