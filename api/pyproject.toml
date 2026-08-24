@@ -47,6 +47,7 @@ siralex-malipense-transition-review-gate = "malipense_version_delta.source_refre
 siralex-malipense-lexical-continuity-gate = "malipense_version_delta.source_refresh.continuity.cli:main"
 siralex-malipense-transition-review-persist = "malipense_version_delta.source_refresh.persist.cli:main"
 siralex-malipense-transition-regression-closure = "malipense_version_delta.source_refresh.transition.closure_cli:main"
+siralex-malipense-canonical-refresh-transaction = "malipense_version_delta.source_refresh.transaction.cli:main"
 
 [tool.ruff]
 line-length = 100
