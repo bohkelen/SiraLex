@@ -12,8 +12,10 @@ import pytest
 from bundle_builder.build_bundle import build_bundle, sha256_file, verify_bundle
 from distribution_compliance.manifest import enrich_manifest_with_licenses
 from publication_readiness.authorization import (
-    build_authorization_worksheet,
+    AUTHORIZATION_V1_SUPERSEDED_STATUS,
+    build_authorization_worksheet_v2,
     validate_authorization_binds_bytes,
+    validate_authorization_v2_binds_bytes,
 )
 from publication_readiness.catalog import (
     design_publication_transaction,
@@ -22,9 +24,14 @@ from publication_readiness.catalog import (
 )
 from publication_readiness.checksum_closure import audit_checksum_closure
 from publication_readiness.identity import (
+    compute_release_artifact_fingerprint,
+    compute_semantic_candidate_fingerprint,
     deterministic_release_bundle_id,
+    identity_from_frozen_bundle,
     identity_from_manifest_files,
+    release_artifact_dir_name,
     release_candidate_fingerprint,
+    semantic_artifact_dir_name,
 )
 from publication_readiness.model import (
     DECISION_READY,
@@ -39,6 +46,65 @@ from publication_readiness.rights_leakage import audit_rights_leakage
 from source_registry.load import LICENSE_CC_BY_NC_SA, SOURCE_MALIPENSE, SOURCE_OWNER, load_source_registry
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _build_minimal_bundle(tmp_path: Path) -> Path:
+    norm = tmp_path / "records.jsonl"
+    idx = tmp_path / "search_index.jsonl"
+    norm.write_text(
+        json.dumps(
+            {
+                "ir_id": "x",
+                "ir_kind": "lexicon_entry",
+                "source_id": SOURCE_MALIPENSE,
+                "norm_version": "norm_v1",
+                "record_locator": {"k": 1},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    idx.write_text(
+        json.dumps({"key_type": "casefold", "key": "a", "ir_ids": ["x"]}) + "\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out"
+    out.mkdir()
+    build_result = build_bundle(
+        norm,
+        idx,
+        out,
+        sources_included=[SOURCE_MALIPENSE],
+        license_enrichment=True,
+        repo_root=REPO_ROOT,
+        versioned_output=False,
+    )
+    built = Path(build_result["bundle_dir"])
+    (built / "ATTRIBUTION.txt").write_text("attr\n", encoding="utf-8")
+    (built / "DATA_LICENSES.md").write_text("# licenses\n", encoding="utf-8")
+    return built
+
+
+def _clone_bundle(src: Path, dest: Path) -> Path:
+    shutil.copytree(src, dest)
+    return dest
+
+
+def _refresh_manifest_payload_hashes(bundle_dir: Path) -> None:
+    manifest_path = bundle_dir / "bundle.manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    files = []
+    for name in ("records.jsonl", "search_index.jsonl"):
+        path = bundle_dir / name
+        files.append(
+            {
+                "path": name,
+                "byte_length": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+        )
+    manifest["files"] = files
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
 
 
 @pytest.fixture
@@ -231,41 +297,62 @@ def test_authorization_binds_exact_candidate_fingerprint():
         bundle_id="bundle_noncommercial_abcd1234",
         content_sha256="sha256:abcd",
     )
-    worksheet = build_authorization_worksheet(
-        bundle_id="bundle_noncommercial_abcd1234",
-        content_sha256="sha256:abcd",
-        candidate_fingerprint=fp,
-        file_hashes={},
+    worksheet = build_authorization_worksheet_v2(
+        semantic_bundle_id="bundle_noncommercial_abcd1234",
+        semantic_content_sha256="sha256:abcd",
+        semantic_candidate_fingerprint=fp,
+        release_artifact_fingerprint="sha256:release",
+        release_artifact_dir_name="bundle_noncommercial_abcd1234__00000000",
+        distributed_file_hashes={"records.jsonl": "sha256:1"},
         counts={},
         rights_summary={},
         product1b_checks={},
         publication_readiness_decision=DECISION_READY,
+        internal_full_regression={"pass": 30, "fail": 0},
+        publication_candidate_regression={
+            "pass": 26,
+            "expected_owner_rights_exclusion": 4,
+            "unexpected_defects": 0,
+        },
         p_gates={},
     )
-    ok = validate_authorization_binds_bytes(
+    ok = validate_authorization_v2_binds_bytes(
         worksheet,
-        bundle_id="bundle_noncommercial_abcd1234",
-        candidate_fingerprint=fp,
+        semantic_bundle_id="bundle_noncommercial_abcd1234",
+        semantic_content_sha256="sha256:abcd",
+        semantic_candidate_fingerprint=fp,
+        release_artifact_fingerprint="sha256:release",
+        distributed_file_hashes={"records.jsonl": "sha256:1"},
     )
     assert ok["binds_exact_bytes"] is True
+    assert ok["binds_release_artifact_identity"] is True
     assert ok["can_publish"] is False
     assert ok["authorized_without_review"] is True
 
 
 def test_unreviewed_authorization_cannot_publish():
-    worksheet = build_authorization_worksheet(
-        bundle_id="b1",
-        content_sha256="sha256:1",
-        candidate_fingerprint="sha256:fp",
-        file_hashes={},
+    worksheet = build_authorization_worksheet_v2(
+        semantic_bundle_id="b1",
+        semantic_content_sha256="sha256:1",
+        semantic_candidate_fingerprint="sha256:fp",
+        release_artifact_fingerprint="sha256:release",
+        release_artifact_dir_name="b1__00000000",
+        distributed_file_hashes={},
         counts={},
         rights_summary={},
         product1b_checks={},
         publication_readiness_decision=DECISION_READY,
+        internal_full_regression={"pass": 30, "fail": 0},
+        publication_candidate_regression={"pass": 26, "expected_owner_rights_exclusion": 4, "unexpected_defects": 0},
         p_gates={},
     )
-    validation = validate_authorization_binds_bytes(
-        worksheet, bundle_id="b1", candidate_fingerprint="sha256:fp"
+    validation = validate_authorization_v2_binds_bytes(
+        worksheet,
+        semantic_bundle_id="b1",
+        semantic_content_sha256="sha256:1",
+        semantic_candidate_fingerprint="sha256:fp",
+        release_artifact_fingerprint="sha256:release",
+        distributed_file_hashes={},
     )
     assert validation["can_publish"] is False
 
@@ -274,9 +361,11 @@ def test_p10_awaiting_human_authorization():
     from publication_readiness.gates import evaluate_gates
 
     gates = evaluate_gates(
-        candidate_reproducible=True,
+        semantic_reproducible=True,
+        release_artifact_reproducible=True,
         bundle_verification={"valid": True},
         checksum_audit={"status": GATE_PASS},
+        release_artifact_closure={"status": GATE_PASS},
         product1b_all_pass=True,
         provenance_complete=True,
         offline_install_ok=True,
@@ -284,11 +373,12 @@ def test_p10_awaiting_human_authorization():
         credits_implemented=True,
         credits_offline_ok=True,
         catalog_schema_ok={"status": GATE_PASS},
-        catalog_simulation={"status": GATE_PASS},
+        catalog_simulation={"status": GATE_PASS, "release_specific_path_resolved": True},
         rollback_design={"rollback_target_bundle_id": "old"},
         publication_transaction={"status": "READY"},
         authorization_validation={
             "authorized_without_review": True,
+            "binds_release_artifact_identity": True,
             "can_publish": False,
         },
     )
@@ -314,6 +404,190 @@ def test_publication_transaction_ready():
     tx = design_publication_transaction()
     assert tx["status"] == "READY"
     assert tx["overwrite_differing_bytes_at_existing_id"] is False
+    assert tx["overwrite_differing_bytes_at_existing_path"] is False
+    assert tx["requires_release_artifact_fingerprint_match"] is True
+
+
+def test_manifest_only_change_preserves_semantic_changes_release(tmp_path):
+    built = _build_minimal_bundle(tmp_path)
+    dir_a = _clone_bundle(built, tmp_path / "candidate_a")
+    dir_b = _clone_bundle(built, tmp_path / "candidate_b")
+
+    manifest_a = json.loads((dir_a / "bundle.manifest.json").read_text(encoding="utf-8"))
+    manifest_a.setdefault("publication", {})["build_commit"] = "aaa"
+    (dir_a / "bundle.manifest.json").write_text(
+        json.dumps(manifest_a, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    manifest_b = json.loads((dir_b / "bundle.manifest.json").read_text(encoding="utf-8"))
+    manifest_b.setdefault("publication", {})["build_commit"] = "bbb"
+    (dir_b / "bundle.manifest.json").write_text(
+        json.dumps(manifest_b, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+    id_a = identity_from_frozen_bundle(dir_a)
+    id_b = identity_from_frozen_bundle(dir_b)
+    assert id_a["semantic_content_sha256"] == id_b["semantic_content_sha256"]
+    assert id_a["semantic_candidate_fingerprint"] == id_b["semantic_candidate_fingerprint"]
+    assert id_a["release_artifact_fingerprint"] != id_b["release_artifact_fingerprint"]
+    assert id_a["release_artifact_dir_name"] != id_b["release_artifact_dir_name"]
+
+    worksheet = build_authorization_worksheet_v2(
+        semantic_bundle_id=id_a["semantic_bundle_id"],
+        semantic_content_sha256=id_a["semantic_content_sha256"],
+        semantic_candidate_fingerprint=id_a["semantic_candidate_fingerprint"],
+        release_artifact_fingerprint=id_a["release_artifact_fingerprint"],
+        release_artifact_dir_name=id_a["release_artifact_dir_name"],
+        distributed_file_hashes=id_a["distributed_file_hashes"],
+        counts={},
+        rights_summary={},
+        product1b_checks={},
+        publication_readiness_decision=DECISION_READY,
+        internal_full_regression={"pass": 30, "fail": 0},
+        publication_candidate_regression={"pass": 26, "expected_owner_rights_exclusion": 4, "unexpected_defects": 0},
+        p_gates={},
+    )
+    auth_b = validate_authorization_v2_binds_bytes(
+        worksheet,
+        semantic_bundle_id=id_b["semantic_bundle_id"],
+        semantic_content_sha256=id_b["semantic_content_sha256"],
+        semantic_candidate_fingerprint=id_b["semantic_candidate_fingerprint"],
+        release_artifact_fingerprint=id_b["release_artifact_fingerprint"],
+        distributed_file_hashes=id_b["distributed_file_hashes"],
+    )
+    assert auth_b["binds_release_artifact_identity"] is False
+    assert auth_b["binds_exact_bytes"] is False
+
+
+def test_attribution_only_change_changes_release_identity(tmp_path):
+    built = _build_minimal_bundle(tmp_path)
+    dir_a = _clone_bundle(built, tmp_path / "a")
+    dir_b = _clone_bundle(built, tmp_path / "b")
+    (dir_b / "ATTRIBUTION.txt").write_text("different attribution\n", encoding="utf-8")
+
+    id_a = identity_from_frozen_bundle(dir_a)
+    id_b = identity_from_frozen_bundle(dir_b)
+    assert id_a["semantic_content_sha256"] == id_b["semantic_content_sha256"]
+    assert id_a["release_artifact_fingerprint"] != id_b["release_artifact_fingerprint"]
+
+
+def test_data_licenses_only_change_changes_release_identity(tmp_path):
+    built = _build_minimal_bundle(tmp_path)
+    dir_a = _clone_bundle(built, tmp_path / "a")
+    dir_b = _clone_bundle(built, tmp_path / "b")
+    (dir_b / "DATA_LICENSES.md").write_text("# different\n", encoding="utf-8")
+
+    id_a = identity_from_frozen_bundle(dir_a)
+    id_b = identity_from_frozen_bundle(dir_b)
+    assert id_a["semantic_content_sha256"] == id_b["semantic_content_sha256"]
+    assert id_a["release_artifact_fingerprint"] != id_b["release_artifact_fingerprint"]
+
+
+def test_records_change_changes_semantic_and_release_identity(tmp_path):
+    built = _build_minimal_bundle(tmp_path)
+    dir_b = _clone_bundle(built, tmp_path / "b")
+    (dir_b / "records.jsonl").write_text(
+        json.dumps(
+            {
+                "ir_id": "y",
+                "ir_kind": "lexicon_entry",
+                "source_id": SOURCE_MALIPENSE,
+                "norm_version": "norm_v1",
+                "record_locator": {"k": 2},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _refresh_manifest_payload_hashes(dir_b)
+
+    id_a = identity_from_frozen_bundle(built)
+    id_b = identity_from_frozen_bundle(dir_b)
+    assert id_a["semantic_content_sha256"] != id_b["semantic_content_sha256"]
+    assert id_a["release_artifact_fingerprint"] != id_b["release_artifact_fingerprint"]
+
+
+def test_search_change_changes_semantic_and_release_identity(tmp_path):
+    built = _build_minimal_bundle(tmp_path)
+    dir_b = _clone_bundle(built, tmp_path / "b")
+    (dir_b / "search_index.jsonl").write_text(
+        json.dumps({"key_type": "casefold", "key": "b", "ir_ids": ["x"]}) + "\n",
+        encoding="utf-8",
+    )
+    _refresh_manifest_payload_hashes(dir_b)
+
+    id_a = identity_from_frozen_bundle(built)
+    id_b = identity_from_frozen_bundle(dir_b)
+    assert id_a["semantic_content_sha256"] != id_b["semantic_content_sha256"]
+    assert id_a["release_artifact_fingerprint"] != id_b["release_artifact_fingerprint"]
+
+
+def test_release_artifact_dir_uses_release_prefix_not_semantic(tmp_path):
+    built = _build_minimal_bundle(tmp_path)
+    identity = identity_from_frozen_bundle(built)
+    semantic_dir = semantic_artifact_dir_name(
+        identity["semantic_bundle_id"], identity["semantic_content_sha256"]
+    )
+    release_dir = release_artifact_dir_name(
+        identity["semantic_bundle_id"], identity["release_artifact_fingerprint"]
+    )
+    assert release_dir.startswith(f"{identity['semantic_bundle_id']}__")
+    assert release_dir == identity["release_artifact_dir_name"]
+    # Release prefix derives from release fingerprint, not semantic content prefix.
+    assert release_dir.split("__", 1)[1] == identity["release_artifact_fingerprint"].split(":", 1)[1][:8]
+
+
+def test_v1_semantic_fingerprint_insufficient_for_manifest_change(tmp_path):
+    built = _build_minimal_bundle(tmp_path)
+    dir_b = _clone_bundle(built, tmp_path / "b")
+    manifest = json.loads((dir_b / "bundle.manifest.json").read_text(encoding="utf-8"))
+    manifest.setdefault("publication", {})["note"] = "changed"
+    (dir_b / "bundle.manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+
+    id_a = identity_from_frozen_bundle(built)
+    id_b = identity_from_frozen_bundle(dir_b)
+    assert id_a["semantic_candidate_fingerprint"] == id_b["semantic_candidate_fingerprint"]
+    legacy = validate_authorization_binds_bytes(
+        {
+            "bundle_id": id_a["semantic_bundle_id"],
+            "candidate_fingerprint": id_a["semantic_candidate_fingerprint"],
+            "protected_fields": {"bundle_id": id_a["semantic_bundle_id"]},
+            "publication_decision": None,
+        },
+        bundle_id=id_b["semantic_bundle_id"],
+        candidate_fingerprint=id_b["semantic_candidate_fingerprint"],
+    )
+    assert legacy["binds_exact_bytes"] is True
+    exact = validate_authorization_v2_binds_bytes(
+        build_authorization_worksheet_v2(
+            semantic_bundle_id=id_a["semantic_bundle_id"],
+            semantic_content_sha256=id_a["semantic_content_sha256"],
+            semantic_candidate_fingerprint=id_a["semantic_candidate_fingerprint"],
+            release_artifact_fingerprint=id_a["release_artifact_fingerprint"],
+            release_artifact_dir_name=id_a["release_artifact_dir_name"],
+            distributed_file_hashes=id_a["distributed_file_hashes"],
+            counts={},
+            rights_summary={},
+            product1b_checks={},
+            publication_readiness_decision=DECISION_READY,
+            internal_full_regression={"pass": 30, "fail": 0},
+            publication_candidate_regression={"pass": 26, "expected_owner_rights_exclusion": 4, "unexpected_defects": 0},
+            p_gates={},
+        ),
+        semantic_bundle_id=id_b["semantic_bundle_id"],
+        semantic_content_sha256=id_b["semantic_content_sha256"],
+        semantic_candidate_fingerprint=id_b["semantic_candidate_fingerprint"],
+        release_artifact_fingerprint=id_b["release_artifact_fingerprint"],
+        distributed_file_hashes=id_b["distributed_file_hashes"],
+    )
+    assert exact["binds_exact_bytes"] is False
+
+
+def test_backward_catalog_schema_still_passes():
+    catalog = json.loads((REPO_ROOT / "web/public/catalog.json").read_text(encoding="utf-8"))
+    result = validate_catalog_schema(catalog)
+    assert result["status"] == GATE_PASS
+    bundles = catalog.get("bundles") or []
+    assert any(b.get("bundle_id") == "bundle_full_20260710_337619ff" for b in bundles)
 
 
 def test_no_canonical_lexical_mutation():
@@ -368,3 +642,4 @@ def test_identity_from_manifest_files():
     identity = identity_from_manifest_files(files)
     assert identity["bundle_id"].startswith("bundle_noncommercial_")
     assert identity["candidate_fingerprint"].startswith("sha256:")
+    assert identity["semantic_candidate_fingerprint"] == identity["candidate_fingerprint"]

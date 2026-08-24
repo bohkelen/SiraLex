@@ -18,9 +18,11 @@ from .rights_leakage import audit_portable_bundle, audit_rights_leakage
 
 def evaluate_gates(
     *,
-    candidate_reproducible: bool,
+    semantic_reproducible: bool,
+    release_artifact_reproducible: bool,
     bundle_verification: dict[str, Any],
     checksum_audit: dict[str, Any],
+    release_artifact_closure: dict[str, Any],
     product1b_all_pass: bool,
     provenance_complete: bool,
     offline_install_ok: bool,
@@ -35,9 +37,16 @@ def evaluate_gates(
 ) -> dict[str, str]:
     gates: dict[str, str] = {}
 
-    gates["P1_CANDIDATE_REPRODUCIBLE"] = GATE_PASS if candidate_reproducible else GATE_BLOCK
+    gates["P1_CANDIDATE_REPRODUCIBLE"] = (
+        GATE_PASS
+        if semantic_reproducible and release_artifact_reproducible
+        else GATE_BLOCK
+    )
     gates["P2_BUNDLE_INTEGRITY"] = (
-        GATE_PASS if bundle_verification.get("valid") and checksum_audit.get("status") == GATE_PASS
+        GATE_PASS
+        if bundle_verification.get("valid")
+        and checksum_audit.get("status") == GATE_PASS
+        and release_artifact_closure.get("status") == GATE_PASS
         else GATE_BLOCK
     )
     gates["P3_RIGHTS_COMPLIANCE"] = GATE_PASS if product1b_all_pass else GATE_BLOCK
@@ -53,6 +62,7 @@ def evaluate_gates(
         GATE_PASS
         if catalog_schema_ok.get("status") == GATE_PASS
         and catalog_simulation.get("status") == GATE_PASS
+        and catalog_simulation.get("release_specific_path_resolved") is not False
         else GATE_BLOCK
     )
     gates["P9_ROLLBACK_DESIGN"] = (
@@ -64,6 +74,7 @@ def evaluate_gates(
     gates["P10_PUBLICATION_AUTHORIZATION_NOT_YET_GRANTED"] = (
         GATE_AWAITING_HUMAN_AUTHORIZATION
         if authorization_validation.get("authorized_without_review")
+        and authorization_validation.get("binds_release_artifact_identity")
         and not authorization_validation.get("can_publish")
         else GATE_BLOCK
     )

@@ -23,7 +23,12 @@ from product_boundary.build import (
 )
 from product_boundary.paths import default_paths as product1a_paths
 
-from .authorization import build_authorization_worksheet, validate_authorization_binds_bytes, write_authorization_worksheet
+from .authorization import (
+    AUTHORIZATION_V1_SUPERSEDED_STATUS,
+    build_authorization_worksheet_v2,
+    validate_authorization_v2_binds_bytes,
+    write_authorization_worksheet,
+)
 from .catalog import (
     build_proposed_catalog_entry,
     design_publication_transaction,
@@ -32,17 +37,19 @@ from .catalog import (
     simulate_catalog_addition,
     validate_catalog_schema,
 )
-from .checksum_closure import audit_checksum_closure
+from .checksum_closure import audit_checksum_closure, audit_release_artifact_closure
 from .freeze import freeze_release_candidate
 from .gates import all_required_gates_pass, evaluate_gates
+from .identity import identity_from_frozen_bundle
 from .manifest import resolve_publication_state
 from .model import DECISION_BLOCKED, DECISION_READY, STATE_PUBLICATION_CANDIDATE
 from .paths import Product2Paths, default_paths
+from .product2b_receipt import write_product2b_receipt
 from .rights_leakage import audit_portable_bundle, audit_rights_leakage
 from .search_validation import run_publication_regression
 
 
-EXPECTED_BASE_COMMIT = "6dc305a1f3bc17a0cd723a30da15c74cb8c924b1"
+EXPECTED_BASE_COMMIT = "8001985cb094cbb8a84eb8060da93cd154c8dc64"
 
 EXPECTED_COUNTS = {
     "records": 22199,
@@ -159,6 +166,13 @@ def evaluate_product2(
     bundle_dir = Path(frozen["bundle_dir"])
 
     checksum_audit = audit_checksum_closure(bundle_dir)
+    release_closure = audit_release_artifact_closure(bundle_dir)
+    recomputed_identity = identity_from_frozen_bundle(bundle_dir)
+    release_artifact_reproducible = (
+        recomputed_identity["release_artifact_fingerprint"]
+        == frozen["release_artifact_fingerprint"]
+        and recomputed_identity["semantic_content_sha256"] == frozen["semantic_content_sha256"]
+    )
     leakage = audit_rights_leakage(
         repo_root=paths.repo_root,
         records_path=bundle_dir / "records.jsonl",
@@ -171,9 +185,10 @@ def evaluate_product2(
     catalog_schema = validate_catalog_schema(catalog)
     current_published = _current_featured_bundle_id(paths)
     proposed_entry = build_proposed_catalog_entry(
-        bundle_id=frozen["bundle_id"],
-        content_sha256=frozen["content_sha256"],
-        artifact_dir_name=frozen["artifact_dir_name"],
+        bundle_id=frozen["semantic_bundle_id"],
+        content_sha256=frozen["semantic_content_sha256"],
+        release_artifact_dir_name=frozen["release_artifact_dir_name"],
+        release_artifact_fingerprint=frozen["release_artifact_fingerprint"],
         bundle_dir=bundle_dir,
     )
     write_json(paths.proposed_catalog_entry, proposed_entry)
@@ -208,11 +223,13 @@ def evaluate_product2(
         and derived_scan.get("derived_lexical_artifacts_with_unknown_substantive_provenance", 1) == 0
     )
 
-    auth_worksheet = build_authorization_worksheet(
-        bundle_id=frozen["bundle_id"],
-        content_sha256=frozen["content_sha256"],
-        candidate_fingerprint=frozen["candidate_fingerprint"],
-        file_hashes=frozen["file_hashes"],
+    auth_worksheet = build_authorization_worksheet_v2(
+        semantic_bundle_id=frozen["semantic_bundle_id"],
+        semantic_content_sha256=frozen["semantic_content_sha256"],
+        semantic_candidate_fingerprint=frozen["semantic_candidate_fingerprint"],
+        release_artifact_fingerprint=frozen["release_artifact_fingerprint"],
+        release_artifact_dir_name=frozen["release_artifact_dir_name"],
+        distributed_file_hashes=frozen["file_hashes"],
         counts={
             "records": candidate_receipt["records_included"],
             "lexicon_entries": candidate_receipt["lexicon_entries_included"],
@@ -222,18 +239,32 @@ def evaluate_product2(
         rights_summary=_rights_summary(registry, candidate_receipt),
         product1b_checks={k: v.get("status") for k, v in checks_pre.items() if str(k).startswith("C")},
         publication_readiness_decision=DECISION_READY,
+        internal_full_regression={
+            "pass": regression.get("internal_pass"),
+            "fail": regression.get("internal_fail"),
+        },
+        publication_candidate_regression={
+            "pass": regression.get("pass"),
+            "expected_owner_rights_exclusion": regression.get("expected_owner_rights_exclusion"),
+            "unexpected_defects": regression.get("unexpected_defects"),
+        },
         p_gates={},
     )
-    auth_validation = validate_authorization_binds_bytes(
+    auth_validation = validate_authorization_v2_binds_bytes(
         auth_worksheet,
-        bundle_id=frozen["bundle_id"],
-        candidate_fingerprint=frozen["candidate_fingerprint"],
+        semantic_bundle_id=frozen["semantic_bundle_id"],
+        semantic_content_sha256=frozen["semantic_content_sha256"],
+        semantic_candidate_fingerprint=frozen["semantic_candidate_fingerprint"],
+        release_artifact_fingerprint=frozen["release_artifact_fingerprint"],
+        distributed_file_hashes=frozen["file_hashes"],
     )
 
     gates = evaluate_gates(
-        candidate_reproducible=counts_match and checks_pre.get("all_pass", False),
+        semantic_reproducible=counts_match and checks_pre.get("all_pass", False),
+        release_artifact_reproducible=release_artifact_reproducible,
         bundle_verification=frozen["verification"],
         checksum_audit=checksum_audit,
+        release_artifact_closure=release_closure,
         product1b_all_pass=checks_pre.get("all_pass", False),
         provenance_complete=provenance_complete,
         offline_install_ok=offline_install_ok,
@@ -247,7 +278,13 @@ def evaluate_product2(
         authorization_validation=auth_validation,
     )
     auth_worksheet["protected_fields"]["p_gates"] = gates
-    write_authorization_worksheet(paths.authorization_worksheet, auth_worksheet)
+    write_authorization_worksheet(paths.authorization_worksheet_v2, auth_worksheet)
+
+    v1_status = (
+        AUTHORIZATION_V1_SUPERSEDED_STATUS
+        if paths.authorization_worksheet.is_file()
+        else "ABSENT"
+    )
 
     if all_required_gates_pass(gates):
         publication_state = resolve_publication_state(
@@ -270,10 +307,15 @@ def evaluate_product2(
         "expected_base_commit": EXPECTED_BASE_COMMIT,
         "publication_state": publication_state,
         "publication_authorized": False,
-        "candidate_bundle_id": frozen["bundle_id"],
-        "candidate_fingerprint": frozen["candidate_fingerprint"],
-        "content_sha256": frozen["content_sha256"],
-        "artifact_dir_name": frozen["artifact_dir_name"],
+        "candidate_bundle_id": frozen["semantic_bundle_id"],
+        "semantic_bundle_id": frozen["semantic_bundle_id"],
+        "semantic_content_sha256": frozen["semantic_content_sha256"],
+        "semantic_candidate_fingerprint": frozen["semantic_candidate_fingerprint"],
+        "release_artifact_fingerprint": frozen["release_artifact_fingerprint"],
+        "release_artifact_dir_name": frozen["release_artifact_dir_name"],
+        "candidate_fingerprint": frozen["semantic_candidate_fingerprint"],
+        "content_sha256": frozen["semantic_content_sha256"],
+        "artifact_dir_name": frozen["release_artifact_dir_name"],
         "candidate_profile": "NONCOMMERCIAL_DISTRIBUTION",
         "candidate_counts": {
             "records": candidate_receipt["records_included"],
@@ -289,6 +331,7 @@ def evaluate_product2(
         "product1b_checks": {k: v for k, v in checks_pre.items() if str(k).startswith("C")},
         "product1b_all_pass": checks_pre.get("all_pass"),
         "checksum_closure": checksum_audit,
+        "release_artifact_closure": release_closure,
         "portable_bundle": portable,
         "offline_install": {"status": "PASS" if offline_install_ok else "BLOCK"},
         "credits_ui": {
@@ -303,17 +346,20 @@ def evaluate_product2(
         "catalog_simulation": catalog_sim,
         "rollback": rollback,
         "publication_transaction": pub_tx,
-        "authorization_worksheet": str(paths.authorization_worksheet),
+        "authorization_worksheet_v2": str(paths.authorization_worksheet_v2),
+        "authorization_worksheet_v1_status": v1_status,
         "p_gates": gates,
         "recommended_next_gate": (
-            "PRODUCT2A_EXPLICIT_NONCOMMERCIAL_PUBLICATION_APPROVAL_AND_PROMOTION"
+            "PRODUCT2C_EXPLICIT_NONCOMMERCIAL_PUBLICATION_AUTHORIZATION"
             if decision == DECISION_READY
-            else "PRODUCT2_PUBLICATION_READINESS_REMEDIATION"
+            else "PRODUCT2B_PREAUTH_EXACT_BYTE_IDENTITY_REMEDIATION"
         ),
     }
     write_json(paths.receipt_path, receipt)
     receipt["receipt_sha256"] = sha256_file(paths.receipt_path)
     write_json(paths.receipt_path, receipt)
+    if decision == DECISION_READY:
+        write_product2b_receipt(paths=paths, publication_receipt=receipt)
     return receipt
 
 

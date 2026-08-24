@@ -7,28 +7,47 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from bundle_builder.build_bundle import build_bundle, sha256_file, verify_bundle
+from bundle_builder.build_bundle import ArtifactDirectoryConflictError, build_bundle, verify_bundle
 from malipense_version_delta.canonical_json import write_json
 from source_registry.load import load_source_registry
 
 from distribution_compliance.manifest import write_bundle_license_sidecars
 
 from .identity import (
-    deterministic_release_bundle_id,
-    identity_from_manifest_files,
-    release_candidate_storage_dir,
+    RELEASE_DISTRIBUTED_FILES,
+    collect_distributed_file_hashes,
+    compute_release_artifact_fingerprint,
+    deterministic_semantic_bundle_id,
+    identity_from_frozen_bundle,
+    list_present_distributed_files,
+    release_artifact_dir_name,
 )
 from .manifest import enrich_manifest_for_publication_readiness
 
 
-DISTRIBUTED_FILES = (
-    "records.jsonl",
-    "search_index.jsonl",
-    "bundle.manifest.json",
-    "checksums.sha256",
-    "ATTRIBUTION.txt",
-    "DATA_LICENSES.md",
-)
+def _commit_release_artifact_directory(
+    *,
+    source_dir: Path,
+    final_dir: Path,
+    release_artifact_fingerprint: str,
+    bundle_id: str,
+    semantic_content_sha256: str,
+) -> Path:
+    """Move staged bundle into release-specific immutable directory."""
+    if final_dir.exists():
+        existing = identity_from_frozen_bundle(final_dir)
+        if existing["release_artifact_fingerprint"] == release_artifact_fingerprint:
+            shutil.rmtree(source_dir)
+            return final_dir
+        raise ArtifactDirectoryConflictError(
+            "Refusing to overwrite existing immutable release artifact directory "
+            f"{final_dir}: existing release_artifact_fingerprint="
+            f"{existing['release_artifact_fingerprint']!r}, "
+            f"new release_artifact_fingerprint={release_artifact_fingerprint!r}"
+        )
+    final_dir.parent.mkdir(parents=True, exist_ok=True)
+    source_dir.rename(final_dir)
+    return final_dir
 
 
 def freeze_release_candidate(
@@ -45,7 +64,8 @@ def freeze_release_candidate(
     """
     Materialize immutable release-candidate bundle directory.
 
-    Uses content-addressed bundle_id and versioned artifact directory naming.
+    Uses semantic bundle_id from payload hash and release-specific physical
+    directory from release_artifact_fingerprint.
     """
     if output_parent.exists():
         shutil.rmtree(output_parent)
@@ -60,31 +80,18 @@ def freeze_release_candidate(
         data_licenses_doc=repo_root / "DATA_LICENSES.md",
     )
 
-    # First build to obtain content hash and deterministic bundle_id.
-    preliminary = build_bundle(
-        normalized_path=records_path,
-        search_index_path=search_index_path,
-        output_dir=output_parent / "_preliminary",
-        bundle_type="noncommercial",
-        sources_included=source_ids,
-        license_enrichment=False,
-        versioned_output=False,
-    )
-    content_sha256 = preliminary["content_sha256"]
-    bundle_id = deterministic_release_bundle_id(content_sha256)
-    artifact_dir = release_candidate_storage_dir(bundle_id, content_sha256)
-
+    build_parent = output_parent / "_build_staging"
+    build_parent.mkdir()
     build_result = build_bundle(
         normalized_path=records_path,
         search_index_path=search_index_path,
-        output_dir=output_parent,
+        output_dir=build_parent,
         bundle_type="noncommercial",
         sources_included=source_ids,
-        bundle_id=bundle_id,
         license_enrichment=True,
         repo_root=repo_root,
         publication_authorized=False,
-        versioned_output=True,
+        versioned_output=False,
         source_lang="fr",
         target_lang="mnk",
         source_label="French",
@@ -115,29 +122,32 @@ def freeze_release_candidate(
     )
     write_json(manifest_path, enriched)
 
-    file_hashes = collect_distributed_file_hashes(bundle_dir)
-    identity = identity_from_manifest_files(manifest.get("files") or [])
-    verification = verify_bundle(bundle_dir)
+    identity = identity_from_frozen_bundle(bundle_dir)
+    final_dir = _commit_release_artifact_directory(
+        source_dir=bundle_dir,
+        final_dir=output_parent / identity["release_artifact_dir_name"],
+        release_artifact_fingerprint=identity["release_artifact_fingerprint"],
+        bundle_id=identity["semantic_bundle_id"],
+        semantic_content_sha256=identity["semantic_content_sha256"],
+    )
+
+    verification = verify_bundle(final_dir)
 
     return {
-        "bundle_id": bundle_id,
-        "artifact_dir_name": artifact_dir,
-        "bundle_dir": str(bundle_dir),
-        "content_sha256": build_result["content_sha256"],
-        "candidate_fingerprint": identity["candidate_fingerprint"],
-        "file_hashes": file_hashes,
+        "semantic_bundle_id": identity["semantic_bundle_id"],
+        "semantic_content_sha256": identity["semantic_content_sha256"],
+        "semantic_candidate_fingerprint": identity["semantic_candidate_fingerprint"],
+        "release_artifact_fingerprint": identity["release_artifact_fingerprint"],
+        "release_artifact_dir_name": identity["release_artifact_dir_name"],
+        # Backward-compatible receipt fields
+        "bundle_id": identity["semantic_bundle_id"],
+        "content_sha256": identity["semantic_content_sha256"],
+        "candidate_fingerprint": identity["semantic_candidate_fingerprint"],
+        "artifact_dir_name": identity["release_artifact_dir_name"],
+        "bundle_dir": str(final_dir),
+        "file_hashes": identity["distributed_file_hashes"],
         "verification": verification,
         "manifest": enriched,
-        "distributed_files": list_present_distributed_files(bundle_dir),
+        "distributed_files": list_present_distributed_files(final_dir),
+        "distributed_files_contract": list(RELEASE_DISTRIBUTED_FILES),
     }
-
-
-def list_present_distributed_files(bundle_dir: Path) -> list[str]:
-    return [name for name in DISTRIBUTED_FILES if (bundle_dir / name).is_file()]
-
-
-def collect_distributed_file_hashes(bundle_dir: Path) -> dict[str, str]:
-    hashes: dict[str, str] = {}
-    for name in sorted(list_present_distributed_files(bundle_dir)):
-        hashes[name] = sha256_file(bundle_dir / name)
-    return hashes

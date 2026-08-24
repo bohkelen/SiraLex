@@ -21,6 +21,27 @@
 
 ---
 
+## PRODUCT2B — Exact-byte release artifact identity (pre-authorization)
+
+**Problem:** Pre-commit and post-commit candidates shared the same semantic `content_sha256` and `candidate_fingerprint` (`sha256:77b9773c…`) but differed in `bundle.manifest.json` bytes (e.g. build provenance). The legacy fingerprint bound **semantic payload identity only**, not the full portable release artifact.
+
+**Repair:** Split identity into two explicit concepts:
+
+| Concept | Question | Key fields |
+|---------|----------|------------|
+| **Semantic content identity** | Same lexical/search product content? | `semantic_bundle_id`, `semantic_content_sha256`, `semantic_candidate_fingerprint` |
+| **Release artifact identity** | Exact same distributed portable bytes? | `release_artifact_fingerprint`, `release_artifact_dir_name`, `distributed_file_hashes` |
+
+**Release fingerprint:** `sha256(canonical_json({bundle_id, semantic_content_sha256, distributed_files: {sorted path → sha256}}))` covering `records.jsonl`, `search_index.jsonl`, `bundle.manifest.json`, `checksums.sha256`, `ATTRIBUTION.txt`, `DATA_LICENSES.md`. Stored **outside** the artifact (receipt / authorization v2) to avoid manifest recursion.
+
+**Physical path hardening:** Immutable release directory `{semantic_bundle_id}__{release_artifact_prefix8}` (not semantic content prefix). Distinct release bytes never overwrite an existing immutable path. Existing published directories (e.g. `bundle_full_20260710_337619ff`) remain addressable; `bundle_catalog_v1` unchanged for old entries.
+
+**Authorization:** `publication_authorization_worksheet_v1.json` is **SUPERSEDED_PRE_EXACT_BYTE_AUTHORIZATION_CONTRACT** (semantic-only). New blank worksheet: `publication_authorization_worksheet_v2.json` (`siralex_publication_authorization_v2`) binds `release_artifact_fingerprint` and every distributed file hash. P10 requires exact release artifact identity.
+
+**Not published.** P10 remains **AWAITING_HUMAN_AUTHORIZATION**. Next gate: **PRODUCT2C_EXPLICIT_NONCOMMERCIAL_PUBLICATION_AUTHORIZATION**.
+
+---
+
 ## 1. Decision
 
 **PRODUCT2_PUBLICATION_READINESS_READY**
@@ -59,16 +80,16 @@ PRODUCT2 reached: **`PUBLICATION_READY`**
 
 ## 5. Release candidate identity
 
-Content-addressed identity (no wall-clock or random UUID in fingerprint):
+Two distinct identities (PRODUCT2B):
 
-| Field | Value |
-|-------|-------|
-| `bundle_id` | `bundle_noncommercial_dfd5ba62` |
-| `content_sha256` | `sha256:dfd5ba62514caa72f9e282d16160ded01c26164c5c982fd6d164b78b6f7aeb33` |
-| `artifact_dir_name` | `bundle_noncommercial_dfd5ba62__dfd5ba62` |
-| `candidate_fingerprint` | `sha256:77b9773c05750e9138971f64217c1071394406bdebdd48adc357d5f4c434c053` |
+| Layer | Fields | Purpose |
+|-------|--------|---------|
+| Semantic | `semantic_bundle_id`, `semantic_content_sha256`, `semantic_candidate_fingerprint` | Same lexical/search payload |
+| Release artifact | `release_artifact_fingerprint`, `release_artifact_dir_name`, `distributed_file_hashes` | Exact portable distributed bytes |
 
-Convention: logical id `bundle_noncommercial_{content_prefix8}`; physical dir `{bundle_id}__{content_prefix8}` per `shared/specs/offline-bundle-versioning.md`.
+Legacy alias: `candidate_fingerprint` = `semantic_candidate_fingerprint` (insufficient for publication authorization).
+
+Convention: logical id `bundle_noncommercial_{semantic_content_prefix8}`; **immutable physical dir** `{semantic_bundle_id}__{release_artifact_prefix8}` (release-specific, not semantic-only).
 
 ## 6. Candidate files / hashes
 
@@ -201,17 +222,18 @@ Local mirror: `data/product2/catalog_simulation/` — **PASS**
 
 ## 20. Publication transaction design
 
-Guarded transaction (not executed): freeze → verify hashes → verify destination absent or byte-identical → copy immutable bundle → validate copy → update catalog atomically → validate runtime → rollback pointer on failure. **No overwrite of differing bytes at existing bundle id.**
+Guarded transaction (not executed): freeze → verify semantic + release fingerprints → verify authorized distributed file hashes → verify destination absent or byte-identical release path → copy immutable release artifact → validate copy → update catalog atomically → validate runtime → rollback pointer on failure. **No overwrite of differing bytes at existing bundle id or release path.**
 
 ## 21. Authorization contract
 
-Blank worksheet: `data/product2/publication_authorization_worksheet_v1.json`
+- **Superseded:** `data/product2/publication_authorization_worksheet_v1.json` — `SUPERSEDED_PRE_EXACT_BYTE_AUTHORIZATION_CONTRACT` (semantic-only fingerprint)
+- **Current blank worksheet:** `data/product2/publication_authorization_worksheet_v2.json` (`siralex_publication_authorization_v2`)
 
-Protected fields bind `bundle_id`, payload hashes, counts, C1–C8, P gates, `candidate_fingerprint`. Editable future fields: `publication_decision`, `reviewer_id`, `reviewed_at`, `review_method`, `notes`.
+Protected fields bind semantic identity, `release_artifact_fingerprint`, full `distributed_file_hashes`, counts, C1–C8, regression accounting, P gates. Editable future fields: `publication_decision`, `reviewer_id`, `reviewed_at`, `review_method`, `notes`.
 
 ## 22. Exact-byte authorization rule
 
-`candidate_fingerprint = sha256(canonical_json({bundle_id, content_sha256}))`. Authorization of bundle A cannot authorize bundle B.
+Publication authorization MUST bind `release_artifact_fingerprint` and every entry in `distributed_file_hashes`. The legacy `semantic_candidate_fingerprint = sha256(canonical_json({bundle_id, semantic_content_sha256}))` remains for semantic lineage only; manifest-only or sidecar changes change release identity without changing semantic identity.
 
 ## 23. Documentation consistency
 
@@ -276,9 +298,9 @@ Gitignored artifacts: `data/product2/`
 
 ## 30. Recommended next gate
 
-**PRODUCT2A_EXPLICIT_NONCOMMERCIAL_PUBLICATION_APPROVAL_AND_PROMOTION**
+**PRODUCT2C_EXPLICIT_NONCOMMERCIAL_PUBLICATION_AUTHORIZATION**
 
-Requires human authorization worksheet completion binding exact frozen candidate fingerprint, then catalog pointer promotion as a separate reversible transaction.
+Requires human completion of authorization worksheet v2 binding exact `release_artifact_fingerprint` and distributed file hashes, then catalog pointer promotion as a separate reversible transaction.
 
 ---
 

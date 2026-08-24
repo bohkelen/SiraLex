@@ -47,17 +47,26 @@ def build_proposed_catalog_entry(
     *,
     bundle_id: str,
     content_sha256: str,
-    artifact_dir_name: str,
+    release_artifact_dir_name: str,
+    release_artifact_fingerprint: str,
     bundle_dir: Path,
     version_label: str = "noncommercial-publication-candidate-product2",
 ) -> dict[str, Any]:
+    """
+    Proposed catalog entry with backward-compatible bundle_catalog_v1 fields.
+
+    content_sha256 remains semantic (payload). url_base points at the immutable
+    release-specific directory so distinct release bytes never alias.
+    """
     return {
         "bundle_id": bundle_id,
         "name": "French ↔ Maninka (noncommercial)",
         "version": version_label,
         "size_bytes": compute_bundle_size_bytes(bundle_dir),
-        "url_base": f"./{artifact_dir_name}/",
+        "url_base": f"./{release_artifact_dir_name}/",
         "content_sha256": content_sha256,
+        "release_artifact_fingerprint": release_artifact_fingerprint,
+        "release_artifact_dir_name": release_artifact_dir_name,
         "languages": {"source_lang": "fr", "target_lang": "mnk"},
         "language_labels": {"source": "French", "target": "Maninka"},
     }
@@ -102,6 +111,13 @@ def simulate_catalog_addition(
     dest = simulation_dir / artifact_name
     shutil.copytree(candidate_bundle_dir, dest)
 
+    release_dir = proposed_entry.get("release_artifact_dir_name")
+    release_specific_path = release_dir == artifact_name if release_dir else True
+    if not release_specific_path:
+        errors.append(
+            f"catalog url_base {artifact_name!r} != release_artifact_dir_name {release_dir!r}"
+        )
+
     sim_catalog_path = simulation_dir / "catalog.json"
     sim_catalog = load_catalog(sim_catalog_path)
     bundles = list(sim_catalog.get("bundles") or [])
@@ -138,6 +154,7 @@ def simulate_catalog_addition(
         "simulation_dir": str(simulation_dir),
         "old_bundle_addressable": old_addressable,
         "new_candidate_addressable": new_addressable,
+        "release_specific_path_resolved": release_specific_path,
         "active_bundle_id": resolved_active,
         "catalog_bundle_count": len(sim_catalog.get("bundles") or []),
     }
@@ -168,13 +185,18 @@ def design_publication_transaction() -> dict[str, Any]:
         "status": "READY",
         "steps": [
             "freeze_candidate",
-            "verify_candidate_hashes",
-            "verify_destination_bundle_id_absent_or_byte_identical",
-            "copy_immutable_bundle",
-            "validate_copied_hashes",
+            "verify_semantic_content_sha256",
+            "verify_release_artifact_fingerprint",
+            "verify_authorized_distributed_file_hashes",
+            "verify_destination_absent_or_byte_identical_release_path",
+            "copy_immutable_release_artifact",
+            "validate_copied_release_fingerprint",
             "update_catalog_atomically",
             "validate_catalog_runtime",
             "rollback_catalog_pointer_on_failure",
         ],
+        "requires_release_artifact_fingerprint_match": True,
+        "requires_distributed_file_hash_match": True,
         "overwrite_differing_bytes_at_existing_id": False,
+        "overwrite_differing_bytes_at_existing_path": False,
     }
