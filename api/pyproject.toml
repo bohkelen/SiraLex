@@ -50,6 +50,7 @@ siralex-malipense-transition-regression-closure = "malipense_version_delta.sourc
 siralex-malipense-canonical-refresh-transaction = "malipense_version_delta.source_refresh.transaction.cli:main"
 siralex-product-rights-boundary = "product_boundary.cli:main"
 siralex-check-noncommercial-distribution = "distribution_compliance.cli:main"
+siralex-check-publication-readiness = "publication_readiness.cli:main"
 
 [tool.ruff]
 line-length = 100
@@ -78,6 +79,7 @@ packages = [
     "product_boundary",
     "distribution_compliance",
     "source_registry",
+    "publication_readiness",
 ]
 
 [build-system]

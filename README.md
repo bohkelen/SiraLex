@@ -35,7 +35,7 @@ Primary Phase 1 sources (initial ingestion targets):
 - **Mali-pense French → Maninka dictionary** (lexicographic backbone)
 - **Corpus Maninka de Référence** (examples selectively; not intended for bulk redistribution without explicit permission)
 
-Design rule: provenance is stored at **entry**, **sense**, and **example** levels. A dedicated in-app **Credits / Sources** screen is a planned surface (not yet implemented); per-entry source information is shown in dictionary entries, and bundle/README attribution covers offline distribution.
+Design rule: provenance is stored at **entry**, **sense**, and **example** levels. After installing a dictionary bundle, open **More → Credits & sources** to view offline source attribution, data licenses (including Mali-pense / Malidaba **CC BY-NC-SA 4.0**), and the separate **MIT OR Apache-2.0** software license. Per-entry source information is also shown in dictionary entries. Bundle-sidecar files (`ATTRIBUTION.txt`, `DATA_LICENSES.md`) and `bundle_manifest_v2` carry the same registry-driven metadata for portable distribution.
 
 ## License
 

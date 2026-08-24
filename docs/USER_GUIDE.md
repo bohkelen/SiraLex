@@ -90,3 +90,21 @@ Manual import steps:
 5. Complete the import.
 
 This fallback matters because real-world connectivity is not guaranteed.
+
+## Credits and sources (offline)
+
+After a dictionary bundle is installed:
+
+1. Open the app (network not required).
+2. Go to **More**.
+3. Open **Credits & sources**.
+
+The screen shows:
+
+- **Application software license** — MIT OR Apache-2.0 (separate from lexical data).
+- **Lexical/data licenses** — per-source entries from the installed bundle manifest (for example Mali-pense / Malidaba **CC BY-NC-SA 4.0**).
+- **Attribution text**, source URLs, NonCommercial posture, and ShareAlike notices when present in the bundle.
+
+Credits are read from the installed bundle metadata on the device. No live request to Mali-pense or other source sites is required to display them.
+
+Publication note: a bundle can be compliance-ready without being published in the public catalog. Catalog promotion is a separate, explicit step.

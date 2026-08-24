@@ -65,6 +65,11 @@ export const EXPECTED_MANIFEST = {
   update_mode: "REPLACE_ALL",
 } as const;
 
+const ACCEPTED_MANIFEST_SCHEMA_VERSIONS = new Set([
+  EXPECTED_MANIFEST.manifest_schema_version,
+  "bundle_manifest_v2",
+]);
+
 const NORMALIZATION_RULESET_RE = /^norm_v\d+$/;
 
 function isObject(x: unknown): x is Record<string, unknown> {
@@ -214,12 +219,12 @@ export function parseAndValidateManifestJson(text: string): BundleManifestValida
   }
 
   // Hard gating checks (must be stable + explicit).
-  if (manifest_schema_version && manifest_schema_version !== EXPECTED_MANIFEST.manifest_schema_version) {
+  if (manifest_schema_version && !ACCEPTED_MANIFEST_SCHEMA_VERSIONS.has(manifest_schema_version)) {
     errors.push(
       `manifest_schema_version mismatch: ${fmtExpected(
         manifest_schema_version,
         EXPECTED_MANIFEST.manifest_schema_version,
-      )}`,
+      )} (also accepts bundle_manifest_v2)`,
     );
   }
   if (compression && compression !== EXPECTED_MANIFEST.compression) {

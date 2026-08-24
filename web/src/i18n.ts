@@ -100,6 +100,29 @@ const MESSAGES = {
     "more.noOfflineDictionary": "No dictionary stored for offline search",
     "more.back": "← Back to More",
     "more.displaySection": "Display",
+    "more.sourcesCredits": "Credits & sources",
+    "more.sourcesCreditsHelp": "Data licenses and attribution for the installed dictionary",
+    "credits.title": "Credits & sources",
+    "credits.intro":
+      "Lexical data licenses and attribution come from the installed offline bundle. Software licensing is separate.",
+    "credits.softwareSection": "Application software",
+    "credits.softwareLicense": "Software license",
+    "credits.softwareHelp": "SiraLex application code is dual-licensed under MIT OR Apache-2.0.",
+    "credits.dataSection": "Lexical / data content",
+    "credits.dataPolicy": "Data license policy",
+    "credits.dataLicense": "Data license",
+    "credits.sourcesSection": "Sources",
+    "credits.sourceId": "Source ID",
+    "credits.reference": "Reference",
+    "credits.shareAlikeRequired": "ShareAlike obligations apply to adapted lexical data from this source.",
+    "credits.nonCommercialData": "NonCommercial distribution applies to this source data.",
+    "credits.bundleNonCommercial": "This dictionary bundle is distributed for noncommercial use.",
+    "credits.shareAlikeLicense": "ShareAlike license",
+    "credits.offlineNote": "Shown from the dictionary installed on this device. No network request is required.",
+    "credits.noDictionary":
+      "Install a dictionary to view source credits and data licenses for offline use.",
+    "credits.noMetadata":
+      "The active dictionary does not include extended source license metadata. Reinstall from a current bundle package.",
     "dictionaries.title": "Dictionaries",
     "dictionaries.installed": "Installed dictionaries",
     "dictionaries.active": "Active",
@@ -893,6 +916,34 @@ const MESSAGES = {
     "more.noOfflineDictionary": "Aucun dictionnaire stocké pour la recherche hors ligne",
     "more.back": "← Retour à Plus",
     "more.displaySection": "Affichage",
+    "more.sourcesCredits": "Crédits et sources",
+    "more.sourcesCreditsHelp":
+      "Licences des données et attribution du dictionnaire installé",
+    "credits.title": "Crédits et sources",
+    "credits.intro":
+      "Les licences et attributions des données lexicales proviennent du bundle hors ligne installé. La licence logicielle est distincte.",
+    "credits.softwareSection": "Logiciel applicatif",
+    "credits.softwareLicense": "Licence logicielle",
+    "credits.softwareHelp": "Le code de SiraLex est sous double licence MIT OU Apache-2.0.",
+    "credits.dataSection": "Contenu lexical / données",
+    "credits.dataPolicy": "Politique de licence des données",
+    "credits.dataLicense": "Licence des données",
+    "credits.sourcesSection": "Sources",
+    "credits.sourceId": "Identifiant source",
+    "credits.reference": "Référence",
+    "credits.shareAlikeRequired":
+      "Les obligations ShareAlike s’appliquent aux données lexicales adaptées de cette source.",
+    "credits.nonCommercialData":
+      "La distribution NonCommercial s’applique aux données de cette source.",
+    "credits.bundleNonCommercial":
+      "Ce bundle dictionnaire est distribué pour un usage non commercial.",
+    "credits.shareAlikeLicense": "Licence ShareAlike",
+    "credits.offlineNote":
+      "Affiché à partir du dictionnaire installé sur cet appareil. Aucune requête réseau n’est nécessaire.",
+    "credits.noDictionary":
+      "Installez un dictionnaire pour consulter les crédits et licences des sources hors ligne.",
+    "credits.noMetadata":
+      "Le dictionnaire actif n’inclut pas les métadonnées étendues de licence. Réinstallez depuis un bundle à jour.",
     "dictionaries.title": "Dictionnaires",
     "dictionaries.installed": "Dictionnaires installés",
     "dictionaries.active": "Actif",

@@ -1,4 +1,5 @@
 import { buildLanguageMetaFromManifest } from "../bundle_labels";
+import { projectCreditsFromManifestJson, type StoredBundleCredits } from "../bundle_credits";
 import {
   deriveBundleAssetUrls,
   validateRemoteUrlPolicy,
@@ -61,6 +62,8 @@ export type InstallBundleMetadata = {
   displayName?: string;
   version?: string;
   storageBytes?: number;
+  /** Pre-projected source credits from manifest text (offline Credits UI). */
+  sourceCredits?: StoredBundleCredits;
   /** Catalog/language metadata when the bundle manifest omits languages. */
   languageMeta?: {
     source_lang?: string;
@@ -294,6 +297,7 @@ function buildInstalledBundleMeta(
     version: metadata?.version,
     storage_scope_id: storageScopeId,
     storage_bytes: metadata?.storageBytes ?? computeManifestPayloadBytes(manifest),
+    ...(metadata?.sourceCredits ? { source_credits: metadata.sourceCredits } : {}),
     manifest_schema_version: manifest.manifest_schema_version,
     record_schema_id: manifest.record_schema_id,
     record_schema_version: manifest.record_schema_version,
@@ -509,6 +513,8 @@ export async function installRemoteCatalogBundle(
     throw new Error(`Manifest validation failed: ${parsed.errors.join("; ")}`);
   }
 
+  const sourceCredits = projectCreditsFromManifestJson(manifestText) ?? undefined;
+
   const manifest = parsed.manifest;
   if (manifest.bundle_id !== entry.bundle_id) {
     throw new Error(
@@ -598,6 +604,7 @@ export async function installRemoteCatalogBundle(
       displayName: entry.name,
       version: entry.version,
       storageBytes: entry.size_bytes,
+      sourceCredits,
       languageMeta: entry.language_meta
         ? {
             source_lang: entry.language_meta.source_lang,

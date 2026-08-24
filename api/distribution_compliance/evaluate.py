@@ -100,7 +100,7 @@ def evaluate_product1b(
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    user_facing_credits = "CREDITS_SURFACE_NOT_IMPLEMENTED"
+    user_facing_credits = "USER_FACING_CREDITS_SURFACE_IMPLEMENTED"
 
     decision = DECISION_READY if checks.get("all_pass") else DECISION_BLOCKED
 

@@ -53,6 +53,7 @@ export type MoreCallbacks = {
   onOpenSearchFeedback(): void;
   onOpenDictionaries(): void;
   onOpenLearningData(): void;
+  onOpenSourcesCredits(): void;
   onThemeChange(theme: UiThemePreference): void;
   onLocaleChange(locale: Locale): void;
 };
@@ -126,6 +127,14 @@ export function renderMore(model: MoreViewModel, callbacks: MoreCallbacks): More
       title: t("more.learningData"),
       help: t("more.learningDataHelp"),
       onClick: () => callbacks.onOpenLearningData(),
+    }),
+  );
+  dataList.appendChild(
+    navRow({
+      id: "openSourcesCredits",
+      title: t("more.sourcesCredits"),
+      help: t("more.sourcesCreditsHelp"),
+      onClick: () => callbacks.onOpenSourcesCredits(),
     }),
   );
   dictionaryData.appendChild(dataList);

@@ -163,6 +163,7 @@ import {
 } from "./render/render_search_feedback_capture";
 import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
 import { renderMore } from "./render/render_more";
+import { renderSourcesCredits } from "./render/render_sources_credits";
 import { renderInstalledDictionaryList } from "./render/render_dictionary_management";
 import {
   renderPrimaryNavigation,
@@ -494,6 +495,10 @@ app.innerHTML = `
       <div id="learningBackupHost" class="learning-backup-host"></div>
     </section>
 
+    <section id="sourcesCreditsSurface" class="ux2-sources-credits-surface" aria-label="${t("credits.title")}" hidden>
+      <div id="sourcesCreditsHost" class="ux2-sources-credits-host"></div>
+    </section>
+
     <section id="dictionariesDestructive" class="ux2-dict-destructive" aria-labelledby="dictionaries-data-heading">
       <h3 id="dictionaries-data-heading" class="ux2-type-section-heading ux2-dict-section-heading">${t("dictionaries.dataManagement")}</h3>
       <p class="ux2-dict-destructive-hint">${t("dictionaries.dataManagementHelp")}</p>
@@ -528,6 +533,8 @@ const moreManagementBackBtn = mustGetEl<HTMLButtonElement>("#moreManagementBack"
 let moreHeading: HTMLHeadingElement | null = null;
 const dictionaryManagementSurface = mustGetEl<HTMLElement>("#dictionaryManagementSurface");
 const learningDataSurface = mustGetEl<HTMLElement>("#learningDataSurface");
+const sourcesCreditsSurface = mustGetEl<HTMLElement>("#sourcesCreditsSurface");
+const sourcesCreditsHost = mustGetEl<HTMLElement>("#sourcesCreditsHost");
 const dictionaryManagementHeading = mustGetEl<HTMLHeadingElement>("#dictionary-management-heading");
 const manageDictionariesPanel = mustGetEl<HTMLElement>("#manageDictionariesPanel");
 const dictionariesAdvanced = mustGetEl<HTMLDetailsElement>("#dictionariesAdvanced");
@@ -2681,7 +2688,7 @@ function focusPrimaryHeading(destination: PrimaryDestination): void {
 }
 
 type MoreViewMode = "landing" | "management";
-type MoreManagementMode = "dictionaries" | "learning_data";
+type MoreManagementMode = "dictionaries" | "learning_data" | "sources_credits";
 
 function setMoreView(view: MoreViewMode): void {
   appShell.dataset.moreView = view;
@@ -2716,14 +2723,20 @@ function hideMoreManagementHost(): void {
   delete appShell.dataset.moreManagement;
   dictionaryManagementSurface.hidden = true;
   learningDataSurface.hidden = true;
+  sourcesCreditsSurface.hidden = true;
 }
 
 function setMoreManagementMode(mode: MoreManagementMode): void {
-  const token = mode === "learning_data" ? "learning-data" : "dictionaries";
+  const token =
+    mode === "learning_data"
+      ? "learning-data"
+      : mode === "sources_credits"
+        ? "sources-credits"
+        : "dictionaries";
   appShell.dataset.moreManagement = token;
-  const showDictionaries = mode === "dictionaries";
-  dictionaryManagementSurface.hidden = !showDictionaries;
-  learningDataSurface.hidden = showDictionaries;
+  dictionaryManagementSurface.hidden = mode !== "dictionaries";
+  learningDataSurface.hidden = mode !== "learning_data";
+  sourcesCreditsSurface.hidden = mode !== "sources_credits";
 }
 
 function openMoreManagement(mode: MoreManagementMode): void {
@@ -2754,9 +2767,37 @@ function openMoreManagement(mode: MoreManagementMode): void {
     })();
     return;
   }
+  if (mode === "sources_credits") {
+    void mountSourcesCreditsSurface();
+    return;
+  }
   void learningBackupSurface?.refreshCount();
   dictionariesAdvanced.open = false;
   dictionaryManagementHeading.focus();
+}
+
+async function mountSourcesCreditsSurface(): Promise<void> {
+  sourcesCreditsHost.replaceChildren();
+  const db = await openSiralexDb();
+  try {
+    const active = await getActiveBundleMeta(db);
+    if (!active?.source_credits) {
+      const empty = document.createElement("p");
+      empty.className = "ux2-credits-empty";
+      empty.textContent = active ? t("credits.noMetadata") : t("credits.noDictionary");
+      sourcesCreditsHost.appendChild(empty);
+      return;
+    }
+    const view = renderSourcesCredits({
+      credits: active.source_credits,
+      bundleId: active.bundle_id,
+      bundleLabel: active.display_name ?? active.bundle_id,
+    });
+    sourcesCreditsHost.appendChild(view.root);
+    view.heading.focus();
+  } finally {
+    db.close();
+  }
 }
 
 function mountMoreLanding(): void {
@@ -2779,6 +2820,9 @@ function mountMoreLanding(): void {
       },
       onOpenLearningData: () => {
         openMoreManagement("learning_data");
+      },
+      onOpenSourcesCredits: () => {
+        openMoreManagement("sources_credits");
       },
       onThemeChange: (theme) => {
         if (theme === getCurrentUiThemePreference()) return;
