@@ -49,6 +49,7 @@ siralex-malipense-transition-review-persist = "malipense_version_delta.source_re
 siralex-malipense-transition-regression-closure = "malipense_version_delta.source_refresh.transition.closure_cli:main"
 siralex-malipense-canonical-refresh-transaction = "malipense_version_delta.source_refresh.transaction.cli:main"
 siralex-product-rights-boundary = "product_boundary.cli:main"
+siralex-check-noncommercial-distribution = "distribution_compliance.cli:main"
 
 [tool.ruff]
 line-length = 100
@@ -75,6 +76,8 @@ packages = [
     "corpus_reviews",
     "malipense_version_delta",
     "product_boundary",
+    "distribution_compliance",
+    "source_registry",
 ]
 
 [build-system]

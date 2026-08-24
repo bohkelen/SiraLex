@@ -35,13 +35,25 @@ Primary Phase 1 sources (initial ingestion targets):
 - **Mali-pense French → Maninka dictionary** (lexicographic backbone)
 - **Corpus Maninka de Référence** (examples selectively; not intended for bulk redistribution without explicit permission)
 
-Design rule: provenance is stored at **entry**, **sense**, and **example** levels, and the app includes a local offline **Credits / Sources** section. If any source maintainer requests modification or removal, the system is designed to make that process straightforward.
+Design rule: provenance is stored at **entry**, **sense**, and **example** levels. A dedicated in-app **Credits / Sources** screen is a planned surface (not yet implemented); per-entry source information is shown in dictionary entries, and bundle/README attribution covers offline distribution.
 
 ## License
+
+### Software code
 
 Dual-licensed under **MIT OR Apache-2.0** (you may choose either license).
 
 See `LICENSE-MIT` and `LICENSE-APACHE`.
+
+### Lexical and data content
+
+**Data/content retains source-specific licensing.** The repository software
+license does not relicense third-party lexical content.
+
+See [`DATA_LICENSES.md`](DATA_LICENSES.md) for per-source rights, including:
+
+- Mali-pense / Malidaba-derived data: **CC BY-NC-SA 4.0** (`src_malipense`)
+- Owner-reviewed additions: governed separately (`src_siralex_lexical_review`)
 
 ## Project posture (non-commercial, community)
 
@@ -49,6 +61,5 @@ SiraLex is built as **non-commercial language infrastructure** for learners and 
 
 - We ask that downstream use **preserves attribution** and respects **source licensing/permissions**.
 - We do **not** intend paywalls, “API resale”, or other extractive commercialization of the lexicon.
-
-Note: the **code** is dual-licensed under MIT/Apache-2.0 as stated above. **Data/content** may have separate provenance and usage constraints depending on its source.
+- Not all repository contents are "open source" under one license: **code** is MIT/Apache-2.0; **lexical data** follows source-specific terms.
 

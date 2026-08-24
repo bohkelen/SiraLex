@@ -417,6 +417,9 @@ def build_bundle(
     lexical_language: str | None = None,
     lookup_languages: list[str] | None = None,
     versioned_output: bool | None = None,
+    license_enrichment: bool = False,
+    repo_root: Path | None = None,
+    publication_authorized: bool = False,
 ) -> dict[str, Any]:
     """
     Build an offline bundle directory from normalized records and search index.
@@ -582,6 +585,20 @@ def build_bundle(
         manifest["scripts"] = {
             "target_supported": list(target_scripts),
         }
+
+    if license_enrichment:
+        if repo_root is None:
+            raise ValueError("license_enrichment requires repo_root")
+        from source_registry.load import load_source_registry
+        from distribution_compliance.manifest import enrich_manifest_with_licenses
+
+        registry = load_source_registry(repo_root)
+        manifest = enrich_manifest_with_licenses(
+            manifest,
+            registry=registry,
+            source_ids=sorted(sources_included),
+            publication_authorized=publication_authorized,
+        )
 
     # Write manifest
     manifest_path = temp_bundle_dir / "bundle.manifest.json"
