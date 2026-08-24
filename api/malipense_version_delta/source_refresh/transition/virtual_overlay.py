@@ -33,9 +33,9 @@ def classify_virtual_reference(
     f15_status: str,
     overlay: dict[str, str],
 ) -> str:
-    if f15_status == RESOLUTION_REMAP and baseline_ir_id in overlay:
+    if baseline_ir_id in overlay:
         return RESOLUTION_STILL
-    if f15_status == RESOLUTION_REMAP and baseline_ir_id not in overlay:
+    if f15_status == RESOLUTION_REMAP:
         return RESOLUTION_REMAP
     if f15_status == RESOLUTION_AMBIGUOUS:
         return RESOLUTION_AMBIGUOUS
