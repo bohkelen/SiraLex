@@ -14,6 +14,15 @@ from malipense_version_delta.frozen_inputs import (
 FROZEN_REVIEW_REGISTRY_SHA256 = (
     "6ada0ee6381379ae1f260c9317e6c6ca4233d76b1dcbc0e198ade21dc8e46104"
 )
+FROZEN_ACCEPTANCE_SHA256 = (
+    "d48d7ee1382f337bc9b628fb7d98858a8e0780a8aad84ba00ebfc053faa29d1e"
+)
+FROZEN_INTEGRITY_MANIFEST_SHA256 = (
+    "2492b284be058f24be560021abf3ca4e95d8b113969989a34bab9e8c08bb5d64"
+)
+FROZEN_DESTRUCTIVE_MANIFEST_SHA256 = (
+    "d7417a5cd83c6a9f766d1e14e2485fc33eed2e05b9312abf18ecb2e8e378f758"
+)
 
 FROZEN_BASELINE_REPARSE_SHA256 = (
     "64b5509e97274f4045302e61c12697519a32cad7a51ac3433c9d975664592142"
@@ -69,6 +78,10 @@ class SourceRefreshPaths:
     @property
     def destructive_manifest(self) -> Path:
         return self.output_dir / "destructive_change_disposition.jsonl"
+
+    @property
+    def f16_dir(self) -> Path:
+        return self.output_dir / "f16"
 
 
 def default_paths(repo_root: Path | None = None) -> SourceRefreshPaths:
@@ -136,6 +149,9 @@ __all__ = [
     "FROZEN_BASELINE_REPARSE_SHA256",
     "FROZEN_CURRENT_IR_SHA256",
     "FROZEN_DELTA_SHA256",
+    "FROZEN_DESTRUCTIVE_MANIFEST_SHA256",
+    "FROZEN_INTEGRITY_MANIFEST_SHA256",
+    "FROZEN_ACCEPTANCE_SHA256",
     "FROZEN_REVIEW_REGISTRY_SHA256",
     "OFFICIAL_ORIGIN_PREFIX",
     "SourceRefreshPaths",
