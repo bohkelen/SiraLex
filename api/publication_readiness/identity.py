@@ -47,7 +47,7 @@ def compute_semantic_candidate_fingerprint(
     """
     payload = {
         "bundle_id": bundle_id,
-        "semantic_content_sha256": semantic_content_sha256,
+        "content_sha256": semantic_content_sha256,
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()

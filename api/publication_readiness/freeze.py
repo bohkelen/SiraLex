@@ -133,6 +133,11 @@ def freeze_release_candidate(
 
     verification = verify_bundle(final_dir)
 
+    for leftover in ("_build_staging", "_staging_sidecars"):
+        path = output_parent / leftover
+        if path.exists():
+            shutil.rmtree(path)
+
     return {
         "semantic_bundle_id": identity["semantic_bundle_id"],
         "semantic_content_sha256": identity["semantic_content_sha256"],
