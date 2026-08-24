@@ -23,6 +23,18 @@ FROZEN_INTEGRITY_MANIFEST_SHA256 = (
 FROZEN_DESTRUCTIVE_MANIFEST_SHA256 = (
     "d7417a5cd83c6a9f766d1e14e2485fc33eed2e05b9312abf18ecb2e8e378f758"
 )
+FROZEN_F16_COMMIT = "604a0927fa870e93a1736da55a2de46bf2b0c76f"
+FROZEN_F16_PROPOSALS_SHA256 = (
+    "74c1553f4bdd5846f20dcf5085e3c52045e3cbddc3b4eebf700bc47d156f290b"
+)
+# Blank F16 Type-B worksheet before human Type-B encoding (F17).
+FROZEN_F16_TYPE_B_BLANK_WORKSHEET_SHA256 = (
+    "60191121f91a9933c289dcc109a5417e5dd560303d181de94896511beb8b032b"
+)
+# Blank F16 Type-A ambiguous remap worksheet (superseded by F17 v2 continuity worksheet).
+FROZEN_F16_TYPE_A_BLANK_WORKSHEET_SHA256 = (
+    "c5bc336a186e116ae034869bbe96c612ee3518f002c489dc3e083636b4e4fa2a"
+)
 
 FROZEN_BASELINE_REPARSE_SHA256 = (
     "64b5509e97274f4045302e61c12697519a32cad7a51ac3433c9d975664592142"
@@ -82,6 +94,10 @@ class SourceRefreshPaths:
     @property
     def f16_dir(self) -> Path:
         return self.output_dir / "f16"
+
+    @property
+    def f17_dir(self) -> Path:
+        return self.output_dir / "f17"
 
 
 def default_paths(repo_root: Path | None = None) -> SourceRefreshPaths:
@@ -150,6 +166,10 @@ __all__ = [
     "FROZEN_CURRENT_IR_SHA256",
     "FROZEN_DELTA_SHA256",
     "FROZEN_DESTRUCTIVE_MANIFEST_SHA256",
+    "FROZEN_F16_COMMIT",
+    "FROZEN_F16_PROPOSALS_SHA256",
+    "FROZEN_F16_TYPE_A_BLANK_WORKSHEET_SHA256",
+    "FROZEN_F16_TYPE_B_BLANK_WORKSHEET_SHA256",
     "FROZEN_INTEGRITY_MANIFEST_SHA256",
     "FROZEN_ACCEPTANCE_SHA256",
     "FROZEN_REVIEW_REGISTRY_SHA256",

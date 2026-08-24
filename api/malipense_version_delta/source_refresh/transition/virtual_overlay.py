@@ -244,13 +244,14 @@ def run_virtual_overlay(
     proposals: list[dict[str, Any]],
     ambiguous_baseline_ids: set[str],
     missing_baseline_ids: set[str],
+    virtual_dir: Path | None = None,
 ) -> dict[str, Any]:
     """
-    Apply deterministic proposals virtually under f16/virtual/.
+    Apply deterministic proposals virtually under a local virtual/ directory.
 
     Never mutates tracked shared tables or canonical build outputs.
     """
-    virtual_dir = paths.f16_dir / "virtual"
+    virtual_dir = virtual_dir or (paths.f16_dir / "virtual")
     virtual_dir.mkdir(parents=True, exist_ok=True)
 
     integrity_rows = load_jsonl_records(paths.integrity_manifest)
