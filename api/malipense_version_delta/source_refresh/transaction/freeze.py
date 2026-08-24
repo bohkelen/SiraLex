@@ -62,7 +62,7 @@ def _req(path: Path, role: str, expected: str) -> FrozenInput:
 def freeze_transaction_inputs(paths: SourceRefreshPaths) -> dict[str, Any]:
     """Verify every frozen input required to reproduce the F19 accepted candidate."""
     items = [
-        _req(paths.baseline_ir, "baseline_canonical_malidaba_ir", FROZEN_BASELINE_IR_SHA256),
+        _req(paths.baseline_ir, "historical_baseline_malidaba_ir", FROZEN_BASELINE_IR_SHA256),
         _req(paths.current_ir, "current_corrected_malidaba_ir", FROZEN_CURRENT_IR_SHA256),
         _req(paths.delta, "trusted_f11_delta", FROZEN_DELTA_SHA256),
         _req(paths.review_registry, "f13_source_delta_review_registry", FROZEN_REVIEW_REGISTRY_SHA256),

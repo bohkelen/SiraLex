@@ -79,11 +79,12 @@ def discover_mutation_surface(
             "kind": KIND_GOVERNED,
             "identity_layer": "edition_specific_ir_id + current-edition provenance",
             "why_change_is_required": (
-                "Replace baseline-era Malidaba IR with frozen current-edition "
-                "source assertions (corrected Malidaba capture)."
+                "Replace pre-refresh installed Malidaba IR with frozen "
+                "current-edition source assertions (corrected Malidaba capture)."
             ),
             "rollback_source": "transaction_local_before_bytes",
-            "before_path": paths.baseline_ir,  # current installed lexicon equals baseline frozen
+            # before_path resolved below: installed DEST_CURRENT_IR if present
+            "before_path": None,
         },
         {
             "path": DEST_LEGACY_IR,
@@ -168,11 +169,13 @@ def discover_mutation_surface(
         },
     ]
 
-    # Installed lexicon before = whatever is currently at DEST_CURRENT_IR if present,
-    # else baseline frozen IR (source-refresh replaces the installed lexicon).
+    # Installed lexicon before = DEST_CURRENT_IR when present; else historical
+    # baseline artifact (pre-refresh installs lived at the same relative path).
     installed = root / DEST_CURRENT_IR
     if installed.is_file():
         specs[0]["before_path"] = installed
+    elif paths.baseline_ir.is_file():
+        specs[0]["before_path"] = paths.baseline_ir
 
     mutations: list[dict[str, Any]] = []
     for spec in specs:

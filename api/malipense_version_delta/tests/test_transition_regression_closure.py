@@ -563,12 +563,21 @@ def test_g7_g9_rights_canonical_invariants_on_local_data():
     assert sha256_file(type_a) == FROZEN_F18_TYPE_A_REGISTRY_SHA256
     assert sha256_file(type_b) == FROZEN_F18_TYPE_B_REGISTRY_SHA256
 
-    from malipense_version_delta.frozen_inputs import FROZEN_BASELINE_IR_SHA256
+    from malipense_version_delta.frozen_inputs import (
+        FROZEN_APPLIED_CURRENT_LEXICON_SHA256,
+        FROZEN_BASELINE_IR_SHA256,
+    )
     from malipense_version_delta.source_refresh.paths import (
         FROZEN_REVIEW_REGISTRY_SHA256,
     )
+    from malipense_version_delta.source_refresh.transaction.model import DEST_CURRENT_IR
 
+    # Historical baseline edition (immutable F11/F19 transition fixture).
     assert sha256_file(paths.baseline_ir) == FROZEN_BASELINE_IR_SHA256
+    # Applied current-edition lexicon (post-CORPUS1F21 mutable canonical path).
+    applied_lexicon = paths.repo_root / DEST_CURRENT_IR
+    assert applied_lexicon.is_file()
+    assert sha256_file(applied_lexicon) == FROZEN_APPLIED_CURRENT_LEXICON_SHA256
     assert sha256_file(paths.review_registry) == FROZEN_REVIEW_REGISTRY_SHA256
 
     from malipense_version_delta.source_refresh.evidence_gates import (

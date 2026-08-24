@@ -541,6 +541,16 @@ def test_transaction_package_files_exist():
         assert (TX_SRC / name).is_file()
 
 
+def test_ignored_ir_reproducible_from_durable_authorities(paths):
+    from malipense_version_delta.source_refresh.transaction.materialize_ir import (
+        materialize_ignored_ir_candidates,
+    )
+
+    result = materialize_ignored_ir_candidates(paths)
+    assert result["all_match"] is True
+    assert all(result["matches"].values())
+
+
 def test_dry_run_receipt_ready_if_present():
     receipt = (
         REPO_ROOT

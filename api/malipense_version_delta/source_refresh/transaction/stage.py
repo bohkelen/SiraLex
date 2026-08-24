@@ -102,8 +102,9 @@ def retain_before_bytes(
             continue
         src = paths.repo_root / rel
         if not src.is_file():
-            # Fall back: for current IR, installed may equal baseline frozen path
             if rel == DEST_CURRENT_IR and paths.baseline_ir.is_file():
+                # Pre-refresh installs lived at DEST_CURRENT_IR; historical
+                # baseline artifact is the durable pre-refresh authority.
                 src = paths.baseline_ir
             elif rel == DEST_ALIASES:
                 src = paths.aliases

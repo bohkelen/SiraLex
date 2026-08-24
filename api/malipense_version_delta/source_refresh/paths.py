@@ -164,7 +164,9 @@ def default_paths(repo_root: Path | None = None) -> SourceRefreshPaths:
     workspace = root / "data" / "malidaba_delta" / "current"
     return SourceRefreshPaths(
         repo_root=root,
-        baseline_ir=root / "data" / "ir" / "malipense_lexicon_v3.jsonl",
+        baseline_ir=(
+            workspace / "artifacts" / "malidaba_baseline_ir.jsonl"
+        ),
         current_ir=workspace / "artifacts" / "malidaba_current_ir.jsonl",
         delta=workspace / "artifacts" / "malidaba_version_delta.jsonl",
         crawl_dir=(
