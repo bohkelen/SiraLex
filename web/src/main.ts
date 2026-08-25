@@ -77,6 +77,7 @@ import {
   openDictionaryUpdateDialog,
   renderDictionaryUpdateDialog,
   renderSearchUpdateNotice,
+  resolveUpdatePresentationCopy,
 } from "./render/render_dictionary_update";
 import {
   buildQueryLogDiagnosticsContext,
@@ -163,6 +164,7 @@ import {
 } from "./render/render_search_feedback_capture";
 import { renderSavedVocabulary } from "./render/render_saved_vocabulary";
 import { renderMore } from "./render/render_more";
+import { renderSourcesCredits } from "./render/render_sources_credits";
 import { renderInstalledDictionaryList } from "./render/render_dictionary_management";
 import {
   renderPrimaryNavigation,
@@ -494,6 +496,10 @@ app.innerHTML = `
       <div id="learningBackupHost" class="learning-backup-host"></div>
     </section>
 
+    <section id="sourcesCreditsSurface" class="ux2-sources-credits-surface" aria-label="${t("credits.title")}" hidden>
+      <div id="sourcesCreditsHost" class="ux2-sources-credits-host"></div>
+    </section>
+
     <section id="dictionariesDestructive" class="ux2-dict-destructive" aria-labelledby="dictionaries-data-heading">
       <h3 id="dictionaries-data-heading" class="ux2-type-section-heading ux2-dict-section-heading">${t("dictionaries.dataManagement")}</h3>
       <p class="ux2-dict-destructive-hint">${t("dictionaries.dataManagementHelp")}</p>
@@ -528,6 +534,8 @@ const moreManagementBackBtn = mustGetEl<HTMLButtonElement>("#moreManagementBack"
 let moreHeading: HTMLHeadingElement | null = null;
 const dictionaryManagementSurface = mustGetEl<HTMLElement>("#dictionaryManagementSurface");
 const learningDataSurface = mustGetEl<HTMLElement>("#learningDataSurface");
+const sourcesCreditsSurface = mustGetEl<HTMLElement>("#sourcesCreditsSurface");
+const sourcesCreditsHost = mustGetEl<HTMLElement>("#sourcesCreditsHost");
 const dictionaryManagementHeading = mustGetEl<HTMLHeadingElement>("#dictionary-management-heading");
 const manageDictionariesPanel = mustGetEl<HTMLElement>("#manageDictionariesPanel");
 const dictionariesAdvanced = mustGetEl<HTMLDetailsElement>("#dictionariesAdvanced");
@@ -739,19 +747,17 @@ function getCatalogEntryRuntimeState(entry: BundleCatalogEntryV1): {
 function getActiveFeaturedUpdateCatalogEntry(): BundleCatalogEntryV1 | undefined {
   if (!currentActiveBundle || loadedCatalogBundles.length === 0) return undefined;
   const featured = getFeaturedCatalogEntry();
-  const entry =
-    featured && featured.bundle_id === currentActiveBundle.bundle_id
-      ? featured
-      : getLoadedCatalogEntry(currentActiveBundle.bundle_id);
   if (
+    !featured ||
     !isActiveFeaturedUpdateAvailable({
       active: currentActiveBundle,
-      featuredEntry: entry,
+      featuredEntry: featured,
     })
   ) {
     return undefined;
   }
-  return entry;
+  // Install target is always the current featured catalog entry.
+  return featured;
 }
 
 function buildConsumerUpdateProgressCopy(): Partial<InstallProgressCopy> {
@@ -782,12 +788,19 @@ function mountDictionaryUpdateDialog(): void {
   dictionaryUpdateDialogEl = null;
   if (dictionaryUpdateState.phase === "idle") return;
 
+  const pending = dictionaryUpdatePendingEntry;
+  const presentation = pending
+    ? resolveUpdatePresentationCopy(pending.update_summary, pending.size_bytes, fmtBytes)
+    : undefined;
+
   const dialog = renderDictionaryUpdateDialog(
     {
       phase: dictionaryUpdateState.phase,
       progressMessage: dictionaryUpdateState.progressMessage,
       failureMessage: dictionaryUpdateState.failureMessage,
       cleanupWarning: dictionaryUpdateState.cleanupWarning,
+      resolvedSummary: presentation?.resolved,
+      sizeLabel: presentation?.sizeLabel,
     },
     {
       onConfirmUpdate: () => {
@@ -836,17 +849,26 @@ function refreshSearchUpdateNotice(): void {
     return;
   }
 
+  const presentation = resolveUpdatePresentationCopy(
+    updateEntry.update_summary,
+    updateEntry.size_bytes,
+    fmtBytes,
+  );
+
   dictionaryUpdateNoticeHost.hidden = false;
   dictionaryUpdateNoticeHost.appendChild(
-    renderSearchUpdateNotice({
-      onUpdate: () => {
-        openDictionaryUpdateConfirm(updateEntry);
+    renderSearchUpdateNotice(
+      {
+        onUpdate: () => {
+          openDictionaryUpdateConfirm(updateEntry);
+        },
+        onNotNow: () => {
+          dictionaryUpdateState = applyNoticeDismissed(dictionaryUpdateState);
+          refreshSearchUpdateNotice();
+        },
       },
-      onNotNow: () => {
-        dictionaryUpdateState = applyNoticeDismissed(dictionaryUpdateState);
-        refreshSearchUpdateNotice();
-      },
-    }),
+      presentation.notice,
+    ),
   );
 }
 
@@ -949,9 +971,20 @@ function renderInstalledBundleManager() {
   }
   installedBundleStatus.textContent = statusLines.join("\n");
 
+  const featuredUpdateEntry = getActiveFeaturedUpdateCatalogEntry();
+  const featuredUpdateHelp = featuredUpdateEntry
+    ? resolveUpdatePresentationCopy(
+        featuredUpdateEntry.update_summary,
+        featuredUpdateEntry.size_bytes,
+        fmtBytes,
+      ).resolved.short_summary
+    : undefined;
   const rows = installedBundles.map((bundle) => {
     const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
     const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
+    const isActive = currentActiveBundle?.bundle_id === bundle.bundle_id;
+    const sameIdUpdate = catalogState?.comparison.state === "update_available";
+    const featuredLineageUpdate = Boolean(isActive && featuredUpdateEntry);
     return {
       bundleId: bundle.bundle_id,
       displayName: getInstalledBundleName(bundle),
@@ -959,8 +992,9 @@ function renderInstalledBundleManager() {
         ? t("catalog.meta.version", { value: bundle.version })
         : undefined,
       languageDirection: `${getLocalizedSourceLabel(bundle.language_meta)} → ${getLocalizedTargetLabel(bundle.language_meta)}`,
-      isActive: currentActiveBundle?.bundle_id === bundle.bundle_id,
-      updateAvailable: catalogState?.comparison.state === "update_available",
+      isActive,
+      updateAvailable: sameIdUpdate || featuredLineageUpdate,
+      updateHelpText: isActive && (sameIdUpdate || featuredLineageUpdate) ? featuredUpdateHelp : undefined,
     };
   });
 
@@ -1003,6 +1037,11 @@ function renderInstalledBundleManager() {
       if (!loadedCatalogUrl) return;
       const bundle = installedBundles.find((b) => b.bundle_id === bundleId);
       if (!bundle) return;
+      const featuredUpdate = getActiveFeaturedUpdateCatalogEntry();
+      if (featuredUpdate && currentActiveBundle?.bundle_id === bundle.bundle_id) {
+        openDictionaryUpdateConfirm(featuredUpdate);
+        return;
+      }
       const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
       const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
       if (!catalogEntry || catalogState?.comparison.state !== "update_available") return;
@@ -2681,7 +2720,7 @@ function focusPrimaryHeading(destination: PrimaryDestination): void {
 }
 
 type MoreViewMode = "landing" | "management";
-type MoreManagementMode = "dictionaries" | "learning_data";
+type MoreManagementMode = "dictionaries" | "learning_data" | "sources_credits";
 
 function setMoreView(view: MoreViewMode): void {
   appShell.dataset.moreView = view;
@@ -2716,14 +2755,20 @@ function hideMoreManagementHost(): void {
   delete appShell.dataset.moreManagement;
   dictionaryManagementSurface.hidden = true;
   learningDataSurface.hidden = true;
+  sourcesCreditsSurface.hidden = true;
 }
 
 function setMoreManagementMode(mode: MoreManagementMode): void {
-  const token = mode === "learning_data" ? "learning-data" : "dictionaries";
+  const token =
+    mode === "learning_data"
+      ? "learning-data"
+      : mode === "sources_credits"
+        ? "sources-credits"
+        : "dictionaries";
   appShell.dataset.moreManagement = token;
-  const showDictionaries = mode === "dictionaries";
-  dictionaryManagementSurface.hidden = !showDictionaries;
-  learningDataSurface.hidden = showDictionaries;
+  dictionaryManagementSurface.hidden = mode !== "dictionaries";
+  learningDataSurface.hidden = mode !== "learning_data";
+  sourcesCreditsSurface.hidden = mode !== "sources_credits";
 }
 
 function openMoreManagement(mode: MoreManagementMode): void {
@@ -2754,9 +2799,37 @@ function openMoreManagement(mode: MoreManagementMode): void {
     })();
     return;
   }
+  if (mode === "sources_credits") {
+    void mountSourcesCreditsSurface();
+    return;
+  }
   void learningBackupSurface?.refreshCount();
   dictionariesAdvanced.open = false;
   dictionaryManagementHeading.focus();
+}
+
+async function mountSourcesCreditsSurface(): Promise<void> {
+  sourcesCreditsHost.replaceChildren();
+  const db = await openSiralexDb();
+  try {
+    const active = await getActiveBundleMeta(db);
+    if (!active?.source_credits) {
+      const empty = document.createElement("p");
+      empty.className = "ux2-credits-empty";
+      empty.textContent = active ? t("credits.noMetadata") : t("credits.noDictionary");
+      sourcesCreditsHost.appendChild(empty);
+      return;
+    }
+    const view = renderSourcesCredits({
+      credits: active.source_credits,
+      bundleId: active.bundle_id,
+      bundleLabel: active.display_name ?? active.bundle_id,
+    });
+    sourcesCreditsHost.appendChild(view.root);
+    view.heading.focus();
+  } finally {
+    db.close();
+  }
 }
 
 function mountMoreLanding(): void {
@@ -2779,6 +2852,9 @@ function mountMoreLanding(): void {
       },
       onOpenLearningData: () => {
         openMoreManagement("learning_data");
+      },
+      onOpenSourcesCredits: () => {
+        openMoreManagement("sources_credits");
       },
       onThemeChange: (theme) => {
         if (theme === getCurrentUiThemePreference()) return;

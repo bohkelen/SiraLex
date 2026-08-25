@@ -7,6 +7,19 @@
 
 ---
 
+## Distribution routes (do not conflate)
+
+| Route | What it validates |
+|---|---|
+| Catalog / Netlify featured install or PRODUCT2E update UX | Website-served catalog bundles after human Netlify deploy |
+| This protocol (manual `.siralex.zip` import) | Real-device acceptance of the package-import path only |
+
+Passing catalog/update automated tests or building `web/dist` does **not** close this protocol. Completing this protocol does **not** by itself authorize a Netlify production deploy.
+
+The candidate package under test must wrap the **intended** product identity for that round. After PRODUCT2D, repository featured is `bundle_noncommercial_dfd5ba62`; the historical Phase 7N1R1 package for `bundle_full_20260710_337619ff` must not be treated as current-featured without an explicit historical-scope decision.
+
+---
+
 ## Integrity and trust boundaries (read first)
 
 A `.siralex.zip` package is **internally integrity-verified**, not publisher-authenticated.

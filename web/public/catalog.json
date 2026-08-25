@@ -3,7 +3,7 @@
   "bundles": [
     {
       "bundle_id": "bundle_full_20260616_phase7j_alias_round2_candidate",
-      "name": "French ↔ Maninka",
+      "name": "French \u2194 Maninka",
       "version": "norm-v3-prior-featured-fallback-phase7j",
       "size_bytes": 24532394,
       "url_base": "./bundle_full_20260616_phase7j_alias_round2_candidate/",
@@ -19,7 +19,7 @@
     },
     {
       "bundle_id": "bundle_full_20260708_27643bb0",
-      "name": "French ↔ Maninka",
+      "name": "French \u2194 Maninka",
       "version": "norm-v3-prior-featured-fallback-7n2a4f8",
       "size_bytes": 26166937,
       "url_base": "./bundle_full_20260708_27643bb0/",
@@ -35,11 +35,50 @@
     },
     {
       "bundle_id": "bundle_full_20260710_337619ff",
-      "name": "French ↔ Maninka",
+      "name": "French \u2194 Maninka",
       "version": "norm-v3-featured-ml1e-multilingual-en-index",
       "size_bytes": 29793679,
       "url_base": "./bundle_full_20260710_337619ff__d076558b/",
       "content_sha256": "sha256:d076558b2f668a06a5a30a143026433e9e0de3523e0397183cfd897b2641d90a",
+      "languages": {
+        "source_lang": "fr",
+        "target_lang": "mnk"
+      },
+      "language_labels": {
+        "source": "French",
+        "target": "Maninka"
+      }
+    },
+    {
+      "bundle_id": "bundle_noncommercial_dfd5ba62",
+      "name": "French \u2194 Maninka (noncommercial)",
+      "version": "noncommercial-cc-by-nc-sa-product2",
+      "size_bytes": 32805591,
+      "url_base": "./bundle_noncommercial_dfd5ba62__51c38a75/",
+      "content_sha256": "sha256:dfd5ba62514caa72f9e282d16160ded01c26164c5c982fd6d164b78b6f7aeb33",
+      "release_artifact_fingerprint": "sha256:51c38a75d5a663caf591d27b1b73da9b7ddc3776c7c96ff724deeaca4b078838",
+      "release_artifact_dir_name": "bundle_noncommercial_dfd5ba62__51c38a75",
+      "update_summary": {
+        "schema_version": "dictionary_update_summary_v1",
+        "title": "Dictionary update available",
+        "title_fr": "Mise à jour du dictionnaire disponible",
+        "short_summary": "An updated Maninka dictionary is available with refreshed dictionary entries, broader search coverage, and a new offline Credits & Sources section.",
+        "short_summary_fr": "Une mise à jour du dictionnaire maninka est disponible, avec des entrées actualisées, une couverture de recherche élargie et une nouvelle section Crédits et sources accessible hors ligne.",
+        "highlights": [
+          "Refreshed dictionary entries from the Mali-pense / Malidaba source",
+          "Broader searchable coverage",
+          "Offline Credits & Sources for the included dictionary data",
+          "Packaged for noncommercial use under CC BY-NC-SA 4.0"
+        ],
+        "highlights_fr": [
+          "Entrées de dictionnaire actualisées à partir de la source Mali-pense / Malidaba",
+          "Couverture de recherche élargie",
+          "Crédits et sources hors ligne pour les données du dictionnaire incluses",
+          "Conditionné pour un usage non commercial sous licence CC BY-NC-SA 4.0"
+        ],
+        "size_bytes": 32805591,
+        "applies_from_bundle_ids": ["bundle_full_20260710_337619ff"]
+      },
       "languages": {
         "source_lang": "fr",
         "target_lang": "mnk"

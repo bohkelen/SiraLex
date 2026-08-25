@@ -52,6 +52,10 @@ from ir.models import (
 
 logger = logging.getLogger(__name__)
 
+# Compatibility maintenance: syntactic broadening for May 2026 nested lxP2 /
+# span-gloss HTML while preserving historical sibling/div semantics.
+# Kept as malipense_lexicon_v1 because historical source bytes must continue to
+# yield the same semantic IR fields (see CORPUS1F11).
 PARSER_VERSION = "malipense_lexicon_v1"
 SOURCE_ID = "src_malipense"
 
@@ -157,15 +161,9 @@ class MalipenseLexiconParser:
                 if next_span:
                     next_entry_id = next_span.get("id")
             
-            # Collect all elements for this entry
-            entry_elements = [header]
-            sibling = header.find_next_sibling()
-            while sibling:
-                if sibling.name == "p" and "lxP" in sibling.get("class", []):
-                    break  # Hit next entry
-                entry_elements.append(sibling)
-                sibling = sibling.find_next_sibling()
-            
+            # Collect header + owned lxP2 blocks (nested and/or sibling layouts)
+            entry_elements = self._collect_entry_elements(header)
+
             # Compute block hash for lossiness detection
             raw_block_hash = compute_block_hash(entry_elements)
             
@@ -178,6 +176,93 @@ class MalipenseLexiconParser:
                 logger.warning(f"Failed to parse entry {entry_id}: {e}")
                 continue
     
+    def _collect_entry_elements(self, header: Tag) -> list:
+        """
+        Collect the entry header plus all owned content blocks.
+
+        Supports:
+        - Historical: lxP2 (and other non-entry nodes) as following siblings
+        - Current (May 2026): lxP2 nested inside lxP (often via BS4 repair of
+          malformed HTML that opens lxP2 before closing lxP)
+
+        Deduplicates by object identity so mixed nested+sibling layouts cannot
+        double-count the same lxP2 node. Stops before the next entry header
+        (p.lxP that is not lxP2).
+        """
+        elements: list = [header]
+        seen: set[int] = {id(header)}
+
+        def _append(node) -> None:
+            nid = id(node)
+            if nid in seen:
+                return
+            seen.add(nid)
+            elements.append(node)
+
+        # Nested lxP2 owned by this header (current structure)
+        for nested in header.find_all("p", class_="lxP2", recursive=True):
+            _append(nested)
+
+        # Following siblings until next entry header (historical structure)
+        sibling = header.find_next_sibling()
+        while sibling is not None:
+            if isinstance(sibling, Tag):
+                classes = sibling.get("class") or []
+                if sibling.name == "p" and "lxP" in classes and "lxP2" not in classes:
+                    break
+                _append(sibling)
+            else:
+                # Preserve historical inclusion of text/comment nodes
+                _append(sibling)
+            sibling = sibling.find_next_sibling()
+
+        return elements
+
+    @staticmethod
+    def _find_gloss_el(
+        elem: Tag,
+        gloss_class: str,
+        *,
+        allow_span: bool,
+    ) -> Tag | None:
+        """
+        Find gloss element.
+
+        Historical sibling layout emits glosses as <div class="Gl*">.
+        May 2026 nested layout emits glosses as <span class="Gl*">.
+
+        Span fallback is enabled only for nested lxP2 blocks so historical
+        sibling pages keep prior div-only extraction semantics.
+        """
+        found = elem.find("div", class_=gloss_class)
+        if found is not None:
+            return found
+        if allow_span:
+            return elem.find("span", class_=gloss_class)
+        return None
+
+    @staticmethod
+    def _find_in_header_strip(header: Tag, name: str, class_name: str) -> Tag | None:
+        """
+        Find the first matching tag in the lxP header strip, excluding nested lxP2.
+
+        May 2026 pages nest lxP2 inside lxP; recursive header.find would otherwise
+        pull sense-level PS/gloss markers into entry-level fields and create false
+        version-delta noise versus historical sibling layout.
+        """
+        for el in header.find_all(name, class_=class_name, recursive=True):
+            parent = el.parent
+            inside_lxp2 = False
+            while parent is not None and parent is not header:
+                classes = parent.get("class") or []
+                if parent.name == "p" and "lxP2" in classes:
+                    inside_lxp2 = True
+                    break
+                parent = parent.parent
+            if not inside_lxp2:
+                return el
+        return None
+
     def _parse_entry(self, entry_id: str, elements: list[Tag], raw_block_hash: str) -> ParsedEntry:
         """Parse entry elements into intermediate structure."""
         warnings: list[str] = []
@@ -188,40 +273,45 @@ class MalipenseLexiconParser:
         # Extract anchor names (a[@name] before the header)
         anchor_names = self._extract_anchor_names(header)
         
-        # Extract headword (span.Lxe)
+        # Extract headword (span.Lxe) — direct header identity marker
         entry_span = header.find("span", class_="Lxe")
         headword_latin = entry_span.get_text(strip=True) if entry_span else ""
         
-        # Extract N'Ko (span.GlNko in header)
-        nko_span = header.find("span", class_="GlNko")
+        # Extract N'Ko (span.GlNko in header strip, not nested sense blocks)
+        nko_span = self._find_in_header_strip(header, "span", "GlNko")
         headword_nko = nko_span.get_text(strip=True) if nko_span else None
         
-        # Extract PS line (span.PS) - DON'T over-interpret
-        ps_span = header.find("span", class_="PS")
+        # Extract PS line (span.PS) from header strip only - DON'T over-interpret
+        ps_span = self._find_in_header_strip(header, "span", "PS")
         ps_raw = ps_span.get_text(strip=True) if ps_span else None
         pos_hint = self._extract_pos_hint(ps_raw) if ps_raw else None
         
         # Extract etymology (span.Mnhbw)
-        etymology_span = header.find("span", class_="Mnhbw")
+        etymology_span = self._find_in_header_strip(header, "span", "Mnhbw")
         etymology_raw = etymology_span.get_text(strip=True) if etymology_span else None
         
         # Extract literal meaning (span.lpLiteralMeaningEnglish or Mnhlitt)
-        literal_span = header.find("span", class_="lpLiteralMeaningEnglish")
+        literal_span = self._find_in_header_strip(header, "span", "lpLiteralMeaningEnglish")
         if not literal_span:
-            literal_span = header.find("span", class_="Mnhlitt")
+            literal_span = self._find_in_header_strip(header, "span", "Mnhlitt")
         literal_meaning_raw = literal_span.get_text(strip=True) if literal_span else None
         
         # Extract corpus count (from the clnknt link)
         corpus_count = self._extract_corpus_count(header)
         
-        # Extract variants (span.Mnhvam, Mnhrv)
+        # Extract variants (span.Mnhvam, Mnhrv) from header strip
         variants_raw = self._extract_variants(header)
         
-        # Extract synonyms (span.Mnhsynm) from header
+        # Extract synonyms (span.Mnhsynm) from header strip
         synonyms_raw = self._extract_synonyms(header)
         
         # Parse sense blocks (p.lxP2)
-        senses = self._parse_senses(elements[1:], warnings)
+        structural_lxp2 = [
+            el
+            for el in elements[1:]
+            if isinstance(el, Tag) and el.name == "p" and "lxP2" in (el.get("class") or [])
+        ]
+        senses = self._parse_senses(elements[1:], warnings, entry_header=header)
         
         # Generate warnings for edge cases
         if not headword_latin:
@@ -229,6 +319,11 @@ class MalipenseLexiconParser:
         
         if not senses:
             warnings.append("no_senses_found")
+            if structural_lxp2:
+                warnings.append(
+                    "structural_lxp2_present_but_no_senses:"
+                    f"{len(structural_lxp2)}"
+                )
         elif all(not s.gloss_fr and not s.gloss_en and not s.gloss_ru for s in senses):
             warnings.append("no_glosses_in_any_sense")
         
@@ -332,8 +427,8 @@ class MalipenseLexiconParser:
         return None
     
     def _extract_corpus_count(self, header: Tag) -> int | None:
-        """Extract corpus link count from clnknt element."""
-        clnknt = header.find("b", class_="clnknt")
+        """Extract corpus link count from clnknt element in the header strip."""
+        clnknt = self._find_in_header_strip(header, "b", "clnknt")
         if clnknt:
             link = clnknt.find("a")
             if link:
@@ -343,20 +438,34 @@ class MalipenseLexiconParser:
                 if match:
                     return int(match.group(1))
         return None
+
+    def _iter_header_strip(self, header: Tag, name: str, class_name: str):
+        """Yield matching tags in the lxP header strip, excluding nested lxP2."""
+        for el in header.find_all(name, class_=class_name, recursive=True):
+            parent = el.parent
+            inside_lxp2 = False
+            while parent is not None and parent is not header:
+                classes = parent.get("class") or []
+                if parent.name == "p" and "lxP2" in classes:
+                    inside_lxp2 = True
+                    break
+                parent = parent.parent
+            if not inside_lxp2:
+                yield el
     
     def _extract_variants(self, header: Tag) -> list[str]:
-        """Extract variant forms from Mnhvam and Mnhrv spans."""
+        """Extract variant forms from Mnhvam and Mnhrv spans in the header strip."""
         variants = []
         
         # Mnhvam contains variant links
-        for vam in header.find_all("span", class_="Mnhvam"):
+        for vam in self._iter_header_strip(header, "span", "Mnhvam"):
             for link in vam.find_all("a", class_="MXRef"):
                 text = link.get_text(strip=True)
                 if text and text not in variants:
                     variants.append(text)
         
         # Mnhrv is "main variant" reference
-        for rv in header.find_all("span", class_="Mnhrv"):
+        for rv in self._iter_header_strip(header, "span", "Mnhrv"):
             for link in rv.find_all("a", class_="MXRef"):
                 text = link.get_text(strip=True)
                 if text and text not in variants:
@@ -367,7 +476,14 @@ class MalipenseLexiconParser:
     def _extract_synonyms(self, element: Tag) -> list[str]:
         """Extract synonyms from Mnhsynm span."""
         synonyms = []
-        for synm in element.find_all("span", class_="Mnhsynm"):
+        # When called on an entry header, exclude nested lxP2; when called on an
+        # lxP2 sense block, search the whole element.
+        classes = element.get("class") or []
+        if element.name == "p" and "lxP" in classes and "lxP2" not in classes:
+            synm_iter = self._iter_header_strip(element, "span", "Mnhsynm")
+        else:
+            synm_iter = element.find_all("span", class_="Mnhsynm")
+        for synm in synm_iter:
             for link in synm.find_all("a"):
                 text = link.get_text(strip=True)
                 if text and text not in synonyms:
@@ -379,7 +495,13 @@ class MalipenseLexiconParser:
                     synonyms.append(text)
         return synonyms
     
-    def _parse_senses(self, elements: list[Tag], warnings: list[str]) -> list[SenseRaw]:
+    def _parse_senses(
+        self,
+        elements: list[Tag],
+        warnings: list[str],
+        *,
+        entry_header: Tag | None = None,
+    ) -> list[SenseRaw]:
         """
         Parse sense blocks (p.lxP2 elements).
         
@@ -387,6 +509,7 @@ class MalipenseLexiconParser:
         - Skip PS-only blocks (they're part of speech info, not senses)
         - Better sub-entry handling (→ markers attach to current sense)
         - Generate warnings for edge cases
+        - Nested lxP2 (parent is entry header) may use span glosses
         """
         senses: list[SenseRaw] = []
         current_sense: SenseRaw | None = None
@@ -400,13 +523,14 @@ class MalipenseLexiconParser:
                 continue
             
             block_count += 1
-            
+            allow_span = entry_header is not None and elem.parent is entry_header
+
             # Check if this is a PS-only block (part of speech line with no glosses)
             ps_span = elem.find("span", class_="PS")
             has_any_gloss = (
-                elem.find("div", class_="GlFr") or 
-                elem.find("div", class_="GlEn") or 
-                elem.find("div", class_="GlRu")
+                self._find_gloss_el(elem, "GlFr", allow_span=allow_span)
+                or self._find_gloss_el(elem, "GlEn", allow_span=allow_span)
+                or self._find_gloss_el(elem, "GlRu", allow_span=allow_span)
             )
             if ps_span and not elem.find("span", class_="SnsN") and not has_any_gloss:
                 # This is just the PS line with no glosses - skip as sense
@@ -434,16 +558,18 @@ class MalipenseLexiconParser:
                 current_sense = SenseRaw(sense_num=None)
             
             # Extract glosses (for both senses and sub-entries)
-            gloss_fr = elem.find("div", class_="GlFr")
-            gloss_en = elem.find("div", class_="GlEn")
-            gloss_ru = elem.find("div", class_="GlRu")
+            gloss_fr = self._find_gloss_el(elem, "GlFr", allow_span=allow_span)
+            gloss_en = self._find_gloss_el(elem, "GlEn", allow_span=allow_span)
+            gloss_ru = self._find_gloss_el(elem, "GlRu", allow_span=allow_span)
             
             # Handle sub-entry blocks
             mxref = elem.find("span", class_="MXRef")
             if is_sub_entry_block or (mxref and not sense_num_span):
                 # This is a sub-entry/collocation
                 sub_text = mxref.get_text(strip=True) if mxref else ""
-                sub_nko = elem.find("div", class_="GlNko")
+                sub_nko = elem.find("div", class_="GlNko") or (
+                    elem.find("span", class_="GlNko") if allow_span else None
+                )
                 
                 current_sense.sub_entries.append({
                     "text": sub_text,
@@ -470,7 +596,7 @@ class MalipenseLexiconParser:
                         current_sense.gloss_ru = text
                 
                 # Extract examples
-                examples = self._parse_examples(elem)
+                examples = self._parse_examples(elem, allow_span=allow_span)
                 current_sense.examples.extend(examples)
                 
                 # Extract synonyms at sense level
@@ -516,7 +642,7 @@ class MalipenseLexiconParser:
             return int(match.group(1))
         return None
     
-    def _parse_examples(self, elem: Tag) -> list[ExampleRaw]:
+    def _parse_examples(self, elem: Tag, *, allow_span: bool = False) -> list[ExampleRaw]:
         """
         Parse example sentences from a sense block.
         
@@ -556,8 +682,11 @@ class MalipenseLexiconParser:
                     if next_elem.name == "span" and "SnsN" in next_elem.get("class", []):
                         break
                     
-                    if next_elem.name == "div":
-                        classes = next_elem.get("class", [])
+                    classes = next_elem.get("class", [])
+                    tag_ok = next_elem.name == "div" or (
+                        allow_span and next_elem.name == "span"
+                    )
+                    if tag_ok:
                         if "GlNko" in classes and text_nko is None:
                             text_nko = next_elem.get_text(strip=True)
                         elif "GlFr" in classes and trans_fr is None:

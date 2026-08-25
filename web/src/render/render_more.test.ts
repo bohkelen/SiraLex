@@ -11,6 +11,7 @@ function callbacks(extra: Partial<Parameters<typeof renderMore>[1]> = {}) {
     onOpenSearchFeedback: vi.fn(),
     onOpenDictionaries: vi.fn(),
     onOpenLearningData: vi.fn(),
+    onOpenSourcesCredits: vi.fn(),
     onThemeChange: vi.fn(),
     onLocaleChange: vi.fn(),
     ...extra,
@@ -52,6 +53,7 @@ describe("UX2I6A More landing renderer", () => {
       "openManageSearchFeedback",
       "openManageDictionaries",
       "openManageLearningData",
+      "openSourcesCredits",
     ]) {
       const btn = root.querySelector<HTMLButtonElement>(`#${id}`)!;
       expect(btn.tagName).toBe("BUTTON");
@@ -61,10 +63,12 @@ describe("UX2I6A More landing renderer", () => {
     root.querySelector<HTMLButtonElement>("#openManageSearchFeedback")!.click();
     root.querySelector<HTMLButtonElement>("#openManageDictionaries")!.click();
     root.querySelector<HTMLButtonElement>("#openManageLearningData")!.click();
+    root.querySelector<HTMLButtonElement>("#openSourcesCredits")!.click();
     expect(cb.onOpenCorrections).toHaveBeenCalledTimes(1);
     expect(cb.onOpenSearchFeedback).toHaveBeenCalledTimes(1);
     expect(cb.onOpenDictionaries).toHaveBeenCalledTimes(1);
     expect(cb.onOpenLearningData).toHaveBeenCalledTimes(1);
+    expect(cb.onOpenSourcesCredits).toHaveBeenCalledTimes(1);
   });
 
   it("reflects Theme options and current value", () => {

@@ -1,4 +1,5 @@
 import { buildLanguageMetaFromManifest } from "../bundle_labels";
+import { projectCreditsFromManifestJson, type StoredBundleCredits } from "../bundle_credits";
 import {
   deriveBundleAssetUrls,
   validateRemoteUrlPolicy,
@@ -61,6 +62,8 @@ export type InstallBundleMetadata = {
   displayName?: string;
   version?: string;
   storageBytes?: number;
+  /** Pre-projected source credits from manifest text (offline Credits UI). */
+  sourceCredits?: StoredBundleCredits;
   /** Catalog/language metadata when the bundle manifest omits languages. */
   languageMeta?: {
     source_lang?: string;
@@ -294,6 +297,7 @@ function buildInstalledBundleMeta(
     version: metadata?.version,
     storage_scope_id: storageScopeId,
     storage_bytes: metadata?.storageBytes ?? computeManifestPayloadBytes(manifest),
+    ...(metadata?.sourceCredits ? { source_credits: metadata.sourceCredits } : {}),
     manifest_schema_version: manifest.manifest_schema_version,
     record_schema_id: manifest.record_schema_id,
     record_schema_version: manifest.record_schema_version,
@@ -509,17 +513,20 @@ export async function installRemoteCatalogBundle(
     throw new Error(`Manifest validation failed: ${parsed.errors.join("; ")}`);
   }
 
-  const manifest = parsed.manifest;
-  if (manifest.bundle_id !== entry.bundle_id) {
+  const sourceCredits = projectCreditsFromManifestJson(manifestText) ?? undefined;
+
+  const parsedManifest = parsed.manifest;
+  if (parsedManifest.content_sha256 !== entry.content_sha256) {
     throw new Error(
-      `Catalog/manifest bundle_id mismatch: catalog=${entry.bundle_id}, manifest=${manifest.bundle_id}`,
+      `Catalog/manifest content_sha256 mismatch: catalog=${entry.content_sha256}, manifest=${parsedManifest.content_sha256}`,
     );
   }
-  if (manifest.content_sha256 !== entry.content_sha256) {
-    throw new Error(
-      `Catalog/manifest content_sha256 mismatch: catalog=${entry.content_sha256}, manifest=${manifest.content_sha256}`,
-    );
-  }
+  // Catalog `bundle_id` is the public durable identity (featured pointer / ActiveBundleMeta).
+  // Build manifests may carry an internal build id; when content hashes match, prefer catalog.
+  const manifest =
+    parsedManifest.bundle_id === entry.bundle_id
+      ? parsedManifest
+      : { ...parsedManifest, bundle_id: entry.bundle_id };
 
   const installed = await getInstalledBundleMeta(db, entry.bundle_id);
   if (installed?.expected_content_sha256 === entry.content_sha256) {
@@ -598,6 +605,7 @@ export async function installRemoteCatalogBundle(
       displayName: entry.name,
       version: entry.version,
       storageBytes: entry.size_bytes,
+      sourceCredits,
       languageMeta: entry.language_meta
         ? {
             source_lang: entry.language_meta.source_lang,

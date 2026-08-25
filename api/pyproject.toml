@@ -31,6 +31,26 @@ siralex-validate-source-index-supplements = "source_index_supplements.validate_s
 siralex-generate-source-index-supplements = "source_index_supplements.generate_supplement_records:main"
 siralex-merge-source-index-supplements = "source_index_supplements.merge_supplements_into_search_index:main"
 siralex-mine-source-index-gaps = "source_index_gap_discovery.mine_candidates:main"
+siralex-validate-corpus-sources = "corpus_sources.validate_corpus_sources:main"
+siralex-validate-corpus-artifacts = "corpus_artifacts.validate_corpus_artifacts:main"
+siralex-validate-corpus-segments = "corpus_segments.validate_corpus_segments:main"
+siralex-validate-corpus-annotations = "corpus_annotations.validate_corpus_annotations:main"
+siralex-validate-corpus-reviews = "corpus_reviews.validate_corpus_reviews:main"
+siralex-export-corpus-review-worksheet = "corpus_reviews.export_review_worksheet:main"
+siralex-corpus-review-dry-run = "corpus_reviews.dry_run_import_reviews:main"
+siralex-write-corpus-reviews = "corpus_reviews.write_corpus_reviews:main"
+siralex-malipense-version-delta = "malipense_version_delta.cli:main"
+siralex-malipense-delta-review = "malipense_version_delta.review_cli:main"
+siralex-write-malipense-delta-reviews = "malipense_version_delta.write_reviews:main"
+siralex-malipense-source-refresh-acceptance = "malipense_version_delta.source_refresh.cli:main"
+siralex-malipense-transition-review-gate = "malipense_version_delta.source_refresh.transition.cli:main"
+siralex-malipense-lexical-continuity-gate = "malipense_version_delta.source_refresh.continuity.cli:main"
+siralex-malipense-transition-review-persist = "malipense_version_delta.source_refresh.persist.cli:main"
+siralex-malipense-transition-regression-closure = "malipense_version_delta.source_refresh.transition.closure_cli:main"
+siralex-malipense-canonical-refresh-transaction = "malipense_version_delta.source_refresh.transaction.cli:main"
+siralex-product-rights-boundary = "product_boundary.cli:main"
+siralex-check-noncommercial-distribution = "distribution_compliance.cli:main"
+siralex-check-publication-readiness = "publication_readiness.cli:main"
 
 [tool.ruff]
 line-length = 100
@@ -50,6 +70,16 @@ packages = [
     "source_aliases",
     "source_index_supplements",
     "source_index_gap_discovery",
+    "corpus_sources",
+    "corpus_artifacts",
+    "corpus_segments",
+    "corpus_annotations",
+    "corpus_reviews",
+    "malipense_version_delta",
+    "product_boundary",
+    "distribution_compliance",
+    "source_registry",
+    "publication_readiness",
 ]
 
 [build-system]

@@ -210,3 +210,13 @@ Before publishing a catalog:
 3. Confirm `url_base` ends with `/`.
 4. Confirm the derived URLs for `bundle.manifest.json`, `records.jsonl`, and `search_index.jsonl` all resolve correctly.
 5. Confirm the catalog `content_sha256` matches the bundle manifest `content_sha256`.
+
+## Credits, licensing, and catalog boundaries
+
+- **Immutable bundle artifact** — a versioned directory (for example `bundle_id__contentprefix/`) containing `records.jsonl`, `search_index.jsonl`, `bundle.manifest.json`, `checksums.sha256`, and license sidecars (`ATTRIBUTION.txt`, `DATA_LICENSES.md` when enriched).
+- **Catalog entry** — metadata in `catalog.json` pointing at one immutable bundle (`bundle_id`, `url_base`, `content_sha256`, size, language labels).
+- **Active/recommended pointer** — which catalog entry the app selects (for example via `VITE_FEATURED_BUNDLE_ID` or user install choice). Changing the pointer does not rewrite prior bundle bytes.
+
+Rollback/downgrade means restoring the catalog active pointer to a previous immutable bundle, not deleting historical bundle directories.
+
+Noncommercial publication candidates carry `bundle_manifest_v2` source license metadata. After installation, users can view credits offline under **More → Credits & sources**.

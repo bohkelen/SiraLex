@@ -31,6 +31,25 @@ PLACE_MAPPING_ID = "96b72ff71179d689"
 PLACE_PRESERVED_TARGET_ID = "de6fb406453616e3"
 OWNER_SOURCE_ID = "src_siralex_lexical_review"
 PROHIBITED_SYNTHETIC_EVIDENCE_IDS = {"7e95a0d4f7f80731", "1ed4f7a94fdba41f"}
+# Last commit before CORPUS1F21 applied remapped supplements to the working tree.
+PRE_REFRESH_SUPPLEMENTS_COMMIT = "7a97fcefa05430e31cbbf2f6803af657e2dacf83"
+PRE_REFRESH_SUPPLEMENTS_PATH = (
+    "shared/source_index_supplements/source_index_supplements_v1.jsonl"
+)
+PRE_REFRESH_SUPPLEMENTS_SHA256 = (
+    "172a0e596a552a78eb3e0a5149c2abbcdd66e00a33f14babc0982ce8522ffced"
+)
+
+
+def write_git_blob(*, repo_root: Path, commit: str, rel_path: str, dest: Path) -> Path:
+    """Materialize an immutable historical blob from Git (not the mutable working tree)."""
+    payload = subprocess.check_output(
+        ["git", "show", f"{commit}:{rel_path}"],
+        cwd=repo_root,
+    )
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(payload)
+    return dest
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
@@ -870,6 +889,12 @@ def test_tracked_health_rows_validate_with_durable_assembly_only(tmp_path: Path)
     for row in health_rows:
         assert PROHIBITED_SYNTHETIC_EVIDENCE_IDS.isdisjoint(set(row["supporting_evidence_ir_ids"]))
 
+    # Remapped Malidaba supplements must not be validated against the historical
+    # published Malidaba search index (cross-edition ir_id collisions). This
+    # test's contract is owner health rows + durable baseline/owner assembly.
+    health_supplements_path = work_dir / "health_supplements.jsonl"
+    write_jsonl(health_supplements_path, health_rows)
+
     records_augmented = read_jsonl(records_augmented_path)
     records_augmented_by_id = {row["ir_id"]: row for row in records_augmented}
     for row in health_rows:
@@ -877,7 +902,7 @@ def test_tracked_health_rows_validate_with_durable_assembly_only(tmp_path: Path)
             assert evidence_id in records_augmented_by_id
 
     validation = validate_supplement_table(
-        supplements_path,
+        health_supplements_path,
         records_augmented_path,
         baseline_bundle / "search_index.jsonl",
         owner_lexical_ir_path=owner_ir_path,
@@ -886,7 +911,7 @@ def test_tracked_health_rows_validate_with_durable_assembly_only(tmp_path: Path)
     assert validation.summary["applied_supplement_count"] >= 3
 
     generated_records, generation_report = generate_supplement_records(
-        supplements_path,
+        health_supplements_path,
         records_augmented_path,
         baseline_bundle / "search_index.jsonl",
         owner_lexical_ir_path=owner_ir_path,
@@ -908,10 +933,12 @@ def test_tracked_health_rows_validate_with_durable_assembly_only(tmp_path: Path)
     assert generation_report["owner_lexical_input"]["path"] == str(owner_ir_path)
     assert generation_report["owner_lexical_input"]["row_count"] == 3
     assert set(HEALTH_TARGET_IDS).issubset(set(generation_report["owner_reviewed_target_ids"]))
-    assert "3b8c3b7a0c5e897d" in generation_report["owner_reviewed_target_ids"]
+    assert "3b8c3b7a0c5e897d" in {
+        row["ir_id"] for row in read_jsonl(owner_ir_path) if row.get("ir_kind") == "lexicon_entry"
+    }
 
     merged_rows, merge_report = merge_supplements_into_search_index(
-        supplement_table_path=supplements_path,
+        supplement_table_path=health_supplements_path,
         records_path=records_augmented_path,
         baseline_search_index_path=baseline_bundle / "search_index.jsonl",
         baseline_bundle_dir=baseline_bundle,
@@ -931,7 +958,7 @@ def test_tracked_health_rows_validate_with_durable_assembly_only(tmp_path: Path)
     assert merge_report["owner_lexical_input"]["path"] == str(owner_ir_path)
     assert merge_report["owner_lexical_input"]["row_count"] == 3
     assert set(HEALTH_TARGET_IDS).issubset(set(merge_report["owner_reviewed_target_ids"]))
-    assert "3b8c3b7a0c5e897d" in merge_report["owner_reviewed_target_ids"]
+    assert set(merge_report["owner_reviewed_target_ids"]) == set(HEALTH_TARGET_IDS)
 
     malipense_source_record_to_ir_id: dict[str, str] = {}
     for row in read_jsonl(repo_root / "data/ir/malipense_lexicon_v3.jsonl"):
@@ -1425,7 +1452,22 @@ def test_deterministic_generated_id_collision_with_unrelated_record_fails(tmp_pa
 
 def test_cumulative_phase7b_phase7d_replay_matches_current_bundle_states(tmp_path: Path):
     repo_root = Path(__file__).resolve().parents[3]
-    supplements = repo_root / "shared/source_index_supplements/source_index_supplements_v1.jsonl"
+    # Historical replay must use pre-refresh supplement targets (git blob), not the
+    # post-CORPUS1F21 remapped working-tree table.
+    historical_supplements = tmp_path / "supplements_prerefresh.jsonl"
+    write_git_blob(
+        repo_root=repo_root,
+        commit=PRE_REFRESH_SUPPLEMENTS_COMMIT,
+        rel_path=PRE_REFRESH_SUPPLEMENTS_PATH,
+        dest=historical_supplements,
+    )
+    import hashlib
+
+    assert (
+        hashlib.sha256(historical_supplements.read_bytes()).hexdigest()
+        == PRE_REFRESH_SUPPLEMENTS_SHA256
+    )
+    supplements = historical_supplements
     phase7b_bundle = repo_root / "web/public/bundle_full_20260603_d0e4f812"
     phase7d_bundle = repo_root / "web/public/bundle_full_20260606_6b8b401a"
     scoped_rows = legacy_phase7b_phase7d_rows(read_jsonl(supplements))

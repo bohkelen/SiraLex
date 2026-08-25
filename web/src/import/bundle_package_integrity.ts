@@ -39,6 +39,7 @@ export type VerifiedBundlePackage = {
 
 export type InstallEligibleSnapshot = {
   readonly manifest: BundleManifestV1;
+  readonly manifestBlob: Blob;
   readonly recordsBlob: Blob;
   readonly searchIndexBlob: Blob;
   readonly storageBytes: number;
@@ -105,12 +106,14 @@ function freezeVerifiedPackageSurface(value: VerifiedBundlePackage): VerifiedBun
 
 function createInstallEligibleSnapshot(
   manifest: BundleManifestV1,
+  manifestBlob: Blob,
   recordsBlob: Blob,
   searchIndexBlob: Blob,
   storageBytes: number,
 ): InstallEligibleSnapshot {
   return Object.freeze({
     manifest: cloneAndFreezeManifest(manifest),
+    manifestBlob,
     recordsBlob,
     searchIndexBlob,
     storageBytes,
@@ -191,6 +194,7 @@ export async function prepareVerifiedBundlePackage(file: File): Promise<Verified
     verified,
     createInstallEligibleSnapshot(
       manifest,
+      opened.manifestBlob,
       opened.recordsBlob,
       opened.searchIndexBlob,
       opened.packageMetadata.totalUncompressedBytes,

@@ -4,6 +4,7 @@
  * Adapter only — does not re-parse ZIPs, re-hash payloads, or duplicate install logic.
  */
 
+import { projectCreditsFromManifestJson } from "../bundle_credits";
 import { openSiralexDb } from "../idb/siralex_db";
 import {
   installBundleIntoDb,
@@ -40,6 +41,8 @@ export async function installVerifiedBundlePackage(
 
   const db = await openSiralexDb();
   try {
+    const manifestText = await snapshot.manifestBlob.text();
+    const sourceCredits = projectCreditsFromManifestJson(manifestText) ?? undefined;
     return await installBundleIntoDb(
       db,
       snapshot.manifest,
@@ -49,7 +52,7 @@ export async function installVerifiedBundlePackage(
       },
       () => undefined,
       undefined,
-      { storageBytes: snapshot.storageBytes },
+      { storageBytes: snapshot.storageBytes, sourceCredits },
     );
   } finally {
     db.close();

@@ -16,6 +16,7 @@ authors:
 # Licensing (verified from indexfr.htm - 2026-01-22)
 claimed_license: "CC BY-NC-SA 4.0"
 license_evidence_url: "https://www.mali-pense.net/emk/lexicon/indexfr.htm"
+license_verified_at: "2026-01-22"
 license_inference_note: |
   Verified 2026-01-22 from indexfr.htm (lexicon landing page):
   - Page explicitly states CC BY-NC-SA 4.0 license
@@ -128,9 +129,10 @@ record_identity_notes: |
   
   Canonicalization: normalize https, lowercase host, no trailing slash.
 
-# Attribution template (pending confirmation of required format)
+# Attribution template (registry-driven; wording preference confirmation still open)
 attribution_template: |
   Source: Mali-pense / Malidaba French → Maninka dictionary
-  License: CC BY-NC-SA 4.0 (pending scope confirmation)
-  URL: https://www.mali-pense.net/
+  License: CC BY-NC-SA 4.0
+  License evidence: {license_evidence_url}
+  URL: {homepage_url}
   Retrieved: {retrieved_at}

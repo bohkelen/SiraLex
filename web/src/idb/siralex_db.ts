@@ -34,12 +34,16 @@ export type BundleLanguageMeta = {
   target_scripts?: string[];
 };
 
+import type { StoredBundleCredits } from "../bundle_credits";
+
 export type ActiveBundleMeta = {
   bundle_id: string;
   display_name?: string;
   version?: string;
   storage_scope_id?: string;
   storage_bytes?: number;
+  /** Manifest-derived source credits for offline Credits / Sources UI. */
+  source_credits?: StoredBundleCredits;
   manifest_schema_version: string;
   record_schema_id: string;
   record_schema_version: string;

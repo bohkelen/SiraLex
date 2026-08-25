@@ -190,7 +190,7 @@ def test_tracked_overlay_contains_approved_mobaa_row():
 
     row = overlay.rows[0].row
     assert row["variant_id"] == "rtv_phase7n2a_0001"
-    assert row["canonical_ir_id"] == "c5f78c8ac66eac6b"
+    assert row["canonical_ir_id"] == "b5023f3908fe9ec5"
     assert row["form"] == "móbaa"
     assert normalize_nfc(row["form"]) == "móbaa"
     assert row["target_script"] == "latin"

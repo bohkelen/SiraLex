@@ -1,0 +1,16 @@
+SiraLex bundle source attribution
+==================================
+
+Source ID: src_malipense
+Title: Mali-pense / Malidaba Maninka dictionary
+URL: https://www.mali-pense.net/
+License: CC BY-NC-SA 4.0
+License evidence: https://www.mali-pense.net/emk/lexicon/indexfr.htm
+
+Source: Mali-pense / Malidaba French → Maninka dictionary
+License: CC BY-NC-SA 4.0
+License evidence: https://www.mali-pense.net/emk/lexicon/indexfr.htm
+URL: https://www.mali-pense.net/
+Retrieved: 2026-01-22
+
+Software in this repository is dual-licensed under MIT OR Apache-2.0. Lexical/data content retains source-specific licensing as declared above.
