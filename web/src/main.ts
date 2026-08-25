@@ -77,6 +77,7 @@ import {
   openDictionaryUpdateDialog,
   renderDictionaryUpdateDialog,
   renderSearchUpdateNotice,
+  resolveUpdatePresentationCopy,
 } from "./render/render_dictionary_update";
 import {
   buildQueryLogDiagnosticsContext,
@@ -746,19 +747,17 @@ function getCatalogEntryRuntimeState(entry: BundleCatalogEntryV1): {
 function getActiveFeaturedUpdateCatalogEntry(): BundleCatalogEntryV1 | undefined {
   if (!currentActiveBundle || loadedCatalogBundles.length === 0) return undefined;
   const featured = getFeaturedCatalogEntry();
-  const entry =
-    featured && featured.bundle_id === currentActiveBundle.bundle_id
-      ? featured
-      : getLoadedCatalogEntry(currentActiveBundle.bundle_id);
   if (
+    !featured ||
     !isActiveFeaturedUpdateAvailable({
       active: currentActiveBundle,
-      featuredEntry: entry,
+      featuredEntry: featured,
     })
   ) {
     return undefined;
   }
-  return entry;
+  // Install target is always the current featured catalog entry.
+  return featured;
 }
 
 function buildConsumerUpdateProgressCopy(): Partial<InstallProgressCopy> {
@@ -789,12 +788,19 @@ function mountDictionaryUpdateDialog(): void {
   dictionaryUpdateDialogEl = null;
   if (dictionaryUpdateState.phase === "idle") return;
 
+  const pending = dictionaryUpdatePendingEntry;
+  const presentation = pending
+    ? resolveUpdatePresentationCopy(pending.update_summary, pending.size_bytes, fmtBytes)
+    : undefined;
+
   const dialog = renderDictionaryUpdateDialog(
     {
       phase: dictionaryUpdateState.phase,
       progressMessage: dictionaryUpdateState.progressMessage,
       failureMessage: dictionaryUpdateState.failureMessage,
       cleanupWarning: dictionaryUpdateState.cleanupWarning,
+      updateSummary: pending?.update_summary,
+      sizeLabel: presentation?.sizeLabel,
     },
     {
       onConfirmUpdate: () => {
@@ -843,17 +849,26 @@ function refreshSearchUpdateNotice(): void {
     return;
   }
 
+  const presentation = resolveUpdatePresentationCopy(
+    updateEntry.update_summary,
+    updateEntry.size_bytes,
+    fmtBytes,
+  );
+
   dictionaryUpdateNoticeHost.hidden = false;
   dictionaryUpdateNoticeHost.appendChild(
-    renderSearchUpdateNotice({
-      onUpdate: () => {
-        openDictionaryUpdateConfirm(updateEntry);
+    renderSearchUpdateNotice(
+      {
+        onUpdate: () => {
+          openDictionaryUpdateConfirm(updateEntry);
+        },
+        onNotNow: () => {
+          dictionaryUpdateState = applyNoticeDismissed(dictionaryUpdateState);
+          refreshSearchUpdateNotice();
+        },
       },
-      onNotNow: () => {
-        dictionaryUpdateState = applyNoticeDismissed(dictionaryUpdateState);
-        refreshSearchUpdateNotice();
-      },
-    }),
+      presentation.notice,
+    ),
   );
 }
 
@@ -956,9 +971,13 @@ function renderInstalledBundleManager() {
   }
   installedBundleStatus.textContent = statusLines.join("\n");
 
+  const featuredUpdateEntry = getActiveFeaturedUpdateCatalogEntry();
   const rows = installedBundles.map((bundle) => {
     const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
     const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
+    const isActive = currentActiveBundle?.bundle_id === bundle.bundle_id;
+    const sameIdUpdate = catalogState?.comparison.state === "update_available";
+    const featuredLineageUpdate = Boolean(isActive && featuredUpdateEntry);
     return {
       bundleId: bundle.bundle_id,
       displayName: getInstalledBundleName(bundle),
@@ -966,8 +985,8 @@ function renderInstalledBundleManager() {
         ? t("catalog.meta.version", { value: bundle.version })
         : undefined,
       languageDirection: `${getLocalizedSourceLabel(bundle.language_meta)} → ${getLocalizedTargetLabel(bundle.language_meta)}`,
-      isActive: currentActiveBundle?.bundle_id === bundle.bundle_id,
-      updateAvailable: catalogState?.comparison.state === "update_available",
+      isActive,
+      updateAvailable: sameIdUpdate || featuredLineageUpdate,
     };
   });
 
@@ -1010,6 +1029,11 @@ function renderInstalledBundleManager() {
       if (!loadedCatalogUrl) return;
       const bundle = installedBundles.find((b) => b.bundle_id === bundleId);
       if (!bundle) return;
+      const featuredUpdate = getActiveFeaturedUpdateCatalogEntry();
+      if (featuredUpdate && currentActiveBundle?.bundle_id === bundle.bundle_id) {
+        openDictionaryUpdateConfirm(featuredUpdate);
+        return;
+      }
       const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
       const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
       if (!catalogEntry || catalogState?.comparison.state !== "update_available") return;

@@ -1,4 +1,8 @@
 import type { ActiveBundleMeta } from "./idb/siralex_db";
+import {
+  normalizeUpdateSummary,
+  type DictionaryUpdateSummaryV1,
+} from "./dictionary_update/dictionary_update_summary";
 
 export type BundleCatalogLanguageMeta = {
   source_lang?: string;
@@ -15,6 +19,10 @@ export type BundleCatalogEntryV1 = {
   url_base: string;
   content_sha256: string;
   language_meta?: BundleCatalogLanguageMeta;
+  /** Optional PRODUCT2E update copy (outside immutable release payload). */
+  update_summary?: DictionaryUpdateSummaryV1;
+  release_artifact_fingerprint?: string;
+  release_artifact_dir_name?: string;
 };
 
 export type BundleCatalogV1 = {
@@ -217,6 +225,9 @@ export function parseAndValidateBundleCatalogJson(text: string): BundleCatalogVa
 
       if (bundle_id && name && url_base && content_sha256 && size_bytes !== undefined) {
         const language_meta = normalizeLanguageMeta(entry);
+        const update_summary = normalizeUpdateSummary(entry["update_summary"]);
+        const release_artifact_fingerprint = getString(entry, "release_artifact_fingerprint");
+        const release_artifact_dir_name = getString(entry, "release_artifact_dir_name");
         bundles.push({
           bundle_id,
           name,
@@ -225,6 +236,9 @@ export function parseAndValidateBundleCatalogJson(text: string): BundleCatalogVa
           url_base,
           content_sha256,
           language_meta,
+          update_summary,
+          release_artifact_fingerprint,
+          release_artifact_dir_name,
         });
       }
     }

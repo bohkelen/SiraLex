@@ -28,6 +28,31 @@ describe("DU1 dictionary update presentation", () => {
     expect(onNotNow).toHaveBeenCalled();
   });
 
+  it("renders confirmation with catalog update summary when provided", () => {
+    const dialog = renderDictionaryUpdateDialog(
+      {
+        phase: "confirming",
+        progressMessage: "",
+        updateSummary: {
+          short_summary: "Refreshed entries and broader search coverage.",
+          highlights: ["Offline Credits & Sources"],
+        },
+        sizeLabel: "Download size: about 31 MB",
+      },
+      {
+        onConfirmUpdate: vi.fn(),
+        onCancel: vi.fn(),
+        onRetry: vi.fn(),
+        onContinue: vi.fn(),
+        onCloseFailure: vi.fn(),
+      },
+    );
+    expect(dialog.textContent).toContain("Refreshed entries and broader search coverage.");
+    expect(dialog.textContent).toContain("Offline Credits & Sources");
+    expect(dialog.textContent).toContain("31 MB");
+    expect(dialog.textContent).not.toMatch(/sha256|bundle_id|IndexedDB/i);
+  });
+
   it("renders confirmation with retained-data explanation", () => {
     const dialog = renderDictionaryUpdateDialog(
       { phase: "confirming", progressMessage: "" },

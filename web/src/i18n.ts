@@ -145,7 +145,8 @@ const MESSAGES = {
     "dictionaryUpdate.availableTitle": "Dictionary update available",
     "dictionaryUpdate.availableBody":
       "A newer version of the French / English ↔ Maninka dictionary is available. Updating replaces the dictionary files stored on this device.\n\nYour saved words, review progress, corrections, and search feedback will be kept.",
-    "dictionaryUpdate.availableBodyShort": "Improved dictionary data is ready.",
+    "dictionaryUpdate.availableBodyShort":
+      "An updated Maninka dictionary is available with refreshed dictionary entries, broader search coverage, and a new offline Credits & Sources section.",
     "dictionaryUpdate.newVersionAvailable": "New version available",
     "dictionaryUpdate.action": "Update dictionary",
     "dictionaryUpdate.actionShort": "Update",
@@ -155,7 +156,8 @@ const MESSAGES = {
     "dictionaryUpdate.confirmBody":
       "Dictionary files on this device will be replaced with the newer version. Your saved words, review progress, corrections, and search feedback will be kept.\n\nIf the update cannot be completed, your current dictionary stays available.",
     "dictionaryUpdate.whatsUpdated":
-      "Updates may include new words, improved translations, corrected entries, and improved search coverage.",
+      "An updated Maninka dictionary is available with refreshed dictionary entries, broader search coverage, and a new offline Credits & Sources section.",
+    "dictionaryUpdate.downloadSize": "Download size: about {size}",
     "dictionaryUpdate.progressTitle": "Updating dictionary",
     "dictionaryUpdate.progress.preparing": "Preparing update…",
     "dictionaryUpdate.progress.downloading": "Downloading new dictionary…",
@@ -165,7 +167,7 @@ const MESSAGES = {
     "dictionaryUpdate.progress.cleanup": "Removing old dictionary files…",
     "dictionaryUpdate.successTitle": "Dictionary updated",
     "dictionaryUpdate.successBody":
-      "The latest dictionary is ready to use.\nThe previous dictionary files were removed.\nYour saved vocabulary and local feedback were kept.",
+      "The latest dictionary is ready to use.\nYour saved vocabulary and local feedback were kept.",
     "dictionaryUpdate.cleanupWarning":
       "Update completed, but storage cleanup could not finish. Cleanup will be retried automatically.",
     "dictionaryUpdate.failureTitle": "Update couldn't be completed.",
@@ -968,7 +970,8 @@ const MESSAGES = {
     "dictionaryUpdate.availableTitle": "Mise à jour du dictionnaire disponible",
     "dictionaryUpdate.availableBody":
       "Une version plus récente du dictionnaire français / anglais ↔ maninka est disponible. La mise à jour remplace les fichiers du dictionnaire stockés sur cet appareil.\n\nVos mots enregistrés, votre progression de révision, vos corrections et vos retours de recherche seront conservés.",
-    "dictionaryUpdate.availableBodyShort": "Des données de dictionnaire améliorées sont prêtes.",
+    "dictionaryUpdate.availableBodyShort":
+      "Une mise à jour du dictionnaire maninka est disponible, avec des entrées rafraîchies, une meilleure couverture de recherche et une section Crédits et sources hors ligne.",
     "dictionaryUpdate.newVersionAvailable": "Nouvelle version disponible",
     "dictionaryUpdate.action": "Mettre à jour le dictionnaire",
     "dictionaryUpdate.actionShort": "Mettre à jour",
@@ -978,7 +981,8 @@ const MESSAGES = {
     "dictionaryUpdate.confirmBody":
       "Les fichiers du dictionnaire sur cet appareil seront remplacés par la version plus récente. Vos mots enregistrés, votre progression de révision, vos corrections et vos retours de recherche seront conservés.\n\nSi la mise à jour ne peut pas aboutir, votre dictionnaire actuel reste disponible.",
     "dictionaryUpdate.whatsUpdated":
-      "Les mises à jour peuvent inclure de nouveaux mots, de meilleures traductions, des entrées corrigées et une meilleure couverture de recherche.",
+      "Une mise à jour du dictionnaire maninka est disponible, avec des entrées rafraîchies, une meilleure couverture de recherche et une section Crédits et sources hors ligne.",
+    "dictionaryUpdate.downloadSize": "Taille du téléchargement : environ {size}",
     "dictionaryUpdate.progressTitle": "Mise à jour du dictionnaire",
     "dictionaryUpdate.progress.preparing": "Préparation de la mise à jour…",
     "dictionaryUpdate.progress.downloading": "Téléchargement du nouveau dictionnaire…",
@@ -988,7 +992,7 @@ const MESSAGES = {
     "dictionaryUpdate.progress.cleanup": "Suppression des anciens fichiers du dictionnaire…",
     "dictionaryUpdate.successTitle": "Dictionnaire mis à jour",
     "dictionaryUpdate.successBody":
-      "La dernière version du dictionnaire est prête.\nLes fichiers précédents du dictionnaire ont été supprimés.\nVotre vocabulaire enregistré et vos retours locaux ont été conservés.",
+      "La dernière version du dictionnaire est prête.\nVotre vocabulaire enregistré et vos retours locaux ont été conservés.",
     "dictionaryUpdate.cleanupWarning":
       "La mise à jour est terminée, mais le nettoyage du stockage n’a pas pu aboutir. Il sera réessayé automatiquement.",
     "dictionaryUpdate.failureTitle": "La mise à jour n’a pas pu aboutir.",

@@ -58,6 +58,19 @@
       "content_sha256": "sha256:dfd5ba62514caa72f9e282d16160ded01c26164c5c982fd6d164b78b6f7aeb33",
       "release_artifact_fingerprint": "sha256:51c38a75d5a663caf591d27b1b73da9b7ddc3776c7c96ff724deeaca4b078838",
       "release_artifact_dir_name": "bundle_noncommercial_dfd5ba62__51c38a75",
+      "update_summary": {
+        "schema_version": "dictionary_update_summary_v1",
+        "title": "Dictionary update available",
+        "short_summary": "An updated Maninka dictionary is available with refreshed dictionary entries, broader search coverage, and a new offline Credits & Sources section.",
+        "highlights": [
+          "Refreshed dictionary entries from the Mali-pense / Malidaba source",
+          "Broader searchable coverage",
+          "Offline Credits & Sources for the included dictionary data",
+          "Packaged for noncommercial use under CC BY-NC-SA 4.0"
+        ],
+        "size_bytes": 32805591,
+        "applies_from_bundle_ids": ["bundle_full_20260710_337619ff"]
+      },
       "languages": {
         "source_lang": "fr",
         "target_lang": "mnk"

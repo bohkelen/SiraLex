@@ -270,4 +270,41 @@ describe("Phase 4.1 update semantics", () => {
       contentMatches: false,
     });
   });
+
+  it("accepts optional update_summary without breaking entries that omit it", () => {
+    const withSummary = parseAndValidateBundleCatalogJson(
+      JSON.stringify({
+        catalog_schema_version: "bundle_catalog_v1",
+        bundles: [
+          {
+            bundle_id: "with_notes",
+            name: "With notes",
+            size_bytes: 10,
+            url_base: "./a/",
+            content_sha256: "sha256:aaa",
+            update_summary: {
+              schema_version: "dictionary_update_summary_v1",
+              short_summary: "Refreshed entries and broader search.",
+              highlights: ["Offline Credits"],
+              size_bytes: 10,
+            },
+            unknown_future_field: "ignored",
+          },
+          {
+            bundle_id: "without_notes",
+            name: "Without notes",
+            size_bytes: 11,
+            url_base: "./b/",
+            content_sha256: "sha256:bbb",
+          },
+        ],
+      }),
+    );
+    expect(withSummary.ok).toBe(true);
+    const noted = withSummary.catalog!.bundles.find((b) => b.bundle_id === "with_notes");
+    const plain = withSummary.catalog!.bundles.find((b) => b.bundle_id === "without_notes");
+    expect(noted?.update_summary?.short_summary).toBe("Refreshed entries and broader search.");
+    expect(noted?.update_summary?.highlights).toEqual(["Offline Credits"]);
+    expect(plain?.update_summary).toBeUndefined();
+  });
 });

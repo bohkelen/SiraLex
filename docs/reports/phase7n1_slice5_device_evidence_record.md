@@ -6,6 +6,8 @@
 **Package identity report:** `docs/reports/phase7n1r1_featured_release_candidate_package_report.md`
 **Rule:** do not mark any scenario `passed` without tester, device, date, observed result, and evidence reference
 
+**PRODUCT2E-A governance note (2026-08-25):** Repository featured is now `bundle_noncommercial_dfd5ba62` (PRODUCT2D). The Phase 7N1R1 package below remains **valid historical evidence** for the bytes it wraps (`bundle_full_20260710_337619ff`) and is classified **`HISTORICAL_PHASE7N1R1_DEVICE_VALIDATION_CANDIDATE`**. It is **not** the current featured product package. No device row below was changed; matrix remains `not_run` / 0%. Catalog/Netlify update (PRODUCT2E) is a separate distribution route and does not satisfy this gate.
+
 ---
 
 ## Record metadata
@@ -15,7 +17,7 @@
 | Evidence record ID | `phase7n1_slice5_evidence_20260628_001` |
 | Protocol version | Slice 5A (package manual-install route) |
 | Record opened | 2026-06-28 |
-| Last updated | 2026-07-23 (Phase 7N1R1 — retarget primary candidate to featured 7N2B) |
+| Last updated | 2026-08-25 (PRODUCT2E-A — reclassify R1 package as historical vs current featured; device rows unchanged) |
 | Maintainer | |
 | Overall matrix status | `not_run` |
 
@@ -23,13 +25,14 @@
 
 ## Candidate identity (fill before device runs)
 
-| Field | Primary candidate | Replacement candidate (scenario B) |
+| Field | Primary candidate (historical Phase 7N1R1) | Replacement candidate (scenario B) |
 |---|---|---|
-| Status | `recorded` | `not_run` |
-| Provenance | Phase 7N1R1: deterministic STORED-ZIP transport envelope around current featured logical bundle `bundle_full_20260710_337619ff`. Records, index, manifest identity, and content hash were not regenerated or altered. | |
-| Featured catalog `bundle_id` | `bundle_full_20260710_337619ff` | |
-| Featured catalog `content_sha256` | `sha256:337619ff43131acde1390d7892d687372785729dac5d85abe82b61cc92285c3c` | |
-| Featured catalog version | `norm-v3-featured-7n2b4g11-7l13-7n2a8-7n2b9-runtime-smoke-pass` | |
+| Status | `recorded` (historical) | `not_run` |
+| Classification | `HISTORICAL_PHASE7N1R1_DEVICE_VALIDATION_CANDIDATE` | |
+| Provenance | Phase 7N1R1: deterministic STORED-ZIP transport envelope around the **then-featured** logical bundle `bundle_full_20260710_337619ff`. Records, index, manifest identity, and content hash were not regenerated or altered. After PRODUCT2D that bundle is previous featured / rollback, not current featured. | |
+| Catalog `bundle_id` at R1 time | `bundle_full_20260710_337619ff` | |
+| Catalog `content_sha256` at R1 time | `sha256:337619ff43131acde1390d7892d687372785729dac5d85abe82b61cc92285c3c` | |
+| Catalog version at R1 time | `norm-v3-featured-7n2b4g11-7l13-7n2a8-7n2b9-runtime-smoke-pass` | |
 | git commit | `6ce089186a79fb970c2fd519a0bae8895f4a59a8` | |
 | branch | `feat/phase-2.0.5-offline-pwa` | |
 | build date (local) | 2026-07-23 18:08:25 EDT | |
@@ -50,7 +53,7 @@
 | package reproducibility check | `cmp` byte-identical rebuild PASS (2026-07-23); both builds SHA-256 `sha256:f27530705132bf0fb81628f129d49d985b8456b63734bfbb93a966ded7c143b0` | |
 | Published to catalog? | no (transport artifact only; wraps existing featured bundle) | no |
 
-**Build command reference (exact — official primary candidate):**
+**Build command reference (exact — historical Phase 7N1R1 primary candidate):**
 
 ```bash
 pip install -e ./api
@@ -77,13 +80,13 @@ cmp -s \
   "$CANDIDATE_ROOT/packages/bundle_full_20260710_337619ff.rebuild.siralex.zip"
 ```
 
-**Retired / non-official identities (do not use for remaining Phase 7N1 device evidence):**
+**Retired / non-current identities:**
 
-- Historical Slice 5 primary package wrapping Phase 7J `bundle_full_20260616_phase7j_alias_round2_candidate` (`sha256:d8273a18b739b8f0c165335dd104f944cb4079ed826a54f43b28d77ba26f7903`) — superseded by Phase 7N1R1 because featured product is now 7N2B.
-- Engineering-only transport-smoke artifact `bundle_full_20260628_5098763f` — not product-equivalent to featured.
+- Historical Slice 5 primary package wrapping Phase 7J `bundle_full_20260616_phase7j_alias_round2_candidate` (`sha256:d8273a18b739b8f0c165335dd104f944cb4079ed826a54f43b28d77ba26f7903`) — superseded by Phase 7N1R1.
+- Engineering-only transport-smoke artifact `bundle_full_20260628_5098763f` — not product-equivalent.
+- Phase 7N1R1 package **`bundle_full_20260710_337619ff.siralex.zip`** / **`sha256:f27530705132bf0fb81628f129d49d985b8456b63734bfbb93a966ded7c143b0`** — remains valid historical wrap of prior featured / rollback bundle; **not** current featured after PRODUCT2D.
 
-Official primary release candidate for all remaining Phase 7N1 work: **`bundle_full_20260710_337619ff.siralex.zip`** / **`sha256:f27530705132bf0fb81628f129d49d985b8456b63734bfbb93a966ded7c143b0`**.
-
+**Current featured manual-package resumption (PRODUCT2E-A):** If Phase 7N1 device validation resumes against the **current** featured dictionary, first build and record a **new** deterministic `.siralex.zip` from authorized public release `web/public/bundle_noncommercial_dfd5ba62__51c38a75/` (catalog id `bundle_noncommercial_dfd5ba62`), with new filename/SHA/byte length/build commit/source identity. Do not create that package in PRODUCT2E-A. Do not mark any matrix row `passed` without real-device evidence.
 ---
 
 ## Environment run header (copy per session)

@@ -6,6 +6,8 @@
 
 import { t } from "../i18n";
 import type { DictionaryUpdateConsumerPhase } from "../dictionary_update/dictionary_update_consumer_state";
+import type { DictionaryUpdateSummaryV1 } from "../dictionary_update/dictionary_update_summary";
+import { formatUpdateSizeLabel } from "../dictionary_update/dictionary_update_summary";
 
 function el(tag: string, cls?: string, text?: string): HTMLElement {
   const e = document.createElement(tag);
@@ -14,22 +16,44 @@ function el(tag: string, cls?: string, text?: string): HTMLElement {
   return e;
 }
 
+export type SearchUpdateNoticeCopy = {
+  title?: string;
+  bodyShort?: string;
+  sizeLabel?: string;
+};
+
 export type SearchUpdateNoticeCallbacks = {
   onUpdate(): void;
   onNotNow(): void;
 };
 
 /** Non-blocking Search notice when a featured dictionary update is available. */
-export function renderSearchUpdateNotice(callbacks: SearchUpdateNoticeCallbacks): HTMLElement {
+export function renderSearchUpdateNotice(
+  callbacks: SearchUpdateNoticeCallbacks,
+  copy?: SearchUpdateNoticeCopy,
+): HTMLElement {
   const root = el("aside", "ux2-dict-update-notice");
   root.setAttribute("role", "status");
   root.setAttribute("aria-labelledby", "dictionary-update-notice-title");
   root.dataset.testid = "dictionary-update-notice";
 
-  const title = el("h3", "ux2-dict-update-notice-title", t("dictionaryUpdate.availableTitle"));
+  const title = el(
+    "h3",
+    "ux2-dict-update-notice-title",
+    copy?.title ?? t("dictionaryUpdate.availableTitle"),
+  );
   title.id = "dictionary-update-notice-title";
   root.appendChild(title);
-  root.appendChild(el("p", "ux2-dict-update-notice-body", t("dictionaryUpdate.availableBodyShort")));
+  root.appendChild(
+    el(
+      "p",
+      "ux2-dict-update-notice-body",
+      copy?.bodyShort ?? t("dictionaryUpdate.availableBodyShort"),
+    ),
+  );
+  if (copy?.sizeLabel) {
+    root.appendChild(el("p", "ux2-dict-update-notice-size", copy.sizeLabel));
+  }
 
   const actions = el("div", "ux2-dict-update-notice-actions");
   const updateBtn = document.createElement("button");
@@ -63,6 +87,9 @@ export type DictionaryUpdateDialogModel = {
   progressMessage: string;
   failureMessage?: string;
   cleanupWarning?: string;
+  /** Optional catalog/app release summary for confirm phase. */
+  updateSummary?: DictionaryUpdateSummaryV1;
+  sizeLabel?: string;
 };
 
 /**
@@ -79,12 +106,26 @@ export function renderDictionaryUpdateDialog(
   dialog.dataset.phase = model.phase;
 
   if (model.phase === "confirming") {
-    const title = el("h2", "ux2-dict-update-dialog-title", t("dictionaryUpdate.confirmTitle"));
+    const titleText = model.updateSummary?.title ?? t("dictionaryUpdate.confirmTitle");
+    const title = el("h2", "ux2-dict-update-dialog-title", titleText);
     title.id = "dictionary-update-dialog-title";
     title.tabIndex = -1;
     dialog.appendChild(title);
     dialog.appendChild(el("p", "ux2-dict-update-dialog-body", t("dictionaryUpdate.confirmBody")));
-    dialog.appendChild(el("p", "ux2-dict-update-dialog-help", t("dictionaryUpdate.whatsUpdated")));
+    const whats =
+      model.updateSummary?.short_summary ?? t("dictionaryUpdate.whatsUpdated");
+    dialog.appendChild(el("p", "ux2-dict-update-dialog-help", whats));
+    if (model.updateSummary?.highlights?.length) {
+      const list = document.createElement("ul");
+      list.className = "ux2-dict-update-dialog-highlights";
+      for (const item of model.updateSummary.highlights) {
+        list.appendChild(el("li", undefined, item));
+      }
+      dialog.appendChild(list);
+    }
+    if (model.sizeLabel) {
+      dialog.appendChild(el("p", "ux2-dict-update-dialog-size", model.sizeLabel));
+    }
 
     const actions = el("div", "ux2-dict-update-dialog-actions");
     const confirmBtn = document.createElement("button");
@@ -203,4 +244,24 @@ export function closeDictionaryUpdateDialog(dialog: HTMLDialogElement | null | u
     dialog.removeAttribute("open");
   }
   dialog.remove();
+}
+
+/** Resolve notice/dialog copy from an optional catalog update_summary. */
+export function resolveUpdatePresentationCopy(
+  summary: DictionaryUpdateSummaryV1 | undefined,
+  sizeBytes: number | undefined,
+  fmtBytes: (n?: number) => string,
+): { notice: SearchUpdateNoticeCopy; sizeLabel?: string } {
+  const sizeLabel = formatUpdateSizeLabel(summary?.size_bytes ?? sizeBytes, fmtBytes);
+  const sizeLine = sizeLabel
+    ? t("dictionaryUpdate.downloadSize", { size: sizeLabel })
+    : undefined;
+  return {
+    notice: {
+      title: summary?.title,
+      bodyShort: summary?.short_summary ?? t("dictionaryUpdate.availableBodyShort"),
+      sizeLabel: sizeLine,
+    },
+    sizeLabel: sizeLine,
+  };
 }

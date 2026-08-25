@@ -1,13 +1,25 @@
 # Phase 7N1R1 — Featured Release Candidate Package
 
+> **PRODUCT2E-A supersession (2026-08-25):** This report remains the durable record of the
+> Phase 7N1R1 package build. Classification now:
+> **`HISTORICAL_PHASE7N1R1_DEVICE_VALIDATION_CANDIDATE`**.
+> It wraps then-featured `bundle_full_20260710_337619ff` (now previous featured / rollback).
+> Repository featured after PRODUCT2D is `bundle_noncommercial_dfd5ba62`. Statements below that
+> say “current featured” or “only primary identity for remaining 7N1 work” are **true of R1
+> time**, not of post-PRODUCT2D repository state. Device matrix evidence was never executed
+> (`not_run`). A new package must be built before validating current featured via the manual route.
+
 ## Decision
 
 ```text
 FEATURED_RELEASE_PACKAGE_READY
 ```
 
+*(Decision at R1 time: package ready for then-featured 7N2B. Not a claim that the package
+remains current-featured after PRODUCT2D.)*
+
 One immutable primary release-candidate `.siralex.zip` was generated from the
-current featured bundle directory, verified, and recorded. Deterministic
+then-featured bundle directory, verified, and recorded. Deterministic
 rebuild produced a byte-identical archive with the same package SHA-256.
 Product behavior, catalog, bundle payloads, runtime, installer, verifier,
 search, lexical data, and package format were not modified.
@@ -76,7 +88,7 @@ siralex-build-bundle package \
 
 ---
 
-## 4. Release-candidate package identity (immutable for remaining 7N1)
+## 4. Release-candidate package identity (immutable R1 record)
 
 | Field | Value |
 |---|---|
@@ -90,8 +102,11 @@ siralex-build-bundle package \
 | Entries | `bundle.manifest.json`, `records.jsonl`, `search_index.jsonl` |
 | Published to catalog? | no (transport artifact only) |
 
-This is the **only** primary release-candidate identity for remaining Phase 7N1
-device work. Do not mint additional primary candidates.
+At R1 time this was the only primary release-candidate identity for remaining
+Phase 7N1 device work against then-featured 7N2B. After PRODUCT2D, treat it as
+**historical** for that wrapped identity; do not retarget it as current-featured
+`bundle_noncommercial_dfd5ba62`. Current-featured manual validation requires a
+**new** recorded package (not created in PRODUCT2E-A).
 
 ---
 

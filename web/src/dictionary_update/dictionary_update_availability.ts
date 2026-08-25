@@ -1,8 +1,11 @@
 /**
- * DU1 — Pure update-availability helpers for the consumer dictionary update UX.
+ * PRODUCT2E — Featured dictionary update availability (same-id hash + lineage change).
  *
- * Detection rule (canonical):
- * same logical bundle_id AND installed content_sha256 != catalog content_sha256.
+ * Same-id rule (DU1):
+ *   active.bundle_id === featured.bundle_id AND content hashes differ.
+ *
+ * Featured lineage rule (PRODUCT2E):
+ *   active.bundle_id !== featured.bundle_id → update available to the featured bundle.
  */
 
 import {
@@ -16,6 +19,8 @@ export type InstalledBundleIdentity = Pick<
   ActiveBundleMeta,
   "bundle_id" | "expected_content_sha256"
 >;
+
+export type FeaturedUpdateKind = "same_id_content" | "featured_lineage" | "none";
 
 export function getDictionaryUpdateComparison(
   entry: BundleCatalogEntryV1,
@@ -32,17 +37,29 @@ export function isDictionaryUpdateAvailable(
 }
 
 /**
- * True when the active installed dictionary is the featured/catalog logical id
- * and a newer catalog content hash is available.
+ * True when the active installed dictionary should be offered an update to the
+ * current featured catalog entry.
  */
 export function isActiveFeaturedUpdateAvailable(args: {
   active?: InstalledBundleIdentity;
   featuredEntry?: BundleCatalogEntryV1;
 }): boolean {
+  return getFeaturedUpdateKind(args) !== "none";
+}
+
+export function getFeaturedUpdateKind(args: {
+  active?: InstalledBundleIdentity;
+  featuredEntry?: BundleCatalogEntryV1;
+}): FeaturedUpdateKind {
   const { active, featuredEntry } = args;
-  if (!active || !featuredEntry) return false;
-  if (active.bundle_id !== featuredEntry.bundle_id) return false;
-  return isDictionaryUpdateAvailable(featuredEntry, active);
+  if (!active || !featuredEntry) return "none";
+  if (active.bundle_id !== featuredEntry.bundle_id) {
+    return "featured_lineage";
+  }
+  if (isDictionaryUpdateAvailable(featuredEntry, active)) {
+    return "same_id_content";
+  }
+  return "none";
 }
 
 /**

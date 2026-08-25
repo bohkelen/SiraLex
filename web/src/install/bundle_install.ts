@@ -515,17 +515,18 @@ export async function installRemoteCatalogBundle(
 
   const sourceCredits = projectCreditsFromManifestJson(manifestText) ?? undefined;
 
-  const manifest = parsed.manifest;
-  if (manifest.bundle_id !== entry.bundle_id) {
+  const parsedManifest = parsed.manifest;
+  if (parsedManifest.content_sha256 !== entry.content_sha256) {
     throw new Error(
-      `Catalog/manifest bundle_id mismatch: catalog=${entry.bundle_id}, manifest=${manifest.bundle_id}`,
+      `Catalog/manifest content_sha256 mismatch: catalog=${entry.content_sha256}, manifest=${parsedManifest.content_sha256}`,
     );
   }
-  if (manifest.content_sha256 !== entry.content_sha256) {
-    throw new Error(
-      `Catalog/manifest content_sha256 mismatch: catalog=${entry.content_sha256}, manifest=${manifest.content_sha256}`,
-    );
-  }
+  // Catalog `bundle_id` is the public durable identity (featured pointer / ActiveBundleMeta).
+  // Build manifests may carry an internal build id; when content hashes match, prefer catalog.
+  const manifest =
+    parsedManifest.bundle_id === entry.bundle_id
+      ? parsedManifest
+      : { ...parsedManifest, bundle_id: entry.bundle_id };
 
   const installed = await getInstalledBundleMeta(db, entry.bundle_id);
   if (installed?.expected_content_sha256 === entry.content_sha256) {

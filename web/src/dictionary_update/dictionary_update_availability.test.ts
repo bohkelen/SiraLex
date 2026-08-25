@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DICTIONARY_REINSTALL_POLICY,
   getDictionaryUpdateComparison,
+  getFeaturedUpdateKind,
   isActiveFeaturedUpdateAvailable,
   isDictionaryUpdateAvailable,
 } from "./dictionary_update_availability";
@@ -21,6 +22,8 @@ import {
 const BUNDLE_ID = "bundle_full_20260710_337619ff";
 const OLD_HASH = "sha256:337619ff43131acde1390d7892d687372785729dac5d85abe82b61cc92285c3c";
 const NEW_HASH = "sha256:d076558b2f668a06a5a30a143026433e9e0de3523e0397183cfd897b2641d90a";
+const FEATURED_LINEAGE_ID = "bundle_noncommercial_dfd5ba62";
+const FEATURED_HASH = "sha256:dfd5ba62514caa72f9e282d16160ded01c26164c5c982fd6d164b78b6f7aeb33";
 
 const catalogEntry = {
   bundle_id: BUNDLE_ID,
@@ -29,6 +32,15 @@ const catalogEntry = {
   size_bytes: 1,
   url_base: "./x/",
   content_sha256: NEW_HASH,
+};
+
+const featuredLineageEntry = {
+  bundle_id: FEATURED_LINEAGE_ID,
+  name: "Noncommercial",
+  version: "1",
+  size_bytes: 32_805_591,
+  url_base: "./bundle_noncommercial_dfd5ba62__51c38a75/",
+  content_sha256: FEATURED_HASH,
 };
 
 describe("DU1 dictionary update availability", () => {
@@ -54,23 +66,51 @@ describe("DU1 dictionary update availability", () => {
     ).toBe(false);
   });
 
-  it("requires active featured identity match for search notice eligibility", () => {
+  it("offers featured update for same-id hash change and for featured lineage change", () => {
     expect(
       isActiveFeaturedUpdateAvailable({
         active: { bundle_id: BUNDLE_ID, expected_content_sha256: OLD_HASH },
         featuredEntry: catalogEntry,
       }),
     ).toBe(true);
+    expect(getFeaturedUpdateKind({
+      active: { bundle_id: BUNDLE_ID, expected_content_sha256: OLD_HASH },
+      featuredEntry: catalogEntry,
+    })).toBe("same_id_content");
+
     expect(
       isActiveFeaturedUpdateAvailable({
         active: { bundle_id: BUNDLE_ID, expected_content_sha256: NEW_HASH },
         featuredEntry: catalogEntry,
       }),
     ).toBe(false);
+
     expect(
       isActiveFeaturedUpdateAvailable({
-        active: { bundle_id: "other", expected_content_sha256: OLD_HASH },
-        featuredEntry: catalogEntry,
+        active: { bundle_id: BUNDLE_ID, expected_content_sha256: NEW_HASH },
+        featuredEntry: featuredLineageEntry,
+      }),
+    ).toBe(true);
+    expect(
+      getFeaturedUpdateKind({
+        active: { bundle_id: BUNDLE_ID, expected_content_sha256: NEW_HASH },
+        featuredEntry: featuredLineageEntry,
+      }),
+    ).toBe("featured_lineage");
+
+    expect(
+      isActiveFeaturedUpdateAvailable({
+        active: { bundle_id: FEATURED_LINEAGE_ID, expected_content_sha256: FEATURED_HASH },
+        featuredEntry: featuredLineageEntry,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not treat missing active/featured as an update", () => {
+    expect(isActiveFeaturedUpdateAvailable({})).toBe(false);
+    expect(
+      isActiveFeaturedUpdateAvailable({
+        featuredEntry: featuredLineageEntry,
       }),
     ).toBe(false);
   });
