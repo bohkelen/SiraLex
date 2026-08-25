@@ -17,7 +17,10 @@ class Product2Paths:
     receipt_path: Path
     authorization_worksheet: Path
     authorization_worksheet_v2: Path
+    authorization_packet_v2: Path
+    authorization_packet_v2_txt: Path
     product2b_receipt_path: Path
+    product2c_remediation_receipt_path: Path
     proposed_catalog_entry: Path
     internal_records: Path
     internal_search: Path
@@ -48,7 +51,11 @@ def default_paths(repo_root: Path | None = None) -> Product2Paths:
         receipt_path=workspace / "siralex_publication_readiness_v1.json",
         authorization_worksheet=workspace / "publication_authorization_worksheet_v1.json",
         authorization_worksheet_v2=workspace / "publication_authorization_worksheet_v2.json",
+        authorization_packet_v2=workspace / "publication_authorization_packet_v2.json",
+        authorization_packet_v2_txt=workspace / "publication_authorization_packet_v2.txt",
         product2b_receipt_path=workspace / "siralex_product2b_exact_byte_identity_receipt_v1.json",
+        product2c_remediation_receipt_path=workspace
+        / "siralex_product2c_freeze_order_remediation_receipt_v1.json",
         proposed_catalog_entry=workspace / "proposed_catalog_entry_v1.json",
         internal_records=internal / "records.jsonl",
         internal_search=internal / "search_index.jsonl",

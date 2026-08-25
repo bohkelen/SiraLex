@@ -42,6 +42,24 @@
 
 ---
 
+## PRODUCT2C-R1 — Finalize-before-seal repair
+
+**Root cause:** `evaluate_product2` wrote authorization worksheet v2 from sealed hashes, then mutated `bundle.manifest.json` (`publication_state` → `PUBLICATION_READY`) inside the frozen directory. That changed release artifact bytes after identity computation, leaving worksheet / directory name / disk bytes incoherent.
+
+**Repair:** Final distributed `publication_state` is set **before** release hashing. Order is now:
+
+1. build candidate + sidecars
+2. finalize manifest (`PUBLICATION_READY`, `publication_authorized=false`)
+3. hash all six distributed files → `release_artifact_fingerprint`
+4. move to `{semantic_bundle_id}__{release_prefix8}`
+5. seal (marker; distributed writes refused)
+6. run gates / regressions against sealed bytes
+7. write worksheet v2 + receipts + authorization packet from sealed evidence only
+
+**Invariant:** `post_seal_distributed_mutations = 0`. Historical incoherent snapshots remain under `data/product2/_superseded_incoherent_pre_freeze_order_fix/` as audit evidence and authorize nothing.
+
+---
+
 ## 1. Decision
 
 **PRODUCT2_PUBLICATION_READINESS_READY**

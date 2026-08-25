@@ -15,14 +15,11 @@ from distribution_compliance.manifest import write_bundle_license_sidecars
 
 from .identity import (
     RELEASE_DISTRIBUTED_FILES,
-    collect_distributed_file_hashes,
-    compute_release_artifact_fingerprint,
-    deterministic_semantic_bundle_id,
     identity_from_frozen_bundle,
     list_present_distributed_files,
-    release_artifact_dir_name,
 )
 from .manifest import enrich_manifest_for_publication_readiness
+from .seal import assert_not_sealed, snapshot_distributed_hashes, write_seal_marker
 
 
 def _commit_release_artifact_directory(
@@ -30,8 +27,6 @@ def _commit_release_artifact_directory(
     source_dir: Path,
     final_dir: Path,
     release_artifact_fingerprint: str,
-    bundle_id: str,
-    semantic_content_sha256: str,
 ) -> Path:
     """Move staged bundle into release-specific immutable directory."""
     if final_dir.exists():
@@ -64,8 +59,9 @@ def freeze_release_candidate(
     """
     Materialize immutable release-candidate bundle directory.
 
-    Uses semantic bundle_id from payload hash and release-specific physical
-    directory from release_artifact_fingerprint.
+    Finalization boundary:
+      build → finalize_manifest (FINAL publication_state) → hash →
+      name release dir → seal → never mutate distributed bytes again.
     """
     if output_parent.exists():
         shutil.rmtree(output_parent)
@@ -99,6 +95,7 @@ def freeze_release_candidate(
         lexical_language="mnk",
         lookup_languages=["fr", "en", "mnk"],
     )
+    # build_bundle may place under build_parent or a nested dir depending on versioning
     bundle_dir = Path(build_result["bundle_dir"])
 
     for name in sidecars:
@@ -106,6 +103,8 @@ def freeze_release_candidate(
         if src.is_file():
             shutil.copy2(src, bundle_dir / name)
 
+    # FINALIZE MANIFEST before any release hash / directory naming.
+    assert_not_sealed(bundle_dir, target="bundle.manifest.json")
     manifest_path = bundle_dir / "bundle.manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if search_key_count is not None:
@@ -122,13 +121,26 @@ def freeze_release_candidate(
     )
     write_json(manifest_path, enriched)
 
+    # HASH → NAME → COMMIT TO IMMUTABLE DIR → SEAL
     identity = identity_from_frozen_bundle(bundle_dir)
     final_dir = _commit_release_artifact_directory(
         source_dir=bundle_dir,
         final_dir=output_parent / identity["release_artifact_dir_name"],
         release_artifact_fingerprint=identity["release_artifact_fingerprint"],
-        bundle_id=identity["semantic_bundle_id"],
-        semantic_content_sha256=identity["semantic_content_sha256"],
+    )
+
+    # Recompute from final path (post-move) before sealing.
+    sealed_identity = identity_from_frozen_bundle(final_dir)
+    if (
+        sealed_identity["release_artifact_fingerprint"]
+        != identity["release_artifact_fingerprint"]
+    ):
+        raise RuntimeError(
+            "release fingerprint changed after commit to immutable directory"
+        )
+    write_seal_marker(
+        final_dir,
+        release_artifact_fingerprint=sealed_identity["release_artifact_fingerprint"],
     )
 
     verification = verify_bundle(final_dir)
@@ -139,20 +151,24 @@ def freeze_release_candidate(
             shutil.rmtree(path)
 
     return {
-        "semantic_bundle_id": identity["semantic_bundle_id"],
-        "semantic_content_sha256": identity["semantic_content_sha256"],
-        "semantic_candidate_fingerprint": identity["semantic_candidate_fingerprint"],
-        "release_artifact_fingerprint": identity["release_artifact_fingerprint"],
-        "release_artifact_dir_name": identity["release_artifact_dir_name"],
-        # Backward-compatible receipt fields
-        "bundle_id": identity["semantic_bundle_id"],
-        "content_sha256": identity["semantic_content_sha256"],
-        "candidate_fingerprint": identity["semantic_candidate_fingerprint"],
-        "artifact_dir_name": identity["release_artifact_dir_name"],
+        "semantic_bundle_id": sealed_identity["semantic_bundle_id"],
+        "semantic_content_sha256": sealed_identity["semantic_content_sha256"],
+        "semantic_candidate_fingerprint": sealed_identity["semantic_candidate_fingerprint"],
+        "release_artifact_fingerprint": sealed_identity["release_artifact_fingerprint"],
+        "release_artifact_dir_name": sealed_identity["release_artifact_dir_name"],
+        "bundle_id": sealed_identity["semantic_bundle_id"],
+        "content_sha256": sealed_identity["semantic_content_sha256"],
+        "candidate_fingerprint": sealed_identity["semantic_candidate_fingerprint"],
+        "artifact_dir_name": sealed_identity["release_artifact_dir_name"],
         "bundle_dir": str(final_dir),
-        "file_hashes": identity["distributed_file_hashes"],
+        "file_hashes": sealed_identity["distributed_file_hashes"],
+        "sealed_hashes_snapshot": snapshot_distributed_hashes(
+            sealed_identity["distributed_file_hashes"]
+        ),
         "verification": verification,
         "manifest": enriched,
+        "publication_state_in_manifest": publication_state,
         "distributed_files": list_present_distributed_files(final_dir),
         "distributed_files_contract": list(RELEASE_DISTRIBUTED_FILES),
+        "sealed": True,
     }
