@@ -971,7 +971,7 @@ const MESSAGES = {
     "dictionaryUpdate.availableBody":
       "Une version plus récente du dictionnaire français / anglais ↔ maninka est disponible. La mise à jour remplace les fichiers du dictionnaire stockés sur cet appareil.\n\nVos mots enregistrés, votre progression de révision, vos corrections et vos retours de recherche seront conservés.",
     "dictionaryUpdate.availableBodyShort":
-      "Une mise à jour du dictionnaire maninka est disponible, avec des entrées rafraîchies, une meilleure couverture de recherche et une section Crédits et sources hors ligne.",
+      "Une mise à jour du dictionnaire maninka est disponible, avec des entrées actualisées, une couverture de recherche élargie et une nouvelle section Crédits et sources accessible hors ligne.",
     "dictionaryUpdate.newVersionAvailable": "Nouvelle version disponible",
     "dictionaryUpdate.action": "Mettre à jour le dictionnaire",
     "dictionaryUpdate.actionShort": "Mettre à jour",
@@ -981,7 +981,7 @@ const MESSAGES = {
     "dictionaryUpdate.confirmBody":
       "Les fichiers du dictionnaire sur cet appareil seront remplacés par la version plus récente. Vos mots enregistrés, votre progression de révision, vos corrections et vos retours de recherche seront conservés.\n\nSi la mise à jour ne peut pas aboutir, votre dictionnaire actuel reste disponible.",
     "dictionaryUpdate.whatsUpdated":
-      "Une mise à jour du dictionnaire maninka est disponible, avec des entrées rafraîchies, une meilleure couverture de recherche et une section Crédits et sources hors ligne.",
+      "Une mise à jour du dictionnaire maninka est disponible, avec des entrées actualisées, une couverture de recherche élargie et une nouvelle section Crédits et sources accessible hors ligne.",
     "dictionaryUpdate.downloadSize": "Taille du téléchargement : environ {size}",
     "dictionaryUpdate.progressTitle": "Mise à jour du dictionnaire",
     "dictionaryUpdate.progress.preparing": "Préparation de la mise à jour…",

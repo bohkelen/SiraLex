@@ -799,7 +799,7 @@ function mountDictionaryUpdateDialog(): void {
       progressMessage: dictionaryUpdateState.progressMessage,
       failureMessage: dictionaryUpdateState.failureMessage,
       cleanupWarning: dictionaryUpdateState.cleanupWarning,
-      updateSummary: pending?.update_summary,
+      resolvedSummary: presentation?.resolved,
       sizeLabel: presentation?.sizeLabel,
     },
     {
@@ -972,6 +972,13 @@ function renderInstalledBundleManager() {
   installedBundleStatus.textContent = statusLines.join("\n");
 
   const featuredUpdateEntry = getActiveFeaturedUpdateCatalogEntry();
+  const featuredUpdateHelp = featuredUpdateEntry
+    ? resolveUpdatePresentationCopy(
+        featuredUpdateEntry.update_summary,
+        featuredUpdateEntry.size_bytes,
+        fmtBytes,
+      ).resolved.short_summary
+    : undefined;
   const rows = installedBundles.map((bundle) => {
     const catalogEntry = getLoadedCatalogEntry(bundle.bundle_id);
     const catalogState = catalogEntry ? getCatalogEntryRuntimeState(catalogEntry) : undefined;
@@ -987,6 +994,7 @@ function renderInstalledBundleManager() {
       languageDirection: `${getLocalizedSourceLabel(bundle.language_meta)} → ${getLocalizedTargetLabel(bundle.language_meta)}`,
       isActive,
       updateAvailable: sameIdUpdate || featuredLineageUpdate,
+      updateHelpText: isActive && (sameIdUpdate || featuredLineageUpdate) ? featuredUpdateHelp : undefined,
     };
   });
 

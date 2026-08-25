@@ -4,10 +4,14 @@
  * Presentation only: does not install or open IndexedDB.
  */
 
-import { t } from "../i18n";
+import { getCurrentLocale, t } from "../i18n";
 import type { DictionaryUpdateConsumerPhase } from "../dictionary_update/dictionary_update_consumer_state";
 import type { DictionaryUpdateSummaryV1 } from "../dictionary_update/dictionary_update_summary";
-import { formatUpdateSizeLabel } from "../dictionary_update/dictionary_update_summary";
+import {
+  formatUpdateSizeLabel,
+  resolveDictionaryUpdateSummary,
+  type ResolvedDictionaryUpdateSummary,
+} from "../dictionary_update/dictionary_update_summary";
 
 function el(tag: string, cls?: string, text?: string): HTMLElement {
   const e = document.createElement(tag);
@@ -87,8 +91,8 @@ export type DictionaryUpdateDialogModel = {
   progressMessage: string;
   failureMessage?: string;
   cleanupWarning?: string;
-  /** Optional catalog/app release summary for confirm phase. */
-  updateSummary?: DictionaryUpdateSummaryV1;
+  /** Locale-resolved release summary for confirm phase. */
+  resolvedSummary?: ResolvedDictionaryUpdateSummary;
   sizeLabel?: string;
 };
 
@@ -106,19 +110,19 @@ export function renderDictionaryUpdateDialog(
   dialog.dataset.phase = model.phase;
 
   if (model.phase === "confirming") {
-    const titleText = model.updateSummary?.title ?? t("dictionaryUpdate.confirmTitle");
+    const titleText = t("dictionaryUpdate.confirmTitle");
     const title = el("h2", "ux2-dict-update-dialog-title", titleText);
     title.id = "dictionary-update-dialog-title";
     title.tabIndex = -1;
     dialog.appendChild(title);
     dialog.appendChild(el("p", "ux2-dict-update-dialog-body", t("dictionaryUpdate.confirmBody")));
     const whats =
-      model.updateSummary?.short_summary ?? t("dictionaryUpdate.whatsUpdated");
+      model.resolvedSummary?.short_summary ?? t("dictionaryUpdate.whatsUpdated");
     dialog.appendChild(el("p", "ux2-dict-update-dialog-help", whats));
-    if (model.updateSummary?.highlights?.length) {
+    if (model.resolvedSummary?.highlights?.length) {
       const list = document.createElement("ul");
       list.className = "ux2-dict-update-dialog-highlights";
-      for (const item of model.updateSummary.highlights) {
+      for (const item of model.resolvedSummary.highlights) {
         list.appendChild(el("li", undefined, item));
       }
       dialog.appendChild(list);
@@ -246,20 +250,29 @@ export function closeDictionaryUpdateDialog(dialog: HTMLDialogElement | null | u
   dialog.remove();
 }
 
-/** Resolve notice/dialog copy from an optional catalog update_summary. */
+/** Resolve notice/dialog copy from catalog update_summary using the active UI locale. */
 export function resolveUpdatePresentationCopy(
   summary: DictionaryUpdateSummaryV1 | undefined,
   sizeBytes: number | undefined,
   fmtBytes: (n?: number) => string,
-): { notice: SearchUpdateNoticeCopy; sizeLabel?: string } {
-  const sizeLabel = formatUpdateSizeLabel(summary?.size_bytes ?? sizeBytes, fmtBytes);
+): {
+  notice: SearchUpdateNoticeCopy;
+  sizeLabel?: string;
+  resolved: ResolvedDictionaryUpdateSummary;
+} {
+  const resolved = resolveDictionaryUpdateSummary(summary, getCurrentLocale(), {
+    title: t("dictionaryUpdate.availableTitle"),
+    short_summary: t("dictionaryUpdate.availableBodyShort"),
+  });
+  const sizeLabel = formatUpdateSizeLabel(resolved.size_bytes ?? sizeBytes, fmtBytes);
   const sizeLine = sizeLabel
     ? t("dictionaryUpdate.downloadSize", { size: sizeLabel })
     : undefined;
   return {
+    resolved,
     notice: {
-      title: summary?.title,
-      bodyShort: summary?.short_summary ?? t("dictionaryUpdate.availableBodyShort"),
+      title: resolved.title,
+      bodyShort: resolved.short_summary,
       sizeLabel: sizeLine,
     },
     sizeLabel: sizeLine,

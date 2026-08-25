@@ -61,12 +61,20 @@
       "update_summary": {
         "schema_version": "dictionary_update_summary_v1",
         "title": "Dictionary update available",
+        "title_fr": "Mise à jour du dictionnaire disponible",
         "short_summary": "An updated Maninka dictionary is available with refreshed dictionary entries, broader search coverage, and a new offline Credits & Sources section.",
+        "short_summary_fr": "Une mise à jour du dictionnaire maninka est disponible, avec des entrées actualisées, une couverture de recherche élargie et une nouvelle section Crédits et sources accessible hors ligne.",
         "highlights": [
           "Refreshed dictionary entries from the Mali-pense / Malidaba source",
           "Broader searchable coverage",
           "Offline Credits & Sources for the included dictionary data",
           "Packaged for noncommercial use under CC BY-NC-SA 4.0"
+        ],
+        "highlights_fr": [
+          "Entrées de dictionnaire actualisées à partir de la source Mali-pense / Malidaba",
+          "Couverture de recherche élargie",
+          "Crédits et sources hors ligne pour les données du dictionnaire incluses",
+          "Conditionné pour un usage non commercial sous licence CC BY-NC-SA 4.0"
         ],
         "size_bytes": 32805591,
         "applies_from_bundle_ids": ["bundle_full_20260710_337619ff"]

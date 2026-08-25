@@ -73,11 +73,12 @@ describe("PRODUCT2E featured lineage update", () => {
     await deleteSiralexDb().catch(() => undefined);
   });
 
-  it("catalog exposes update_summary for the featured noncommercial release", () => {
+  it("catalog exposes bilingual update_summary for the featured noncommercial release", () => {
     const entry = loadCatalogEntry(NEW_ID);
     expect(entry.update_summary?.short_summary).toMatch(/Credits|Sources|search/i);
+    expect(entry.update_summary?.short_summary_fr).toMatch(/Crédits|sources|recherche/i);
     expect(entry.update_summary?.applies_from_bundle_ids).toContain(OLD_ID);
-    expect(normalizeUpdateSummary(entry.update_summary)?.short_summary).toBeTruthy();
+    expect(normalizeUpdateSummary(entry.update_summary)?.short_summary_fr).toBeTruthy();
   });
 
   it("new user (no install) is not shown an out-of-date update notice", () => {

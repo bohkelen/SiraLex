@@ -285,7 +285,9 @@ describe("Phase 4.1 update semantics", () => {
             update_summary: {
               schema_version: "dictionary_update_summary_v1",
               short_summary: "Refreshed entries and broader search.",
+              short_summary_fr: "Entrées actualisées et recherche élargie.",
               highlights: ["Offline Credits"],
+              highlights_fr: ["Crédits hors ligne"],
               size_bytes: 10,
             },
             unknown_future_field: "ignored",
@@ -304,7 +306,9 @@ describe("Phase 4.1 update semantics", () => {
     const noted = withSummary.catalog!.bundles.find((b) => b.bundle_id === "with_notes");
     const plain = withSummary.catalog!.bundles.find((b) => b.bundle_id === "without_notes");
     expect(noted?.update_summary?.short_summary).toBe("Refreshed entries and broader search.");
+    expect(noted?.update_summary?.short_summary_fr).toBe("Entrées actualisées et recherche élargie.");
     expect(noted?.update_summary?.highlights).toEqual(["Offline Credits"]);
+    expect(noted?.update_summary?.highlights_fr).toEqual(["Crédits hors ligne"]);
     expect(plain?.update_summary).toBeUndefined();
   });
 });

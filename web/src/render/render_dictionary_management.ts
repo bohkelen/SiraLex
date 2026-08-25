@@ -20,6 +20,8 @@ export type InstalledDictionaryRowModel = {
   languageDirection: string;
   isActive: boolean;
   updateAvailable: boolean;
+  /** Locale-resolved release summary when an update is offered. */
+  updateHelpText?: string;
 };
 
 export type InstalledDictionaryListCallbacks = {
@@ -81,7 +83,13 @@ export function renderInstalledDictionaryRow(
     const updateState = el("div", "ux2-dict-row-update", t("dictionaryUpdate.newVersionAvailable"));
     updateState.setAttribute("role", "status");
     main.appendChild(updateState);
-    main.appendChild(el("p", "ux2-dict-row-update-help", t("dictionaryUpdate.whatsUpdated")));
+    main.appendChild(
+      el(
+        "p",
+        "ux2-dict-row-update-help",
+        row.updateHelpText ?? t("dictionaryUpdate.whatsUpdated"),
+      ),
+    );
   }
   main.appendChild(el("p", "ux2-dict-row-retain", t("dictionaries.savedDataRetained")));
 

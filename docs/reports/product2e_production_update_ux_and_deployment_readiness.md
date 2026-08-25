@@ -2,13 +2,15 @@
 
 ## 1. Decision
 
-**PRODUCT2E_PRODUCTION_UPDATE_UX_AND_DEPLOYMENT_READY**
+**PRODUCT2E_PRODUCTION_UPDATE_UX_AND_DEPLOYMENT_READY** (implementation gate)
 
-*(Superseded for commit status by PRODUCT2E-A: see commit message / return block
-`PRODUCT2E_PRODUCTION_UPDATE_UX_COMMITTED` when committed.)*
+Finalization commit decision is recorded after PRODUCT2E-A2:
+**PRODUCT2E_PRODUCTION_UPDATE_UX_COMMITTED** when localization + governance
+reconciliation are committed (core UX landed in `b414fec`; A1 locale fields in the
+follow-up commit).
 
 Existing-user featured-lineage update detection and consumer UX are implemented,
-release notes are derived from a measured public-bundle delta, production
+release notes are derived from a measured public-bundle delta (EN/FR), production
 `web/dist` was built and verified, and Netlify deployment was **not** performed.
 
 ## 2. Repository vs production state
@@ -79,7 +81,7 @@ Source audit (not lexical truth): `data/product2e/release_delta.json` (gitignore
 | Metric | Old (`…337619ff`) | New (`…dfd5ba62`) |
 |--------|-------------------|-------------------|
 | records / ir_ids | 19335 | 22199 (net +2864; +8906/−6042) |
-| distinct `preferred_form` string values (record field) | 17927 | 20634 |
+| distinct `preferred_form` values (`preferred_form_values`) | 17927 | 20634 |
 | search index lines | 147178 | 174700 |
 | unique search keys | 62849 | 75095 (+12508/−262) |
 | approx size | ~29.8 MB | ~32.8 MB |
@@ -87,10 +89,13 @@ Source audit (not lexical truth): `data/product2e/release_delta.json` (gitignore
 | manifest schema | v1 | v2 (Credits/Sources projectable) |
 | owner review rows | 7 | 0 (Malidaba-only noncommercial) |
 
-**Metric naming note:** `preferred_form` distinct-value counts above are **not** the same
-measurement as publication-candidate `headwords` (e.g. PRODUCT2 readiness
-`headwords: 10148` / `lexicon_entries: 11694`), which come from build/IR
-accounting. Do not equate the two labels.
+**Metric definition — `preferred_form_values`:** count of distinct non-empty
+`preferred_form` string fields across `records.jsonl` lines. This is a PRODUCT2E
+delta audit statistic only.
+
+**Not the same as** publication-candidate **canonical unique published headwords**
+(`headwords: 10148`) or `lexicon_entries: 11694` from PRODUCT2 readiness / IR
+build accounting. Do not treat 20634 as the canonical unique published headword count.
 
 Categories:
 
@@ -101,9 +106,23 @@ Categories:
 
 ## 8. User-facing release summary
 
+English:
+
 > An updated Maninka dictionary is available with refreshed dictionary entries, broader search coverage, and a new offline Credits & Sources section.
 
-Carried in catalog `update_summary` (outside sealed six files) and i18n fallbacks.
+French (same measured facts):
+
+> Une mise à jour du dictionnaire maninka est disponible, avec des entrées actualisées, une couverture de recherche élargie et une nouvelle section Crédits et sources accessible hors ligne.
+
+Carried in catalog `update_summary` / `short_summary_fr` (+ `highlights_fr`) outside sealed six files, with matching i18n fallbacks.
+
+### PRODUCT2E-A1 localization repair
+
+**Defect:** English-only catalog `update_summary` overrode French i18n, so FR UI chrome mixed with English release body.
+
+**Fix:** Additive `title_fr` / `short_summary_fr` / `highlights_fr` (nested `{en,fr}` also accepted). Shared `resolveDictionaryUpdateSummary(summary, locale, i18n)` used by Search notice, confirm dialog, and Dictionaries update help.
+
+**Fallback:** FR = catalog_fr → i18n → catalog_en; EN = catalog_en → i18n.
 
 ## 9. Update UI implementation
 
