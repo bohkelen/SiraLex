@@ -109,7 +109,21 @@ def simulate_catalog_addition(
 
     artifact_name = proposed_entry["url_base"].strip("./").rstrip("/")
     dest = simulation_dir / artifact_name
-    shutil.copytree(candidate_bundle_dir, dest)
+    if dest.exists():
+        # Already published into catalog: require byte-identical release, do not overwrite.
+        from .identity import identity_from_frozen_bundle
+
+        existing_fp = identity_from_frozen_bundle(dest)["release_artifact_fingerprint"]
+        candidate_fp = identity_from_frozen_bundle(candidate_bundle_dir)[
+            "release_artifact_fingerprint"
+        ]
+        if existing_fp != candidate_fp:
+            errors.append(
+                "simulation destination already exists with different release "
+                f"fingerprint: existing={existing_fp!r} candidate={candidate_fp!r}"
+            )
+    else:
+        shutil.copytree(candidate_bundle_dir, dest)
 
     release_dir = proposed_entry.get("release_artifact_dir_name")
     release_specific_path = release_dir == artifact_name if release_dir else True
@@ -121,8 +135,14 @@ def simulate_catalog_addition(
     sim_catalog_path = simulation_dir / "catalog.json"
     sim_catalog = load_catalog(sim_catalog_path)
     bundles = list(sim_catalog.get("bundles") or [])
-    bundles.append(proposed_entry)
-    sim_catalog["bundles"] = sorted(bundles, key=lambda b: (b.get("name", ""), b.get("bundle_id", "")))
+    existing_ids = {
+        b.get("bundle_id") for b in bundles if isinstance(b, dict) and b.get("bundle_id")
+    }
+    if proposed_entry.get("bundle_id") not in existing_ids:
+        bundles.append(proposed_entry)
+    sim_catalog["bundles"] = sorted(
+        bundles, key=lambda b: (b.get("name", ""), b.get("bundle_id", ""))
+    )
     sim_catalog_path.write_text(json.dumps(sim_catalog, indent=2) + "\n", encoding="utf-8")
 
     # Validate addressability
